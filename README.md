@@ -1,52 +1,75 @@
-# Rust Coreutils Switch
+# oxidizr-arch Scaffolding (Arch + AUR)
 
-A Rust library and CLI tool for abstracting over different coreutils implementations (GNU coreutils and uutils).
+A Rust scaffolding for safely switching Arch Linux core utilities (e.g., coreutils) to Rust-based replacements (e.g., uutils) using Pacman/AUR, inspired by oxidizr. This project is intentionally non-destructive and leaves real system calls as TODOs behind a `Worker` abstraction.
 
-## Features
+See `TECHNICAL_IMPLEMENTATION.md` for the complete design and checklist.
 
-- Switch between GNU coreutils and uutils implementations at runtime
-- Unified interface for common core utilities
-- Easy to extend with additional implementations
+## Features (Scaffold)
 
-## Installation
+- Arch Linux focused ("rolling") compatibility gate.
+- Experiment model for families (e.g., `coreutils`).
+- AUR-friendly configuration (package/helper overridable).
+- Idempotent enable/disable flows via symlink strategy (implemented via `Worker` stubs).
+
+## Install (Local Build)
 
 ```bash
 cargo install --path .
 ```
 
-## Usage
+This installs the binary `coreutils-switch`.
 
-### As a Library
+## CLI Usage
 
-```rust
-use rust_coreutils_switch::{create_core_util, CoreUtilsImpl};
-
-// Create a GNU ls command
-let ls = create_core_util("ls", CoreUtilsImpl::Gnu);
-ls.execute(&["-la".to_string()]).unwrap();
-
-// Create a uutils ls command
-let ls = create_core_util("ls", CoreUtilsImpl::Uutils);
-ls.execute(&["-la".to_string()]).unwrap();
-```
-
-### As a CLI Tool
+Commands:
 
 ```bash
-# List available commands
-coreutils-switch list
+# Check compatibility with the current system (expects Arch/rolling in scaffold)
+coreutils-switch check
 
-# Execute a command using GNU coreutils
-coreutils-switch exec ls -la
+# List target paths that would be affected (computed via which() fallback)
+coreutils-switch list-targets
 
-# Execute a command using uutils
-coreutils-switch --uutils exec ls -la
+# Enable (install package + symlink swap-in) — scaffold does not perform real system ops yet
+coreutils-switch enable
+
+# Disable (restore backups + remove package) — scaffold does not perform real system ops yet
+coreutils-switch disable
 ```
 
-## Requirements
+Common flags:
 
-- Rust 1.60 or later
-- GNU coreutils or uutils installed on your system
+```bash
+# Override package/helper/paths
+coreutils-switch \
+  --experiment coreutils \
+  --package uutils-coreutils \
+  --aur-helper paru \
+  --bin-dir /usr/lib/uutils/coreutils \
+  --unified-binary /usr/bin/coreutils \
+  enable
+
+# Skip update step
+coreutils-switch --no-update enable
+
+# Skip confirmations (to be implemented)
+coreutils-switch --assume-yes enable
+```
+
+Defaults for `--experiment coreutils`:
+
+- `package`: `uutils-coreutils`
+- `bin-dir`: `/usr/lib/uutils/coreutils`
+- `unified-binary`: `/usr/bin/coreutils`
+- compatibility: `Arch` + `rolling`
+
+## Library Status
+
+The `core` module is a placeholder. The intended extension surface is via `experiment` (switch orchestration) and `worker` (system operations). Implement `Worker` with real Arch logic to make the tool functional.
+
+## Development
+
+Read `TECHNICAL_IMPLEMENTATION.md` for the Arch/AUR plan, including safety requirements, idempotence, backups, and atomic restore behavior.
 
 ## License
 
