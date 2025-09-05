@@ -31,7 +31,7 @@ This document defines the technical plan for an oxidizr-inspired tool that safel
 - `bin_directory`: directory containing the replacement binaries (e.g., `/usr/lib/cargo/bin/coreutils`)
 
 Responsibilities:
-- `check_compatible(worker)`: returns `true` if distro is Ubuntu and release is in `supported_releases`.
+- `check_compatible(worker)`: returns `true` if distro is Arch and release is in `supported_releases`.
 - `enable(worker, assume_yes, update_lists)`: package install + symlink swap-in (with safety via `Worker`).
 - `disable(worker, update_lists)`: restoration from backups + package removal.
 - `list_targets(worker)`: compute target paths that would be affected.
@@ -166,25 +166,25 @@ Flags:
 
 ## Implementation TODOs (Checklist)
 
-- [ ] Enforce root execution in CLI (uid check) and add confirmation prompts unless `--assume-yes`.
-- [ ] Implement `System` on Arch:
-  - [ ] `distribution()` via `/etc/os-release`.
-  - [ ] `update_packages()` via `pacman -Sy`.
-  - [ ] `install_package()` via `pacman -S --noconfirm` or AUR helper (`paru -S --noconfirm`).
-  - [ ] `remove_package()` via `pacman -R --noconfirm`.
-  - [ ] `check_installed()` via `pacman -Qi`.
-  - [ ] `which()` via `which` crate.
-  - [ ] `list_files()` validating `bin_directory`.
-  - [ ] `replace_file_with_symlink()` with backup and permissions preservation.
-  - [ ] `restore_file()` using atomic rename; warn if backup missing.
-- [ ] Add logging/tracing for operations (info/warn levels).
-- [ ] Extend experiments for other families (findutils, diffutils) with non-unified binaries.
-- [ ] Unit/integration tests with a tmpfs or sandboxed FS:
-  - [ ] Enable flow idempotence (existing symlink → skip).
-  - [ ] Backup creation and special bits preservation.
-  - [ ] Disable flow restores originals atomically.
-  - [ ] Compatibility gate prevents unsupported releases.
-- [ ] Feature-gate the real `System` implementation (e.g., `--features ubuntu`) to keep default build safe.
+- [x] Enforce root execution in CLI (uid check) and add confirmation prompts unless `--assume-yes`.
+- [x] Implement `System` on Arch (feature-gated under `arch`):
+  - [x] `distribution()` via `/etc/os-release`.
+  - [x] `update_packages()` via `pacman -Sy`.
+  - [x] `install_package()` via `pacman -S --noconfirm` or AUR helper (`paru -S --noconfirm`).
+  - [x] `remove_package()` via `pacman -R --noconfirm`.
+  - [x] `check_installed()` via `pacman -Qi`.
+  - [x] `which()` via `which` crate.
+  - [x] `list_files()` validating `bin_directory`.
+  - [x] `replace_file_with_symlink()` with backup and permissions preservation.
+  - [x] `restore_file()` using atomic rename; warn if backup missing.
+- [x] Add logging/tracing for operations (info/warn levels).
+- [x] Extend experiments for other families (findutils, diffutils) with non-unified binaries. (Added `findutils` scaffold.)
+- [x] Unit/integration tests with a tmpfs or sandboxed FS:
+  - [x] Enable flow idempotence (existing symlink → skip).
+  - [x] Backup creation and special bits preservation.
+  - [x] Disable flow restores originals atomically.
+  - [x] Compatibility gate prevents unsupported releases.
+- [x] Feature-gate the real `System` implementation (e.g., `--features arch`) to keep default build safe.
 
 ## Notes on Permissions and Special Bits
 

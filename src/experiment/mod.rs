@@ -26,7 +26,7 @@ impl UutilsExperiment {
     pub fn enable<W: Worker>(&self, worker: &W, _assume_yes: bool, update_lists: bool) -> Result<()> {
         // Safety gates
         if !self.check_compatible(worker)? {
-            return Err(CoreutilsError::Incompatible("Unsupported Ubuntu release".into()));
+            return Err(CoreutilsError::Incompatible("Unsupported Arch release".into()));
         }
         if update_lists { log::info!("Updating package lists..."); worker.update_packages()?; }
         // In real impl, verify root and confirm unless assume_yes
