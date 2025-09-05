@@ -1,0 +1,29 @@
+summary: Disable only coreutils under a German locale, leaving sudo-rs enabled
+execute: |
+  set -euo pipefail
+  source "$(dirname "$0")/../lib/uutils.sh"
+  source "$(dirname "$0")/../lib/sudo-rs.sh"
+
+  # Enable German locale (Ubuntu style)
+  if grep -q '^# *de_DE.UTF-8 UTF-8' /etc/locale.gen; then
+    sudo sed -i 's/^# *\(de_DE.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+    sudo locale-gen
+  fi
+  export LC_ALL=de_DE.UTF-8
+  export LANGUAGE=de_DE.UTF-8
+  export LANG=de_DE.UTF-8
+
+  oxidizr enable --yes
+  oxidizr disable --yes --experiments coreutils
+
+  # Reset to English for assertions
+  export LC_ALL=en_GB.UTF-8
+  export LANGUAGE=en_GB.UTF-8
+  export LANG=en_GB.UTF-8
+
+  ensure_coreutils_absent
+  ensure_sudors_installed
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr disable --yes --all || true
+  fi

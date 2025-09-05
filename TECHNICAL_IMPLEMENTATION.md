@@ -2,23 +2,23 @@ Here’s a deep-dive of every file in src at commit 132c889d, with responsibilit
 
 ## Project requirements compliance (current repository: rust_coreutils_switch)
 
-This repository is a scaffold inspired by the referenced implementation but targets an Arch-like environment (AUR helpers, pacman) rather than Ubuntu. Based on the current sources under `src/`:
+This repository is a scaffold inspired by the referenced implementation and it targets an Arch environment (AUR helpers, pacman) rather than Ubuntu. Based on the current sources under `src/`:
 
 - Files present: `src/main.rs`, `src/lib.rs`, `src/cli.rs`, `src/error.rs`, `src/experiment/`, `src/worker/`, `src/core/`
 - Files absent (from the referenced deep-dive): `src/experiments/mod.rs`, `src/experiments/uutils.rs`, `src/experiments/sudors.rs`, `src/utils/mod.rs`, `src/utils/command.rs`, `src/utils/worker.rs`, `src/utils/worker_mock.rs`
 
 Compliance overview:
 
-- CLI entrypoint exists: `src/main.rs` and `src/cli.rs` provide argument parsing with `clap`, root checks, prompts, and subcommands `Enable|Disable|Check|ListTargets`. Partially compliant with described behavior but tailored to Arch (`paru`/`yay`) rather than apt-based systems.
+- CLI entrypoint exists: `src/main.rs` and `src/cli.rs` provide argument parsing with `clap`, root checks, prompts, and subcommands `Enable|Disable|Check|ListTargets`. Partially compliant with described behavior and tailored to Arch (`pacman` for repo packages and `paru`/`yay` for AUR) rather than apt-based systems.
 - Experiment abstraction: Present as `src/experiment` (singular) with a `UutilsExperiment` scaffold. Missing multi-experiment registry and type-erased enum (`Experiment`) that unifies uutils families and `sudo-rs`.
 - System/Worker abstraction: Present under `src/worker` but not split into `utils` with `command.rs` and `worker.rs` as in the deep-dive; mock worker is not present behind `#[cfg(test)]` in this repo.
-- Distro gating: The scaffold assumes a "rolling" release and Arch-like environment; the Ubuntu gating and release allow-list from the deep-dive is not implemented.
+- Distro gating: The scaffold assumes a "rolling" Arch environment; compatibility gating must validate Arch specifically (id "arch", release "rolling") with an override flag to skip checks.
 - Utilities/helpers: `utils::vecs_eq`, `utils::command`, and the exact backup/symlink semantics from the deep-dive are not present. Backup/restore behavior should be verified in `worker` once aligned.
-- Tests: The testing requirements doc `TESTING_REQUIREMENTS.MD` is currently empty, and there is no integrated `utils::worker_mock`-style test harness. Unit tests in `src/lib.rs` are minimal and do not cover enable/disable flows.
+- Tests: The testing requirements doc `TESTING_REQUIREMENTS.MD` is present and should reflect Arch semantics (pacman/AUR). An integrated `utils::worker_mock`-style test harness is recommended. Unit tests in `src/lib.rs` are minimal and do not cover enable/disable flows.
 
-Conclusion: The project is a functional scaffold but does not yet meet the full requirements and structure defined in the referenced technical implementation. Key gaps are the experiments registry, utils/worker split (with command wrapper, backup/symlink semantics), mock-based tests, and Ubuntu-based compatibility gating.
+Conclusion: The project is a functional scaffold but does not yet meet the full requirements and structure defined in the referenced technical implementation. Key gaps are the experiments registry, utils/worker split (with command wrapper, backup/symlink semantics), mock-based tests, and Arch-based compatibility gating refinements.
 
-## Migration plan to match the technical implementation structure
+## Migration plan to match the technical implementation structure (Arch)
 
 Objective: Align `rust_coreutils_switch` to the structure and behaviors described in this document while keeping Arch support as a configurable variant.
 
@@ -37,9 +37,12 @@ Step-by-step plan:
    - Update `src/lib.rs` to export `experiments` and `utils` modules and re-exports used by `cli` and tests.
 
 2) Behavior alignment
-   - Implement Ubuntu compatibility gating as default behavior (per deep-dive) with an override flag to skip checks. Preserve Arch support by parameterizing package operations via `Worker` implementations or feature flags:
-     - For apt-based systems (Ubuntu): use `apt-get` commands and `dpkg-query` for `check_installed`.
-     - For Arch-based systems: use `pacman`/AUR helper commands. Choose at runtime based on `Distribution.id` or via a `--package-manager` flag.
+  - Implement Arch compatibility gating as default behavior with an override flag to skip checks:
+    - By default, require `distribution().id == "arch"` and `release == "rolling"`.
+    - When `--no-compatibility-check` is set, proceed regardless of distro info (emit a warning).
+  - Package operations: use `pacman` and optionally an AUR helper (`paru`/`yay`) via configuration or auto-detection:
+    - Repository packages: `pacman -S --noconfirm <pkg>`, remove with `pacman -Rns --noconfirm <pkg>`, update sync database with `pacman -Sy`.
+    - AUR packages: prefer `paru -S --noconfirm <pkg>` (fallback to `yay` if configured). Query installed via `paru -Qi`/`yay -Qi` with fallback to `pacman -Qi`.
    - Implement unified vs non-unified symlink strategy in `UutilsExperiment`:
      - Coreutils: symlink `/usr/bin/{date,sort,...}` -> unified binary path (e.g., `/usr/bin/coreutils`).
      - Findutils/diffutils: per-file symlinks from the uutils bin directory.
@@ -50,7 +53,7 @@ Step-by-step plan:
      - Add `--all`, `--experiments`, `--yes`, and `--no-compatibility-check` aligned with the deep-dive.
      - Add selection logic `selected_experiments(all, selected, &system)` using `utils::vecs_eq`.
      - Add `default_experiments()` returning sorted defaults (e.g., `["coreutils", "sudo-rs"]`).
-   - Maintain `--dry-run`, Arch flags like `--aur-helper`, but gate them under Arch mode or when `Distribution.id == "Arch"`.
+   - Maintain `--dry-run` and add Arch flags like `--aur-helper=paru|yay|none` and `--use-pacman-only`. Default to auto-detect `paru` then `yay`, otherwise `pacman` only.
 
 4) Testing
    - Populate `TESTING_REQUIREMENTS.MD` with unit test coverage expectations:
@@ -90,21 +93,21 @@ The following sections remain as a reference specification for the target archit
       - --no-compatibility-check: skip distro/release gating (dangerous)
       - --experiments/-e <list>: filter experiments (defaults to default_experiments())
     - Commands: Enable | Disable
-  - Runtime flow (main):
+  - Runtime flow (main) [Arch]:
     - Parses args (Args::parse()).
     - Safety: requires root (uzers::get_current_uid() == 0).
     - Logging: initializes tracing_subscriber with verbosity via clap_verbosity_flag.
     - Constructs System implementing Worker (System::new()?).
-    - Distro gating:
-      - If no_compatibility_check = false: require Ubuntu (system.distribution()?.id == "Ubuntu"), else bail.
-      - If skipping check and not Ubuntu, logs warn about instability.
+    - Distro gating (Arch):
+      - If `no_compatibility_check = false`: require Arch (system.distribution()?.id == "arch") and `release == "rolling"`, else bail.
+      - If skipping check and not Arch, log a warning about instability.
     - Selects experiments via selected_experiments(all, experiments, &system).
     - Dispatch:
-      - Enable: confirm_or_exit, apt-get update via system.update_package_lists(), then e.enable(no_compatibility_check) for each.
+      - Enable: confirm_or_exit, pacman sync update via system.update_package_lists(), then e.enable(no_compatibility_check) for each.
       - Disable: confirm_or_exit, then e.disable() for each.
   - Helper functions:
     - enable(system, experiments, yes, no_compatibility_check) -> Result<()>:
-      - Confirmation, apt update, then enabling experiments (respecting per-experiment compatibility unless globally skipped).
+      - Confirmation, pacman sync update, then enabling experiments (respecting per-experiment compatibility unless globally skipped).
     - disable(experiments, yes) -> Result<()>:
       - Confirmation, then disabling experiments (per-experiment no-ops if not installed).
     - selected_experiments(all, selected: Vec<String>, system) -> Vec<Experiment>:
@@ -133,9 +136,9 @@ The following sections remain as a reference specification for the target archit
       - supported_releases(&self) -> Vec<String>
       - check_installed(&self) -> bool
     - Catalog: all_experiments(system: &impl Worker) -> Vec<Experiment>:
-      - Uutils("coreutils"): package rust-coreutils; releases: 24.04, 24.10, 25.04; unified_binary Some("/usr/bin/coreutils"); bin_directory "/usr/lib/cargo/bin/coreutils"
-      - Uutils("diffutils"): package rust-diffutils; releases: 24.10, 25.04; unified_binary Some("/usr/lib/cargo/bin/diffutils/diffutils"); bin_directory "/usr/lib/cargo/bin/diffutils"
-      - Uutils("findutils"): package rust-findutils; releases: 24.04, 24.10, 25.04; unified_binary None; bin_directory "/usr/lib/cargo/bin/findutils"
+      - Uutils("coreutils"): package uutils-coreutils; releases: rolling; unified_binary Some("/usr/bin/coreutils"); bin_directory "/usr/lib/cargo/bin/coreutils"
+      - Uutils("diffutils"): package uutils-diffutils; releases: rolling; unified_binary Some("/usr/lib/cargo/bin/diffutils/diffutils"); bin_directory "/usr/lib/cargo/bin/diffutils"
+      - Uutils("findutils"): package uutils-findutils; releases: rolling; unified_binary None; bin_directory "/usr/lib/cargo/bin/findutils"
       - SudoRs: sudo replacement (see sudors.rs).
   - Notes:
     - The unified_binary option controls whether all utility names symlink to a single binary (e.g., coreutils), vs linking each tool individually from a bin directory.
@@ -225,18 +228,18 @@ The following sections remain as a reference specification for the target archit
 
 - src/utils/worker.rs
   - Link: utils/worker.rs
-  - Role: System abstraction defining all OS-touching behaviors and the real implementation (System).
+  - Role: System abstraction defining all OS-touching behaviors and the real implementation (System) for Arch.
   - Trait Worker:
     - distribution() -> Result<Distribution>:
-      - Default implementation invokes run(lsb_release -is) and run(lsb_release -rs).
+      - Default implementation invokes `/etc/os-release` parsing to derive `ID=arch` and sets `release="rolling"` on Arch. Fallback to `lsb_release -is/-rs` when available.
     - run(&self, cmd: &Command) -> Result<Output>: required by implementors.
     - list_files(&self, directory: PathBuf) -> Result<Vec<PathBuf>>: required.
     - which(&self, binary_name: &str) -> Result<PathBuf>: required.
     - Package helpers (with default implementations using run):
-      - install_package(apt-get install -y <pkg>)
-      - remove_package(apt-get remove -y <pkg>)
-      - update_package_lists(apt-get update)
-      - check_installed(dpkg-query -s <pkg>): returns Ok(true) on success, Ok(false) otherwise.
+      - install_package: prefer AUR helper if configured (`paru -S --noconfirm <pkg>` or `yay -S --noconfirm <pkg>`), otherwise `pacman -S --noconfirm <pkg>`.
+      - remove_package: `pacman -Rns --noconfirm <pkg>`.
+      - update_package_lists: `pacman -Sy`.
+      - check_installed: try `paru -Qi <pkg>` or `yay -Qi <pkg>` (exit code 0 => installed), fallback to `pacman -Qi <pkg>`.
     - File ops (required):
       - replace_file_with_symlink(source, target)
       - backup_file(file)
@@ -284,7 +287,7 @@ The following sections remain as a reference specification for the target archit
       - restored_files: Vec<String>
       - backed_up_files: Vec<String>
       - mocked_commands: HashMap<command_string, stdout>
-    - Defaults: sets mocked lsb_release outputs to Ubuntu 24.04.
+    - Defaults: sets mocked distribution to Arch rolling (id: "arch", release: "rolling").
     - Helpers:
       - mock_files([(path, contents, primary_in_PATH)]) to populate virtual FS and PATH resolution preference.
       - mock_install_package(pkg) to mark as “installed”.

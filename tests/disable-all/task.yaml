@@ -1,0 +1,17 @@
+summary: Disable all experiments removes all managed packages and restores system
+execute: |
+  set -euo pipefail
+  # Load helpers
+  source "$(dirname "$0")/../lib/uutils.sh"
+  source "$(dirname "$0")/../lib/sudo-rs.sh"
+
+  oxidizr enable --yes --all
+  oxidizr disable --yes --all
+
+  ensure_coreutils_absent
+  ensure_findutils_absent
+  ensure_diffutils_absent
+  ensure_sudors_absent
+restore: |
+  # Already in disabled state; nothing else to do
+  true

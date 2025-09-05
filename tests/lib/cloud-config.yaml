@@ -1,0 +1,14 @@
+#cloud-config
+ssh_pwauth: true
+users:
+  - default
+  - name: spread
+    gecos: Spread Test User
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    shell: /bin/bash
+    passwd: "$6$SPREAD_SALT$SPREAD_PASSWORD_HASH"
+chpasswd:
+  expire: false
+  list: |
+    spread:SPREAD_PASSWORD

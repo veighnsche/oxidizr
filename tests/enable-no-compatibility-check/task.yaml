@@ -1,0 +1,15 @@
+summary: Enable with --no-compatibility-check should proceed on unsupported distro
+execute: |
+  set -euo pipefail
+  source "$(dirname "$0")/../lib/uutils.sh"
+  source "$(dirname "$0")/../lib/sudo-rs.sh"
+
+  oxidizr enable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs
+
+  ensure_coreutils_installed
+  ensure_findutils_installed
+  ensure_sudors_installed
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr disable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs || true
+  fi

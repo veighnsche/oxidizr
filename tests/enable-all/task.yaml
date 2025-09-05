@@ -1,0 +1,16 @@
+summary: Enable all experiments installs all and wires symlinks/backups
+execute: |
+  set -euo pipefail
+  source "$(dirname "$0")/../lib/uutils.sh"
+  source "$(dirname "$0")/../lib/sudo-rs.sh"
+
+  oxidizr enable --yes --all
+
+  ensure_coreutils_installed
+  ensure_findutils_installed
+  ensure_diffutils_installed_if_supported
+  ensure_sudors_installed
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr disable --yes --all || true
+  fi

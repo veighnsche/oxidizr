@@ -1,12 +1,14 @@
-Below is a precise, file-by-file explanation of every test under tests/, including what each one sets up, runs, and asserts, plus any cleanup and noteworthy requirements the test enforces.# Testing Requirements
+# Testing Requirements
 
-This document outlines the expected test coverage and scenarios for the refactored architecture under `src/experiments/` and `src/utils/`.
+Below is a precise, file-by-file explanation of every test under tests/, including what each one sets up, runs, and asserts, plus any cleanup and noteworthy requirements the test enforces.
+
+This document outlines the expected test coverage and scenarios for the refactored architecture under `src/experiments/` and `src/utils/`, tailored for Arch Linux (pacman + optional AUR helper such as paru/yay).
 
 ## Scope
 
 - Validate experiment enable/disable flows for both unified-binary and per-binary strategies.
 - Validate distro compatibility gating and the `--no-compatibility-check` skip flag.
-- Validate package manager interactions for Arch-like systems (pacman/AUR), with room to add Ubuntu/apt in future.
+- Validate package manager interactions for Arch (pacman/AUR), with room to add Ubuntu/apt in future.
 - Validate backup/restore and symlink semantics.
 - Validate CLI parsing and selection logic for `--all`, `--experiments`, `--experiment` (deprecated), `--assume-yes`, `--no-update`, and `--no-compatibility-check`.
 
@@ -51,7 +53,7 @@ This document outlines the expected test coverage and scenarios for the refactor
 
 - Introduce `utils::worker_mock` behind `#[cfg(test)]`:
   - In-memory store for files, backups, and symlinks.
-  - Captures invoked commands and package ops.
+  - Captures invoked commands and package ops (e.g., `pacman -S/Rns -Sy`, `paru -S -Qi`).
   - Provides `distribution()` stubbing and `which()` resolution rules.
 
 ## Non-goals (for now)
@@ -80,19 +82,19 @@ tests/disable-all/task.yaml
   - oxidizr disable --yes --all
 - Assertions:
   - ensure_coreutils_absent:
-    - The apt listing for rust-coreutils must not say “installed”.
+    - Package query must indicate uutils-coreutils is not installed (`paru -Qi`/`yay -Qi`/`pacman -Qi` should fail).
     - /usr/bin/date must not be a symlink to /usr/bin/coreutils; no backup file .date.oxidizr.bak should remain.
     - date --help must contain “GNU” (verifies GNU coreutils restored).
   - ensure_findutils_absent:
-    - The apt listing for rust-findutils must not say “installed”.
+    - Package query must indicate uutils-findutils is not installed.
     - /usr/bin/find must not link to /usr/lib/cargo/bin/findutils/find; no .find.oxidizr.bak file should remain.
     - find --help must contain “GNU”.
     - Likewise for xargs: not symlinked, no backup; xargs --help shows “GNU”.
   - ensure_diffutils_absent:
-    - The apt listing for rust-diffutils must not say “installed”.
+    - Package query must indicate uutils-diffutils is not installed.
     - It also checks that /usr/bin/find is not linked to a diffutils path and that “find” help shows GNU (note: the test asserts absence via “find”; this mirrors the file’s current content).
   - ensure_sudors_absent:
-    - The apt listing for sudo-rs must not say “installed”.
+    - Package query must indicate sudo-rs is not installed.
     - /usr/bin/sudo, /usr/bin/su, /usr/sbin/visudo must not be symlinks to their /usr/lib/cargo/bin counterparts; their backup files (.sudo/.su/.visudo.oxidizr.bak) must not remain.
     - sudo --version and su --version must not contain “sudo-rs”/“su-rs”.
 - Cleanup: none (the test already ends in the “all disabled” state).
@@ -122,7 +124,7 @@ tests/disable-in-german/task.yaml
 - Assertions:
   - ensure_coreutils_absent (GNU date restored, no rust-coreutils package, no symlink/backups).
   - ensure_sudors_installed (sudo-rs still enabled):
-    - apt list sudo-rs | MATCH installed
+    - package query for sudo-rs reports installed
     - /usr/bin/sudo -> /usr/lib/cargo/bin/sudo; /usr/bin contains .sudo.oxidizr.bak; sudo --version shows “sudo-rs”
     - /usr/bin/su -> /usr/lib/cargo/bin/su; .su.oxidizr.bak exists; su --version shows “su-rs”
     - /usr/sbin/visudo -> /usr/lib/cargo/bin/visudo; .visudo.oxidizr.bak exists
@@ -146,17 +148,17 @@ tests/enable-all/task.yaml
   - oxidizr enable --yes --all
 - Assertions:
   - ensure_coreutils_installed:
-    - apt list rust-coreutils | MATCH installed
+    - package query for uutils-coreutils reports installed
     - For every binary in tests/lib/rust-coreutils-bins.txt:
       - which $bin gives the path; that path must be a symlink to /usr/bin/coreutils (multi-call frontend).
       - A backup file .$bin.oxidizr.bak should be present alongside (the helper tolerates printing a note if absent).
       - $bin --help must NOT include the GNU coreutils URL, demonstrating the Rust replacement is active.
   - ensure_findutils_installed:
-    - apt list rust-findutils | MATCH installed
+    - package query for uutils-findutils reports installed
     - /usr/bin/find -> /usr/lib/cargo/bin/findutils/find; .find.oxidizr.bak present; find --help must not show GNU URL.
     - /usr/bin/xargs -> /usr/lib/cargo/bin/findutils/xargs; .xargs.oxidizr.bak present; xargs --help must not show GNU URL.
   - ensure_diffutils_installed (conditionally):
-    - If lsb_release -rs != 24.04, apt list rust-diffutils | MATCH installed
+    - If supported on this Arch snapshot, package query for uutils-diffutils reports installed
     - /usr/bin/diff -> /usr/lib/cargo/bin/diffutils/diff; .diff.oxidizr.bak present; diff --help must not show GNU URL.
   - ensure_sudors_installed (as described above).
 - Cleanup (restore): If not CI, oxidizr disable --yes --all.
@@ -175,13 +177,12 @@ tests/enable-default/task.yaml
 tests/enable-no-compatibility-check/task.yaml
 - Purpose: Ensure enabling with the compatibility gate bypass actually proceeds and results are installed.
 - Setup: source uutils.sh and sudo-rs.sh.
-- Actions:
   - oxidizr enable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs
 - Assertions:
-  - ensure_coreutils_installed, ensure_findutils_installed, ensure_sudors_installed (as detailed above).
+  - ensure_coreutils_installed, ensure_findutils_installed, ensure_sudors_installed (as detailed above, with pacman/paru query semantics).
 - Cleanup (restore):
   - If not CI, oxidizr disable --yes --experiments coreutils findutils sudo-rs --no-compatibility-check
-- Requirements this enforces:
+  - Requirements this enforces:
   - The flag --no-compatibility-check must bypass normal version/compatibility gating so the enable proceeds and the artifacts (packages, symlinks, backups) appear.
 
 tests/enable-partial/task.yaml
@@ -207,25 +208,25 @@ Library files referenced by tests
 
 tests/lib/uutils.sh
 - ensure_coreutils_installed:
-  - Apt package rust-coreutils must be reported installed.
+  - Package uutils-coreutils must be reported installed via `paru -Qi`/`yay -Qi` (fallback `pacman -Qi`).
   - For each binary in tests/lib/rust-coreutils-bins.txt:
     - which resolves to a path that must be a symlink to /usr/bin/coreutils.
     - A backup file .$bin.oxidizr.bak is expected (the helper prints a note if absent).
     - The command’s help must not reference the GNU coreutils URL.
 - ensure_coreutils_absent:
-  - rust-coreutils not installed; /usr/bin/date not symlinked; no .date.oxidizr.bak; date --help contains “GNU”.
+  - uutils-coreutils not installed; /usr/bin/date not symlinked; no .date.oxidizr.bak; date --help contains “GNU”.
 - ensure_findutils_installed:
-  - rust-findutils installed.
+  - uutils-findutils installed.
   - /usr/bin/find -> /usr/lib/cargo/bin/findutils/find; .find.oxidizr.bak exists; find --help not GNU URL.
   - /usr/bin/xargs -> /usr/lib/cargo/bin/findutils/xargs; .xargs.oxidizr.bak exists; xargs --help not GNU URL.
 - ensure_findutils_absent:
-  - rust-findutils not installed; find/xargs not symlinked; no backups; their --help shows “GNU”.
+  - uutils-findutils not installed; find/xargs not symlinked; no backups; their --help shows “GNU”.
 - ensure_diffutils_installed:
-  - Only when lsb_release -rs != "24.04":
-    - rust-diffutils installed.
+  - Only when supported on this Arch snapshot:
+    - uutils-diffutils installed.
     - /usr/bin/diff -> /usr/lib/cargo/bin/diffutils/diff; .diff.oxidizr.bak exists; diff --help not GNU URL.
 - ensure_diffutils_absent:
-  - rust-diffutils not installed.
+  - uutils-diffutils not installed.
   - Also verifies that /usr/bin/find is not linked to a diffutils path, no .find.oxidizr.bak, and find --help shows “GNU” (this reflects the current assertions in the file).
 
 tests/lib/sudo-rs.sh
@@ -238,22 +239,22 @@ tests/lib/sudo-rs.sh
   - sudo-rs not installed; none of the above symlinks/backups exist; versions not branded “sudo-rs/su-rs”.
 
 tests/lib/rust-coreutils-bins.txt
-- A canonical list of binaries that must be redirected to the Rust coreutils multi-call binary (/usr/bin/coreutils) when rust-coreutils is enabled. The ensure_coreutils_installed function loops over this list to validate the symlinks and non-GNU help output.
+- A canonical list of binaries that must be redirected to the Rust coreutils multi-call binary (/usr/bin/coreutils) when uutils-coreutils is enabled. The ensure_coreutils_installed function loops over this list to validate the symlinks and non-GNU help output.
 
 tests/lib/cloud-config.yaml
 - Cloud-init snippet enabling SSH password auth and creating the “spread” user (password placeholder SPREAD_PASSWORD) with passwordless sudo. Ensures the test runner can exercise both root and non-root behaviors (e.g., tests/non-root).
 
 Key behavioral guarantees these tests enforce
-- Root requirement: All privileged operations must fail for non-root with the exact error “Error: This program must be run as root”.
+- Root requirement: All privileged operations must fail for non-root with the exact error “This command must be run as root”.
 - Default vs all:
-  - Default enable/disable must at least affect: rust-coreutils and sudo-rs.
+  - Default enable/disable must at least affect: uutils-coreutils and sudo-rs.
   - “All” must additionally include findutils and (on supported releases) diffutils.
 - Selective operations:
   - --experiments coreutils targets only coreutils; other experiments remain as they were.
 - Compatibility bypass:
   - --no-compatibility-check must actually bypass gating and yield successful installation of the specified experiments.
 - System effects and reversibility:
-  - Enabling installs the corresponding apt package(s), rewires system binaries via symlinks to Rust/uutils or sudo-rs paths, and creates backup files .<name>.oxidizr.bak next to originals.
+  - Enabling installs the corresponding pacman package(s) or AUR package(s) (via configured helper), rewires system binaries via symlinks to Rust/uutils or sudo-rs paths, and creates backup files .<name>.oxidizr.bak next to originals.
   - Disabling removes packages, restores original binaries (no symlinks), and removes backup files; GNU-provided tools must be observable via their help output containing “GNU”.
 - Locale robustness:
   - Operations must succeed correctly when the process locale is set to de_DE.UTF-8 (test switches back to English for assertions).

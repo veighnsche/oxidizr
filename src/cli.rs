@@ -1,7 +1,31 @@
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+pub enum AurHelperArg {
+    /// Auto-detect installed helper (prefer paru, then yay, then trizen, then pamac)
+    Auto,
+    /// Do not use any AUR helper (pacman only)
+    None,
+    Paru,
+    Yay,
+    Trizen,
+    Pamac,
+}
+
+impl AurHelperArg {
+    fn as_helper_str(&self) -> &'static str {
+        match self {
+            AurHelperArg::Auto => "auto",
+            AurHelperArg::None => "none",
+            AurHelperArg::Paru => "paru",
+            AurHelperArg::Yay => "yay",
+            AurHelperArg::Trizen => "trizen",
+            AurHelperArg::Pamac => "pamac",
+        }
+    }
+}
 use crate::error::Result;
 use crate::experiments::{all_experiments, Experiment};
 use crate::utils::worker::System;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use std::io::{self, Write};
 
@@ -32,9 +56,9 @@ pub struct Cli {
     #[arg(long)]
     pub no_compatibility_check: bool,
 
-    /// AUR helper to use for package operations (e.g., paru or yay)
-    #[arg(long, default_value = "paru")]
-    pub aur_helper: String,
+    /// AUR helper to use for package operations (auto-detect by default)
+    #[arg(long, value_enum, default_value_t = AurHelperArg::Auto)]
+    pub aur_helper: AurHelperArg,
 
     /// Force a specific package manager (AUR helper) instead of auto-detect (e.g., paru, yay, trizen, pamac)
     #[arg(long)]
@@ -81,7 +105,10 @@ pub enum Commands {
 pub fn handle_cli() -> Result<()> {
     let cli = Cli::parse();
     // Prefer --package-manager when provided; else fallback to --aur-helper
-    let effective_helper = cli.package_manager.clone().unwrap_or(cli.aur_helper.clone());
+    let effective_helper = cli
+        .package_manager
+        .clone()
+        .unwrap_or_else(|| cli.aur_helper.as_helper_str().to_string());
     let worker = System { aur_helper: effective_helper, dry_run: cli.dry_run, wait_lock_secs: cli.wait_lock };
     let update_lists = !cli.no_update;
 

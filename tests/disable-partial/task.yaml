@@ -1,0 +1,15 @@
+summary: Disable only coreutils and keep sudo-rs enabled
+execute: |
+  set -euo pipefail
+  source "$(dirname "$0")/../lib/uutils.sh"
+  source "$(dirname "$0")/../lib/sudo-rs.sh"
+
+  oxidizr enable --yes
+  oxidizr disable --yes --experiments coreutils
+
+  ensure_coreutils_absent
+  ensure_sudors_installed
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr disable --yes --all || true
+  fi

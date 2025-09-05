@@ -1,0 +1,16 @@
+summary: Enable only coreutils; others remain absent
+execute: |
+  set -euo pipefail
+  source "$(dirname "$0")/../lib/uutils.sh"
+  source "$(dirname "$0")/../lib/sudo-rs.sh"
+
+  oxidizr enable --yes --experiments coreutils
+
+  ensure_coreutils_installed
+  ensure_findutils_absent
+  ensure_diffutils_absent
+  ensure_sudors_absent
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr disable --yes --all || true
+  fi
