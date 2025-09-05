@@ -49,16 +49,17 @@ impl Worker for System {
 #[cfg(feature = "arch")]
 impl Worker for System {
     fn distribution(&self) -> Result<(String, String)> {
-        // Parse /etc/os-release
-        let content = fs::read_to_string("/etc/os-release")?;
-        let mut id = String::new();
+        // Parse /etc/os-release for ID, default to "arch" when missing.
+        let content = fs::read_to_string("/etc/os-release").unwrap_or_default();
+        let mut id = String::from("arch");
         for line in content.lines() {
             if let Some(rest) = line.strip_prefix("ID=") {
                 id = rest.trim_matches('"').to_string();
                 break;
             }
         }
-        Ok((id.chars().next_uppercase().to_string() + &id.chars().skip(1).collect::<String>(), "rolling".to_string()))
+        // Return id in lowercase; experiment code lowercases for comparison anyway.
+        Ok((id.to_ascii_lowercase(), "rolling".to_string()))
     }
 
     fn update_packages(&self) -> Result<()> {

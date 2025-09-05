@@ -15,7 +15,8 @@ pub struct UutilsExperiment {
 impl UutilsExperiment {
     pub fn check_compatible<W: Worker>(&self, worker: &W) -> Result<bool> {
         let (distro, release) = worker.distribution()?;
-        if distro != "Arch" {
+        // Accept any case variant of "arch" from /etc/os-release (e.g., "arch", "Arch")
+        if distro.to_ascii_lowercase() != "arch" {
             return Ok(false);
         }
         Ok(self.supported_releases.iter().any(|r| r == &release))

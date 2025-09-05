@@ -12,7 +12,7 @@ pub struct Cli {
     #[arg(long)]
     pub assume_yes: bool,
 
-    /// Do not run apt-get update before actions
+    /// Do not run pacman -Sy before actions
     #[arg(long)]
     pub no_update: bool,
 
@@ -20,7 +20,7 @@ pub struct Cli {
     #[arg(long, default_value = "coreutils")]
     pub experiment: String,
 
-    /// AUR helper to use for package operations (scaffold default)
+    /// AUR helper to use for package operations (e.g., paru or yay)
     #[arg(long, default_value = "paru")]
     pub aur_helper: String,
 
