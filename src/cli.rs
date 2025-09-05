@@ -36,6 +36,10 @@ pub struct Cli {
     #[arg(long)]
     pub unified_binary: Option<PathBuf>,
 
+    /// Dry-run: print planned actions without making changes
+    #[arg(long)]
+    pub dry_run: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -81,7 +85,7 @@ fn coreutils_scaffold(package: Option<String>, bin_dir: Option<PathBuf>, unified
 
 pub fn handle_cli() -> Result<()> {
     let cli = Cli::parse();
-    let worker = System { aur_helper: cli.aur_helper.clone() };
+    let worker = System { aur_helper: cli.aur_helper.clone(), dry_run: cli.dry_run };
     let update_lists = !cli.no_update;
 
     let exp = match cli.experiment.as_str() {
@@ -98,13 +102,13 @@ pub fn handle_cli() -> Result<()> {
 
     match cli.command {
         Commands::Enable => {
-            enforce_root()?;
+            if !cli.dry_run { enforce_root()?; }
             if !cli.assume_yes && !confirm("Enable and switch to Rust replacements?")? { return Ok(()); }
             exp.enable(&worker, cli.assume_yes, update_lists)?;
             println!("Enabled experiment: {}", exp.name);
         }
         Commands::Disable => {
-            enforce_root()?;
+            if !cli.dry_run { enforce_root()?; }
             if !cli.assume_yes && !confirm("Disable and restore system-provided tools?")? { return Ok(()); }
             exp.disable(&worker, update_lists)?;
             println!("Disabled experiment: {}", exp.name);

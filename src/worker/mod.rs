@@ -28,6 +28,7 @@ pub trait Worker {
 /// Replace methods with real Arch Linux (pacman/AUR helper) interactions later.
 pub struct System {
     pub aur_helper: String,
+    pub dry_run: bool,
 }
 
 #[cfg(not(feature = "arch"))]
@@ -61,6 +62,7 @@ impl Worker for System {
     }
 
     fn update_packages(&self) -> Result<()> {
+        if self.dry_run { log::info!("[dry-run] pacman -Sy"); return Ok(()); }
         let status = std::process::Command::new("pacman")
             .args(["-Sy"])
             .status()?;
@@ -68,18 +70,27 @@ impl Worker for System {
     }
 
     fn install_package(&self, package: &str) -> Result<()> {
-        // Try pacman, then fall back to AUR helper
+        if self.dry_run { log::info!("[dry-run] install {} (pacman/aur)", package); return Ok(()); }
+        // Try pacman, then fall back to AUR helper(s)
         let status = std::process::Command::new("pacman")
             .args(["-S", "--noconfirm", package])
             .status()?;
         if status.success() { return Ok(()); }
-        let status = std::process::Command::new(&self.aur_helper)
-            .args(["-S", "--noconfirm", package])
-            .status()?;
-        if status.success() { Ok(()) } else { Err(CoreutilsError::ExecutionFailed(format!("Failed to install {}", package))) }
+        // choose helper order: explicit -> paru -> yay
+        let helpers = if !self.aur_helper.is_empty() {
+            vec![self.aur_helper.as_str(), "paru", "yay"]
+        } else { vec!["paru", "yay"] };
+        for h in helpers {
+            let status = std::process::Command::new(h)
+                .args(["-S", "--noconfirm", package])
+                .status();
+            if let Ok(s) = status { if s.success() { return Ok(()); } }
+        }
+        Err(CoreutilsError::ExecutionFailed(format!("Failed to install {} via pacman or AUR helper", package)))
     }
 
     fn remove_package(&self, package: &str) -> Result<()> {
+        if self.dry_run { log::info!("[dry-run] pacman -R --noconfirm {}", package); return Ok(()); }
         let status = std::process::Command::new("pacman")
             .args(["-R", "--noconfirm", package])
             .status()?;
@@ -114,6 +125,10 @@ impl Worker for System {
             log::info!("Skipping existing symlink: {}", target.display());
             return Ok(());
         }
+        if self.dry_run {
+            log::info!("[dry-run] would backup and symlink {} -> {}", source.display(), target.display());
+            return Ok(());
+        }
         // Backup if exists and not a symlink
         if target.exists() {
             let backup = backup_path(target);
@@ -136,6 +151,10 @@ impl Worker for System {
     fn restore_file(&self, target: &Path) -> Result<()> {
         let backup = backup_path(target);
         if backup.exists() {
+            if self.dry_run {
+                log::info!("[dry-run] would restore {} from {}", target.display(), backup.display());
+                return Ok(());
+            }
             log::info!("Restoring {} <- {}", target.display(), backup.display());
             // Remove symlink or leftover
             let _ = fs::remove_file(target);

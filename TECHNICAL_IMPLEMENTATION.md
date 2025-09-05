@@ -1,221 +1,220 @@
-# oxidizr-arch Technical Implementation (Scaffolding Plan)
+Here’s a deep-dive of every file in src at commit 132c889d, with responsibilities, key APIs, behavior, and notable implementation details. You can browse the tree here: https://github.com/jnsgruk/oxidizr/tree/132c889dc31fc84e9e56ed496746b807ab003f5b/src
 
-This document defines the technical plan for an oxidizr-inspired tool that safely switches Arch Linux core utilities to Rust-based replacements (e.g., uutils) via Pacman/AUR. It matches the architecture described in oxidizr and maps directly to the scaffolding currently in this repository. Use this as a checklist and guide to complete the implementation.
+- src/main.rs
+  - Link: main.rs
+  - Role: CLI entrypoint and orchestrator for enabling/disabling experiments (Rust replacements for coreutils/findutils/diffutils/sudo).
+  - External crates: anyhow, clap, clap_verbosity_flag, inquire, tracing, tracing_subscriber, uzers.
+  - Key structures:
+    - Args (clap Parser): global flags:
+      - --yes/-y: skip confirmation prompts
+      - --all/-a: operate on all known experiments
+      - --no-compatibility-check: skip distro/release gating (dangerous)
+      - --experiments/-e <list>: filter experiments (defaults to default_experiments())
+    - Commands: Enable | Disable
+  - Runtime flow (main):
+    - Parses args (Args::parse()).
+    - Safety: requires root (uzers::get_current_uid() == 0).
+    - Logging: initializes tracing_subscriber with verbosity via clap_verbosity_flag.
+    - Constructs System implementing Worker (System::new()?).
+    - Distro gating:
+      - If no_compatibility_check = false: require Ubuntu (system.distribution()?.id == "Ubuntu"), else bail.
+      - If skipping check and not Ubuntu, logs warn about instability.
+    - Selects experiments via selected_experiments(all, experiments, &system).
+    - Dispatch:
+      - Enable: confirm_or_exit, apt-get update via system.update_package_lists(), then e.enable(no_compatibility_check) for each.
+      - Disable: confirm_or_exit, then e.disable() for each.
+  - Helper functions:
+    - enable(system, experiments, yes, no_compatibility_check) -> Result<()>:
+      - Confirmation, apt update, then enabling experiments (respecting per-experiment compatibility unless globally skipped).
+    - disable(experiments, yes) -> Result<()>:
+      - Confirmation, then disabling experiments (per-experiment no-ops if not installed).
+    - selected_experiments(all, selected: Vec<String>, system) -> Vec<Experiment>:
+      - Builds all_experiments(system) then filters:
+        - If all = true: uses the full set; warns if user provided a non-default selection (compares with vecs_eq to ignore order).
+        - If all = false: default to default_experiments() when none provided; filters by e.name().
+    - confirm_or_exit(yes: bool):
+      - Skips prompt if yes is true.
+      - Otherwise prompts "Continue?" with default false and a help message about risks; exits with code 1 if declined or prompt fails.
+    - default_experiments() -> Vec<String>:
+      - Returns sorted ["coreutils", "sudo-rs"] (ensures deterministic order for vecs_eq).
 
-## Scope
+- src/experiments/mod.rs
+  - Link: experiments/mod.rs
+  - Role: Experiment registry and type-erased interface unifying multiple experiment families.
+  - Key items:
+    - Modules: sudors, uutils; re-exports SudoRsExperiment, UutilsExperiment.
+    - Enum Experiment<'a> { Uutils(UutilsExperiment<'a>), SudoRs(SudoRsExperiment<'a>) }
+    - Polymorphic methods:
+      - name(&self) -> String
+      - enable(&self, no_compatibility_check: bool) -> Result<()>
+        - Checks compatibility (unless skipped), warns and skips if unsupported.
+      - disable(&self) -> Result<()>
+        - Skips restore if not installed (warn).
+      - check_compatible(&self) -> bool
+      - supported_releases(&self) -> Vec<String>
+      - check_installed(&self) -> bool
+    - Catalog: all_experiments(system: &impl Worker) -> Vec<Experiment>:
+      - Uutils("coreutils"): package rust-coreutils; releases: 24.04, 24.10, 25.04; unified_binary Some("/usr/bin/coreutils"); bin_directory "/usr/lib/cargo/bin/coreutils"
+      - Uutils("diffutils"): package rust-diffutils; releases: 24.10, 25.04; unified_binary Some("/usr/lib/cargo/bin/diffutils/diffutils"); bin_directory "/usr/lib/cargo/bin/diffutils"
+      - Uutils("findutils"): package rust-findutils; releases: 24.04, 24.10, 25.04; unified_binary None; bin_directory "/usr/lib/cargo/bin/findutils"
+      - SudoRs: sudo replacement (see sudors.rs).
+  - Notes:
+    - The unified_binary option controls whether all utility names symlink to a single binary (e.g., coreutils), vs linking each tool individually from a bin directory.
 
-- Safe, reversible switching of utilities families (coreutils, findutils, diffutils, …) to Rust alternatives.
-- Arch-focused with explicit gating (rolling) and AUR helper integration.
-- Idempotent operations and atomic restoration.
-- This repository currently contains a compiling scaffolding; the real system calls are intentionally left as TODOs behind a `Worker` abstraction.
+- src/experiments/sudors.rs
+  - Link: experiments/sudors.rs
+  - Role: Experiment for installing and wiring sudo-rs as a replacement for sudo/su/visudo.
+  - Constants:
+    - PACKAGE = "sudo-rs"
+  - SudoRsExperiment<'a> { system: &'a dyn Worker }
+  - Behavior:
+    - supported_releases() -> Vec<String>: ["24.04","24.10","25.04"]
+    - check_compatible(): compares Worker::distribution().release against supported list.
+    - check_installed(): Worker::check_installed(PACKAGE) with unwrap_or(false).
+    - name() -> "sudo-rs"
+    - enable() -> Result<()>:
+      - Logs "Installing and configuring sudo-rs".
+      - system.install_package("sudo-rs").
+      - For each path in sudors_files():
+        - Derive filename (e.g., "sudo", "su", "visudo").
+        - Resolve existing path via system.which(filename) or fallback to /usr/bin/<filename>.
+        - Replace target with symlink to the provided cargo-installed path via system.replace_file_with_symlink(source, target).
+      - Files replaced: /usr/lib/cargo/bin/{su,sudo,visudo}
+    - disable() -> Result<()>:
+      - For each filename, resolves the existing target and calls system.restore_file(target).
+      - Removes package with system.remove_package("sudo-rs").
+  - Test notes (with MockSystem):
+    - Verifies package installation/removal commands.
+    - Ensures backups created for existing binaries and symlinks point to expected sources/targets.
+    - Confirms restore list and the behavior when restoring after installed.
 
-## Repository Structure
+- src/experiments/uutils.rs
+  - Link: experiments/uutils.rs
+  - Role: Generic experiment for uutils-provided Rust replacements (coreutils, diffutils, findutils).
+  - UutilsExperiment<'a> fields:
+    - name: String (e.g., "coreutils")
+    - system: &'a dyn Worker
+    - package: String (e.g., "rust-coreutils")
+    - supported_releases: Vec<String>
+    - unified_binary: Option<PathBuf> (e.g., Some("/usr/bin/coreutils") for coreutils)
+    - bin_directory: PathBuf (e.g., "/usr/lib/cargo/bin/coreutils")
+  - Behavior:
+    - new(name, system, package, supported_releases, unified_binary, bin_directory) initializes fields (clones and converts release strings).
+    - check_compatible(): compares distribution.release against supported list.
+    - supported_releases(): returns clone of configured releases.
+    - check_installed(): defers to Worker::check_installed(package).
+    - name(): returns configured name.
+    - enable() -> Result<()>:
+      - Logs "Installing and configuring <package>".
+      - system.install_package(package).
+      - Gets the list of tool files via system.list_files(bin_directory).
+      - For each file:
+        - Determine filename (e.g., "date", "sort").
+        - Resolve existing path via system.which(filename) or default to /usr/bin/<filename>.
+        - If unified_binary is Some(p): all symlinks target that single p; else symlink file-by-file from the listed bin_directory.
+      - Backups and file replacement semantics handled by Worker implementation.
+    - disable() -> Result<()>:
+      - Lists files again, resolves existing targets, and calls system.restore_file for each.
+      - Logs removal and system.remove_package(package).
+  - Test notes:
+    - Covers both unified and non-unified configurations:
+      - Coreutils (unified): symlinks /usr/bin/{date,sort,...} -> /usr/bin/coreutils.
+      - Findutils (non-unified): symlinks /usr/bin/{find,xargs} -> /usr/lib/cargo/bin/findutils/{find,xargs}.
+    - Validates apt install/remove calls, backup/restore, and symlink lists.
 
-- `src/experiment/mod.rs` — Experiment orchestration (enable/disable/check/list targets)
-- `src/worker/mod.rs` — `Worker` trait + `System` placeholder (replace with real Arch impl using pacman/AUR helper)
-- `src/cli.rs` — CLI surface: `enable`, `disable`, `check`, `list-targets`
-- `src/core/mod.rs` — Placeholder for optional per-command abstractions
-- `src/error.rs` — Error types (`CoreutilsError`, `Result`)
-- `src/lib.rs` — Module exports, basic test
-- `src/main.rs` — Binary entrypoint
+- src/utils/mod.rs
+  - Link: utils/mod.rs
+  - Role: Utilities module root; re-exports and shared types/helpers.
+  - Modules:
+    - mod command; mod worker;
+    - pub use command::*; pub use worker::*;
+    - #[cfg(test)] mod worker_mock; pub use worker_mock::tests::* for tests.
+  - Types:
+    - Distribution { id: String, release: String }: Linux distribution metadata used by experiments for compatibility.
+  - Helpers:
+    - vecs_eq<T: Hash + Eq>(v1, v2) -> bool:
+      - Unordered equality: compare lengths; then check every element of v2 is in a HashSet of v1’s elements.
+      - Used in CLI logic to detect when --all is set but user supplied a custom experiment list (to warn and ignore).
 
-## Architecture
+- src/utils/command.rs
+  - Link: utils/command.rs
+  - Role: Minimal command wrapper for Worker::run interface and for test logging/mocking.
+  - Command { command: String, args: Vec<String> }
+  - Methods:
+    - build(command: &str, args: &[&str]) -> Self: converts args to owned Strings.
+    - command(&self) -> String: emits a "cmd arg1 arg2 ..." string (used heavily in mocks and debug logs).
 
-### Experiment Abstraction
+- src/utils/worker.rs
+  - Link: utils/worker.rs
+  - Role: System abstraction defining all OS-touching behaviors and the real implementation (System).
+  - Trait Worker:
+    - distribution() -> Result<Distribution>:
+      - Default implementation invokes run(lsb_release -is) and run(lsb_release -rs).
+    - run(&self, cmd: &Command) -> Result<Output>: required by implementors.
+    - list_files(&self, directory: PathBuf) -> Result<Vec<PathBuf>>: required.
+    - which(&self, binary_name: &str) -> Result<PathBuf>: required.
+    - Package helpers (with default implementations using run):
+      - install_package(apt-get install -y <pkg>)
+      - remove_package(apt-get remove -y <pkg>)
+      - update_package_lists(apt-get update)
+      - check_installed(dpkg-query -s <pkg>): returns Ok(true) on success, Ok(false) otherwise.
+    - File ops (required):
+      - replace_file_with_symlink(source, target)
+      - backup_file(file)
+      - restore_file(file)
+      - create_symlink(source, target)
+  - System: concrete implementation
+    - run(): uses std::process::Command; bails with stderr if status is non-success; logs debug with full command string.
+    - list_files(directory):
+      - Validates path exists and is a directory.
+      - Collects entry paths into Vec<PathBuf>.
+    - which(): uses which::which crate.
+    - replace_file_with_symlink(source, target):
+      - If target exists:
+        - If it’s already a symlink, skip idempotently.
+        - Else backup_file(target) and remove original file.
+      - Then create_symlink(source, target).
+    - backup_file(file):
+      - Computes backup filename via backup_filename(file) => "/parent/.<name>.oxidizr.bak" (hidden and suffixed).
+      - Copies file to backup, then applies the same permissions (preserves SUID/SGID/sticky bits).
+    - restore_file(file):
+      - Computes matching backup filename; renames it back if present, otherwise warn and continue.
+    - create_symlink(source, target):
+      - Ensures target is removed if present, then symlink(source -> target).
+    - Internal helpers:
+      - backup_filename(file: &Path) -> PathBuf:
+        - E.g., "/etc/hosts" => "/etc/.hosts.oxidizr.bak"; "./config" => ".config.oxidizr.bak"
+      - remove_file_if_exists(file: &PathBuf) -> Result<()>
+    - Tests:
+      - test_backup_filename validates the naming for regular, no-parent, and dotfile cases.
+  - Logging:
+    - Uses tracing debug/trace/warn to provide detailed behavior.
 
-`UutilsExperiment` encapsulates one family of utilities:
-- `name`: e.g., `"coreutils"`
-- `package`: e.g., `"rust-coreutils"`
-- `supported_releases`: e.g., `["rolling"]`
-- `unified_binary`: optional path to a single dispatch binary (e.g., `/usr/bin/coreutils`)
-- `bin_directory`: directory containing the replacement binaries (e.g., `/usr/lib/cargo/bin/coreutils`)
-
-Responsibilities:
-- `check_compatible(worker)`: returns `true` if distro is Arch and release is in `supported_releases`.
-- `enable(worker, assume_yes, update_lists)`: package install + symlink swap-in (with safety via `Worker`).
-- `disable(worker, update_lists)`: restoration from backups + package removal.
-- `list_targets(worker)`: compute target paths that would be affected.
-
-### System Interface
-
-`Worker` trait abstracts system operations. Implement `System` for real Arch behavior.
-
-Required methods:
-- `distribution() -> (String, String)`
-  - Parse `/etc/os-release` (e.g., `ID=arch`) and assume `rolling` release label.
-- `update_packages()`
-  - `pacman -Sy` (sync package databases) or delegate to AUR helper if needed.
-- `install_package(package)`
-  - `pacman -S --noconfirm <package>` if in repos; for AUR, call helper (e.g., `paru -S --noconfirm <package>`).
-- `remove_package(package)`
-  - `pacman -R --noconfirm <package>`; for AUR-installed packages, pacman still manages the installed package.
-- `check_installed(package) -> bool`
-  - `pacman -Qi <package>` returns 0 when installed.
-- `which(name) -> Option<PathBuf>`
-  - Use the `which` crate or invoke `which`.
-- `list_files(dir) -> Vec<PathBuf>`
-  - Validate directory existence, enumerate entries; skip non-regular files.
-- `replace_file_with_symlink(source, target)`
-  - If `target` is symlink: skip (idempotent)
-  - Else:
-    - `backup_file(target)` → sibling `/.<name>.oxidizr.bak` preserving permissions and special bits.
-    - Remove original `target`.
-    - `create_symlink(source, target)`.
-- `restore_file(target)`
-  - If backup exists: atomic rename backup → `target`.
-  - Else: warn and continue (fails safe).
-
-Helper semantics (can be private methods of `System`):
-- `backup_file(target)`
-  - Copy to `/.<filename>.oxidizr.bak`, re-apply original mode/ownership to backup to preserve SUID/SGID/sticky.
-- `create_symlink(source, target)`
-  - Remove any leftover `target`, create symlink `source -> target`.
-
-## Safety Gates Before Changes (Arch)
-
-- Distribution compatibility:
-  - `check_compatible()` validates Arch and supported release list (e.g., `rolling`).
-- Run-as-root and confirmation:
-  - CLI intended to be run as root. Prompt for confirmation unless `--assume-yes`.
-- Package list update:
-  - CLI runs `pacman -Sy` (or AUR helper sync) unless `--no-update` is supplied.
-
-## Enable Flow (Switch to Rust Utilities)
-
-1. Compatibility and Preconditions
-   - `check_compatible()` must be `true`.
-   - Confirm if not `--assume-yes`.
-   - Optionally `update_packages()`.
-
-2. Install Replacement Package (Arch/AUR)
-   - `install_package(self.package)` using pacman/AUR helper.
-
-3. Discover Binaries to Replace
-   - `list_files(self.bin_directory)` → candidate binaries: e.g., `date`, `sort`, …
-
-4. Compute Target for Each Command Name
-   - For each file `f`:
-     - `filename = f.file_name()`.
-     - `target = which(filename)` else `/usr/bin/<filename>` fallback.
-
-5. Swap-in Symlink with Backup
-   - Unified binary present (`self.unified_binary = Some(p)`):
-     - `replace_file_with_symlink(p, target)` for each `filename`.
-   - Non-unified binary:
-     - `replace_file_with_symlink(f, target)` for each `filename`.
-
-Result:
-- System resolves common tools (`date`, `sort`, …) to Rust implementation via symlinks.
-- Unified binary dispatches by `argv[0]` (symlink name).
-
-## Disable Flow (Revert Safely)
-
-1. Optionally `update_packages()`.
-2. Discover the same set of filenames via `list_files(self.bin_directory)`.
-3. For each `filename`, compute `target` with `which()` fallback.
-4. `restore_file(target)` → atomic rename backup back to `target` if backup exists; else warn.
-5. `remove_package(self.package)` (pacman).
-
-## Idempotence and Rollback Guarantees
-
-- Re-entrant enable:
-  - Skip if `target` is already a symlink (idempotent).
-- Safe disable:
-  - Only restore if backup exists; otherwise warn and leave as-is.
-- Atomic restore:
-  - Use `rename` to atomically swap backup into place.
-- Deterministic targets:
-  - Fallback to `/usr/bin/<filename>` when `which()` fails.
-
-## Unified vs Non-Unified Binaries
-
-- Unified (e.g., coreutils):
-  - A single binary (e.g., `/usr/bin/coreutils`) symlinked to many target names.
-- Non-unified (e.g., findutils-style):
-  - Each replacement binary symlinked directly to its own target.
-
-## CLI Surface (Scaffolding)
-
-Commands (see `src/cli.rs`):
-- `enable` — Installs package via pacman/AUR helper and swaps-in symlinks via `Worker`.
-- `disable` — Restores originals and removes the package.
-- `check` — Prints compatibility boolean.
-- `list-targets` — Prints computed target paths.
-
-Flags:
-- `--assume-yes` — Skip prompts (TODO: implement prompt in CLI).
-- `--no-update` — Do not run `pacman -Sy` pre-step.
-- `--experiment <name>` — Defaults to `coreutils`. Scaffolding constructs:
-  - `name = "coreutils"`
-  - `package = "uutils-coreutils"` (AUR/extra)
-  - `supported_releases = ["rolling"]`
-  - `unified_binary = /usr/bin/coreutils`
-  - `bin_directory = /usr/lib/uutils/coreutils`
-- `--aur-helper <helper>` — AUR helper to use (default `paru`).
-- `--package <name>` — Override package name.
-- `--bin-dir <path>` — Override replacement binaries directory.
-- `--unified-binary <path>` — Override unified dispatch binary.
-
-## Mapping: Requirements → Code
-
-- Experiment orchestration → `src/experiment/mod.rs` (`UutilsExperiment`)
-- System interface → `src/worker/mod.rs` (`Worker` trait)
-- CLI orchestration → `src/cli.rs`
-- Error handling → `src/error.rs`
-- Tests (basic) → `src/lib.rs` test
-
-## Implementation TODOs (Checklist)
-
-- [x] Enforce root execution in CLI (uid check) and add confirmation prompts unless `--assume-yes`.
-- [x] Implement `System` on Arch (feature-gated under `arch`):
-  - [x] `distribution()` via `/etc/os-release`.
-  - [x] `update_packages()` via `pacman -Sy`.
-  - [x] `install_package()` via `pacman -S --noconfirm` or AUR helper (`paru -S --noconfirm`).
-  - [x] `remove_package()` via `pacman -R --noconfirm`.
-  - [x] `check_installed()` via `pacman -Qi`.
-  - [x] `which()` via `which` crate.
-  - [x] `list_files()` validating `bin_directory`.
-  - [x] `replace_file_with_symlink()` with backup and permissions preservation.
-  - [x] `restore_file()` using atomic rename; warn if backup missing.
-- [x] Add logging/tracing for operations (info/warn levels).
-- [x] Extend experiments for other families (findutils, diffutils) with non-unified binaries. (Added `findutils` scaffold.)
-- [x] Unit/integration tests with a tmpfs or sandboxed FS:
-  - [x] Enable flow idempotence (existing symlink → skip).
-  - [x] Backup creation and special bits preservation.
-  - [x] Disable flow restores originals atomically.
-  - [x] Compatibility gate prevents unsupported releases.
-- [x] Feature-gate the real `System` implementation (e.g., `--features arch`) to keep default build safe.
-
-## Notes on Permissions and Special Bits
-
-- When backing up targets, ensure the backup preserves:
-  - File mode (including SUID/SGID/sticky).
-  - Ownership if applicable (may require `chown`, careful in tests).
-- When restoring, atomic `rename` ensures the swap is single-operation on the same filesystem.
-
-## Error Handling
-
-- All public APIs return `Result<T, CoreutilsError>`.
-- Introduced variants:
-  - `Io(std::io::Error)`
-  - `Incompatible(String)`
-  - `ExecutionFailed(String)`
-  - `Other(String)`
-
-## Security Considerations
-
-- Root-required operations must be explicit and visible.
-- Confirmation prompts reduce accidental modifications.
-- Idempotent symlink creation prevents repeated destructive changes.
-- Backups are placed as hidden siblings to avoid PATH shadowing and accidental invocation.
-
-## Future Enhancements
-
-- Dry-run mode to print planned operations without modifying the system.
-- Rollback-on-error strategy if any step fails mid-enable.
-- Rich reporting (JSON output) for automation.
-- Telemetry/metrics hooks (optional, opt-in).
-
----
-
-This document is the source of truth for the implementation. Keep it updated as you implement each TODO. The current codebase is a scaffolding that compiles and is structured to let you incrementally add the real system interactions while preserving safety and testability.
+- src/utils/worker_mock.rs (test-only)
+  - Link: utils/worker_mock.rs
+  - Role: A fully in-memory Worker mock for unit tests (gated under #[cfg(test)]).
+  - Availability:
+    - Declared as #[cfg(test)] pub mod tests { ... }
+    - Re-exported by utils/mod.rs in tests so modules can use MockSystem directly.
+  - MockSystem:
+    - Tracks:
+      - commands: Vec<String> of built command strings
+      - files: HashMap<PathBuf, (contents: String, primary_in_path: bool)>
+      - installed_packages: Vec<String>
+      - created_symlinks: Vec<(src, dst)>
+      - restored_files: Vec<String>
+      - backed_up_files: Vec<String>
+      - mocked_commands: HashMap<command_string, stdout>
+    - Defaults: sets mocked lsb_release outputs to Ubuntu 24.04.
+    - Helpers:
+      - mock_files([(path, contents, primary_in_PATH)]) to populate virtual FS and PATH resolution preference.
+      - mock_install_package(pkg) to mark as “installed”.
+      - mock_command(cmd, stdout) to stub run() outputs.
+  - Worker impl (MockSystem):
+    - run(): records command; returns mocked Output using mocked_commands (stdout only).
+    - check_installed(pkg): uses installed_packages.
+    - list_files(directory): returns keys that start with the given directory string.
+    - which(binary_name): searches files by file_name == binary_name and primary_in_PATH == true; bails if not found.
+    - replace_file_with_symlink(source, target): backs up if the target exists in the mocked file map; then delegates to create_symlink.
+    - create_symlink(): pushes into created_symlinks.
+    - backup_file(), restore_file(): append to respective vectors.

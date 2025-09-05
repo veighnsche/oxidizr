@@ -26,7 +26,7 @@ mod tests {
             unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
             bin_directory: PathBuf::from("/usr/lib/uutils/coreutils"),
         };
-        let sys = System { aur_helper: "paru".into() };
+        let sys = System { aur_helper: "paru".into(), dry_run: true };
         let ok = exp.check_compatible(&sys).expect("compat check");
         assert!(ok);
     }

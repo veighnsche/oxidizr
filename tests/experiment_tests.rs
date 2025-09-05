@@ -5,10 +5,46 @@ use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
+use std::os::unix::fs::PermissionsExt;
 
 struct MockWorker {
     root: TempDir,
     which_map: Vec<(String, PathBuf)>,
+}
+
+/// Ensure backup preserves permission bits (e.g., sticky bit) when created.
+#[test]
+fn backup_preserves_permissions_bits() -> Result<()> {
+    let mut w = MockWorker::new();
+    let bin_dir = w.path_in_root("/usr/lib/uutils/coreutils");
+    fs::create_dir_all(&bin_dir)?;
+    let date_rust = bin_dir.join("date"); fs::write(&date_rust, b"rust-date")?;
+
+    let date = w.path_in_root("/usr/bin/date");
+    fs::create_dir_all(date.parent().unwrap())?;
+    fs::write(&date, b"system-date")?;
+    // set sticky bit on target (01000)
+    let mut perms = fs::metadata(&date)?.permissions();
+    let mode = perms.mode();
+    perms.set_mode(mode | 0o1000);
+    fs::set_permissions(&date, perms.clone())?;
+
+    w.add_which("date", date.clone());
+    let exp = UutilsExperiment {
+        name: "coreutils".into(),
+        package: "uutils-coreutils".into(),
+        supported_releases: vec!["rolling".into()],
+        unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
+        bin_directory: bin_dir.clone(),
+    };
+
+    exp.enable(&w, true, false)?;
+
+    let backup = backup_path(&date);
+    assert!(backup.exists());
+    let backup_mode = fs::metadata(&backup)?.permissions().mode();
+    assert_eq!(backup_mode & 0o7000, (mode | 0o1000) & 0o7000);
+    Ok(())
 }
 
 #[test]
