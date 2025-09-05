@@ -1,0 +1,26 @@
+[package]
+name = "rust_coreutils_switch"
+version = "0.1.0"
+edition = "2021"
+description = "A library for abstracting over different coreutils implementations"
+repository = ""
+license = "MIT OR Apache-2.0"
+keywords = ["coreutils", "cli", "gnu", "uutils"]
+categories = ["command-line-utilities"]
+
+[lib]
+name = "coreutils_switch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "coreutils-switch"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "2.0"
+clap = { version = "4.4", features = ["derive"] }
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.0"
