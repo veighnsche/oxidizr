@@ -1,6 +1,6 @@
 use crate::error::Result;
-use crate::experiment::UutilsExperiment;
-use crate::worker::{System, Worker};
+use crate::experiments::{all_experiments, Experiment};
+use crate::utils::worker::System;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::io::{self, Write};
@@ -16,13 +16,29 @@ pub struct Cli {
     #[arg(long)]
     pub no_update: bool,
 
-    /// Select which experiment to operate on (currently only 'coreutils' scaffold)
-    #[arg(long, default_value = "coreutils")]
-    pub experiment: String,
+    /// Select all known experiments from the registry
+    #[arg(long, short = 'a')]
+    pub all: bool,
+
+    /// Select which experiments to operate on (comma separated or repeatable)
+    #[arg(long, value_delimiter = ',')]
+    pub experiments: Vec<String>,
+
+    /// Backward compatibility: single experiment selection (deprecated)
+    #[arg(long)]
+    pub experiment: Option<String>,
+
+    /// Skip compatibility checks (dangerous)
+    #[arg(long)]
+    pub no_compatibility_check: bool,
 
     /// AUR helper to use for package operations (e.g., paru or yay)
     #[arg(long, default_value = "paru")]
     pub aur_helper: String,
+
+    /// Force a specific package manager (AUR helper) instead of auto-detect (e.g., paru, yay, trizen, pamac)
+    #[arg(long)]
+    pub package_manager: Option<String>,
 
     /// Override package name (Arch/AUR). Defaults depend on experiment.
     #[arg(long)]
@@ -40,20 +56,12 @@ pub struct Cli {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Wait for pacman database lock to clear, in seconds (polling). If unset, fail fast when lock is present.
+    #[arg(long)]
+    pub wait_lock: Option<u64>,
+
     #[command(subcommand)]
     pub command: Commands,
-}
-
-fn findutils_scaffold(package: Option<String>, bin_dir: Option<PathBuf>) -> UutilsExperiment {
-    let default_pkg = "uutils-findutils".to_string();
-    let default_bin = PathBuf::from("/usr/lib/uutils/findutils");
-    UutilsExperiment {
-        name: "findutils".to_string(),
-        package: package.unwrap_or(default_pkg),
-        supported_releases: vec!["rolling".into()],
-        unified_binary: None,
-        bin_directory: bin_dir.unwrap_or(default_bin),
-    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -68,58 +76,66 @@ pub enum Commands {
     ListTargets,
 }
 
-fn coreutils_scaffold(package: Option<String>, bin_dir: Option<PathBuf>, unified: Option<PathBuf>) -> UutilsExperiment {
-    // Arch/AUR defaults for uutils coreutils
-    let default_pkg = "uutils-coreutils".to_string();
-    let default_bin = PathBuf::from("/usr/lib/uutils/coreutils");
-    let default_unified = PathBuf::from("/usr/bin/coreutils");
-
-    UutilsExperiment {
-        name: "coreutils".to_string(),
-        package: package.unwrap_or(default_pkg),
-        supported_releases: vec!["rolling".into()],
-        unified_binary: Some(unified.unwrap_or(default_unified)),
-        bin_directory: bin_dir.unwrap_or(default_bin),
-    }
-}
+// (legacy scaffolds removed; use experiments registry instead)
 
 pub fn handle_cli() -> Result<()> {
     let cli = Cli::parse();
-    let worker = System { aur_helper: cli.aur_helper.clone(), dry_run: cli.dry_run };
+    // Prefer --package-manager when provided; else fallback to --aur-helper
+    let effective_helper = cli.package_manager.clone().unwrap_or(cli.aur_helper.clone());
+    let worker = System { aur_helper: effective_helper, dry_run: cli.dry_run, wait_lock_secs: cli.wait_lock };
     let update_lists = !cli.no_update;
 
-    let exp = match cli.experiment.as_str() {
-        "coreutils" => coreutils_scaffold(cli.package.clone(), cli.bin_dir.clone(), cli.unified_binary.clone()),
-        "findutils" => findutils_scaffold(cli.package.clone(), cli.bin_dir.clone()),
-        other => UutilsExperiment {
-            name: other.to_string(),
-            package: cli.package.clone().unwrap_or_else(|| format!("uutils-{}", other)),
-            supported_releases: vec!["rolling".into()],
-            unified_binary: cli.unified_binary.clone(),
-            bin_directory: cli.bin_dir.clone().unwrap_or_else(|| PathBuf::from("/usr/lib/uutils")),
-        },
+    // Build experiment selection
+    let selection: Vec<String> = if cli.all {
+        // Will be replaced by all experiments below
+        Vec::new()
+    } else if !cli.experiments.is_empty() {
+        cli.experiments.clone()
+    } else if let Some(single) = &cli.experiment {
+        vec![single.clone()]
+    } else {
+        default_experiments()
     };
+
+    let mut exps: Vec<Experiment> = all_experiments(&worker);
+    if !cli.all {
+        // Filter by provided names
+        exps = exps.into_iter().filter(|e| selection.contains(&e.name())).collect();
+    }
+
+    if exps.is_empty() {
+        eprintln!("No experiments selected. Use --all or --experiments=<names>");
+        return Ok(());
+    }
 
     match cli.command {
         Commands::Enable => {
             if !cli.dry_run { enforce_root()?; }
             if !cli.assume_yes && !confirm("Enable and switch to Rust replacements?")? { return Ok(()); }
-            exp.enable(&worker, cli.assume_yes, update_lists)?;
-            println!("Enabled experiment: {}", exp.name);
+            for e in &exps {
+                e.enable(&worker, cli.assume_yes, update_lists, cli.no_compatibility_check)?;
+                println!("Enabled experiment: {}", e.name());
+            }
         }
         Commands::Disable => {
             if !cli.dry_run { enforce_root()?; }
             if !cli.assume_yes && !confirm("Disable and restore system-provided tools?")? { return Ok(()); }
-            exp.disable(&worker, update_lists)?;
-            println!("Disabled experiment: {}", exp.name);
+            for e in &exps {
+                e.disable(&worker, update_lists)?;
+                println!("Disabled experiment: {}", e.name());
+            }
         }
         Commands::Check => {
-            let ok = exp.check_compatible(&worker)?;
-            println!("Compatible: {}", ok);
+            for e in &exps {
+                let ok = e.check_compatible(&worker)?;
+                println!("{}\tCompatible: {}", e.name(), ok);
+            }
         }
         Commands::ListTargets => {
-            for t in exp.list_targets(&worker)? {
-                println!("{}", t.display());
+            for e in &exps {
+                for t in e.list_targets(&worker)? {
+                    println!("{}\t{}", e.name(), t.display());
+                }
             }
         }
     }
@@ -144,4 +160,10 @@ fn confirm(prompt: &str) -> Result<bool> {
     if io::stdin().read_line(&mut s).is_err() { return Ok(false); }
     let ans = s.trim().to_ascii_lowercase();
     Ok(ans == "y" || ans == "yes")
+}
+
+fn default_experiments() -> Vec<String> {
+    let mut v = vec!["coreutils".to_string(), "sudo-rs".to_string()];
+    v.sort();
+    v
 }

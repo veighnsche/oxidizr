@@ -1,6 +1,7 @@
 use coreutils_switch::experiment::UutilsExperiment;
 use coreutils_switch::worker::Worker;
 use coreutils_switch::Result;
+use coreutils_switch::utils::Distribution;
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
@@ -33,7 +34,6 @@ fn backup_preserves_permissions_bits() -> Result<()> {
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        supported_releases: vec!["rolling".into()],
         unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
@@ -59,7 +59,6 @@ fn reentrant_enable_is_idempotent() -> Result<()> {
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        supported_releases: vec!["rolling".into()],
         unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
@@ -94,7 +93,7 @@ impl MockWorker {
 }
 
 impl Worker for MockWorker {
-    fn distribution(&self) -> Result<(String, String)> { Ok(("Arch".into(), "rolling".into())) }
+    fn distribution(&self) -> Result<Distribution> { Ok(Distribution { id: "arch".into(), release: "rolling".into() }) }
     fn update_packages(&self) -> Result<()> { Ok(()) }
     fn install_package(&self, _package: &str) -> Result<()> { Ok(()) }
     fn remove_package(&self, _package: &str) -> Result<()> { Ok(()) }
@@ -165,7 +164,6 @@ fn enable_creates_symlinks_and_backups_unified() -> Result<()> {
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        supported_releases: vec!["rolling".into()],
         unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
@@ -195,7 +193,6 @@ fn disable_restores_originals() -> Result<()> {
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        supported_releases: vec!["rolling".into()],
         unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
@@ -214,12 +211,24 @@ fn disable_restores_originals() -> Result<()> {
 }
 
 #[test]
-fn check_incompatible_release_fails_gate() -> Result<()> {
-    let w = MockWorker::new();
+fn check_incompatible_distro_fails_gate() -> Result<()> {
+    struct NonArchWorker;
+    impl Worker for NonArchWorker {
+        fn distribution(&self) -> Result<Distribution> { Ok(Distribution { id: "debian".into(), release: "12".into() }) }
+        fn update_packages(&self) -> Result<()> { Ok(()) }
+        fn install_package(&self, _package: &str) -> Result<()> { Ok(()) }
+        fn remove_package(&self, _package: &str) -> Result<()> { Ok(()) }
+        fn check_installed(&self, _package: &str) -> Result<bool> { Ok(false) }
+        fn which(&self, _name: &str) -> Result<Option<PathBuf>> { Ok(None) }
+        fn list_files(&self, _dir: &Path) -> Result<Vec<PathBuf>> { Ok(vec![]) }
+        fn replace_file_with_symlink(&self, _source: &Path, _target: &Path) -> Result<()> { Ok(()) }
+        fn restore_file(&self, _target: &Path) -> Result<()> { Ok(()) }
+    }
+
+    let w = NonArchWorker;
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        supported_releases: vec!["not-rolling".into()],
         unified_binary: None,
         bin_directory: PathBuf::from("/unused"),
     };

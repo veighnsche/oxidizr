@@ -1,20 +1,23 @@
 //! A scaffolding library for safely switching system core utilities
 //! (oxidizr-arch inspired). This is intentionally minimal and non-destructive.
 
-pub mod core; // placeholder for future per-command abstractions
 pub mod error;
 pub mod cli;
-pub mod worker;
-pub mod experiment;
+pub mod utils;
+pub mod experiments;
 
 // Re-export commonly used items
 pub use crate::error::{CoreutilsError, Result};
 
+// Backward-compatibility re-exports for legacy module paths
+pub use crate::experiments as experiment;
+pub use crate::utils::worker as worker;
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::experiment::UutilsExperiment;
-    use crate::worker::{System, Worker};
+    use crate::experiments::UutilsExperiment;
+    use crate::utils::worker::{System, Worker};
     use std::path::PathBuf;
 
     #[test]
@@ -22,7 +25,6 @@ mod tests {
         let exp = UutilsExperiment {
             name: "coreutils".into(),
             package: "uutils-coreutils".into(),
-            supported_releases: vec!["rolling".into()],
             unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
             bin_directory: PathBuf::from("/usr/lib/uutils/coreutils"),
         };

@@ -1,240 +1,259 @@
-# Technical Test Requirements
+Below is a precise, file-by-file explanation of every test under tests/, including what each one sets up, runs, and asserts, plus any cleanup and noteworthy requirements the test enforces.# Testing Requirements
 
-This document defines the mandatory requirements, conventions, tooling, and quality gates for all automated tests in this repository. It applies to all contributors, CI pipelines, and release processes.
+This document outlines the expected test coverage and scenarios for the refactored architecture under `src/experiments/` and `src/utils/`.
 
-## 1. Purpose and Scope
+## Scope
 
-- Ensure reliability, determinism, and maintainability of the codebase through comprehensive automated tests.
-- Provide a single source of truth for how tests must be written, organized, executed, and evaluated.
-- Cover all layers: unit, integration, end-to-end/CLI, property-based, fuzz, performance/benchmarks, and security-related tests.
+- Validate experiment enable/disable flows for both unified-binary and per-binary strategies.
+- Validate distro compatibility gating and the `--no-compatibility-check` skip flag.
+- Validate package manager interactions for Arch-like systems (pacman/AUR), with room to add Ubuntu/apt in future.
+- Validate backup/restore and symlink semantics.
+- Validate CLI parsing and selection logic for `--all`, `--experiments`, `--experiment` (deprecated), `--assume-yes`, `--no-update`, and `--no-compatibility-check`.
 
-## 2. Terminology
+## Unit Tests
 
-- Unit Test: Verifies a single function/module in isolation with mocks/stubs.
-- Integration Test: Verifies multiple components interacting through public interfaces.
-- End-to-End (E2E) / CLI Test: Exercises the built artifact (binary/CLI or service) as a user would.
-- Property-Based Test: Generates many inputs to validate invariant properties hold (e.g., round-trip, idempotency).
-- Fuzz Test: Feeds semi-random inputs to find crashes, panics, or UB.
-- Snapshot Test: Captures and approves human-readable outputs that should remain stable.
-- Benchmark: Measures performance, memory, and regressions against baselines.
+- Experiments
+  - UutilsExperiment (unified):
+    - Given bin directory with sample files, ensure `list_targets()` yields `/usr/bin/<name>` targets.
+    - `enable()`: creates backups for existing targets, then symlinks all targets to the unified binary path.
+    - `disable()`: restores backups and removes package.
+  - UutilsExperiment (non-unified):
+    - `enable()`: symlinks each bin file individually to the corresponding target.
+    - `disable()`: restores each target.
+  - SudoRsExperiment:
+    - `enable()`: installs `sudo-rs` and replaces `sudo`, `su`, `visudo` with symlinks; `disable()` restores and removes package.
 
-## 3. Supported Platforms and Toolchain
+- Compatibility gating
+  - With `distribution().id = "arch", release = "rolling"`, `check_compatible()` returns true; otherwise false.
+  - `--no-compatibility-check` allows `enable()` to proceed regardless of gating result.
 
-- Operating Systems: Linux (x86_64), macOS (arm64 and x86_64), Windows (x86_64).
-- Architectures: x86_64 and arm64 where feasible.
-- Toolchain:
-  - The minimum supported language/toolchain version (MSRV) equals the `rust-version` (or equivalent) declared in the project manifest.
-  - Tests must pass on stable toolchains and the MSRV.
-- Optional Tooling (enable if present in the repo):
-  - Parallel test runner.
-  - Property-based testing library.
-  - Snapshot testing library.
-  - Coverage tooling with LLVM-based or platform-native backends.
-  - Benchmarking framework.
-  - Fuzzing framework (nightly toolchain may be required).
+- Worker behaviors
+  - `replace_file_with_symlink()` creates backup at `.<name>.oxidizr.bak`, preserves permissions, and is idempotent for existing symlinks.
+  - `restore_file()` restores when backup exists and warns when absent.
+  - `which()` resolution preferred; falls back to `/usr/bin/<name>`.
 
-## 4. Directory Layout and Naming
+## CLI Tests
 
-- Unit tests colocated with source files where supported (e.g., `src/**` with inline test modules).
-- Integration tests placed under `tests/` as multiple files; each file compiles to a separate test binary.
-- Benchmarks under `benches/`.
-- Fuzz targets under `fuzz/` (if used).
-- Test data and fixtures under `tests/fixtures/`:
-  - Large assets (>100 KB) should be compressed or generated on the fly if possible.
-  - Prefer minimal, representative samples over large datasets.
+- Parsing
+  - `--all` selects all from registry.
+  - `--experiments coreutils,findutils` selects both in any order.
+  - Deprecated `--experiment coreutils` still works to select one.
+  - `--no-update` prevents package list updates.
+  - `--assume-yes` suppresses confirmation prompts.
+  - `--no-compatibility-check` allows enable on incompatible distro.
 
-Naming conventions:
-- Test files: `*_test.rs` or standard integration test naming (e.g., `tests/http.rs`).
-- Test functions: `test_<behavior>_<condition>_<expected>()`.
-- Property tests: `prop_<property>()`.
-- Benchmarks: `bench_<subject>()`.
-- Fuzz targets: `fuzz_<target>()`.
+- Execution wiring (with mock worker)
+  - Enable/Disable iterates over selection and dispatches to each experiment.
+  - ListTargets prints experiment name and each target path.
+  - Check prints compatibility per experiment.
 
-## 5. Test Writing Conventions
+## Test Infrastructure
 
-- Follow the Arrange–Act–Assert pattern.
-- One assertion of behavior per test where practical; multiple related assertions permitted if they validate a single behavior.
-- Prefer pure, side-effect-free helpers. Avoid hidden global state.
-- Tests must be deterministic:
-  - Seed random generators explicitly (configurable via env var: `TEST_SEED`).
-  - Use fixed timestamps/clock abstractions and temporary directories.
-  - Isolate filesystem/network state; don’t rely on user environment.
-- Parallel-safety:
-  - Tests must be safe to run in parallel.
-  - Use per-test temporary directories (e.g., OS temp dir with unique prefix).
-  - Avoid shared mutable global state; if unavoidable, guard with synchronization and document.
+- Introduce `utils::worker_mock` behind `#[cfg(test)]`:
+  - In-memory store for files, backups, and symlinks.
+  - Captures invoked commands and package ops.
+  - Provides `distribution()` stubbing and `which()` resolution rules.
 
-## 6. Mocking, Stubbing, and Test Doubles
+## Non-goals (for now)
 
-- Mock only at module boundaries; prefer real integrations for integration tests.
-- Avoid overspecifying mocks (assert behavior not call order unless necessary).
-- When mocking FS/network/time:
-  - Provide clear fixtures and teardown.
-  - Ensure predictable paths and deterministic responses.
+- Ubuntu/apt path is not implemented yet; add when Ubuntu gating is introduced.
+- E2E tests that make real system changes; rely on dry-run and mocks in CI.
 
-## 7. Test Data and Fixtures
+## Coverage Target
 
-- Place reusable fixtures in `tests/fixtures/` or a dedicated module.
-- Document the meaning of each fixture and its expected format.
-- Keep fixtures small; prune redundancy.
-- For generated fixtures, include a generator script with deterministic seeds.
+- Aim for high-confidence unit coverage on experiment flows and worker semantics. Minimum: 80% coverage on experiments and worker modules.
 
-## 8. Property-Based Testing
+Test harness conventions these files rely on
+- Runner: These YAML files are Spread tasks. The execute block is a shell script. restore runs after execute for cleanup (when not in CI).
+- Assertions: MATCH and NOMATCH are assertion helpers provided by the harness. A command like cmd | MATCH "text" passes when “text” appears in output; NOMATCH passes when “text” does not appear.
+- Helpers and fixtures:
+  - ${SPREAD_PATH}/tests/lib/uutils.sh and sudo-rs.sh define ensure_* functions that check for package presence, symlinks, backups, and outputs.
+  - ${SPREAD_PATH}/tests/lib/rust-coreutils-bins.txt enumerates binaries expected to be handled under rust-coreutils.
+  - tests/lib/cloud-config.yaml creates the non-root user “spread” with passwordless sudo for the environment.
 
-- For critical parsers/encoders/transformations, add property tests:
-  - Round-trip: `decode(encode(x)) == x` for valid inputs.
-  - Idempotency: `f(f(x)) == f(x)` where applicable.
-  - Monotonicity/order-preserving properties where applicable.
-- Minimum generated cases per property: 256 in CI, 4096 in nightly/extended jobs.
-- Shrinking must be enabled to minimize failing cases.
+tests/disable-all/task.yaml
+- Purpose: Verify that “disable everything” actually removes all managed experiments after they were enabled.
+- Setup:
+  - source tests/lib/uutils.sh and tests/lib/sudo-rs.sh to get ensure_* helpers.
+- Actions:
+  - oxidizr enable --yes --all
+  - oxidizr disable --yes --all
+- Assertions:
+  - ensure_coreutils_absent:
+    - The apt listing for rust-coreutils must not say “installed”.
+    - /usr/bin/date must not be a symlink to /usr/bin/coreutils; no backup file .date.oxidizr.bak should remain.
+    - date --help must contain “GNU” (verifies GNU coreutils restored).
+  - ensure_findutils_absent:
+    - The apt listing for rust-findutils must not say “installed”.
+    - /usr/bin/find must not link to /usr/lib/cargo/bin/findutils/find; no .find.oxidizr.bak file should remain.
+    - find --help must contain “GNU”.
+    - Likewise for xargs: not symlinked, no backup; xargs --help shows “GNU”.
+  - ensure_diffutils_absent:
+    - The apt listing for rust-diffutils must not say “installed”.
+    - It also checks that /usr/bin/find is not linked to a diffutils path and that “find” help shows GNU (note: the test asserts absence via “find”; this mirrors the file’s current content).
+  - ensure_sudors_absent:
+    - The apt listing for sudo-rs must not say “installed”.
+    - /usr/bin/sudo, /usr/bin/su, /usr/sbin/visudo must not be symlinks to their /usr/lib/cargo/bin counterparts; their backup files (.sudo/.su/.visudo.oxidizr.bak) must not remain.
+    - sudo --version and su --version must not contain “sudo-rs”/“su-rs”.
+- Cleanup: none (the test already ends in the “all disabled” state).
 
-## 9. Fuzz Testing
+tests/disable-default/task.yaml
+- Purpose: Verify disabling the default experiment set (not “all”) removes only the defaults.
+- Setup: source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes (default set)
+  - oxidizr disable --yes (default set)
+- Assertions:
+  - ensure_coreutils_absent (same checks as above)
+  - ensure_sudors_absent (same checks as above)
+- Implicit requirement: “default” includes at least coreutils and sudo-rs; findutils/diffutils are not checked here and thus are not implied defaults.
+- Cleanup: none (final state already disabled).
 
-- Add fuzz targets for public parsers, deserializers, and boundary handlers.
-- Run fuzzing continuously on a CI schedule for at least 15 minutes per target.
-- Crashes, panics, and OOM are failures and must be triaged within 24 hours.
-- Store minimized corpus and regression seeds under `fuzz/corpus/` and `fuzz/artifacts/` with descriptions.
+tests/disable-in-german/task.yaml
+- Purpose: Ensure behavior is correct under a non-English locale when selectively disabling a subset.
+- Setup:
+  - Enable the de_DE.UTF-8 locale by uncommenting in /etc/locale.gen then locale-gen.
+  - Export LC_ALL, LANGUAGE, LANG=de_DE.UTF-8 for the session.
+  - source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes (default set)
+  - oxidizr disable --yes --experiments coreutils (selective disable in a non-English locale)
+  - Reset locale to en_GB.UTF-8 for subsequent assertions.
+- Assertions:
+  - ensure_coreutils_absent (GNU date restored, no rust-coreutils package, no symlink/backups).
+  - ensure_sudors_installed (sudo-rs still enabled):
+    - apt list sudo-rs | MATCH installed
+    - /usr/bin/sudo -> /usr/lib/cargo/bin/sudo; /usr/bin contains .sudo.oxidizr.bak; sudo --version shows “sudo-rs”
+    - /usr/bin/su -> /usr/lib/cargo/bin/su; .su.oxidizr.bak exists; su --version shows “su-rs”
+    - /usr/sbin/visudo -> /usr/lib/cargo/bin/visudo; .visudo.oxidizr.bak exists
+- Cleanup (restore): If not CI, run oxidizr disable --yes --all.
 
-## 10. Snapshot Testing
+tests/disable-partial/task.yaml
+- Purpose: Selectively disable a subset (coreutils) while leaving others (sudo-rs) enabled.
+- Setup: source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes (default set)
+  - oxidizr disable --yes --experiments coreutils
+- Assertions:
+  - ensure_coreutils_absent (as above).
+  - ensure_sudors_installed (as above).
+- Cleanup (restore): If not CI, run oxidizr disable --yes --all.
 
-- Snapshots must be human-readable (e.g., JSON/TOML/Text with stable formatting).
-- Review snapshots into VCS explicitly; do not auto-accept in CI.
-- Normalize nondeterministic fields (timestamps, paths, hashes) before snapshotting.
-- Breaking snapshot changes require an entry in the changelog and reviewer approval.
+tests/enable-all/task.yaml
+- Purpose: Verify enabling “all” activates all managed experiments.
+- Setup: source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes --all
+- Assertions:
+  - ensure_coreutils_installed:
+    - apt list rust-coreutils | MATCH installed
+    - For every binary in tests/lib/rust-coreutils-bins.txt:
+      - which $bin gives the path; that path must be a symlink to /usr/bin/coreutils (multi-call frontend).
+      - A backup file .$bin.oxidizr.bak should be present alongside (the helper tolerates printing a note if absent).
+      - $bin --help must NOT include the GNU coreutils URL, demonstrating the Rust replacement is active.
+  - ensure_findutils_installed:
+    - apt list rust-findutils | MATCH installed
+    - /usr/bin/find -> /usr/lib/cargo/bin/findutils/find; .find.oxidizr.bak present; find --help must not show GNU URL.
+    - /usr/bin/xargs -> /usr/lib/cargo/bin/findutils/xargs; .xargs.oxidizr.bak present; xargs --help must not show GNU URL.
+  - ensure_diffutils_installed (conditionally):
+    - If lsb_release -rs != 24.04, apt list rust-diffutils | MATCH installed
+    - /usr/bin/diff -> /usr/lib/cargo/bin/diffutils/diff; .diff.oxidizr.bak present; diff --help must not show GNU URL.
+  - ensure_sudors_installed (as described above).
+- Cleanup (restore): If not CI, oxidizr disable --yes --all.
 
-## 11. Performance and Benchmarks
+tests/enable-default/task.yaml
+- Purpose: Verify enabling the default experiment set.
+- Setup: source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes (defaults)
+- Assertions:
+  - ensure_coreutils_installed (as above).
+  - ensure_sudors_installed (as above).
+- Cleanup (restore): If not CI, oxidizr disable --yes --all.
+- Implicit requirement: “default” includes coreutils and sudo-rs.
 
-- Use a benchmarking framework with statistical noise reduction (warm-up, multiple samples).
-- Define performance budgets:
-  - Unit hot path: no regression >10% in p95 latency without explicit approval.
-  - Memory: no regression >10% in peak usage on representative workloads.
-- Bench results are compared to the last main-branch baseline.
-- For flaky perf environments (e.g., CI), use relative comparisons with confidence intervals.
+tests/enable-no-compatibility-check/task.yaml
+- Purpose: Ensure enabling with the compatibility gate bypass actually proceeds and results are installed.
+- Setup: source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs
+- Assertions:
+  - ensure_coreutils_installed, ensure_findutils_installed, ensure_sudors_installed (as detailed above).
+- Cleanup (restore):
+  - If not CI, oxidizr disable --yes --experiments coreutils findutils sudo-rs --no-compatibility-check
+- Requirements this enforces:
+  - The flag --no-compatibility-check must bypass normal version/compatibility gating so the enable proceeds and the artifacts (packages, symlinks, backups) appear.
 
-## 12. Security, Robustness, and Error Handling
+tests/enable-partial/task.yaml
+- Purpose: Enable only a specific subset (coreutils) and verify the others remain untouched/absent.
+- Setup: source uutils.sh and sudo-rs.sh.
+- Actions:
+  - oxidizr enable --yes --experiments coreutils
+- Assertions:
+  - ensure_coreutils_installed (present).
+  - ensure_findutils_absent, ensure_diffutils_absent, ensure_sudors_absent (not present; GNU tools show for find/xargs/date; no symlinks/backups).
+- Cleanup (restore): If not CI, oxidizr disable --yes --all.
 
-- Validate robust handling of:
-  - Zero-length inputs
-  - Extremely large inputs (boundary limits)
-  - Invalid encodings / malformed data
-  - Permission errors (EACCES), missing files (ENOENT), disk full (ENOSPC)
-  - Network timeouts/resets (if networking is present)
-  - Concurrency hazards (races, deadlocks)
-- Panics must not be user-triggerable in release builds; tests must verify error paths return structured errors.
-- Sensitive data must never be present in logs or test artifacts.
+tests/non-root/task.yaml
+- Purpose: Verify the application refuses to run as non-root with a clear error.
+- Actions:
+  - sudo -u spread oxidizr enable --yes 2>&1 | MATCH "Error: This program must be run as root"
+  - sudo -u spread oxidizr disable --yes 2>&1 | MATCH "Error: This program must be run as root"
+- Assertions:
+  - Both commands must emit that exact error string when run as the unprivileged “spread” user.
+  - Ensures both enable and disable subcommands are protected by the root check.
 
-## 13. Compatibility and Feature Flags
+Library files referenced by tests
 
-- Tests must cover:
-  - Default configuration
-  - Each feature flag enabled/disabled (matrix)
-  - MSRV and latest stable toolchain
-- Backwards/forwards-compatibility tests where serialization or on-disk formats are involved:
-  - Golden files with version annotations
-  - Migration tests for format changes
+tests/lib/uutils.sh
+- ensure_coreutils_installed:
+  - Apt package rust-coreutils must be reported installed.
+  - For each binary in tests/lib/rust-coreutils-bins.txt:
+    - which resolves to a path that must be a symlink to /usr/bin/coreutils.
+    - A backup file .$bin.oxidizr.bak is expected (the helper prints a note if absent).
+    - The command’s help must not reference the GNU coreutils URL.
+- ensure_coreutils_absent:
+  - rust-coreutils not installed; /usr/bin/date not symlinked; no .date.oxidizr.bak; date --help contains “GNU”.
+- ensure_findutils_installed:
+  - rust-findutils installed.
+  - /usr/bin/find -> /usr/lib/cargo/bin/findutils/find; .find.oxidizr.bak exists; find --help not GNU URL.
+  - /usr/bin/xargs -> /usr/lib/cargo/bin/findutils/xargs; .xargs.oxidizr.bak exists; xargs --help not GNU URL.
+- ensure_findutils_absent:
+  - rust-findutils not installed; find/xargs not symlinked; no backups; their --help shows “GNU”.
+- ensure_diffutils_installed:
+  - Only when lsb_release -rs != "24.04":
+    - rust-diffutils installed.
+    - /usr/bin/diff -> /usr/lib/cargo/bin/diffutils/diff; .diff.oxidizr.bak exists; diff --help not GNU URL.
+- ensure_diffutils_absent:
+  - rust-diffutils not installed.
+  - Also verifies that /usr/bin/find is not linked to a diffutils path, no .find.oxidizr.bak, and find --help shows “GNU” (this reflects the current assertions in the file).
 
-## 14. Code Coverage and Quality Gates
+tests/lib/sudo-rs.sh
+- ensure_sudors_installed:
+  - sudo-rs installed.
+  - /usr/bin/sudo -> /usr/lib/cargo/bin/sudo; .sudo.oxidizr.bak present; sudo --version shows “sudo-rs”.
+  - /usr/bin/su -> /usr/lib/cargo/bin/su; .su.oxidizr.bak present; su --version shows “su-rs”.
+  - /usr/sbin/visudo -> /usr/lib/cargo/bin/visudo; .visudo.oxidizr.bak present.
+- ensure_sudors_absent:
+  - sudo-rs not installed; none of the above symlinks/backups exist; versions not branded “sudo-rs/su-rs”.
 
-- Line coverage threshold: ≥85% overall, ≥90% for critical modules.
-- Branch coverage threshold: ≥75% overall.
-- Coverage excludes generated code and test-only helpers, but includes error handling branches where feasible.
-- Lints:
-  - Formatting check must pass.
-  - Static analysis warnings are denied (treated as errors).
-- No allowed flaky tests; any flakes must be quarantined and fixed before merging.
+tests/lib/rust-coreutils-bins.txt
+- A canonical list of binaries that must be redirected to the Rust coreutils multi-call binary (/usr/bin/coreutils) when rust-coreutils is enabled. The ensure_coreutils_installed function loops over this list to validate the symlinks and non-GNU help output.
 
-## 15. Test Execution
+tests/lib/cloud-config.yaml
+- Cloud-init snippet enabling SSH password auth and creating the “spread” user (password placeholder SPREAD_PASSWORD) with passwordless sudo. Ensures the test runner can exercise both root and non-root behaviors (e.g., tests/non-root).
 
-Local developer commands (examples; adapt to project tooling):
-- Format and lint:
-  - Format check: `cargo fmt -- --check`
-  - Lints: `cargo clippy --all-targets --all-features -- -D warnings`
-- Unit/integration:
-  - `cargo test --all-features`
-  - With parallel runner (if configured): `cargo nextest run --all-features`
-- Coverage (preferred):
-  - `cargo llvm-cov nextest --all-features --lcov --output-path lcov.info`
-- Snapshots:
-  - Run: `cargo test -p <pkg>`
-  - Review new/changed snapshots: `cargo insta review`
-- Benchmarks:
-  - `cargo bench`
-- Fuzzing (if enabled; nightly required):
-  - `cargo fuzz run <target> -- -runs=0 -max_total_time=900`
-
-CI requirements:
-- Matrix:
-  - OS: ubuntu-latest, macos-latest, windows-latest
-  - Toolchain: MSRV (from manifest), stable
-  - Features: default, all-features
-- Required steps (must pass):
-  - Format check
-  - Lints with warnings denied
-  - Unit/integration tests
-  - Coverage thresholds enforced
-  - Snapshot review not auto-accepted
-  - Optional: property tests with elevated case counts
-  - Optional: scheduled fuzz jobs
-
-Artifacts:
-- Upload coverage reports (HTML/LCOV).
-- Upload failing seeds and minimized corpora for fuzz failures.
-- Persist benchmark comparisons for trend analysis.
-
-## 16. Logging and Observability in Tests
-
-- Tests should configure logging to capture debug information on failure.
-- Do not assert on log contents unless part of the contract; prefer structured assertions on returned values/events.
-
-## 17. Time, Randomness, and External Dependencies
-
-- Abstract time via a clock interface; avoid reading system time directly in code paths under test.
-- Fix random seeds via `TEST_SEED` env var; tests must print/record the seed on failure.
-- Network calls must be mocked or recorded; no live external calls in CI.
-- Filesystem:
-  - Use temp dirs per test.
-  - Clean up resources on success; keep on failure with clear path outputs for debugging.
-
-## 18. Error Messages and UX (for CLI/E2E)
-
-- Validate exit codes:
-  - `0` for success; non-zero for error categories.
-- Validate stderr/stdout formatting and helpful error messages.
-- Ensure help/usage output is accurate and includes examples.
-
-## 19. Documentation and Test Discoverability
-
-- Each non-trivial test must have a short doc comment describing:
-  - Scenario being tested
-  - Preconditions
-  - Expected outcome
-- Complex test helpers must be documented with examples.
-
-## 20. Adding New Tests: Checklist
-
-- Choose the appropriate layer (unit/integration/e2e/property/fuzz/bench).
-- Create/locate minimal fixtures; avoid duplication.
-- Ensure deterministic behavior (seed, time, tempdir).
-- Follow naming conventions and AAA structure.
-- Run locally with all features and on MSRV if possible.
-- Update snapshots and review diffs if applicable.
-- Verify coverage remains above thresholds.
-- Add CI configuration if introducing a new test target (e.g., fuzz).
-
-## 21. Non-Goals and Out of Scope
-
-- Manual QA processes are not covered here.
-- UI accessibility testing is out of scope unless the project provides a UI.
-- Long-running stress/load tests belong to a separate performance test suite and infrastructure.
-
-## 22. Governance and Exceptions
-
-- Changes to these requirements require approval from maintainers.
-- Temporary exceptions (e.g., coverage dips) must:
-  - Be time-boxed with an issue reference,
-  - Include a remediation plan,
-  - Be tracked in CI as a known debt item.
-
----
-
-By adhering to this specification, contributors ensure the test suite remains fast, reliable, and informative, enabling safe refactoring and confident releases.
+Key behavioral guarantees these tests enforce
+- Root requirement: All privileged operations must fail for non-root with the exact error “Error: This program must be run as root”.
+- Default vs all:
+  - Default enable/disable must at least affect: rust-coreutils and sudo-rs.
+  - “All” must additionally include findutils and (on supported releases) diffutils.
+- Selective operations:
+  - --experiments coreutils targets only coreutils; other experiments remain as they were.
+- Compatibility bypass:
+  - --no-compatibility-check must actually bypass gating and yield successful installation of the specified experiments.
+- System effects and reversibility:
+  - Enabling installs the corresponding apt package(s), rewires system binaries via symlinks to Rust/uutils or sudo-rs paths, and creates backup files .<name>.oxidizr.bak next to originals.
+  - Disabling removes packages, restores original binaries (no symlinks), and removes backup files; GNU-provided tools must be observable via their help output containing “GNU”.
+- Locale robustness:
+  - Operations must succeed correctly when the process locale is set to de_DE.UTF-8 (test switches back to English for assertions).

@@ -1,12 +1,91 @@
 Here’s a deep-dive of every file in src at commit 132c889d, with responsibilities, key APIs, behavior, and notable implementation details. You can browse the tree here: https://github.com/jnsgruk/oxidizr/tree/132c889dc31fc84e9e56ed496746b807ab003f5b/src
 
-- src/main.rs
+## Project requirements compliance (current repository: rust_coreutils_switch)
+
+This repository is a scaffold inspired by the referenced implementation but targets an Arch-like environment (AUR helpers, pacman) rather than Ubuntu. Based on the current sources under `src/`:
+
+- Files present: `src/main.rs`, `src/lib.rs`, `src/cli.rs`, `src/error.rs`, `src/experiment/`, `src/worker/`, `src/core/`
+- Files absent (from the referenced deep-dive): `src/experiments/mod.rs`, `src/experiments/uutils.rs`, `src/experiments/sudors.rs`, `src/utils/mod.rs`, `src/utils/command.rs`, `src/utils/worker.rs`, `src/utils/worker_mock.rs`
+
+Compliance overview:
+
+- CLI entrypoint exists: `src/main.rs` and `src/cli.rs` provide argument parsing with `clap`, root checks, prompts, and subcommands `Enable|Disable|Check|ListTargets`. Partially compliant with described behavior but tailored to Arch (`paru`/`yay`) rather than apt-based systems.
+- Experiment abstraction: Present as `src/experiment` (singular) with a `UutilsExperiment` scaffold. Missing multi-experiment registry and type-erased enum (`Experiment`) that unifies uutils families and `sudo-rs`.
+- System/Worker abstraction: Present under `src/worker` but not split into `utils` with `command.rs` and `worker.rs` as in the deep-dive; mock worker is not present behind `#[cfg(test)]` in this repo.
+- Distro gating: The scaffold assumes a "rolling" release and Arch-like environment; the Ubuntu gating and release allow-list from the deep-dive is not implemented.
+- Utilities/helpers: `utils::vecs_eq`, `utils::command`, and the exact backup/symlink semantics from the deep-dive are not present. Backup/restore behavior should be verified in `worker` once aligned.
+- Tests: The testing requirements doc `TESTING_REQUIREMENTS.MD` is currently empty, and there is no integrated `utils::worker_mock`-style test harness. Unit tests in `src/lib.rs` are minimal and do not cover enable/disable flows.
+
+Conclusion: The project is a functional scaffold but does not yet meet the full requirements and structure defined in the referenced technical implementation. Key gaps are the experiments registry, utils/worker split (with command wrapper, backup/symlink semantics), mock-based tests, and Ubuntu-based compatibility gating.
+
+## Migration plan to match the technical implementation structure
+
+Objective: Align `rust_coreutils_switch` to the structure and behaviors described in this document while keeping Arch support as a configurable variant.
+
+Step-by-step plan:
+
+1) Module layout refactor
+   - Create `src/experiments/` with:
+     - `mod.rs`: registry exposing `Experiment<'a>`, `all_experiments(&impl Worker)`, and re-exports.
+     - `uutils.rs`: generic `UutilsExperiment<'a>` with fields: `name`, `package`, `supported_releases`, `unified_binary: Option<PathBuf>`, `bin_directory: PathBuf>`; methods: `name`, `enable`, `disable`, `check_compatible`, `supported_releases`, `check_installed`.
+     - `sudors.rs`: `SudoRsExperiment<'a>` for `sudo-rs` install and link management.
+   - Introduce `src/utils/` with:
+     - `mod.rs`: re-export `command` and `worker`, define `Distribution { id, release }`, and helper `vecs_eq`.
+     - `command.rs`: small command wrapper `Command::build`, `Command::command()` for logging/mocking.
+     - `worker.rs`: `Worker` trait and concrete `System` implementation with `run`, `which`, `list_files`, `install/remove/update/check_installed`, file backup/restore/symlink helpers.
+     - `worker_mock.rs` behind `#[cfg(test)]` providing an in-memory `MockSystem`.
+   - Update `src/lib.rs` to export `experiments` and `utils` modules and re-exports used by `cli` and tests.
+
+2) Behavior alignment
+   - Implement Ubuntu compatibility gating as default behavior (per deep-dive) with an override flag to skip checks. Preserve Arch support by parameterizing package operations via `Worker` implementations or feature flags:
+     - For apt-based systems (Ubuntu): use `apt-get` commands and `dpkg-query` for `check_installed`.
+     - For Arch-based systems: use `pacman`/AUR helper commands. Choose at runtime based on `Distribution.id` or via a `--package-manager` flag.
+   - Implement unified vs non-unified symlink strategy in `UutilsExperiment`:
+     - Coreutils: symlink `/usr/bin/{date,sort,...}` -> unified binary path (e.g., `/usr/bin/coreutils`).
+     - Findutils/diffutils: per-file symlinks from the uutils bin directory.
+   - Ensure backup/restore semantics: hidden `.name.oxidizr.bak` file naming, permissions preserved, idempotent symlink creation.
+
+3) CLI refactor
+   - Keep `clap`-based `Cli`, but route actions through the `Experiment` enum:
+     - Add `--all`, `--experiments`, `--yes`, and `--no-compatibility-check` aligned with the deep-dive.
+     - Add selection logic `selected_experiments(all, selected, &system)` using `utils::vecs_eq`.
+     - Add `default_experiments()` returning sorted defaults (e.g., `["coreutils", "sudo-rs"]`).
+   - Maintain `--dry-run`, Arch flags like `--aur-helper`, but gate them under Arch mode or when `Distribution.id == "Arch"`.
+
+4) Testing
+   - Populate `TESTING_REQUIREMENTS.MD` with unit test coverage expectations:
+     - Enable/disable flows call correct package manager commands.
+     - Backup/restore lists and symlink targets are correct (both unified and non-unified cases).
+     - Distro compatibility gating behavior, including skip flag.
+   - Add unit tests using `utils::worker_mock` to simulate filesystem and package operations.
+   - Add integration-style tests for CLI argument parsing and selection logic.
+
+5) Migration execution order
+   - Phase 1: Introduce `utils::worker` and migrate current `worker` code; add `utils::command` wrapper.
+   - Phase 2: Move `UutilsExperiment` into `experiments/uutils.rs`; add `experiments/mod.rs` and wire registry; keep existing CLI temporarily calling the new locations.
+   - Phase 3: Add `experiments/sudors.rs` and initial support for `sudo-rs` experiment behind a flag.
+   - Phase 4: Refactor `cli.rs` to add selection logic and Ubuntu gating; add `--no-compatibility-check` and `--all/--experiments`.
+   - Phase 5: Introduce `utils::worker_mock` and expand tests; fill `TESTING_REQUIREMENTS.MD`.
+   - Phase 6: Clean-up: remove legacy paths (`src/experiment`, `src/worker`) after ensuring imports updated.
+
+6) Risk and rollback
+   - Ensure `System::backup_file` and `restore_file` are robust and idempotent. Keep `--dry-run` for safe previews.
+   - During rollout, prefer not to remove legacy code until tests pass. Provide a `Disable` command that fully restores originals.
+
+Deliverables
+   - New module structure under `src/experiments` and `src/utils`.
+   - Updated `cli` and `lib` wiring.
+   - Tests and mock system with coverage of enable/disable logic and distro gating.
+
+---
+
+The following sections remain as a reference specification for the target architecture and behavior.
   - Link: main.rs
   - Role: CLI entrypoint and orchestrator for enabling/disabling experiments (Rust replacements for coreutils/findutils/diffutils/sudo).
   - External crates: anyhow, clap, clap_verbosity_flag, inquire, tracing, tracing_subscriber, uzers.
   - Key structures:
-    - Args (clap Parser): global flags:
-      - --yes/-y: skip confirmation prompts
+  - Args (clap Parser): global flags:
+  - --yes/-y: skip confirmation prompts
       - --all/-a: operate on all known experiments
       - --no-compatibility-check: skip distro/release gating (dangerous)
       - --experiments/-e <list>: filter experiments (defaults to default_experiments())
