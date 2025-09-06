@@ -15,6 +15,7 @@ import (
 // Usage examples:
 //   go run .
 //   go run . --smoke-arch-docker
+//   go run . --arch-shell
 
 func main() {
 	var (
@@ -22,6 +23,7 @@ func main() {
 		archBuild   = flag.Bool("arch-build", false, "Build the Arch Docker image used for isolated tests")
 		archRun     = flag.Bool("arch-run", false, "Run the Arch Docker container to execute tests via entrypoint.sh")
 		archAll     = flag.Bool("arch", false, "Build the Arch Docker image if needed, then run the tests (one-shot)")
+		archShell   = flag.Bool("arch-shell", false, "Open an interactive shell inside the Arch Docker container with the repo mounted at /workspace")
 		imageTag    = flag.String("image-tag", "oxidizr-arch:latest", "Docker image tag to build/run")
 		dockerCtx   = flag.String("docker-context", "test-orch/docker", "Docker build context directory (relative or absolute)")
 		rootDirFlag = flag.String("root-dir", "", "Host directory to mount at /workspace (defaults to git root or repo root)")
@@ -41,7 +43,7 @@ func main() {
 	}
 
 	// Developer-friendly default: with no action flags, perform one-shot build+run
-	if !*smokeDocker && !*archBuild && !*archRun && !*archAll {
+	if !*smokeDocker && !*archBuild && !*archRun && !*archAll && !*archShell {
 		*archAll = true
 	}
 
@@ -57,8 +59,8 @@ func main() {
 		}
 	}
 
-	// Orchestrate Docker Arch image build/run if requested, but only if previous checks passed
-	if ok && (*archBuild || *archRun || *archAll) {
+	// Orchestrate Docker Arch image build/run/shell if requested, but only if previous checks passed
+	if ok && (*archBuild || *archRun || *archAll || *archShell) {
 		// Resolve docker context dir relative to current working dir/repo
 		ctxDir := *dockerCtx
 		if !filepath.IsAbs(ctxDir) {
@@ -118,6 +120,33 @@ func main() {
 				containerCmd := "bash /workspace/test-orch/docker/entrypoint.sh"
 				if err := runArchContainer(*imageTag, rootDir, containerCmd, *keepCtr, *timeout, *verbose); err != nil {
 					warn("docker run failed: ", err)
+					ok = false
+				}
+			}
+		}
+
+		// If interactive shell is requested
+		if ok && *archShell {
+			// Resolve rootDir to mount
+			rootDir := *rootDirFlag
+			if rootDir == "" {
+				if root, err := detectRepoRoot(); err == nil {
+					rootDir = root
+				} else {
+					rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
+				}
+			}
+			// Auto-build if the image tag is missing
+			if err := runSilent("docker", "image", "inspect", *imageTag); err != nil {
+				section("Docker image not found; building")
+				if err2 := buildArchImage(*imageTag, ctxDir, *noCache, *pullBase, *verbose); err2 != nil {
+					warn("docker build failed: ", err2)
+					ok = false
+				}
+			}
+			if ok {
+				if err := runArchInteractiveShell(*imageTag, rootDir, *verbose); err != nil {
+					warn("interactive shell failed: ", err)
 					ok = false
 				}
 			}

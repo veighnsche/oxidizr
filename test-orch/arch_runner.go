@@ -38,7 +38,7 @@ func buildArchImage(tag, contextDir string, noCache, pull bool, verbose bool) er
 		return fmt.Errorf("create build context: %w", err)
 	}
 	defer buildCtx.Close()
-
+	
 	opts := types.ImageBuildOptions{
 		Tags:       []string{tag},
 		Remove:     true,
@@ -59,6 +59,79 @@ func buildArchImage(tag, contextDir string, noCache, pull bool, verbose bool) er
 	} else {
 		io.Copy(io.Discard, resp.Body)
 	}
+	return nil
+}
+
+// runArchInteractiveShell starts an interactive TTY container with the repo mounted at /workspace
+// and attaches the current stdio to a bash login shell.
+func runArchInteractiveShell(tag, rootDir string, verbose bool) error {
+    if verbose {
+        log.Println(prefixRun(), "docker run -it -v", rootDir+":/workspace", tag, "bash /workspace/test-orch/docker/prepare_and_shell.sh")
+    }
+    ctx := context.Background()
+    cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+    if err != nil {
+        return fmt.Errorf("docker client: %w", err)
+    }
+
+	exists, err := imageExists(ctx, cli, tag)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("image %s not found (build it first with --arch or --arch-build)", tag)
+	}
+
+    cfg := &container.Config{
+        Image:        tag,
+        // The image ENTRYPOINT is ["/bin/bash","-lc"]. Pass a single string so it becomes the -c command.
+        Cmd:          strslice.StrSlice([]string{"bash /workspace/test-orch/docker/prepare_and_shell.sh"}),
+        Tty:          true,
+        OpenStdin:    true,
+        AttachStdout: true,
+        AttachStderr: true,
+        AttachStdin:  true,
+    }
+	hostCfg := &container.HostConfig{Binds: []string{fmt.Sprintf("%s:/workspace", rootDir)}, AutoRemove: true}
+    // Best-effort remove any stale container with the same name to avoid name conflicts
+    _ = cli.ContainerRemove(context.Background(), "oxidizr-arch-shell", container.RemoveOptions{Force: true})
+
+    created, err := cli.ContainerCreate(ctx, cfg, hostCfg, nil, nil, "oxidizr-arch-shell")
+	if err != nil {
+		return fmt.Errorf("container create: %w", err)
+	}
+
+	// Put terminal in raw mode if stdout is a TTY
+	inFd, _ := term.GetFdInfo(os.Stdin)
+	_, isTerm := term.GetFdInfo(os.Stdout)
+	var restore func() error
+	if isTerm {
+		state, err := term.MakeRaw(inFd)
+		if err == nil {
+			restore = func() error { return term.RestoreTerminal(inFd, state) }
+		}
+	}
+	if restore != nil {
+		defer restore()
+	}
+
+    // Attach to the container (request prior logs too, to capture prelude output)
+    attach, err := cli.ContainerAttach(ctx, created.ID, container.AttachOptions{
+        Stream: true, Stdin: true, Stdout: true, Stderr: true, Logs: true,
+    })
+    if err != nil {
+        return fmt.Errorf("container attach: %w", err)
+    }
+    defer attach.Close()
+
+    if err := cli.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
+        return fmt.Errorf("container start: %w", err)
+    }
+
+    // Copy stdio (since TTY is true, the stream is raw)
+    go func() { io.Copy(attach.Conn, os.Stdin) }()
+    _, _ = io.Copy(os.Stdout, attach.Conn)
+
 	return nil
 }
 
@@ -89,8 +162,8 @@ func runArchContainer(tag, rootDir, entrypoint string, keepContainer bool, timeo
 	cfg := &container.Config{
 		Image: tag,
 		// Use bash -lc to execute the provided entrypoint string, mirroring CLI usage
-		Cmd:   strslice.StrSlice([]string{"/bin/bash", "-lc", entrypoint}),
-		Tty:   false,
+		Cmd: strslice.StrSlice([]string{"/bin/bash", "-lc", entrypoint}),
+		Tty: false,
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{fmt.Sprintf("%s:/workspace", rootDir)},
