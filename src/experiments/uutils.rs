@@ -29,12 +29,67 @@ impl UutilsExperiment {
         // Determine applet names and their source paths
         let mut applets: Vec<(String, PathBuf)> = Vec::new();
         if self.name == "coreutils" {
+            // Resolve unified coreutils dispatch binary robustly
+            // Preference: configured path if it exists -> which("coreutils") -> default path
+            let unified_path: PathBuf = if let Some(cfg) = &self.unified_binary {
+                if cfg.exists() {
+                    cfg.clone()
+                } else if let Ok(Some(found)) = worker.which("coreutils") {
+                    found
+                } else {
+                    PathBuf::from("/usr/bin/coreutils")
+                }
+            } else if let Ok(Some(found)) = worker.which("coreutils") {
+                found
+            } else {
+                PathBuf::from("/usr/bin/coreutils")
+            };
+            if !unified_path.exists() {
+                // Try multiple known candidate locations for the unified dispatch binary
+                let candidates: [PathBuf; 3] = [
+                    self.bin_directory.join("coreutils"),
+                    PathBuf::from("/usr/lib/cargo/bin/coreutils"),
+                    PathBuf::from("/usr/bin/coreutils.uutils"),
+                ];
+                if let Some(found) = candidates.iter().find(|p| p.exists()) {
+                    log::warn!(
+                        "Unified coreutils not found at {}; creating symlink /usr/bin/coreutils -> {}",
+                        unified_path.display(),
+                        found.display()
+                    );
+                    // Best-effort create; ignore errors so we can still proceed or fail clearly below
+                    let _ = std::fs::create_dir_all(std::path::Path::new("/usr/bin"));
+                    let _ = std::fs::remove_file("/usr/bin/coreutils");
+                    if let Err(e) = std::os::unix::fs::symlink(found, "/usr/bin/coreutils") {
+                        log::error!("Failed to create /usr/bin/coreutils symlink: {}", e);
+                    } else {
+                        log::info!("Created /usr/bin/coreutils symlink to {}", found.display());
+                    }
+                } else {
+                    log::warn!(
+                        "Unified coreutils binary not found in any known location ({}; {}; {}): will error if not present after this step",
+                        self.bin_directory.join("coreutils").display(),
+                        Path::new("/usr/lib/cargo/bin/coreutils").display(),
+                        Path::new("/usr/bin/coreutils.uutils").display(),
+                    );
+                }
+            }
+            if !Path::new("/usr/bin/coreutils").exists() {
+                log::error!(
+                    "Unified coreutils binary not available at /usr/bin/coreutils after remediation"
+                );
+                return Err(CoreutilsError::ExecutionFailed(
+                    "Unified coreutils binary not found at /usr/bin/coreutils".into()
+                ));
+            }
+            log::info!("Using unified coreutils binary at: {}", Path::new("/usr/bin/coreutils").display());
+
             // Use baked-in list of applets to symlink the unified binary to.
             const COREUTILS_BINS: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
             for line in COREUTILS_BINS.lines() {
                 let name = line.trim();
                 if name.is_empty() { continue; }
-                applets.push((name.to_string(), self.unified_binary.clone().unwrap_or_else(|| PathBuf::from("/usr/bin/coreutils"))));
+                applets.push((name.to_string(), Path::new("/usr/bin/coreutils").to_path_buf()));
             }
         } else {
             // Use the files present in the bin_directory (e.g., findutils/xargs)

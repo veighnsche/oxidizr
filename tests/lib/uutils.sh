@@ -1,18 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve realpath robustly even if the readlink applet symlink is not yet present
-_rl() {
-  if command -v readlink >/dev/null 2>&1; then
-    readlink "$@"
-  elif [ -x /usr/bin/coreutils ]; then
-    /usr/bin/coreutils --coreutils-prog=readlink "$@"
-  else
-    echo "readlink unavailable (no applet and no /usr/bin/coreutils)" >&2
-    return 127
-  fi
-}
-
 # Basic assertion helpers (compatible with pipe usage: cmd | MATCH 'text')
 MATCH() {
   local pattern="$1"; shift || true
@@ -76,7 +64,7 @@ ensure_coreutils_installed() {
       echo "Expected symlink for $target" >&2; exit 1
     fi
     local dest
-    dest="$(_rl -f "$target")"
+    dest="$(readlink -f "$target")"
     if [ "$bin" != "coreutils" ] && [ "$dest" != "/usr/bin/coreutils" ]; then
       echo "$target -> $dest" | MATCH '/usr/bin/coreutils' >/dev/null
     fi

@@ -152,17 +152,71 @@ impl Worker for System {
     }
 
     fn replace_file_with_symlink(&self, source: &Path, target: &Path) -> Result<()> {
-        // If target is already a symlink, skip
-        if fs::symlink_metadata(target).map(|m| m.file_type().is_symlink()).unwrap_or(false) {
-            log::info!("Skipping existing symlink: {}", target.display());
-            return Ok(());
-        }
+        // Gather initial state for logging/instrumentation
+        let existed = target.exists();
+        let is_symlink = fs::symlink_metadata(target)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+        let current_dest = if is_symlink { fs::read_link(target).ok() } else { None };
+        log::info!(
+            "replace_file_with_symlink pre-state: target={}, existed={}, is_symlink={}, current_dest={}",
+            target.display(),
+            existed,
+            is_symlink,
+            current_dest
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "<none>".into())
+        );
+
         if self.dry_run {
-            log::info!("[dry-run] would backup and symlink {} -> {}", source.display(), target.display());
+            log::info!(
+                "[dry-run] would ensure symlink {} -> {} (updating/replacing as needed)",
+                source.display(),
+                target.display()
+            );
             return Ok(());
         }
-        // Backup if exists and not a symlink
-        if target.exists() {
+
+        // If a symlink already exists, verify it points to the desired source; if not, replace it
+        if is_symlink {
+            // Try to canonicalize both sides for robust comparison (handles relative symlink targets)
+            let desired = fs::canonicalize(source).unwrap_or_else(|_| source.to_path_buf());
+            let mut resolved_current = current_dest.clone().unwrap_or_default();
+            if resolved_current.is_relative() {
+                if let Some(parent) = target.parent() { resolved_current = parent.join(resolved_current); }
+            }
+            let resolved_current = fs::canonicalize(&resolved_current).unwrap_or(resolved_current);
+            if resolved_current == desired {
+                log::info!(
+                    "Existing symlink already correct: {} -> {} (no action)",
+                    target.display(),
+                    resolved_current.display()
+                );
+                return Ok(());
+            } else {
+                log::info!(
+                    "Replacing existing symlink: {} currently -> {}, desired -> {}",
+                    target.display(),
+                    current_dest
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "<unreadable>".into()),
+                    source.display()
+                );
+                fs::remove_file(target)?;
+                unix_fs::symlink(source, target)?;
+                log::info!(
+                    "Symlink updated: {} -> {}",
+                    target.display(),
+                    source.display()
+                );
+                return Ok(());
+            }
+        }
+
+        // For regular files: backup then replace with symlink
+        if existed {
             let backup = backup_path(target);
             log::info!("Backing up {} -> {}", target.display(), backup.display());
             fs::copy(target, &backup)?;
@@ -177,6 +231,7 @@ impl Worker for System {
         // Remove leftover target then symlink
         let _ = fs::remove_file(target);
         unix_fs::symlink(source, target)?;
+        log::info!("Symlink created: {} -> {}", target.display(), source.display());
         Ok(())
     }
 

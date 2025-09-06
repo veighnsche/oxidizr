@@ -42,8 +42,32 @@
 - **Minimize the test surface:** The more the test harness rewrites system state, the more it risks diverging from the product behavior under test.
 - **Prefer atomic, syscall-based changes:** They are less error-prone than invoking external binaries that may be unavailable during a switch.
 
+## Extra stupidity: commenting on a workaround without removing it
+
+- Adding a comment that a workaround is “stupid” while keeping the workaround in place is worse than doing nothing:
+  - It normalizes keeping masking code in the codebase.
+  - It creates zero incentive to actually remove the workaround.
+  - It misleads future maintainers into thinking the workaround has some sanctioned reason to exist.
+
+- Policy going forward:
+  - If something is a workaround that masks a product shortcoming (e.g., `hash -r` in the harness to refresh shell caches), remove it immediately.
+  - If you must add a temporary workaround to unblock, open a blocking task to remove it and attach a clear rationale and owner.
+  - Prefer to fix the sequencing/product so the workaround is unnecessary (e.g., run assertions in a fresh process or ensure the product re-execs where needed).
+
 ## Action items
 
 - Remove BusyBox-related logic from `test-orch/docker/entrypoint.sh`.
 - Keep only: build binary, run `enable`, assert, run `disable`, assert.
 - If persistent caching is needed, move heavy, stable dependencies into the Dockerfile—do not mutate applet symlinks in the entrypoint.
+
+## Masking attempts we made (and reverted)
+
+- tests/lib/uutils.sh: added a fallback wrapper for `readlink`
+  - What we did: introduced a helper that tried `readlink`, then fell back to `/usr/bin/coreutils --coreutils-prog=readlink` if the applet symlink wasn’t present.
+  - Why this was wrong: it weakens the test by accepting scenarios where the applet symlink wasn’t correctly switched by the product. The test should fail if `readlink` isn’t available via the expected applet symlink after `enable`.
+  - Status: reverted. The test now calls `readlink` directly again, ensuring the product must provide it.
+
+- test-orch/docker/entrypoint.sh: added `hash -r || true` after `enable`
+  - What we did: flushed the shell’s command hash to force re-resolution of applets after switching.
+  - Why this was wrong: it masks issues where the product/harness sequencing leaves the current environment in an inconsistent state. The harness should not hide such failures; assertions should either run in a fresh process or the product should guarantee correct resolution without requiring a shell cache flush.
+  - Status: removed. A comment now explicitly forbids adding masking workarounds here; fix the product or run assertions in a fresh process instead.
