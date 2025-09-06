@@ -1,57 +1,206 @@
 package main
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/strslice"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/term"
 )
 
 // buildArchImage builds the Arch Docker image used for running the isolated tests.
 func buildArchImage(tag, contextDir string, noCache, pull bool, verbose bool) error {
-	args := []string{"build", "-t", tag}
-	if noCache {
-		args = append(args, "--no-cache")
-	}
-	if pull {
-		args = append(args, "--pull")
-	}
-	args = append(args, contextDir)
 	if verbose {
-		log.Println(prefixRun(), "docker "+strings.Join(args, " "))
+		log.Println(prefixRun(), "docker build -t", tag, contextDir)
 	}
-	return runMaybeSilent(verbose, "docker", args...)
+	// Initialize Docker client
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	// Create tar build context from contextDir
+	buildCtx, err := tarDirectory(contextDir)
+	if err != nil {
+		return fmt.Errorf("create build context: %w", err)
+	}
+	defer buildCtx.Close()
+
+	opts := types.ImageBuildOptions{
+		Tags:       []string{tag},
+		Remove:     true,
+		NoCache:    noCache,
+		PullParent: pull,
+	}
+	resp, err := cli.ImageBuild(ctx, buildCtx, opts)
+	if err != nil {
+		return fmt.Errorf("image build: %w", err)
+	}
+	defer resp.Body.Close()
+	if verbose {
+		// Render the daemon's JSON message stream in a human-friendly way
+		fd, isTerm := term.GetFdInfo(os.Stdout)
+		if err := jsonmessage.DisplayJSONMessagesStream(resp.Body, os.Stdout, fd, isTerm, nil); err != nil {
+			return fmt.Errorf("render build output: %w", err)
+		}
+	} else {
+		io.Copy(io.Discard, resp.Body)
+	}
+	return nil
 }
 
 // runArchContainer runs the Arch image with the repo mounted at /workspace and executes entrypoint.sh
 func runArchContainer(tag, rootDir, entrypoint string, keepContainer bool, timeout time.Duration, verbose bool) error {
 	containerName := "oxidizr-arch-test"
-	args := []string{"run"}
-	if !keepContainer {
-		args = append(args, "--rm")
-	}
-	args = append(args, "-i", "-v", rootDir+":/workspace", "--name", containerName, tag, entrypoint)
 	if verbose {
-		log.Println(prefixRun(), "docker "+strings.Join(args, " "))
+		log.Println(prefixRun(), "docker run -v", rootDir+":/workspace", "--name", containerName, tag, entrypoint)
 	}
-	// Apply timeout
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
 	}
-	// In non-verbose mode, suppress docker CLI noise but still capture timeout/exit code.
-	err := cmd.Run()
-	if ctx.Err() == context.DeadlineExceeded {
+
+	// Ensure image exists
+	exists, err := imageExists(ctx, cli, tag)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("image %s not found", tag)
+	}
+
+	// Create container
+	cfg := &container.Config{
+		Image: tag,
+		// Use bash -lc to execute the provided entrypoint string, mirroring CLI usage
+		Cmd:   strslice.StrSlice([]string{"/bin/bash", "-lc", entrypoint}),
+		Tty:   false,
+	}
+	hostCfg := &container.HostConfig{
+		Binds: []string{fmt.Sprintf("%s:/workspace", rootDir)},
+	}
+	created, err := cli.ContainerCreate(ctx, cfg, hostCfg, nil, nil, containerName)
+	if err != nil {
+		return fmt.Errorf("container create: %w", err)
+	}
+	// Ensure cleanup if not kept
+	if !keepContainer {
+		defer func() {
+			timeout := 5 * time.Second
+			cctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			_ = cli.ContainerRemove(cctx, created.ID, container.RemoveOptions{Force: true})
+		}()
+	}
+
+	if err := cli.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("container start: %w", err)
+	}
+
+	// Stream logs if verbose
+	if verbose {
+		go func() {
+			// best-effort log stream; do not block shutdown
+			lctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			rdr, err := cli.ContainerLogs(lctx, created.ID, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "all"})
+			if err == nil {
+				defer rdr.Close()
+				// Demultiplex Docker's combined stdout/stderr stream
+				_, _ = stdcopy.StdCopy(os.Stdout, os.Stderr, rdr)
+			}
+		}()
+	}
+
+	// Wait for completion or timeout
+	statusCh, errCh := cli.ContainerWait(ctx, created.ID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return fmt.Errorf("container wait: %w", err)
+		}
+	case status := <-statusCh:
+		if status.StatusCode != 0 {
+			return fmt.Errorf("container exited with status %d", status.StatusCode)
+		}
+	case <-ctx.Done():
 		return fmt.Errorf("docker run timed out after %s", timeout)
 	}
-	return err
+	return nil
+}
+
+// imageExists checks if a Docker image tag exists locally via SDK
+func imageExists(ctx context.Context, cli *client.Client, tag string) (bool, error) {
+	f := filters.NewArgs()
+	f.Add("reference", tag)
+	imgs, err := cli.ImageList(ctx, image.ListOptions{Filters: f})
+	if err != nil {
+		return false, fmt.Errorf("image list: %w", err)
+	}
+	return len(imgs) > 0, nil
+}
+
+// Tar the given directory into an io.ReadCloser suitable for Docker build context
+func tarDirectory(dir string) (io.ReadCloser, error) {
+	pr, pw := io.Pipe()
+	tw := tar.NewWriter(pw)
+
+	go func() {
+		defer pw.Close()
+		defer tw.Close()
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			// Docker build context expects paths relative to the context root
+			rel, err := filepath.Rel(dir, path)
+			if err != nil {
+				return err
+			}
+			// Normalize directory headers
+			hdr, err := tar.FileInfoHeader(info, "")
+			if err != nil {
+				return err
+			}
+			hdr.Name = rel
+			if info.IsDir() {
+				hdr.Name += "/"
+			}
+			if err := tw.WriteHeader(hdr); err != nil {
+				return err
+			}
+			if info.Mode().IsRegular() {
+				f, err := os.Open(path)
+				if err != nil {
+					return err
+				}
+				_, err = io.Copy(tw, f)
+				f.Close()
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}()
+
+	return pr, nil
 }
 
 // detectRepoRoot finds the git repository root, or returns an error.

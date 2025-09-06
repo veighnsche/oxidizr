@@ -5,6 +5,29 @@ set -euo pipefail
 export PATH="/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}"
 export RUST_LOG="info"
 
+# Helper: show how selected coreutils resolve and which implementation they are
+show_coreutils_snapshot() {
+  local label="$1"; shift || true
+  local apps=(readlink ls cp mv rm ln mkdir rmdir touch date echo)
+  echo "[snapshot:$label] ==== Applet resolution & versions ===="
+  for a in "${apps[@]}"; do
+    echo "[snapshot:$label] -- $a --"
+    command -V "$a" || true
+    if [ -e "/usr/bin/$a" ]; then
+      ls -l "/usr/bin/$a" || true
+      dest=$(readlink -f "/usr/bin/$a" || true)
+      echo "[snapshot:$label] /usr/bin/$a -> ${dest}" || true
+    fi
+    # Prefer running via absolute path to avoid shell hashing issues
+    if [ -x "/usr/bin/$a" ]; then
+      "/usr/bin/$a" --version 2>&1 | head -n 1 || true
+    else
+      "$a" --version 2>&1 | head -n 1 || true
+    fi
+  done
+  echo "[snapshot:$label] ==================================="
+}
+
 # 1) Stage workspace into /root/project/oxidizr-arch for paths expected by tests
 mkdir -p /root/project/oxidizr-arch
 cp -a /workspace/. /root/project/oxidizr-arch/
@@ -43,19 +66,14 @@ oxidizr-arch --help >/dev/null
 cd /root/project/oxidizr-arch
 source tests/lib/uutils.sh
 source tests/lib/sudo-rs.sh
-# Pre-enable: capture a few applet resolutions in this fresh shell
-echo "[pre-enable] command -V readlink"; command -V readlink || true
-echo "[pre-enable] ls -l /usr/bin/readlink"; ls -l /usr/bin/readlink || true
-echo "[pre-enable] readlink --version (via /usr/bin if needed)"; /usr/bin/readlink --version || /usr/bin/coreutils --coreutils-prog=readlink --version || true
-echo "[pre-enable] ls -l /usr/bin/{cp,ln,rm}"; ls -l /usr/bin/{cp,ln,rm} || true
+
+# Show GNU state before enabling uutils
+show_coreutils_snapshot pre-enable
 
 oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none enable
 
-# Post-enable: show exact symlink destinations for a sample of applets
-echo "[post-enable] command -V readlink"; command -V readlink || true
-echo "[post-enable] ls -l /usr/bin/readlink"; ls -l /usr/bin/readlink || true
-echo "[post-enable] /usr/bin/readlink --version (or via coreutils dispatch)"; /usr/bin/readlink --version || /usr/bin/coreutils --coreutils-prog=readlink --version || true
-echo "[post-enable] ls -l /usr/bin/{cp,ln,rm}"; ls -l /usr/bin/{cp,ln,rm} || true
+# Show uutils state after enabling
+show_coreutils_snapshot post-enable
 
 # Do NOT add masking workarounds (e.g., 'hash -r') here. If applet resolution fails
 # after enable, fix the product or run assertions in a fresh process. The harness must
@@ -68,6 +86,7 @@ ensure_sudors_installed
 
 # 9) Disable and assertions
 oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none disable
+show_coreutils_snapshot post-disable
 ensure_coreutils_absent
 ensure_diffutils_absent
 ensure_sudors_absent
