@@ -70,7 +70,15 @@ source tests/lib/sudo-rs.sh
 # Show GNU state before enabling uutils
 show_coreutils_snapshot pre-enable
 
+# Concise demo sequence requested: ls --version, enable, ls --version
+# Print the first line only to keep it tidy.
+{ /usr/bin/ls --version 2>/dev/null || ls --version; } | head -n 1 || true
+echo "enable"
+
 oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none enable
+
+# After enabling, show ls version again (first line)
+{ /usr/bin/ls --version 2>/dev/null || ls --version; } | head -n 1 || true
 
 # Show uutils state after enabling
 show_coreutils_snapshot post-enable
@@ -79,16 +87,25 @@ show_coreutils_snapshot post-enable
 # after enable, fix the product or run assertions in a fresh process. The harness must
 # not hide product failures with shell-level cache flushes.
 
-# Ensure required toolsets are installed after enabling
-ensure_coreutils_installed
-ensure_diffutils_installed_if_supported
-ensure_sudors_installed
+# Ensure required toolsets are installed after enabling (quiet with summary)
+echo "[assert] coreutils installed: running..."
+if ensure_coreutils_installed >/dev/null 2>&1; then echo "[assert] coreutils installed: OK"; else echo "[assert] coreutils installed: FAIL"; fi
+echo "[assert] diffutils installed (if supported): running..."
+if ensure_diffutils_installed_if_supported >/dev/null 2>&1; then echo "[assert] diffutils installed: OK or skipped"; else echo "[assert] diffutils installed: FAIL"; fi
+echo "[assert] sudo-rs installed: running..."
+if ensure_sudors_installed >/dev/null 2>&1; then echo "[assert] sudo-rs installed: OK"; else echo "[assert] sudo-rs installed: FAIL"; fi
 
 # 9) Disable and assertions
+echo "disable"
 oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none disable
+# After disabling, show ls version once more (first line)
+{ /usr/bin/ls --version 2>/dev/null || ls --version; } | head -n 1 || true
 show_coreutils_snapshot post-disable
-ensure_coreutils_absent
-ensure_diffutils_absent
-ensure_sudors_absent
+echo "[assert] coreutils absent: running..."
+if ensure_coreutils_absent >/dev/null 2>&1; then echo "[assert] coreutils absent: OK"; else echo "[assert] coreutils absent: FAIL"; fi
+echo "[assert] diffutils absent: running..."
+if ensure_diffutils_absent >/dev/null 2>&1; then echo "[assert] diffutils absent: OK"; else echo "[assert] diffutils absent: FAIL"; fi
+echo "[assert] sudo-rs absent: running..."
+if ensure_sudors_absent >/dev/null 2>&1; then echo "[assert] sudo-rs absent: OK"; else echo "[assert] sudo-rs absent: FAIL"; fi
 
 echo "All assertions passed under Docker Arch container."

@@ -16,6 +16,8 @@ import (
 //   go run .
 //   go run . --smoke-arch-docker
 //   go run . --arch-shell
+//   go run . --arch-test-sudo
+//   go run . --arch-shell-test-sudo
 
 func main() {
 	var (
@@ -24,6 +26,8 @@ func main() {
 		archRun     = flag.Bool("arch-run", false, "Run the Arch Docker container to execute tests via entrypoint.sh")
 		archAll     = flag.Bool("arch", false, "Build the Arch Docker image if needed, then run the tests (one-shot)")
 		archShell   = flag.Bool("arch-shell", false, "Open an interactive shell inside the Arch Docker container with the repo mounted at /workspace")
+		archTestSudo = flag.Bool("arch-test-sudo", false, "Run automated sudo/sudo-rs enable/disable assertions inside the Arch container")
+		archShellTestSudo = flag.Bool("arch-shell-test-sudo", false, "Run automated sudo/sudo-rs assertions, then drop into an interactive shell")
 		imageTag    = flag.String("image-tag", "oxidizr-arch:latest", "Docker image tag to build/run")
 		dockerCtx   = flag.String("docker-context", "test-orch/docker", "Docker build context directory (relative or absolute)")
 		rootDirFlag = flag.String("root-dir", "", "Host directory to mount at /workspace (defaults to git root or repo root)")
@@ -43,7 +47,7 @@ func main() {
 	}
 
 	// Developer-friendly default: with no action flags, perform one-shot build+run
-	if !*smokeDocker && !*archBuild && !*archRun && !*archAll && !*archShell {
+	if !*smokeDocker && !*archBuild && !*archRun && !*archAll && !*archShell && !*archTestSudo && !*archShellTestSudo {
 		*archAll = true
 	}
 
@@ -60,7 +64,7 @@ func main() {
 	}
 
 	// Orchestrate Docker Arch image build/run/shell if requested, but only if previous checks passed
-	if ok && (*archBuild || *archRun || *archAll || *archShell) {
+	if ok && (*archBuild || *archRun || *archAll || *archShell || *archTestSudo || *archShellTestSudo) {
 		// Resolve docker context dir relative to current working dir/repo
 		ctxDir := *dockerCtx
 		if !filepath.IsAbs(ctxDir) {
@@ -85,7 +89,7 @@ func main() {
 		}
 
 		// If running, ensure image exists (auto-build if missing unless user explicitly disabled by not using --arch or --arch-build)
-		doRun := *archRun || *archAll
+		doRun := *archRun || *archAll || *archTestSudo
 		if doRun {
 			// Resolve rootDir to mount
 			rootDir := *rootDirFlag
@@ -106,27 +110,36 @@ func main() {
 					ok = false
 				}
 			}
-			hostEntrypoint := filepath.Join(rootDir, "test-orch/docker/entrypoint.sh")
-			if _, err := os.Stat(hostEntrypoint); err != nil {
-				warn("entrypoint not found at ", hostEntrypoint)
-				if *verbose {
-					log.Println("Ensure --root-dir points to the repository root so test-orch/docker/entrypoint.sh is available.")
+			// Decide which non-interactive path to run
+			if ok {
+				var hostScript string
+				var entryCmd string
+				if *archTestSudo {
+					hostScript = filepath.Join(rootDir, "test-orch/docker/run_sudo_tests.sh")
+					entryCmd = "bash /workspace/test-orch/docker/run_sudo_tests.sh"
 				} else {
-					log.Println("Hint: set --root-dir to the repo root. Run with -v for details.")
+					hostScript = filepath.Join(rootDir, "test-orch/docker/entrypoint.sh")
+					entryCmd = "bash /workspace/test-orch/docker/entrypoint.sh"
 				}
-				ok = false
-			} else {
-				// Run via bash to avoid needing executable bit on the mounted script
-				containerCmd := "bash /workspace/test-orch/docker/entrypoint.sh"
-				if err := runArchContainer(*imageTag, rootDir, containerCmd, *keepCtr, *timeout, *verbose); err != nil {
-					warn("docker run failed: ", err)
+				if _, err := os.Stat(hostScript); err != nil {
+					warn("required script not found at ", hostScript)
+					if *verbose {
+						log.Println("Ensure --root-dir points to the repository root so the script exists.")
+					} else {
+						log.Println("Hint: set --root-dir to the repo root. Run with -v for details.")
+					}
 					ok = false
+				} else {
+					if err := runArchContainer(*imageTag, rootDir, entryCmd, *keepCtr, *timeout, *verbose); err != nil {
+						warn("docker run failed: ", err)
+						ok = false
+					}
 				}
 			}
 		}
 
 		// If interactive shell is requested
-		if ok && *archShell {
+		if ok && (*archShell || *archShellTestSudo) {
 			// Resolve rootDir to mount
 			rootDir := *rootDirFlag
 			if rootDir == "" {
@@ -145,9 +158,18 @@ func main() {
 				}
 			}
 			if ok {
-				if err := runArchInteractiveShell(*imageTag, rootDir, *verbose); err != nil {
-					warn("interactive shell failed: ", err)
-					ok = false
+				if *archShellTestSudo {
+					// Run tests, then drop into a login shell in the same container
+					cmd := "bash -lc 'bash /workspace/test-orch/docker/run_sudo_tests.sh && exec bash -l'"
+					if err := runArchInteractiveCommand(*imageTag, rootDir, cmd, *verbose); err != nil {
+						warn("interactive shell with tests failed: ", err)
+						ok = false
+					}
+				} else {
+					if err := runArchInteractiveShell(*imageTag, rootDir, *verbose); err != nil {
+						warn("interactive shell failed: ", err)
+						ok = false
+					}
 				}
 			}
 		}

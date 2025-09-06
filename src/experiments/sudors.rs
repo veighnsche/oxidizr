@@ -7,6 +7,18 @@ pub struct SudoRsExperiment<'a> {
     pub system: &'a dyn Worker,
 }
 
+// Prefer cargo-style install location, but accept Arch packaging under /usr/bin/*-rs.
+fn find_sudors_source(name: &str) -> Option<PathBuf> {
+    let candidates = [
+        PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
+        PathBuf::from(format!("/usr/bin/{}-rs", name)),
+    ];
+    for c in candidates {
+        if Path::new(&c).exists() { return Some(c); }
+    }
+    None
+}
+
 impl<'a> SudoRsExperiment<'a> {
     pub fn name(&self) -> &'static str { "sudo-rs" }
 
@@ -24,20 +36,18 @@ impl<'a> SudoRsExperiment<'a> {
         if update_lists { worker.update_packages()?; }
         // Install sudo-rs
         worker.install_package("sudo-rs")?;
-        // Replace sudo, su, visudo with binaries provided by sudo-rs package under /usr/lib/cargo/bin
-        // Match test expectations in tests/lib/sudo-rs.sh
-        // - sudo   -> /usr/lib/cargo/bin/sudo   at target /usr/bin/sudo
-        // - su     -> /usr/lib/cargo/bin/su     at target /usr/bin/su
-        // - visudo -> /usr/lib/cargo/bin/visudo at target /usr/sbin/visudo
-        let mappings: [(&str, &str, &str); 3] = [
-            ("sudo", "/usr/lib/cargo/bin/sudo", "/usr/bin/sudo"),
-            ("su", "/usr/lib/cargo/bin/su", "/usr/bin/su"),
-            ("visudo", "/usr/lib/cargo/bin/visudo", "/usr/sbin/visudo"),
-        ];
-        for (name, src_path, tgt_path) in mappings {
-            let source = PathBuf::from(src_path);
-            // For visudo specifically, tests assert /usr/sbin/visudo; otherwise, use resolved target.
-            let target = if name == "visudo" { PathBuf::from(tgt_path) } else { resolve_target(worker, name) };
+        // Replace sudo, su, visudo with binaries provided by sudo-rs. The Arch package layout may
+        // install either into /usr/lib/cargo/bin/<name> or as /usr/bin/<name>-rs. Detect robustly.
+        for (name, target) in [
+            ("sudo", resolve_target(worker, "sudo")),
+            ("su", resolve_target(worker, "su")),
+            ("visudo", PathBuf::from("/usr/sbin/visudo")),
+        ] {
+            let source = find_sudors_source(name);
+            let source = source.ok_or_else(|| CoreutilsError::ExecutionFailed(format!(
+                "Could not find installed sudo-rs binary for '{}'; looked for /usr/lib/cargo/bin/{} and /usr/bin/{}-rs",
+                name, name, name
+            )))?;
             worker.replace_file_with_symlink(&source, &target)?;
         }
         Ok(())

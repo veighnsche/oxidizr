@@ -141,13 +141,31 @@ impl UutilsExperiment {
 
     pub fn disable<W: Worker>(&self, worker: &W, update_lists: bool) -> Result<()> {
         if update_lists { log::info!("Updating package lists..."); worker.update_packages()?; }
-        let files = worker.list_files(&self.bin_directory)?;
-        for f in files {
-            let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if filename.is_empty() { continue; }
-            let target = resolve_target(worker, filename);
-            log::info!("Restoring target {} (if backup exists)", target.display());
-            worker.restore_file(&target)?;
+
+        // IMPORTANT: On enable() we may have linked a large, baked-in set of applets
+        // to the unified dispatcher (/usr/bin/coreutils). Those applets will NOT be
+        // present under bin_directory, so listing bin_directory is insufficient for
+        // complete restoration. Mirror the enable() selection for coreutils.
+        if self.name == "coreutils" {
+            const COREUTILS_BINS: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
+            for line in COREUTILS_BINS.lines() {
+                let filename = line.trim();
+                if filename.is_empty() { continue; }
+                let target = resolve_target(worker, filename);
+                log::info!("[disable] Restoring {} (if backup exists)", target.display());
+                worker.restore_file(&target)?;
+            }
+        } else {
+            // Non-coreutils families: restore based on the binaries actually provided
+            // by the package under bin_directory.
+            let files = worker.list_files(&self.bin_directory)?;
+            for f in files {
+                let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                if filename.is_empty() { continue; }
+                let target = resolve_target(worker, filename);
+                log::info!("[disable] Restoring {} (if backup exists)", target.display());
+                worker.restore_file(&target)?;
+            }
         }
         log::info!("Removing package: {}", self.package);
         worker.remove_package(&self.package)?;

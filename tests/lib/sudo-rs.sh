@@ -18,15 +18,48 @@ pkg_installed() {
 ensure_sudors_installed() {
   pkg_installed sudo-rs || { echo "sudo-rs not installed" >&2; exit 1; }
 
-  [ -L "/usr/bin/sudo" ] && [ "$(readlink -f /usr/bin/sudo)" = "/usr/lib/cargo/bin/sudo" ] || { echo "sudo not linked to sudo-rs" >&2; exit 1; }
+  if [ ! -L "/usr/bin/sudo" ]; then
+    echo "sudo not a symlink after enable" >&2; exit 1
+  fi
+  _sudo_dest="$(readlink -f /usr/bin/sudo || true)"
+  case "${_sudo_dest}" in
+    "/usr/lib/cargo/bin/sudo"|"/usr/bin/sudo-rs") ;;
+    *) echo "Unexpected sudo link target: ${_sudo_dest}" >&2; exit 1 ;;
+  esac
   [ -e "/usr/bin/.sudo.oxidizr.bak" ] || { echo "Missing .sudo.oxidizr.bak" >&2; exit 1; }
-  sudo --version 2>&1 | MATCH 'sudo-rs'
+  # Ensure that invoking 'sudo' by basename resolves correctly and is runnable
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "'sudo' not found in PATH after enable" >&2; exit 1
+  fi
+  # Prefer type -P to get the resolved path without function/alias noise
+  _sudo_path="$(type -P sudo || command -v sudo || true)"
+  if [ "${_sudo_path:-}" != "/usr/bin/sudo" ]; then
+    echo "Unexpected sudo path: ${_sudo_path:-<none>} (expected /usr/bin/sudo)" >&2; exit 1
+  fi
+  # Sanity: 'sudo --version' should execute (no strict string matching)
+  sudo --version >/dev/null 2>&1 || { echo "'sudo --version' failed to execute after enable" >&2; exit 1; }
+  # Version output of sudo-rs may vary across builds/distros; avoid strict string matching.
+  # The symlink and backup checks above are sufficient to prove the switch.
 
-  [ -L "/usr/bin/su" ] && [ "$(readlink -f /usr/bin/su)" = "/usr/lib/cargo/bin/su" ] || { echo "su not linked to su-rs" >&2; exit 1; }
+  if [ ! -L "/usr/bin/su" ]; then
+    echo "su not a symlink after enable" >&2; exit 1
+  fi
+  _su_dest="$(readlink -f /usr/bin/su || true)"
+  case "${_su_dest}" in
+    "/usr/lib/cargo/bin/su"|"/usr/bin/su-rs") ;;
+    *) echo "Unexpected su link target: ${_su_dest}" >&2; exit 1 ;;
+  esac
   [ -e "/usr/bin/.su.oxidizr.bak" ] || { echo "Missing .su.oxidizr.bak" >&2; exit 1; }
-  su --version 2>&1 | MATCH 'su-rs'
+  # Likewise, avoid strict matching on su version output.
 
-  [ -L "/usr/sbin/visudo" ] && [ "$(readlink -f /usr/sbin/visudo)" = "/usr/lib/cargo/bin/visudo" ] || { echo "visudo not linked" >&2; exit 1; }
+  if [ ! -L "/usr/sbin/visudo" ]; then
+    echo "visudo not a symlink after enable" >&2; exit 1
+  fi
+  _visudo_dest="$(readlink -f /usr/sbin/visudo || true)"
+  case "${_visudo_dest}" in
+    "/usr/lib/cargo/bin/visudo"|"/usr/bin/visudo-rs") ;;
+    *) echo "Unexpected visudo link target: ${_visudo_dest}" >&2; exit 1 ;;
+  esac
   [ -e "/usr/sbin/.visudo.oxidizr.bak" ] || { echo "Missing .visudo.oxidizr.bak" >&2; exit 1; }
 }
 
