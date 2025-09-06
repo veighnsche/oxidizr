@@ -153,4 +153,8 @@ If you want, I can commit a ready-to-run `spread.yaml` configured for `images:ar
 
 ## License
 
-Dual-licensed under MIT or Apache 2.0 at your option.
+This project is licensed under the GNU General Public License, version 3 or (at your option) any later version.
+
+Copyright (C) 2025 veighnsche
+
+See the `LICENSE` file for the full text of the GPL-3.0-or-later license.
