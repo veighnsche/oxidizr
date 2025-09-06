@@ -78,11 +78,6 @@ func main() {
 		if doBuild {
 			if err := buildArchImage(*imageTag, ctxDir, *noCache, *pullBase, *verbose); err != nil {
 				warn("docker build failed: ", err)
-				if *verbose {
-					log.Println(dockerTroubleshootTips("build"))
-				} else {
-					log.Println("Hint: verify the Docker context path exists and permissions are correct. Run with -v for detailed tips.")
-				}
 				ok = false
 			}
 		}
@@ -106,11 +101,6 @@ func main() {
 				section("Docker image not found; building")
 				if err2 := buildArchImage(*imageTag, ctxDir, *noCache, *pullBase, *verbose); err2 != nil {
 					warn("docker build failed: ", err2)
-					if *verbose {
-						log.Println(dockerTroubleshootTips("build"))
-					} else {
-						log.Println("Hint: check the Docker context directory and Docker daemon status. Run with -v for detailed tips.")
-					}
 					ok = false
 				}
 			}
@@ -128,11 +118,6 @@ func main() {
 				containerCmd := "bash /workspace/test-orch/docker/entrypoint.sh"
 				if err := runArchContainer(*imageTag, rootDir, containerCmd, *keepCtr, *timeout, *verbose); err != nil {
 					warn("docker run failed: ", err)
-					if *verbose {
-						log.Println(dockerTroubleshootTips("run"))
-					} else {
-						log.Println("Hint: check bind mounts and permissions. Run with -v for detailed tips.")
-					}
 					ok = false
 				}
 			}

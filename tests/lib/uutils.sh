@@ -65,8 +65,15 @@ ensure_coreutils_installed() {
     fi
     local dest
     dest="$(readlink -f "$target")"
-    if [ "$bin" != "coreutils" ] && [ "$dest" != "/usr/bin/coreutils" ]; then
-      echo "$target -> $dest" | MATCH '/usr/bin/coreutils' >/dev/null
+    if [ "$bin" != "coreutils" ]; then
+      if [ "$dest" = "/usr/bin/coreutils" ]; then
+        : # unified multicall OK
+      elif [ "$dest" = "/usr/bin/uu-$bin" ]; then
+        : # per-applet uu-* binary OK
+      else
+        echo "Unexpected target for $target -> $dest (expected /usr/bin/coreutils or /usr/bin/uu-$bin)" >&2
+        exit 1
+      fi
     fi
     _note_if_missing_backup "$target"
     $bin --help 2>&1 | NOMATCH 'www.gnu.org/software/coreutils'

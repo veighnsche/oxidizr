@@ -24,11 +24,20 @@ impl<'a> SudoRsExperiment<'a> {
         if update_lists { worker.update_packages()?; }
         // Install sudo-rs
         worker.install_package("sudo-rs")?;
-        // Replace sudo, su, visudo with sudo-rs binary (scaffold assumption)
-        let targets = ["sudo", "su", "visudo"];
-        for name in targets {
-            let target = resolve_target(worker, name);
-            let source = PathBuf::from("/usr/bin/sudo-rs");
+        // Replace sudo, su, visudo with binaries provided by sudo-rs package under /usr/lib/cargo/bin
+        // Match test expectations in tests/lib/sudo-rs.sh
+        // - sudo   -> /usr/lib/cargo/bin/sudo   at target /usr/bin/sudo
+        // - su     -> /usr/lib/cargo/bin/su     at target /usr/bin/su
+        // - visudo -> /usr/lib/cargo/bin/visudo at target /usr/sbin/visudo
+        let mappings: [(&str, &str, &str); 3] = [
+            ("sudo", "/usr/lib/cargo/bin/sudo", "/usr/bin/sudo"),
+            ("su", "/usr/lib/cargo/bin/su", "/usr/bin/su"),
+            ("visudo", "/usr/lib/cargo/bin/visudo", "/usr/sbin/visudo"),
+        ];
+        for (name, src_path, tgt_path) in mappings {
+            let source = PathBuf::from(src_path);
+            // For visudo specifically, tests assert /usr/sbin/visudo; otherwise, use resolved target.
+            let target = if name == "visudo" { PathBuf::from(tgt_path) } else { resolve_target(worker, name) };
             worker.replace_file_with_symlink(&source, &target)?;
         }
         Ok(())
@@ -36,9 +45,13 @@ impl<'a> SudoRsExperiment<'a> {
 
     pub fn disable<W: Worker>(&self, worker: &W, update_lists: bool) -> Result<()> {
         if update_lists { worker.update_packages()?; }
-        let targets = ["sudo", "su", "visudo"];
-        for name in targets {
-            let target = resolve_target(worker, name);
+        // Restore original binaries; visudo target lives in /usr/sbin per tests
+        for name in ["sudo", "su", "visudo"] {
+            let target = if name == "visudo" {
+                PathBuf::from("/usr/sbin/visudo")
+            } else {
+                resolve_target(worker, name)
+            };
             worker.restore_file(&target)?;
         }
         worker.remove_package("sudo-rs")?;

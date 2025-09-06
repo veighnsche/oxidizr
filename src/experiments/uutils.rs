@@ -74,22 +74,51 @@ impl UutilsExperiment {
                     );
                 }
             }
-            if !Path::new("/usr/bin/coreutils").exists() {
-                log::error!(
-                    "Unified coreutils binary not available at /usr/bin/coreutils after remediation"
+            if Path::new("/usr/bin/coreutils").exists() {
+                log::info!("Using unified coreutils binary at: {}", Path::new("/usr/bin/coreutils").display());
+                // Use baked-in list of applets to symlink the unified binary to.
+                const COREUTILS_BINS: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
+                for line in COREUTILS_BINS.lines() {
+                    let name = line.trim();
+                    if name.is_empty() { continue; }
+                    applets.push((name.to_string(), Path::new("/usr/bin/coreutils").to_path_buf()));
+                }
+            } else {
+                // Per-applet fallback: link each applet to its individual binary under bin_directory
+                log::warn!(
+                    "Unified dispatcher not available; falling back to per-applet binaries under {}",
+                    self.bin_directory.display()
                 );
-                return Err(CoreutilsError::ExecutionFailed(
-                    "Unified coreutils binary not found at /usr/bin/coreutils".into()
-                ));
-            }
-            log::info!("Using unified coreutils binary at: {}", Path::new("/usr/bin/coreutils").display());
-
-            // Use baked-in list of applets to symlink the unified binary to.
-            const COREUTILS_BINS: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
-            for line in COREUTILS_BINS.lines() {
-                let name = line.trim();
-                if name.is_empty() { continue; }
-                applets.push((name.to_string(), Path::new("/usr/bin/coreutils").to_path_buf()));
+                const COREUTILS_BINS: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
+                for line in COREUTILS_BINS.lines() {
+                    let name = line.trim();
+                    if name.is_empty() { continue; }
+                    // Probe multiple candidate locations per applet
+                    let candidates: [PathBuf; 4] = [
+                        self.bin_directory.join(name),
+                        PathBuf::from(format!("/usr/bin/uu-{}", name)),
+                        PathBuf::from(format!("/usr/lib/cargo/bin/coreutils/{}", name)),
+                        PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
+                    ];
+                    if let Some(found) = candidates.iter().find(|p| p.exists()) {
+                        log::info!(
+                            "Per-applet source selected for '{}': {}",
+                            name,
+                            found.display()
+                        );
+                        applets.push((name.to_string(), found.clone()));
+                    } else {
+                        log::warn!(
+                            "Per-applet binary for '{}' not found in any known location; skipping",
+                            name
+                        );
+                    }
+                }
+                if applets.is_empty() {
+                    return Err(CoreutilsError::ExecutionFailed(
+                        format!("No coreutils applet binaries found under {}", self.bin_directory.display())
+                    ));
+                }
             }
         } else {
             // Use the files present in the bin_directory (e.g., findutils/xargs)

@@ -71,7 +71,7 @@ Once Docker is installed, you can retry:
 // dockerTroubleshootTips provides additional, context-aware guidance for common Docker issues.
 // The ctx parameter can be one of: "daemon", "pull", "smoke", "build", "run".
 func dockerTroubleshootTips(ctx string) string {
-	header := "\nAdditional troubleshooting tips:\n\n"
+    header := "\nAdditional troubleshooting tips:\n\n"
 	common := `
 General
   - Check the Docker service: sudo systemctl status docker
