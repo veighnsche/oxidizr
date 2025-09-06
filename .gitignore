@@ -1,8 +1,8 @@
 /target
 
-# Go testing orchestrator (blep) artifacts
-blep/isolated-runner
-blep/isolated-runner.exe
-blep/*.test
-blep/coverage*.out
-blep/go.sum
+# Go testing orchestrator (test-orch) artifacts
+test-orch/isolated-runner
+test-orch/isolated-runner.exe
+test-orch/*.test
+test-orch/coverage*.out
+test-orch/go.sum
