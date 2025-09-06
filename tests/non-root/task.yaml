@@ -4,7 +4,7 @@ execute: |
   source "$(dirname "$0")/../lib/uutils.sh"
 
   # Ensure spread user exists per cloud-config
-  sudo -u spread bash -lc 'oxidizr enable --yes' 2>&1 | MATCH 'Error: This program must be run as root'
-  sudo -u spread bash -lc 'oxidizr disable --yes' 2>&1 | MATCH 'Error: This program must be run as root'
+  sudo -u spread bash -lc 'oxidizr-arch enable --yes' 2>&1 | MATCH 'Error: This program must be run as root'
+  sudo -u spread bash -lc 'oxidizr-arch disable --yes' 2>&1 | MATCH 'Error: This program must be run as root'
 restore: |
   true

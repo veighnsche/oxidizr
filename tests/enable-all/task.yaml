@@ -4,7 +4,7 @@ execute: |
   source "$(dirname "$0")/../lib/uutils.sh"
   source "$(dirname "$0")/../lib/sudo-rs.sh"
 
-  oxidizr enable --yes --all
+  oxidizr-arch enable --yes --all
 
   ensure_coreutils_installed
   ensure_findutils_installed
@@ -12,5 +12,5 @@ execute: |
   ensure_sudors_installed
 restore: |
   if [ -z "${CI:-}" ]; then
-    oxidizr disable --yes --all || true
+    oxidizr-arch disable --yes --all || true
   fi

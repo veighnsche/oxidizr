@@ -96,6 +96,8 @@ impl Worker for System {
             log::info!("[dry-run] <aur-helper> -S --noconfirm {} (fallback)", package);
             return Ok(());
         }
+        // If already installed, do nothing (avoids invoking AUR helpers as root)
+        if self.check_installed(package)? { return Ok(()); }
         if !self.wait_for_pacman_lock_clear()? {
             return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
         }

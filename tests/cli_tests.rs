@@ -13,7 +13,7 @@ fn init_logging() {
 #[test]
 fn help_shows_usage() {
     init_logging();
-    let mut cmd = Command::cargo_bin("coreutils-switch").unwrap();
+    let mut cmd = Command::cargo_bin("oxidizr-arch").unwrap();
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -24,7 +24,7 @@ fn help_shows_usage() {
 #[test]
 fn check_reports_compatible_on_scaffold() {
     init_logging();
-    let mut cmd = Command::cargo_bin("coreutils-switch").unwrap();
+    let mut cmd = Command::cargo_bin("oxidizr-arch").unwrap();
     cmd.arg("check");
     cmd.assert()
         .success()
@@ -40,7 +40,7 @@ fn list_targets_accepts_custom_bin_dir() {
     let fake = td.path().join("date");
     fs::write(&fake, b"bin").unwrap();
 
-    let mut cmd = Command::cargo_bin("coreutils-switch").unwrap();
+    let mut cmd = Command::cargo_bin("oxidizr-arch").unwrap();
     cmd.args(["--bin-dir", td.path().to_string_lossy().as_ref(), "list-targets"]);
     cmd.assert().success();
 }
@@ -49,7 +49,7 @@ fn list_targets_accepts_custom_bin_dir() {
 #[test]
 fn enable_fails_without_root_with_clear_message() {
     init_logging();
-    let mut cmd = Command::cargo_bin("coreutils-switch").unwrap();
+    let mut cmd = Command::cargo_bin("oxidizr-arch").unwrap();
     cmd.args(["--assume-yes", "enable"]);
     cmd.assert()
         .failure()

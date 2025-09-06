@@ -1,8 +1,8 @@
 [package]
 name = "rust_coreutils_switch"
 version = "0.1.0"
-edition = "2021"
-description = "A library for abstracting over different coreutils implementations"
+edition = "2024"
+description = "An oxidizr port to Arch Linux written in Rust"
 repository = ""
 license = "MIT OR Apache-2.0"
 keywords = ["coreutils", "cli", "gnu", "uutils"]
@@ -13,7 +13,7 @@ name = "coreutils_switch"
 path = "src/lib.rs"
 
 [[bin]]
-name = "coreutils-switch"
+name = "oxidizr-arch"
 path = "src/main.rs"
 
 [dependencies]

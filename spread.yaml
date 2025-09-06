@@ -1,0 +1,71 @@
+project: oxidizr-arch
+kill-timeout: 90m
+workers: 1
+
+environment:
+  CI: "$(HOST: echo $CI)"
+
+backends:
+  lxd:
+    type: adhoc
+    allocate: |
+      CONTAINER_NAME="oxidizr-arch-${SPREAD_SYSTEM/./-}-${RANDOM}"
+
+      lxc launch \
+        "${SPREAD_SYSTEM/-/:}" \
+        "${CONTAINER_NAME}" \
+        -c user.user-data="$(sed "s|SPREAD_PASSWORD|$SPREAD_PASSWORD|g" tests/lib/cloud-config.yaml)"
+
+      # Wait for the spread user; if cloud-init isn't available, create it manually
+      tries=0
+      while ! lxc exec "${CONTAINER_NAME}" -- id -u spread &>/dev/null; do
+        sleep 0.5
+        tries=$((tries+1))
+        if [ "$tries" -gt 40 ]; then
+          lxc exec "${CONTAINER_NAME}" -- bash -lc 'useradd -m spread || true; echo "spread ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/spread; chmod 440 /etc/sudoers.d/spread'
+        fi
+      done
+
+      # Set the instance address for spread
+      ADDRESS "$(lxc ls -f csv | grep "${CONTAINER_NAME}" | cut -d"," -f3 | cut -d" " -f1)"
+    discard: |
+      instance_name="$(lxc ls -f csv | grep oxidizr-arch | grep $SPREAD_SYSTEM_ADDRESS | cut -f1 -d",")"
+      lxc delete -f $instance_name
+    systems:
+      - archlinux:
+          image: images:archlinux
+          username: spread
+          workers: 1
+
+suites:
+  tests/:
+    summary: Spread tests for oxidizr-arch
+    systems: [archlinux]
+    environment:
+      SPREAD_PATH: "$PWD"
+
+exclude:
+  - .git
+  - .github
+
+path: /root/proj
+
+prepare: |
+  set -euo pipefail
+  # Basic tooling
+  pacman -Sy --noconfirm --needed base-devel sudo git curl
+  # Install AUR helper (paru-bin) as spread user for AUR package installs
+  if ! command -v paru >/dev/null 2>&1; then
+    su - spread -c 'mkdir -p ~/build && cd ~/build && git clone https://aur.archlinux.org/paru-bin.git || true && cd paru-bin && makepkg -si --noconfirm'
+  fi
+  # Rust toolchain
+  if ! command -v rustup >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+  fi
+  rustup default stable
+  # Build project and expose expected binary name
+  pushd "$SPREAD_PATH/rust_coreutils_switch"
+  cargo build --release
+  install -Dm755 "$PWD/target/release/oxidizr-arch" /usr/bin/oxidizr-arch
+  popd

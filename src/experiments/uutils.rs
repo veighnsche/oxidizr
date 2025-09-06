@@ -26,23 +26,31 @@ impl UutilsExperiment {
         log::info!("Installing package: {}", self.package);
         worker.install_package(&self.package)?;
 
-        log::info!("Listing replacement binaries in {}", self.bin_directory.display());
-        let files = worker.list_files(&self.bin_directory)?;
-        for f in files {
-            let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if filename.is_empty() { continue; }
-            let target = resolve_target(worker, filename);
-            log::info!("Computed target for {} -> {}", filename, target.display());
-            match &self.unified_binary {
-                Some(unified) => {
-                    log::info!("Symlinking unified {} -> {}", unified.display(), target.display());
-                    worker.replace_file_with_symlink(unified, &target)?;
-                }
-                None => {
-                    log::info!("Symlinking {} -> {}", f.display(), target.display());
-                    worker.replace_file_with_symlink(&f, &target)?;
-                }
+        // Determine applet names and their source paths
+        let mut applets: Vec<(String, PathBuf)> = Vec::new();
+        if self.name == "coreutils" {
+            // Use baked-in list of applets to symlink the unified binary to.
+            const COREUTILS_BINS: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
+            for line in COREUTILS_BINS.lines() {
+                let name = line.trim();
+                if name.is_empty() { continue; }
+                applets.push((name.to_string(), self.unified_binary.clone().unwrap_or_else(|| PathBuf::from("/usr/bin/coreutils"))));
             }
+        } else {
+            // Use the files present in the bin_directory (e.g., findutils/xargs)
+            log::info!("Listing replacement binaries in {}", self.bin_directory.display());
+            let files = worker.list_files(&self.bin_directory)?;
+            for f in files {
+                let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                if filename.is_empty() { continue; }
+                applets.push((filename, f.clone()));
+            }
+        }
+
+        for (filename, src) in applets {
+            let target = resolve_target(worker, &filename);
+            log::info!("Symlinking {} -> {}", src.display(), target.display());
+            worker.replace_file_with_symlink(&src, &target)?;
         }
         Ok(())
     }

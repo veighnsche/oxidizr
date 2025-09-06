@@ -1,11 +1,11 @@
-summary: Disable default experiment set restores only defaults
+summary: Disable default experiment set removes defaults
 execute: |
   set -euo pipefail
   source "$(dirname "$0")/../lib/uutils.sh"
   source "$(dirname "$0")/../lib/sudo-rs.sh"
 
-  oxidizr enable --yes
-  oxidizr disable --yes
+  oxidizr-arch enable --yes
+  oxidizr-arch disable --yes
 
   ensure_coreutils_absent
   ensure_sudors_absent

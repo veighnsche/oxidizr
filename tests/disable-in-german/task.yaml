@@ -13,8 +13,8 @@ execute: |
   export LANGUAGE=de_DE.UTF-8
   export LANG=de_DE.UTF-8
 
-  oxidizr enable --yes
-  oxidizr disable --yes --experiments coreutils
+  oxidizr-arch enable --yes
+  oxidizr-arch disable --yes --experiments coreutils
 
   # Reset to English for assertions
   export LC_ALL=en_GB.UTF-8
@@ -25,5 +25,5 @@ execute: |
   ensure_sudors_installed
 restore: |
   if [ -z "${CI:-}" ]; then
-    oxidizr disable --yes --all || true
+    oxidizr-arch disable --yes --all || true
   fi

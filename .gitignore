@@ -1,1 +1,8 @@
 /target
+
+# Go testing orchestrator (testing/isolated-runner) artifacts
+testing/isolated-runner/isolated-runner
+testing/isolated-runner/isolated-runner.exe
+testing/isolated-runner/*.test
+testing/isolated-runner/coverage*.out
+testing/isolated-runner/go.sum

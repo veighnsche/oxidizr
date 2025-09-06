@@ -66,7 +66,7 @@ pub fn all_experiments<'a, W: Worker>(worker: &'a W) -> Vec<Experiment<'a>> {
         name: "findutils".into(),
         package: "uutils-findutils".into(),
         unified_binary: None,
-        bin_directory: PathBuf::from("/usr/lib/uutils/findutils"),
+        bin_directory: PathBuf::from("/usr/lib/cargo/bin/findutils"),
     };
     let sudo = SudoRsExperiment { system: worker };
     vec![

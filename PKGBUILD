@@ -1,6 +1,6 @@
 # Maintainer: Your Name <you@example.com>
 
-pkgname=coreutils-switch
+pkgname=oxidizr-arch
 pkgver=0.1.0
 pkgrel=1
 epoch=
@@ -10,7 +10,7 @@ url="https://github.com/your/repo"
 license=('MIT' 'Apache')
 depends=('pacman' 'bash')
 makedepends=('rust' 'cargo')
-provides=('coreutils-switch')
+provides=('oxidizr-arch')
 conflicts=()
 source=("local://${pkgname}-${pkgver}.tar.gz")
 sha256sums=('SKIP')
@@ -22,7 +22,7 @@ build() {
 
 package() {
   cd "${srcdir}/${pkgname}-${pkgver}"
-  install -Dm755 "target/release/coreutils-switch" "${pkgdir}/usr/bin/coreutils-switch"
+  install -Dm755 "target/release/oxidizr-arch" "${pkgdir}/usr/bin/oxidizr-arch"
   install -Dm644 LICENSE-MIT "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT"
   install -Dm644 LICENSE-APACHE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-APACHE"
   install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"

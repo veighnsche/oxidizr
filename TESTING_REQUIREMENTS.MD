@@ -78,8 +78,8 @@ tests/disable-all/task.yaml
 - Setup:
   - source tests/lib/uutils.sh and tests/lib/sudo-rs.sh to get ensure_* helpers.
 - Actions:
-  - oxidizr enable --yes --all
-  - oxidizr disable --yes --all
+  - oxidizr-arch enable --yes --all
+  - oxidizr-arch disable --yes --all
 - Assertions:
   - ensure_coreutils_absent:
     - Package query must indicate uutils-coreutils is not installed (`paru -Qi`/`yay -Qi`/`pacman -Qi` should fail).
@@ -103,8 +103,8 @@ tests/disable-default/task.yaml
 - Purpose: Verify disabling the default experiment set (not “all”) removes only the defaults.
 - Setup: source uutils.sh and sudo-rs.sh.
 - Actions:
-  - oxidizr enable --yes (default set)
-  - oxidizr disable --yes (default set)
+  - oxidizr-arch enable --yes (default set)
+  - oxidizr-arch disable --yes (default set)
 - Assertions:
   - ensure_coreutils_absent (same checks as above)
   - ensure_sudors_absent (same checks as above)
@@ -118,8 +118,8 @@ tests/disable-in-german/task.yaml
   - Export LC_ALL, LANGUAGE, LANG=de_DE.UTF-8 for the session.
   - source uutils.sh and sudo-rs.sh.
 - Actions:
-  - oxidizr enable --yes (default set)
-  - oxidizr disable --yes --experiments coreutils (selective disable in a non-English locale)
+  - oxidizr-arch enable --yes (default set)
+  - oxidizr-arch disable --yes --experiments coreutils (selective disable in a non-English locale)
   - Reset locale to en_GB.UTF-8 for subsequent assertions.
 - Assertions:
   - ensure_coreutils_absent (GNU date restored, no rust-coreutils package, no symlink/backups).
@@ -128,18 +128,18 @@ tests/disable-in-german/task.yaml
     - /usr/bin/sudo -> /usr/lib/cargo/bin/sudo; /usr/bin contains .sudo.oxidizr.bak; sudo --version shows “sudo-rs”
     - /usr/bin/su -> /usr/lib/cargo/bin/su; .su.oxidizr.bak exists; su --version shows “su-rs”
     - /usr/sbin/visudo -> /usr/lib/cargo/bin/visudo; .visudo.oxidizr.bak exists
-- Cleanup (restore): If not CI, run oxidizr disable --yes --all.
+- Cleanup (restore): If not CI, run oxidizr-arch disable --yes --all.
 
 tests/disable-partial/task.yaml
 - Purpose: Selectively disable a subset (coreutils) while leaving others (sudo-rs) enabled.
 - Setup: source uutils.sh and sudo-rs.sh.
 - Actions:
-  - oxidizr enable --yes (default set)
-  - oxidizr disable --yes --experiments coreutils
+  - oxidizr-arch enable --yes (default set)
+  - oxidizr-arch disable --yes --experiments coreutils
 - Assertions:
   - ensure_coreutils_absent (as above).
   - ensure_sudors_installed (as above).
-- Cleanup (restore): If not CI, run oxidizr disable --yes --all.
+- Cleanup (restore): If not CI, run oxidizr-arch disable --yes --all.
 
 tests/enable-all/task.yaml
 - Purpose: Verify enabling “all” activates all managed experiments.
@@ -161,13 +161,13 @@ tests/enable-all/task.yaml
     - If supported on this Arch snapshot, package query for uutils-diffutils reports installed
     - /usr/bin/diff -> /usr/lib/cargo/bin/diffutils/diff; .diff.oxidizr.bak present; diff --help must not show GNU URL.
   - ensure_sudors_installed (as described above).
-- Cleanup (restore): If not CI, oxidizr disable --yes --all.
+- Cleanup (restore): If not CI, oxidizr-arch disable --yes --all.
 
 tests/enable-default/task.yaml
 - Purpose: Verify enabling the default experiment set.
 - Setup: source uutils.sh and sudo-rs.sh.
 - Actions:
-  - oxidizr enable --yes (defaults)
+  - oxidizr-arch enable --yes (defaults)
 - Assertions:
   - ensure_coreutils_installed (as above).
   - ensure_sudors_installed (as above).
@@ -177,11 +177,11 @@ tests/enable-default/task.yaml
 tests/enable-no-compatibility-check/task.yaml
 - Purpose: Ensure enabling with the compatibility gate bypass actually proceeds and results are installed.
 - Setup: source uutils.sh and sudo-rs.sh.
-  - oxidizr enable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs
+  - oxidizr-arch enable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs
 - Assertions:
   - ensure_coreutils_installed, ensure_findutils_installed, ensure_sudors_installed (as detailed above, with pacman/paru query semantics).
 - Cleanup (restore):
-  - If not CI, oxidizr disable --yes --experiments coreutils findutils sudo-rs --no-compatibility-check
+  - If not CI, oxidizr-arch disable --yes --experiments coreutils findutils sudo-rs --no-compatibility-check
   - Requirements this enforces:
   - The flag --no-compatibility-check must bypass normal version/compatibility gating so the enable proceeds and the artifacts (packages, symlinks, backups) appear.
 
@@ -189,7 +189,7 @@ tests/enable-partial/task.yaml
 - Purpose: Enable only a specific subset (coreutils) and verify the others remain untouched/absent.
 - Setup: source uutils.sh and sudo-rs.sh.
 - Actions:
-  - oxidizr enable --yes --experiments coreutils
+  - oxidizr-arch enable --yes --experiments coreutils
 - Assertions:
   - ensure_coreutils_installed (present).
   - ensure_findutils_absent, ensure_diffutils_absent, ensure_sudors_absent (not present; GNU tools show for find/xargs/date; no symlinks/backups).
@@ -198,8 +198,8 @@ tests/enable-partial/task.yaml
 tests/non-root/task.yaml
 - Purpose: Verify the application refuses to run as non-root with a clear error.
 - Actions:
-  - sudo -u spread oxidizr enable --yes 2>&1 | MATCH "Error: This program must be run as root"
-  - sudo -u spread oxidizr disable --yes 2>&1 | MATCH "Error: This program must be run as root"
+  - sudo -u spread oxidizr-arch enable --yes 2>&1 | MATCH "Error: This program must be run as root"
+  - sudo -u spread oxidizr-arch disable --yes 2>&1 | MATCH "Error: This program must be run as root"
 - Assertions:
   - Both commands must emit that exact error string when run as the unprivileged “spread” user.
   - Ensures both enable and disable subcommands are protected by the root check.
