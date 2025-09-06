@@ -1,6 +1,6 @@
 # Isolated Test Runner (Arch Linux + Docker)
 
-This directory contains a small Go utility and Docker assets to run the `rust_coreutils_switch` end-to-end assertions inside a clean Arch Linux container.
+This directory contains a small Go utility and Docker assets to run the project's end-to-end assertions inside a clean Arch Linux container.
 
 It is useful when you want strong isolation from your host OS and reproducible setup of required packages and toolchains.
 
@@ -14,7 +14,7 @@ It is useful when you want strong isolation from your host OS and reproducible s
 - Builds an Arch Docker image with the tools needed for the tests.
 - Runs that image mounting your repository at `/workspace` and executes `docker/entrypoint.sh`.
 - The entrypoint will:
-  - Stage the repo into `/root/project` for paths expected by the tests.
+  - Stage the repo into `/root/project/oxidizr-arch` for paths expected by the tests.
   - Ensure base packages and Rust toolchains exist.
   - Build the project (produces `target/release/oxidizr-arch` and symlinks it to `/usr/local/bin/oxidizr-arch`).
   - Run enable/disable assertions using helper scripts in `tests/lib/`.
@@ -23,33 +23,30 @@ It is useful when you want strong isolation from your host OS and reproducible s
 
 - Docker installed and the daemon running.
 - Your user can run Docker without `sudo` (typically by being in the `docker` group).
-- Go 1.21+ (only if you want to build and run the Go helper locally; otherwise you can call Docker directly).
+- Go 1.21+.
 
 ## Quick start
 
 From the repository root:
 
 ```bash
-# 1) Build the runner (optional, you can also `go run` it)
-(cd rust_coreutils_switch/testing/isolated-runner && go build -o isolated-runner)
+# Zero-flag: just run it (builds image if needed, then runs tests)
+go run ./testing/isolated-runner
 
-# 2) Build the Arch image used for tests
-./rust_coreutils_switch/testing/isolated-runner/isolated-runner \
-  --arch-build --image-tag oxidizr-arch:latest
+# Or with the compiled runner
+(cd testing/isolated-runner && go build -o isolated-runner)
+./testing/isolated-runner/isolated-runner
 
-# 3) Run the tests in the container (mounts repo into /workspace)
-./rust_coreutils_switch/testing/isolated-runner/isolated-runner \
-  --arch-run --image-tag oxidizr-arch:latest
 ```
 
 If you prefer not to build the binary:
 
 ```bash
-# Build image
-go run ./rust_coreutils_switch/testing/isolated-runner --arch-build
+# Build image only
+go run ./testing/isolated-runner --arch-build
 
-# Run tests
-go run ./rust_coreutils_switch/testing/isolated-runner --arch-run
+# Run tests (auto-builds the image if missing)
+go run ./testing/isolated-runner --arch-run
 ```
 
 ## Useful options
@@ -59,8 +56,9 @@ The runner supports several flags (see `main.go`):
 - `--smoke-arch-docker` — Run a short Arch smoke test (`pacman` + DNS) with the public `archlinux:base-devel` image.
 - `--arch-build` — Build the isolated Arch Docker image in `docker/`.
 - `--arch-run` — Run the container and execute `docker/entrypoint.sh` to perform assertions.
+- `--arch` — One-shot: build the image if needed, then run the tests.
 - `--image-tag` — Image tag to build/run (default: `oxidizr-arch:latest`).
-- `--docker-context` — Docker build context directory (default: `rust_coreutils_switch/testing/isolated-runner/docker`).
+- `--docker-context` — Docker build context directory (default: `testing/isolated-runner/docker`).
 - `--root-dir` — Host directory to mount at `/workspace` (defaults to the repository root; auto-detected via Git when possible).
 - `--no-cache` — Build the Docker image without using cache.
 - `--pull` — Always attempt to pull newer base image layers during build.
@@ -72,14 +70,18 @@ Examples:
 
 ```bash
 # Just verify Docker and run a quick smoke test
-go run ./rust_coreutils_switch/testing/isolated-runner --smoke-arch-docker
+go run ./testing/isolated-runner --smoke-arch-docker
 
 # Build without cache and always pull latest base
-go run ./rust_coreutils_switch/testing/isolated-runner \
+go run ./testing/isolated-runner \
   --arch-build --no-cache --pull --image-tag oxidizr-arch:latest
 
+# Zero-flag build+run with a custom tag
+go run ./testing/isolated-runner \
+  --image-tag oxidizr-arch:dev
+
 # Run with an explicit repo root (if auto-detection fails)
-go run ./rust_coreutils_switch/testing/isolated-runner \
+go run ./testing/isolated-runner \
   --arch-run --root-dir "$PWD" --image-tag oxidizr-arch:latest
 ```
 

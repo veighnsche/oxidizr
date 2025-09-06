@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 1) Stage workspace into /root/project for paths expected by tests
-mkdir -p /root/project
-cp -a /workspace/. /root/project/
+# 1) Stage workspace into /root/project/oxidizr-arch for paths expected by tests
+mkdir -p /root/project/oxidizr-arch
+cp -a /workspace/. /root/project/oxidizr-arch/
 
 # 2) Ensure base tools (most are already installed via Dockerfile)
 pacman -Syy --noconfirm
@@ -25,14 +25,12 @@ su - builder -c 'set -euo pipefail; mkdir -p ~/build && cd ~/build && git clone 
 # 6) Pre-install AUR packages required by experiments as builder
 su - builder -c 'set -euo pipefail; paru -S --noconfirm uutils-findutils uutils-diffutils sudo-rs || true'
 
-# 7) Build oxidizr-arch
-if [ -d /root/project/rust_coreutils_switch ]; then
-  cd /root/project/rust_coreutils_switch
-elif [ -f /root/project/Cargo.toml ]; then
-  cd /root/project
+# 7) Build oxidizr-arch (assume /root/project/oxidizr-arch is the repository root)
+if [ -f /root/project/oxidizr-arch/Cargo.toml ]; then
+  cd /root/project/oxidizr-arch
 else
-  echo "Cargo project not found under /root/project" >&2
-  ls -la /root/project || true
+  echo "Cargo project not found under /root/project/oxidizr-arch" >&2
+  ls -la /root/project/oxidizr-arch || true
   exit 1
 fi
 rustup default stable
@@ -41,13 +39,13 @@ ln -sf "$PWD/target/release/oxidizr-arch" /usr/local/bin/oxidizr-arch
 oxidizr-arch --help >/dev/null
 
 # 8) Enable and assertions
-cd /root/project/rust_coreutils_switch
+cd /root/project/oxidizr-arch
 source tests/lib/uutils.sh
 source tests/lib/sudo-rs.sh
 oxidizr-arch --assume-yes --all --package-manager none enable
 
 # Repair coreutils applet symlinks if any missing
-LIST_FILE="/root/project/rust_coreutils_switch/tests/lib/rust-coreutils-bins.txt"
+LIST_FILE="/root/project/oxidizr-arch/tests/lib/rust-coreutils-bins.txt"
 if [ -f "$LIST_FILE" ]; then
   while read -r bin; do
     [ -z "$bin" ] && continue
