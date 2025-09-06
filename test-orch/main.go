@@ -23,16 +23,22 @@ func main() {
 		archRun     = flag.Bool("arch-run", false, "Run the Arch Docker container to execute tests via entrypoint.sh")
 		archAll     = flag.Bool("arch", false, "Build the Arch Docker image if needed, then run the tests (one-shot)")
 		imageTag    = flag.String("image-tag", "oxidizr-arch:latest", "Docker image tag to build/run")
-		dockerCtx   = flag.String("docker-context", "testing/isolated-runner/docker", "Docker build context directory (relative or absolute)")
+		dockerCtx   = flag.String("docker-context", "test-orch/docker", "Docker build context directory (relative or absolute)")
 		rootDirFlag = flag.String("root-dir", "", "Host directory to mount at /workspace (defaults to git root or repo root)")
 		noCache     = flag.Bool("no-cache", false, "Build without using cache")
 		pullBase    = flag.Bool("pull", false, "Always attempt to pull a newer base image during build")
 		keepCtr     = flag.Bool("keep-container", false, "Do not remove container after run (omit --rm)")
 		timeout     = flag.Duration("timeout", 30*time.Minute, "Timeout for docker run")
-		verbose     = flag.Bool("v", true, "Verbose output")
+		verbose     = flag.Bool("v", false, "Verbose output")
 	)
 	flag.Parse()
 	log.SetFlags(0)
+
+	// Require root privileges (sudo) for consistent Docker access on systems without docker group configuration.
+	if !isRoot() {
+		warn("requires root privileges to interact with Docker reliably. Re-run with: sudo go run . [flags]")
+		os.Exit(1)
+	}
 
 	// Developer-friendly default: with no action flags, perform one-shot build+run
 	if !*smokeDocker && !*archBuild && !*archRun && !*archAll {
@@ -51,8 +57,8 @@ func main() {
 		}
 	}
 
-	// Orchestrate Docker Arch image build/run if requested
-	if *archBuild || *archRun || *archAll {
+	// Orchestrate Docker Arch image build/run if requested, but only if previous checks passed
+	if ok && (*archBuild || *archRun || *archAll) {
 		// Resolve docker context dir relative to current working dir/repo
 		ctxDir := *dockerCtx
 		if !filepath.IsAbs(ctxDir) {
@@ -72,7 +78,11 @@ func main() {
 		if doBuild {
 			if err := buildArchImage(*imageTag, ctxDir, *noCache, *pullBase, *verbose); err != nil {
 				warn("docker build failed: ", err)
-				log.Println(dockerTroubleshootTips("build"))
+				if *verbose {
+					log.Println(dockerTroubleshootTips("build"))
+				} else {
+					log.Println("Hint: verify the Docker context path exists and permissions are correct. Run with -v for detailed tips.")
+				}
 				ok = false
 			}
 		}
@@ -96,18 +106,33 @@ func main() {
 				section("Docker image not found; building")
 				if err2 := buildArchImage(*imageTag, ctxDir, *noCache, *pullBase, *verbose); err2 != nil {
 					warn("docker build failed: ", err2)
-					log.Println(dockerTroubleshootTips("build"))
+					if *verbose {
+						log.Println(dockerTroubleshootTips("build"))
+					} else {
+						log.Println("Hint: check the Docker context directory and Docker daemon status. Run with -v for detailed tips.")
+					}
 					ok = false
 				}
 			}
-			entrypoint := filepath.Join(rootDir, "testing/isolated-runner/docker/entrypoint.sh")
-			if _, err := os.Stat(entrypoint); err != nil {
-				warn("entrypoint not found at ", entrypoint, "; ensure you are pointing root-dir at the repository root")
+			hostEntrypoint := filepath.Join(rootDir, "test-orch/docker/entrypoint.sh")
+			if _, err := os.Stat(hostEntrypoint); err != nil {
+				warn("entrypoint not found at ", hostEntrypoint)
+				if *verbose {
+					log.Println("Ensure --root-dir points to the repository root so test-orch/docker/entrypoint.sh is available.")
+				} else {
+					log.Println("Hint: set --root-dir to the repo root. Run with -v for details.")
+				}
 				ok = false
 			} else {
-				if err := runArchContainer(*imageTag, rootDir, entrypoint, *keepCtr, *timeout, *verbose); err != nil {
+				// Run via bash to avoid needing executable bit on the mounted script
+				containerCmd := "bash /workspace/test-orch/docker/entrypoint.sh"
+				if err := runArchContainer(*imageTag, rootDir, containerCmd, *keepCtr, *timeout, *verbose); err != nil {
 					warn("docker run failed: ", err)
-					log.Println(dockerTroubleshootTips("run"))
+					if *verbose {
+						log.Println(dockerTroubleshootTips("run"))
+					} else {
+						log.Println("Hint: check bind mounts and permissions. Run with -v for detailed tips.")
+					}
 					ok = false
 				}
 			}

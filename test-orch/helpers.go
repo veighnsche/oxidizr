@@ -38,6 +38,19 @@ func runSilent(name string, args ...string) error {
 	return cmd.Run()
 }
 
+// runMaybeSilent runs a command and only streams output when verbose is true.
+func runMaybeSilent(verbose bool, name string, args ...string) error {
+	if verbose {
+		return run(name, args...)
+	}
+	return runSilent(name, args...)
+}
+
+// isRoot reports whether the current process has UID 0.
+func isRoot() bool {
+	return os.Geteuid() == 0
+}
+
 func warn(v ...interface{}) {
 	log.Println("WARN:", fmt.Sprint(v...))
 }

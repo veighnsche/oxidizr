@@ -17,7 +17,11 @@ func smokeTestDockerArch(verbose bool) bool {
 	}
 	if err := run("docker", "pull", "archlinux:base-devel"); err != nil {
 		warn("failed to pull archlinux:base-devel: ", err)
-		log.Println(dockerTroubleshootTips("pull"))
+		if verbose {
+			log.Println(dockerTroubleshootTips("pull"))
+		} else {
+			log.Println("Hint: check network/proxy/DNS and Docker daemon status. Run with -v for detailed tips.")
+		}
 		return false
 	}
 	cmd := []string{"run", "--rm", "archlinux:base-devel",
@@ -27,7 +31,11 @@ func smokeTestDockerArch(verbose bool) bool {
 	}
 	if err := run("docker", cmd...); err != nil {
 		warn("Docker Arch smoke test failed. Check network reachability and DNS. Error: ", err)
-		log.Println(dockerTroubleshootTips("smoke"))
+		if verbose {
+			log.Println(dockerTroubleshootTips("smoke"))
+		} else {
+			log.Println("Hint: verify DNS (e.g., set resolv.conf) and connectivity. Run with -v for detailed tips.")
+		}
 		return false
 	}
 	log.Println("Docker Arch smoke test: OK")

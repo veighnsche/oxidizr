@@ -24,7 +24,7 @@ func buildArchImage(tag, contextDir string, noCache, pull bool, verbose bool) er
 	if verbose {
 		log.Println(prefixRun(), "docker "+strings.Join(args, " "))
 	}
-	return run("docker", args...)
+	return runMaybeSilent(verbose, "docker", args...)
 }
 
 // runArchContainer runs the Arch image with the repo mounted at /workspace and executes entrypoint.sh
@@ -42,8 +42,11 @@ func runArchContainer(tag, rootDir, entrypoint string, keepContainer bool, timeo
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	// In non-verbose mode, suppress docker CLI noise but still capture timeout/exit code.
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("docker run timed out after %s", timeout)

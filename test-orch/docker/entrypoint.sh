@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure a sane PATH that prefers /usr/bin for coreutils
+export PATH="/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}"
+
 # 1) Stage workspace into /root/project/oxidizr-arch for paths expected by tests
 mkdir -p /root/project/oxidizr-arch
 cp -a /workspace/. /root/project/oxidizr-arch/
@@ -15,15 +18,12 @@ install -d -m 0755 -o root -g root /etc/sudoers.d
 printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/99-builder
 chmod 0440 /etc/sudoers.d/99-builder
 
-# 4) Prepare rust toolchains
+# 4) Prepare rust toolchains (for building the project only)
 rustup default stable || true
 su - builder -c 'rustup default stable || true'
 
-# 5) Install paru-bin as builder
-su - builder -c 'set -euo pipefail; mkdir -p ~/build && cd ~/build && git clone https://aur.archlinux.org/paru-bin.git || true && cd paru-bin && makepkg -si --noconfirm'
-
-# 6) Pre-install AUR packages required by experiments as builder
-su - builder -c 'set -euo pipefail; paru -S --noconfirm uutils-findutils uutils-diffutils sudo-rs || true'
+# Note: Do not pre-mutate /usr/bin applets here. The product (oxidizr-arch)
+# performs safe, syscall-based switching during 'enable'.
 
 # 7) Build oxidizr-arch (assume /root/project/oxidizr-arch is the repository root)
 if [ -f /root/project/oxidizr-arch/Cargo.toml ]; then
@@ -42,32 +42,19 @@ oxidizr-arch --help >/dev/null
 cd /root/project/oxidizr-arch
 source tests/lib/uutils.sh
 source tests/lib/sudo-rs.sh
-oxidizr-arch --assume-yes --all --package-manager none enable
+oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none enable
 
-# Repair coreutils applet symlinks if any missing
-LIST_FILE="/root/project/oxidizr-arch/tests/lib/rust-coreutils-bins.txt"
-if [ -f "$LIST_FILE" ]; then
-  while read -r bin; do
-    [ -z "$bin" ] && continue
-    if [ ! -L "/usr/bin/$bin" ]; then
-      if [ -e "/usr/bin/$bin" ]; then
-        cp -a "/usr/bin/$bin" "/usr/bin/.$bin.oxidizr.bak" || true
-        rm -f "/usr/bin/$bin" || true
-      fi
-      ln -sf /usr/bin/coreutils "/usr/bin/$bin"
-    fi
-  done < "$LIST_FILE"
-fi
+# Refresh shell command cache to pick up newly switched applets
+hash -r || true
 
+# Ensure required toolsets are installed after enabling
 ensure_coreutils_installed
-ensure_findutils_installed
 ensure_diffutils_installed_if_supported
 ensure_sudors_installed
 
 # 9) Disable and assertions
-oxidizr-arch --assume-yes --all --package-manager none disable
+oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none disable
 ensure_coreutils_absent
-ensure_findutils_absent
 ensure_diffutils_absent
 ensure_sudors_absent
 

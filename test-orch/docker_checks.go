@@ -10,7 +10,11 @@ func checkDocker(verbose bool) bool {
 	ok := true
 	if !have("docker") {
 		warn("docker not found on PATH.")
-		log.Println(dockerInstallHelp())
+		if verbose {
+			log.Println(dockerInstallHelp())
+		} else {
+			log.Println("Docker is not installed. Run with -v for full install instructions.")
+		}
 		return false
 	}
 	if verbose {
@@ -18,10 +22,14 @@ func checkDocker(verbose bool) bool {
 	}
 	if err := runSilent("docker", "version"); err != nil {
 		warn("docker is installed but not responding. Make sure the Docker daemon is running and your user is in the docker group.")
-		log.Println("Quick fix:")
-		log.Println("  sudo systemctl enable --now docker")
-		log.Println("  sudo usermod -aG docker \"$USER\"  # then re-login or run: newgrp docker")
-		log.Println(dockerTroubleshootTips("daemon"))
+		if verbose {
+			log.Println("Quick fix:")
+			log.Println("  sudo systemctl enable --now docker")
+			log.Println("  sudo usermod -aG docker \"$USER\"  # then re-login or run: newgrp docker")
+			log.Println(dockerTroubleshootTips("daemon"))
+		} else {
+			log.Println("Hint: sudo systemctl enable --now docker; add your user to the 'docker' group. Run with -v for detailed tips.")
+		}
 		ok = false
 	}
 	return ok
