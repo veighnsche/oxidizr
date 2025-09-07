@@ -1,5 +1,5 @@
-use coreutils_switch::Result;
-use coreutils_switch::cli::handle_cli;
+use oxidizr_arch::Result;
+use oxidizr_arch::cli::handle_cli;
 
 fn main() -> Result<()> {
     let _ = env_logger::builder().is_test(false).try_init();

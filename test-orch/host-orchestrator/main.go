@@ -97,7 +97,7 @@ func main() {
 		*archBuild = true
 		*archRun = true
 		if !quietMode {
-			log.Println("Defaulting to: build + run Docker Arch tests (Go runner)")
+			log.Println("==> No action specified, running default: build + test")
 		}
 	}
 
@@ -132,6 +132,9 @@ func main() {
 		// If one-shot, we implicitly build
 		doBuild := *archBuild
 		if doBuild {
+			if !quietMode {
+				log.Printf("==> Building test environment (%s)...\n", *imageTag)
+			}
 			if err := dockerutil.BuildArchImage(*imageTag, ctxDir, *noCache, *pullBase, verbosityLevel >= 2); err != nil {
 				warn("docker build failed: ", err)
 				ok = false
@@ -181,14 +184,11 @@ func main() {
 
 				if ok {
 					if !quietMode {
-						log.Println("Starting Docker tests (YAML suites then assertions)...")
+						log.Println("==> Starting tests...")
 					}
 					if err := dockerutil.RunArchContainer(*imageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1); err != nil {
 						warn("docker run failed: ", err)
 						ok = false
-					}
-					if ok && !quietMode {
-						log.Println("Docker tests completed.")
 					}
 				}
 			}
@@ -226,9 +226,13 @@ func main() {
 
 	if ok {
 		if !quietMode {
-			log.Println("All requested checks passed.")
+			log.Println("==> All tests passed successfully.")
 		}
 		os.Exit(0)
+	} else {
+		if !quietMode {
+			log.Println("==> Some tests failed.")
+		}
 	}
 	os.Exit(1)
 }

@@ -22,8 +22,7 @@ ENV LANG=C.UTF-8
 
 # Refresh system and install essentials used by our scripts
 RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm --needed sudo git curl rustup which findutils \
-        uutils-coreutils sudo-rs && \
+    pacman -S --noconfirm --needed sudo git curl rustup which findutils && \
     # Create non-root builder user for building AUR packages
     useradd -m builder && \
     install -d -m 0755 -o root -g root /etc/sudoers.d && \
@@ -39,5 +38,6 @@ WORKDIR /workspace
 
 # Copy the compiled Go runner from the builder stage, make it executable, and set it as the entrypoint.
 COPY --from=builder /isolated-runner /usr/local/bin/isolated-runner
-RUN chmod +x /usr/local/bin/isolated-runner
+COPY docker/setup_shell.sh /usr/local/bin/setup_shell.sh
+RUN chmod +x /usr/local/bin/isolated-runner && chmod +x /usr/local/bin/setup_shell.sh
 ENTRYPOINT ["/usr/local/bin/isolated-runner"]

@@ -1,5 +1,5 @@
 [package]
-name = "rust_coreutils_switch"
+name = "oxidizr-arch"
 version = "0.1.0"
 edition = "2024"
 description = "An oxidizr port to Arch Linux written in Rust"
@@ -9,7 +9,7 @@ keywords = ["coreutils", "cli", "gnu", "uutils"]
 categories = ["command-line-utilities"]
 
 [lib]
-name = "coreutils_switch"
+name = "oxidizr_arch"
 path = "src/lib.rs"
 
 [[bin]]

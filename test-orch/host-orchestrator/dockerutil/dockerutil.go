@@ -74,8 +74,7 @@ func RunArchInteractiveShell(tag, rootDir string, verbose bool) error {
 	}
 	cfg := &container.Config{
 		Image:      tag,
-		Entrypoint: []string{"/bin/bash"},
-		Cmd:        []string{"-l"},
+		Entrypoint: []string{"/bin/bash", "-c", "setup_shell.sh && bash -l"},
 		Tty:        true,
 		OpenStdin:  true,
 	}
