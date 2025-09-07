@@ -2,7 +2,6 @@ use crate::error::{CoreutilsError, Result};
 use crate::utils::worker::Worker;
 use crate::experiments::uutils::model::UutilsExperiment;
 use std::path::PathBuf;
-use std::fs;
 use std::env;
 use std::path::Path;
 
@@ -91,7 +90,7 @@ impl UutilsExperiment {
     /// Gets candidate paths for non-coreutils binaries.
     pub fn get_non_coreutils_candidates(&self, name: &str) -> [PathBuf; 4] {
         if cfg!(test) {
-            let out_dir = env::var("OUT_DIR").unwrap();
+            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "/tmp".to_string());
             let base_dir = Path::new(&out_dir).join("bin");
             [
                 base_dir.join(format!("uu-{}", name)),

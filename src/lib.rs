@@ -3,6 +3,8 @@
 
 pub mod error;
 pub mod cli;
+pub mod config;
+pub mod package_manager;
 pub mod utils;
 pub mod experiments;
 

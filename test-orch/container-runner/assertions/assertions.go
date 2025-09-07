@@ -93,7 +93,11 @@ func ensureCoreutilsInstalled() error {
 		if !fileExists("/usr/bin/." + bin + ".oxidizr.bak") {
 			return fmt.Errorf("backup file for %s not found", target)
 		}
-		out, _ := exec.Command(target, "--version").Output()
+		out, err := exec.Command(target, "--version").Output()
+		if err != nil {
+			log.Printf("Warning: failed to run %s --version: %v", target, err)
+			continue
+		}
 		if strings.Contains(string(out), "GNU") {
 			return fmt.Errorf("%s appears to be GNU version", target)
 		}
@@ -112,7 +116,10 @@ func ensureCoreutilsAbsent() error {
 	if fileExists("/usr/bin/.date.oxidizr.bak") {
 		return fmt.Errorf("backup file for date should not exist")
 	}
-	out, _ := exec.Command(target, "--version").Output()
+	out, err := exec.Command(target, "--version").Output()
+	if err != nil {
+		return fmt.Errorf("failed to run %s --version: %w", target, err)
+	}
 	if !strings.Contains(string(out), "GNU") {
 		return fmt.Errorf("%s does not appear to be GNU version", target)
 	}
@@ -143,6 +150,12 @@ func readLines(path string) ([]string, error) {
 }
 
 func checkSymlink(path, expectedTarget string) error {
+	if path == "" {
+		return fmt.Errorf("empty path provided")
+	}
+	if expectedTarget == "" {
+		return fmt.Errorf("empty expected target provided")
+	}
 	if !isSymlink(path) {
 		return fmt.Errorf("%s is not a symlink", path)
 	}
@@ -151,7 +164,7 @@ func checkSymlink(path, expectedTarget string) error {
 		return fmt.Errorf("could not read link %s: %w", path, err)
 	}
 	if !strings.Contains(dest, expectedTarget) {
-		return fmt.Errorf("symlink %s has unexpected target '%s'", path, dest)
+		return fmt.Errorf("symlink %s has unexpected target '%s', expected to contain '%s'", path, dest, expectedTarget)
 	}
 	return nil
 }

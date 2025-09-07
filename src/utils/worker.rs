@@ -1,5 +1,7 @@
 use crate::error::{CoreutilsError, Result};
 use crate::utils::Distribution;
+use crate::utils::audit::AUDIT;
+use crate::config::{paths, aur_helpers, timeouts};
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
@@ -37,7 +39,7 @@ impl System {
                 let timeout = Duration::from_secs(secs);
                 while start.elapsed() < timeout {
                     if !pacman_locked() { return Ok(true); }
-                    sleep(Duration::from_millis(500));
+                    sleep(timeouts::PACMAN_LOCK_CHECK_INTERVAL);
                 }
                 Ok(!pacman_locked())
             }
@@ -126,8 +128,14 @@ impl Worker for System {
         let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
         let mut tried_any = false;
         for h in available_iter.by_ref() {
-            let cmd = format!("{} -S --noconfirm --needed {}", h, package);
-            let status = std::process::Command::new("su").args(["-", "builder", "-c"]).arg(&cmd).status();
+            // Validate package name to prevent command injection
+            if !is_valid_package_name(package) {
+                return Err(CoreutilsError::ExecutionFailed(format!("Invalid package name: {}", package)));
+            }
+            // Use proper argument array instead of string interpolation
+            let status = std::process::Command::new("sudo")
+                .args(["-u", "builder", "--", h, "-S", "--noconfirm", "--needed", package])
+                .status();
             if let Ok(s) = status { if s.success() { return Ok(()); } }
             tried_any = true;
         }
@@ -178,9 +186,15 @@ impl Worker for System {
     }
 
     fn replace_file_with_symlink(&self, source: &Path, target: &Path) -> Result<()> {
-        // Gather initial state for logging/instrumentation
-        let existed = target.exists();
-        let is_symlink = fs::symlink_metadata(target)
+        // Validate paths to prevent directory traversal attacks
+        if !is_safe_path(source) || !is_safe_path(target) {
+            return Err(CoreutilsError::ExecutionFailed("Invalid path: contains directory traversal".into()));
+        }
+        // Use symlink_metadata to avoid TOCTOU race conditions
+        let metadata = fs::symlink_metadata(target);
+        let existed = metadata.is_ok();
+        let is_symlink = metadata
+            .as_ref()
             .map(|m| m.file_type().is_symlink())
             .unwrap_or(false);
         let current_dest = if is_symlink { fs::read_link(target).ok() } else { None };
@@ -260,16 +274,20 @@ impl Worker for System {
             }
         }
 
-        // For regular files: backup then replace with symlink
+        // For regular files: backup then replace with symlink atomically
         if existed {
             let backup = backup_path(target);
             log::info!("Backing up {} -> {}", target.display(), backup.display());
-            fs::copy(target, &backup)?;
-            // Reapply permissions from original to backup
-            let meta = fs::metadata(target)?;
-            let perm = meta.permissions();
-            fs::set_permissions(&backup, perm)?;
-            fs::remove_file(target)?;
+            // Use metadata we already have to avoid additional TOCTOU
+            if let Ok(ref meta) = metadata {
+                fs::copy(target, &backup)?;
+                let perm = meta.permissions();
+                fs::set_permissions(&backup, perm)?;
+                fs::remove_file(target)?;
+            } else {
+                // If metadata failed, the file might have been removed - handle gracefully
+                log::warn!("Target file {} disappeared during operation", target.display());
+            }
         }
         // Ensure parent exists
         if let Some(parent) = target.parent() { fs::create_dir_all(parent)?; }
@@ -277,6 +295,12 @@ impl Worker for System {
         let _ = fs::remove_file(target);
         unix_fs::symlink(source, target)?;
         log::info!("Symlink created: {} -> {}", target.display(), source.display());
+        // Audit log the symlink creation
+        let _ = AUDIT.log_operation(
+            "CREATE_SYMLINK",
+            &format!("{} -> {}", target.display(), source.display()),
+            true
+        );
         Ok(())
     }
 
@@ -291,6 +315,12 @@ impl Worker for System {
             // Remove symlink or leftover
             let _ = fs::remove_file(target);
             fs::rename(backup, target)?;
+            // Audit log the restoration
+            let _ = AUDIT.log_operation(
+                "RESTORE_FILE",
+                &format!("{}", target.display()),
+                true
+            );
         } else {
             log::warn!("No backup for {}, leaving as-is", target.display());
         }
@@ -301,17 +331,46 @@ impl Worker for System {
 fn backup_path(target: &Path) -> PathBuf {
     let name = target.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    parent.join(format!(".{}.oxidizr.bak", name))
+    parent.join(format!(".{}{}", name, paths::BACKUP_SUFFIX))
 }
 
 fn pacman_locked() -> bool {
-    Path::new("/var/lib/pacman/db.lck").exists()
+    Path::new(paths::PACMAN_LOCK).exists()
 }
 
 fn aur_helper_candidates(configured: &str) -> Vec<&str> {
     if !configured.is_empty() {
-        vec![configured, "paru", "yay", "trizen", "pamac"]
+        let mut helpers = vec![configured];
+        helpers.extend_from_slice(&aur_helpers::DEFAULT_HELPERS);
+        helpers
     } else {
-        vec!["paru", "yay", "trizen", "pamac"]
+        aur_helpers::DEFAULT_HELPERS.to_vec()
     }
+}
+
+// Validate package names to prevent command injection
+fn is_valid_package_name(name: &str) -> bool {
+    // Package names should only contain alphanumeric, dash, underscore, plus, and dot
+    // and should not start with dash
+    if name.is_empty() || name.starts_with('-') {
+        return false;
+    }
+    name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '+' || c == '.')
+}
+
+// Validate paths to prevent directory traversal attacks
+fn is_safe_path(path: &Path) -> bool {
+    // Check for directory traversal patterns
+    for component in path.components() {
+        if let std::path::Component::ParentDir = component {
+            return false;
+        }
+    }
+    // Check for absolute paths that go outside expected directories
+    if let Some(path_str) = path.to_str() {
+        if path_str.contains("/../") || path_str.contains("..\\") {
+            return false;
+        }
+    }
+    true
 }

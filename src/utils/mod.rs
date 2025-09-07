@@ -1,5 +1,6 @@
 pub mod command;
 pub mod worker;
+pub mod audit;
 
 // Distribution metadata used by experiments for compatibility gating
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

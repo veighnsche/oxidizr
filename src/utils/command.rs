@@ -13,7 +13,10 @@ impl Command {
     }
 
     pub fn command(&self) -> String {
-        let mut s = self.command.clone();
+        // Pre-allocate capacity to avoid repeated allocations
+        let capacity = self.command.len() + self.args.iter().map(|a| a.len() + 1).sum::<usize>();
+        let mut s = String::with_capacity(capacity);
+        s.push_str(&self.command);
         for a in &self.args {
             s.push(' ');
             s.push_str(a);

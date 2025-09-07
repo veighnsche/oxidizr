@@ -192,8 +192,8 @@ func TarDirectory(dir string) (io.ReadCloser, error) {
 				if err != nil {
 					return err
 				}
+				defer f.Close()
 				_, err = io.Copy(tw, f)
-				f.Close()
 				if err != nil {
 					return err
 				}

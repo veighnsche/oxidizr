@@ -1,9 +1,8 @@
 use crate::error::Result;
 use crate::utils::worker::Worker;
-use crate::experiments::uutils::constants::{COREUTILS_BINS_LIST, SYSTEM_BIN_DIR};
+use crate::experiments::uutils::constants::COREUTILS_BINS_LIST;
 use crate::experiments::uutils::model::UutilsExperiment;
 use crate::experiments::uutils::utils::resolve_target;
-use std::path::PathBuf;
 
 impl UutilsExperiment {
     /// Disables the uutils experiment by restoring backups and removing the package.

@@ -1,9 +1,6 @@
 use crate::error::{CoreutilsError, Result};
 use crate::utils::worker::Worker;
-use crate::experiments::uutils::constants::{COREUTILS_UNIFIED_PATH, COREUTILS_UNIFIED_CANDIDATES, COREUTILS_BINS_LIST};
 use crate::experiments::uutils::model::UutilsExperiment;
-use std::path::{Path, PathBuf};
-use std::fs;
 
 impl UutilsExperiment {
     /// Enables the uutils experiment by installing the package and setting up symlinks.

@@ -84,21 +84,26 @@ func runSingleSuite(taskPath, projectDir string) error {
 }
 
 func executeScriptBlock(script, workDir string) error {
-	tmpFile, err := os.CreateTemp("", "task-*.sh")
+	// Create temp file with secure permissions from the start
+	tmpDir := os.TempDir()
+	tmpFile, err := os.CreateTemp(tmpDir, "task-*.sh")
 	if err != nil {
 		return fmt.Errorf("failed to create temp script file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
+	// Set permissions before writing content to avoid race condition
+	if err := os.Chmod(tmpFile.Name(), 0700); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to set script permissions: %w", err)
+	}
+
 	scriptContent := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n\n%s", script)
 	if _, err := tmpFile.WriteString(scriptContent); err != nil {
+		tmpFile.Close()
 		return fmt.Errorf("failed to write to temp script: %w", err)
 	}
 	tmpFile.Close()
-
-	if err := os.Chmod(tmpFile.Name(), 0755); err != nil {
-		return fmt.Errorf("failed to make script executable: %w", err)
-	}
 
 	cmd := exec.Command(tmpFile.Name())
 	cmd.Dir = workDir

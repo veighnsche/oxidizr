@@ -3,14 +3,12 @@ use crate::utils::worker::Worker;
 use crate::experiments::uutils::constants::{COREUTILS_UNIFIED_PATH, COREUTILS_UNIFIED_CANDIDATES, COREUTILS_BINS_LIST, SYSTEM_BIN_DIR};
 use crate::experiments::uutils::model::UutilsExperiment;
 use std::path::{Path, PathBuf};
-use std::fs;
 use std::env;
-use std::process;
 
 impl UutilsExperiment {
     /// Handles applet collection for coreutils family.
     pub fn handle_coreutils_applets<W: Worker>(&self, worker: &W) -> Result<Vec<(String, PathBuf)>> {
-        let unified_path = self.resolve_unified_coreutils_path(worker);
+        let _unified_path = self.resolve_unified_coreutils_path(worker);
         if Path::new(if cfg!(test) { "bin/coreutils" } else { COREUTILS_UNIFIED_PATH }).exists() {
             log::info!("Using unified coreutils binary at: {}", if cfg!(test) { "bin/coreutils" } else { COREUTILS_UNIFIED_PATH });
             Ok(self.collect_applets_with_unified_dispatcher(worker))
@@ -36,7 +34,7 @@ impl UutilsExperiment {
         }
 
         let default_path = if cfg!(test) {
-            let out_dir = env::var("OUT_DIR").unwrap();
+            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "/tmp".to_string());
             PathBuf::from(out_dir).join("bin/coreutils")
         } else {
             PathBuf::from(COREUTILS_UNIFIED_PATH)
@@ -116,7 +114,7 @@ impl UutilsExperiment {
                     );
                     // Use a relative path in test mode
                     let fallback_path = if cfg!(test) {
-                        let out_dir = env::var("OUT_DIR").unwrap();
+                        let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "/tmp".to_string());
                         PathBuf::from(out_dir).join("bin/uu-arch")
                     } else {
                         PathBuf::from("/usr/bin/uu-arch")
