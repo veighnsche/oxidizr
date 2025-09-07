@@ -1,19 +1,18 @@
 summary: Non-root execution should fail with explicit error
 execute: |
   set -euo pipefail
-  source "$(dirname "$0")/../lib/uutils.sh"
 
   # Ensure spread user exists per cloud-config
   output_enable=$(sudo -u spread /usr/local/bin/oxidizr-arch enable --yes 2>&1) || true
   echo "--- Captured output for 'enable' ---"
   echo "$output_enable"
   echo "------------------------------------"
-  echo "$output_enable" | MATCH 'This command must be run as root'
+  echo "$output_enable" | grep -q 'This command must be run as root' || { echo "Expected root error message not found"; exit 1; }
 
   output_disable=$(sudo -u spread /usr/local/bin/oxidizr-arch disable --yes 2>&1) || true
   echo "--- Captured output for 'disable' ---"
   echo "$output_disable"
-  echo "-------------------------------------"
-  echo "$output_disable" | MATCH 'This command must be run as root'
+  echo "------------------------------------"
+  echo "$output_disable" | grep -q 'This command must be run as root' || { echo "Expected root error message not found"; exit 1; }
 restore: |
   true

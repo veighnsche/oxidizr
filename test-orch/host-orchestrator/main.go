@@ -1,0 +1,206 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+
+	"host-orchestrator/dockerutil"
+)
+
+// Simple troubleshooter to validate host readiness for isolated Arch tests.
+// Assumes Docker is already installed and running, and can optionally run a short
+// smoke test using a Docker Arch container.
+//
+// Usage examples:
+//   go run .
+//   go run . --smoke-arch-docker
+//   go run . --arch-shell
+//   go run . --arch-test-sudo
+//   go run . --arch-shell-test-sudo
+
+func main() {
+
+	var (
+		smokeDocker = flag.Bool("smoke-arch-docker", false, "Run a short Arch docker smoke test (pacman + DNS)")
+		archBuild   = flag.Bool("arch-build", false, "Build the Arch Docker image used for isolated tests")
+		archRun     = flag.Bool("run", false, "Run the Arch Docker container to execute tests via the Go runner")
+		archShell   = flag.Bool("shell", false, "Open an interactive shell inside the Arch Docker container")
+		imageTag    = flag.String("image-tag", "oxidizr-arch:latest", "Docker image tag to build/run")
+		dockerCtx   = flag.String("docker-context", "test-orch", "Docker build context directory (relative or absolute)")
+		rootDirFlag = flag.String("root-dir", "", "Host directory to mount at /workspace (defaults to git root or repo root)")
+		noCache     = flag.Bool("no-cache", false, "Build without using cache")
+		pullBase    = flag.Bool("pull", false, "Always attempt to pull a newer base image during build")
+		keepCtr     = flag.Bool("keep-container", false, "Do not remove container after run (omit --rm)")
+		timeout     = flag.Duration("timeout", 30*time.Minute, "Timeout for docker run")
+		verbose     = flag.Bool("v", false, "Verbose output")
+		veryVerbose = flag.Bool("vv", false, "Very verbose (trace) output")
+		quiet       = flag.Bool("q", false, "Quiet output (only critical errors and final summary)")
+		testFilter  = flag.String("test-filter", "", "Run a single test YAML file instead of all tests")
+	)
+	flag.Parse()
+	log.SetFlags(0)
+
+	// Configure verbosity levels
+	var verbosityLevel int
+	if *quiet {
+		verbosityLevel = 0
+	} else if *veryVerbose {
+		verbosityLevel = 3
+	} else if *verbose {
+		verbosityLevel = 2
+	} else {
+		verbosityLevel = 1
+	}
+	setQuiet(*quiet)
+	setVerbosity(verbosityLevel)
+
+	// Require root privileges (sudo) for consistent Docker access on systems without docker group configuration.
+	if !isRoot() {
+		warn("requires root privileges to interact with Docker reliably. Re-run with: sudo go run . [flags]")
+		os.Exit(1)
+	}
+
+	// Developer-friendly default: with no action flags, perform build+run using the Go runner
+	if !*smokeDocker && !*archBuild && !*archRun && !*archShell {
+		*archBuild = true
+		*archRun = true
+		if !quietMode {
+			log.Println("Defaulting to: build + run Docker Arch tests (Go runner)")
+		}
+	}
+
+	ok := true
+
+	// Always perform Docker checks
+	if !checkDocker(verbosityLevel >= 2) {
+		ok = false
+	}
+	if *smokeDocker {
+		if !smokeTestDockerArch(verbosityLevel >= 2) {
+			ok = false
+		}
+	}
+
+	// Orchestrate Docker Arch image build/run/shell if requested, but only if previous checks passed
+	if ok && (*archBuild || *archRun || *archShell) {
+		// Resolve docker context dir relative to current working dir/repo
+		ctxDir := *dockerCtx
+		if !filepath.IsAbs(ctxDir) {
+			// Try to resolve relative to repo root for convenience
+			if root, err := detectRepoRoot(); err == nil {
+				ctxDir = filepath.Join(root, ctxDir)
+			} else {
+				// Fallback to current working directory
+				if wd, err2 := os.Getwd(); err2 == nil {
+					ctxDir = filepath.Join(wd, *dockerCtx)
+				}
+			}
+		}
+
+		// If one-shot, we implicitly build
+		doBuild := *archBuild
+		if doBuild {
+			if err := dockerutil.BuildArchImage(*imageTag, ctxDir, *noCache, *pullBase, verbosityLevel >= 2); err != nil {
+				warn("docker build failed: ", err)
+				ok = false
+			}
+		}
+
+		// If running, ensure image exists (auto-build if missing unless user explicitly disabled by not using --arch or --arch-build)
+		doRun := *archRun
+		if doRun {
+			// Resolve rootDir to mount
+			rootDir := *rootDirFlag
+			if rootDir == "" {
+				if root, err := detectRepoRoot(); err == nil {
+					rootDir = root
+				} else {
+					// Fall back two directories up from docker context (/workspace expected to contain repo root)
+					rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
+				}
+			}
+
+			// Auto-build if the image tag is missing
+			if err := runSilent("docker", "image", "inspect", *imageTag); err != nil {
+				section("Docker image not found; building")
+				if err2 := dockerutil.BuildArchImage(*imageTag, ctxDir, *noCache, *pullBase, verbosityLevel >= 2); err2 != nil {
+					warn("docker build failed: ", err2)
+					ok = false
+				}
+			}
+			// Decide which non-interactive path to run
+			if ok {
+				// Propagate verbosity and test filter into container
+				var envVars []string
+				switch verbosityLevel {
+				case 0:
+					envVars = append(envVars, "VERBOSE=0")
+				case 1:
+					envVars = append(envVars, "VERBOSE=1")
+				case 2:
+					envVars = append(envVars, "VERBOSE=2")
+				default:
+					envVars = append(envVars, "VERBOSE=3")
+				}
+
+				if *testFilter != "" {
+					envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
+				}
+
+				if ok {
+					if !quietMode {
+						log.Println("Starting Docker tests (YAML suites then assertions)...")
+					}
+					if err := dockerutil.RunArchContainer(*imageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1); err != nil {
+						warn("docker run failed: ", err)
+						ok = false
+					}
+					if ok && !quietMode {
+						log.Println("Docker tests completed.")
+					}
+				}
+			}
+		}
+
+		// If interactive shell is requested
+		if ok && *archShell {
+			// Resolve rootDir to mount
+			rootDir := *rootDirFlag
+			if rootDir == "" {
+				if root, err := detectRepoRoot(); err == nil {
+					rootDir = root
+				} else {
+					rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
+				}
+			}
+			// Auto-build if the image tag is missing
+			if err := runSilent("docker", "image", "inspect", *imageTag); err != nil {
+				section("Docker image not found; building")
+				if err2 := dockerutil.BuildArchImage(*imageTag, ctxDir, *noCache, *pullBase, verbosityLevel >= 2); err2 != nil {
+					warn("docker build failed: ", err2)
+					ok = false
+				}
+			}
+			if ok {
+				if err := dockerutil.RunArchInteractiveShell(*imageTag, rootDir, verbosityLevel >= 2); err != nil {
+					warn("interactive shell failed: ", err)
+					ok = false
+				}
+			}
+		}
+	}
+
+	// LXD checks removed: this troubleshooter is Docker-only
+
+	if ok {
+		if !quietMode {
+			log.Println("All requested checks passed.")
+		}
+		os.Exit(0)
+	}
+	os.Exit(1)
+}

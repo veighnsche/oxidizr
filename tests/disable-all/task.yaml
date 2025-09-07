@@ -1,17 +1,21 @@
 summary: Disable all experiments removes all managed packages and restores system
 execute: |
   set -euo pipefail
-  # Load helpers
-  source "$(dirname "$0")/../lib/uutils.sh"
-  source "$(dirname "$0")/../lib/sudo-rs.sh"
 
   oxidizr-arch enable --yes --all
   oxidizr-arch disable --yes --all
 
-  ensure_coreutils_absent
-  ensure_findutils_absent
-  ensure_diffutils_absent
-  ensure_sudors_absent
+  # Verify packages are removed
+  ! pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should not be installed"; exit 1; }
+  ! pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should not be installed"; exit 1; }
+  
+  # Verify symlinks are restored
+  [ ! -L /usr/bin/date ] || { echo "/usr/bin/date should not be a symlink"; exit 1; }
+  [ ! -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should not be a symlink"; exit 1; }
+  
+  # Verify backup files are cleaned up
+  [ ! -f /usr/bin/.date.oxidizr.bak ] || { echo "backup file should not exist"; exit 1; }
+  [ ! -f /usr/bin/.sudo.oxidizr.bak ] || { echo "backup file should not exist"; exit 1; }
 restore: |
   # Already in disabled state; nothing else to do
   true

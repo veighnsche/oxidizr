@@ -4,101 +4,166 @@ This directory contains a small Go utility and Docker assets to run the project'
 
 It is useful when you want strong isolation from your host OS and reproducible setup of required packages and toolchains.
 
-- Runner: `main.go`
-- Docker context: `docker/` (contains `Dockerfile` and `entrypoint.sh`)
+The test orchestration system has been separated into two independent Go programs:
 
-## What it does
+1. **Host Orchestrator** (`host-orchestrator/`): Manages Docker operations from the host system
+2. **Container Runner** (`container-runner/`): Executes tests inside Docker containers
 
-- Validates your Docker setup.
-- Optionally runs a quick Arch smoke test (`docker pull`, `pacman`, DNS check).
-- Builds an Arch Docker image with the tools needed for the tests.
-- Runs that image mounting your repository at `/workspace` and executes `docker/entrypoint.sh`.
-- The entrypoint will:
-  - Stage the repo into `/root/project/oxidizr-arch` for paths expected by the tests.
-  - Ensure base packages and Rust toolchains exist.
-  - Build the project (produces `target/release/oxidizr-arch` and symlinks it to `/usr/local/bin/oxidizr-arch`).
-  - Run enable/disable assertions using helper scripts in `tests/lib/`.
+This separation provides better modularity, clearer responsibilities, and easier maintenance.
 
-## Prerequisites
+## Quick Start
 
-- Docker installed and the daemon running.
-- Your user can run Docker without `sudo` (typically by being in the `docker` group).
-- Go 1.21+.
-
-## Quick start
-
-From the repository root:
+### Running Tests
 
 ```bash
-# Zero-flag: just run it (builds image if needed, then runs tests)
-go run ./test-orch
+# Navigate to host orchestrator directory
+cd host-orchestrator/
 
-# Or with the compiled runner
-(cd test-orch && go build -o isolated-runner)
-./test-orch/isolated-runner
+# Run all tests with Docker (requires sudo for Docker access)
+sudo go run .
 
+# Build Docker image only
+sudo go run . --arch-build
+
+# Run tests with verbose output
+sudo go run . -v
+
+# Run specific test filter
+sudo go run . --test-filter="disable-all"
+
+# Open interactive shell in test container
+sudo go run . --shell
 ```
 
-If you prefer not to build the binary:
+### Prerequisites
+
+- Docker installed and running
+- Root privileges (sudo) for Docker access
+- Go 1.21 or later
+
+## Architecture
+
+The test orchestration system consists of two separate Go programs:
+
+### Host Orchestrator (`host-orchestrator/`)
+
+Responsible for:
+- Docker image building and management
+- Container lifecycle operations
+- Environment variable propagation
+- Host-side logging and error handling
+- Interactive shell access
+
+### Container Runner (`container-runner/`)
+
+Responsible for:
+- Environment setup inside containers
+- YAML test suite execution
+- Test assertions and validation
+- In-container logging and reporting
+
+## Directory Structure
+
+```
+test-orch/
+├── host-orchestrator/           # Host-side Docker orchestration
+│   ├── main.go                  # Host orchestrator entry point
+│   ├── dockerutil/              # Docker operations and utilities
+│   ├── helpers.go               # Shared utility functions
+│   ├── docker_checks.go         # Docker validation and troubleshooting
+│   ├── go.mod                   # Host orchestrator dependencies
+│   └── README.md                # Host orchestrator documentation
+├── container-runner/            # In-container test execution
+│   ├── main.go                  # Container entry point
+│   ├── runner.go                # Test execution logic
+│   ├── setup/                   # Environment setup
+│   ├── yamlrunner/              # YAML test suite execution
+│   ├── assertions/              # Test assertions
+│   ├── util/                    # Shared utilities
+│   ├── go.mod                   # Container runner dependencies
+│   └── README.md                # Container runner documentation
+├── docker/
+│   └── Dockerfile               # Container image definition
+└── README.md                   # This file
+```
+
+## Command Line Options
+
+The host orchestrator supports these options:
+
+- `--arch-build`: Build the Arch Docker image
+- `--run`: Run tests in Docker container
+- `--shell`: Open interactive shell in container
+- `--image-tag`: Docker image tag (default: oxidizr-arch:latest)
+- `--docker-context`: Docker build context directory
+- `--root-dir`: Host directory to mount at /workspace
+- `--no-cache`: Build without using cache
+- `--pull`: Always pull newer base image during build
+- `--keep-container`: Don't remove container after run
+- `--timeout`: Timeout for docker run (default: 30m)
+- `--test-filter`: Run specific test YAML file
+- `-v`: Verbose output
+- `-vv`: Very verbose (trace) output
+- `-q`: Quiet output
+
+## Test Flow
+
+1. **Host Orchestrator**: Builds Docker image and starts container
+2. **Container Runner**: Takes over inside the container
+3. **Environment Setup**: Install system packages, Rust toolchain, and build tools
+4. **Project Build**: Compile oxidizr-arch from source
+5. **YAML Test Suites**: Execute declarative test scenarios
+6. **Assertions**: Run custom validation logic
+7. **Cleanup**: Restore system state and report results
+
+## Development
+
+### Working with Separated Programs
+
+Each program has its own `go.mod` file and can be developed independently:
 
 ```bash
-# Build image only
-go run ./test-orch --arch-build
+# Work on host orchestrator
+cd host-orchestrator/
+go build .
+go test ./...
 
-# Run tests (auto-builds the image if missing)
-go run ./test-orch --arch-run
+# Work on container runner
+cd container-runner/
+go build .
+go test ./...
 ```
 
-## Useful options
+### Adding New Features
 
-The runner supports several flags (see `main.go`):
+- **Host-side features**: Modify files in `host-orchestrator/`
+- **Container-side features**: Modify files in `container-runner/`
+- **Docker image changes**: Update `docker/Dockerfile`
 
-- `--smoke-arch-docker` — Run a short Arch smoke test (`pacman` + DNS) with the public `archlinux:base-devel` image.
-- `--arch-build` — Build the isolated Arch Docker image in `docker/`.
-- `--arch-run` — Run the container and execute `docker/entrypoint.sh` to perform assertions.
-- (no flags) — One-shot: build the image if needed, then run the tests.
-- `--image-tag` — Image tag to build/run (default: `oxidizr-arch:latest`).
-- `--docker-context` — Docker build context directory (default: `testing/isolated-runner/docker`).
-- `--root-dir` — Host directory to mount at `/workspace` (defaults to the repository root; auto-detected via Git when possible).
-- `--no-cache` — Build the Docker image without using cache.
-- `--pull` — Always attempt to pull newer base image layers during build.
-- `--keep-container` — Do not remove the container after run (omit `--rm`).
-- `--timeout` — Timeout for `docker run` (default: 30m).
-- `-v` — Verbose output (default: true).
-
-Examples:
+### Building and Testing
 
 ```bash
-# Just verify Docker and run a quick smoke test
-go run ./testing/isolated-runner --smoke-arch-docker
+# Build host orchestrator
+cd host-orchestrator/
+go build .
 
-# Build without cache and always pull latest base
-go run ./testing/isolated-runner \
-  --arch-build --no-cache --pull --image-tag oxidizr-arch:latest
+# Build container runner
+cd container-runner/
+go build .
 
-# Zero-flag build+run with a custom tag
-go run ./test-orch \
-  --image-tag oxidizr-arch:dev
-
-# Run with an explicit repo root (if auto-detection fails)
-go run ./test-orch \
-  --arch-run --root-dir "$PWD" --image-tag oxidizr-arch:latest
+# Test the complete system
+cd host-orchestrator/
+sudo ./host-orchestrator
 ```
 
-## How it works
+## Benefits of Separation
 
-- The Go runner detects the repository root (via `git rev-parse --show-toplevel` or heuristics) and builds/runs the Docker image.
-- When running, it mounts the repo root at `/workspace` and launches `docker/entrypoint.sh` inside the container.
-- The entrypoint:
-  - copies `/workspace` to `/root/project` (expected by the tests);
-  - ensures required packages exist (via `pacman`) and installs Rust toolchains (via `rustup`);
-  - installs AUR helpers/packages needed for the experiments (`paru-bin`, `uutils-*`, `sudo-rs`);
-  - builds the project and exposes `oxidizr-arch` on the PATH;
-  - runs enable/disable assertions from `tests/lib/*.sh`.
-
-See:
-- `docker/Dockerfile`
-- `docker/entrypoint.sh`
+1. **Modularity**: Each program has a single, clear responsibility
+2. **Independent Development**: Programs can be developed and tested separately
+3. **Cleaner Dependencies**: Each program only includes necessary dependencies
+4. **Better Documentation**: Each program has its own focused README
+5. **Easier Maintenance**: Smaller, more focused codebases
+6. **Deployment Flexibility**: Programs can be distributed and versioned independently
 - `main.go` (functions: `buildArchImage`, `runArchContainer`, `detectRepoRoot`)
 
 ## Troubleshooting

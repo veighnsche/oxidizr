@@ -1,8 +1,24 @@
 # syntax=docker/dockerfile:1
+
+# Builder stage for compiling the Go runner
+FROM golang:1.21 as builder
+
+WORKDIR /build
+
+# Copy the container runner source code
+COPY container-runner/ ./
+
+# Download dependencies
+RUN go mod download
+
+# Build the in-container runner
+RUN CGO_ENABLED=0 GOOS=linux go build -o /isolated-runner .
+
+# Final stage
 FROM archlinux:base-devel
 
+
 ENV LANG=C.UTF-8
-SHELL ["/bin/bash", "-lc"]
 
 # Refresh system and install essentials used by our scripts
 RUN pacman -Syu --noconfirm && \
@@ -21,6 +37,7 @@ RUN pacman -Syu --noconfirm && \
 # Working directory where we will mount the repo
 WORKDIR /workspace
 
-# Default entrypoint will be provided via run.sh (bind mounts scripts/ and repo)
-ENTRYPOINT ["/bin/bash", "-lc"]
-CMD ["echo", "Use run.sh to start the test runner with proper mounts."]
+# Copy the compiled Go runner from the builder stage, make it executable, and set it as the entrypoint.
+COPY --from=builder /isolated-runner /usr/local/bin/isolated-runner
+RUN chmod +x /usr/local/bin/isolated-runner
+ENTRYPOINT ["/usr/local/bin/isolated-runner"]

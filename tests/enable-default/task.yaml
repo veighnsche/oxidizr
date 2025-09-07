@@ -1,13 +1,16 @@
 summary: Enable default experiment set installs coreutils and sudo-rs
 execute: |
   set -euo pipefail
-  source "$(dirname "$0")/../lib/uutils.sh"
-  source "$(dirname "$0")/../lib/sudo-rs.sh"
 
   oxidizr-arch enable --yes
 
-  ensure_coreutils_installed
-  ensure_sudors_installed
+  # Verify packages are installed
+  pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }
+  pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should be installed"; exit 1; }
+  
+  # Verify symlinks are created
+  [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink"; exit 1; }
+  [ -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should be a symlink"; exit 1; }
 restore: |
   if [ -z "${CI:-}" ]; then
     oxidizr-arch disable --yes --all || true
