@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::utils::worker::Worker;
 use crate::experiments::uutils::model::UutilsExperiment;
 use crate::experiments::uutils::utils::resolve_target;
+use crate::utils::worker::Worker;
 use std::path::PathBuf;
 
 impl UutilsExperiment {
@@ -10,8 +10,14 @@ impl UutilsExperiment {
         let files = worker.list_files(&self.bin_directory)?;
         let mut out = Vec::new();
         for f in files {
-            let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-            if filename.is_empty() { continue; }
+            let filename = f
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            if filename.is_empty() {
+                continue;
+            }
             out.push(resolve_target(worker, &filename));
         }
         Ok(out)

@@ -1,6 +1,6 @@
 use crate::error::Result;
-use crate::utils::worker::Worker;
 use crate::utils::Distribution;
+use crate::utils::worker::Worker;
 use std::path::PathBuf;
 
 /// Represents an experiment for replacing system utilities with uutils equivalents.

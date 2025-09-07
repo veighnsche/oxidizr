@@ -1,13 +1,13 @@
+use crate::config::{aur_helpers, paths, timeouts};
 use crate::error::{CoreutilsError, Result};
 use crate::utils::Distribution;
 use crate::utils::audit::AUDIT;
-use crate::config::{paths, aur_helpers, timeouts};
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
-use which::which;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use which::which;
 
 // Abstracts system operations needed by experiments.
 pub trait Worker {
@@ -31,14 +31,18 @@ pub trait Worker {
 
 impl System {
     fn wait_for_pacman_lock_clear(&self) -> Result<bool> {
-        if !pacman_locked() { return Ok(true); }
+        if !pacman_locked() {
+            return Ok(true);
+        }
         match self.wait_lock_secs {
             None => Ok(false),
             Some(secs) => {
                 let start = Instant::now();
                 let timeout = Duration::from_secs(secs);
                 while start.elapsed() < timeout {
-                    if !pacman_locked() { return Ok(true); }
+                    if !pacman_locked() {
+                        return Ok(true);
+                    }
                     sleep(timeouts::PACMAN_LOCK_CHECK_INTERVAL);
                 }
                 Ok(!pacman_locked())
@@ -73,33 +77,63 @@ impl Worker for System {
                 }
             }
         }
-        let id_lower = id.unwrap_or_else(|| "arch".to_string()).to_ascii_lowercase();
+        let id_lower = id
+            .unwrap_or_else(|| "arch".to_string())
+            .to_ascii_lowercase();
         let id_like_lower = id_like.unwrap_or_default().to_ascii_lowercase();
         // Include common Arch derivatives
-        let arch_markers = ["arch", "manjaro", "endeavouros", "artix", "garuda", "rebornos", "rebornos", "reborn"];
+        let arch_markers = [
+            "arch",
+            "manjaro",
+            "endeavouros",
+            "artix",
+            "garuda",
+            "rebornos",
+            "rebornos",
+            "reborn",
+        ];
         let is_arch_like = arch_markers.iter().any(|m| id_lower.contains(m))
             || arch_markers.iter().any(|m| id_like_lower.contains(m));
-        let norm_id = if is_arch_like { "arch".to_string() } else { id_lower };
-        Ok(Distribution { id: norm_id, release: "rolling".to_string() })
+        let norm_id = if is_arch_like {
+            "arch".to_string()
+        } else {
+            id_lower
+        };
+        Ok(Distribution {
+            id: norm_id,
+            release: "rolling".to_string(),
+        })
     }
 
     fn update_packages(&self) -> Result<()> {
-        if self.dry_run { log::info!("[dry-run] pacman -Sy"); return Ok(()); }
-        if !self.wait_for_pacman_lock_clear()? {
-            return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
+        if self.dry_run {
+            log::info!("[dry-run] pacman -Sy");
+            return Ok(());
         }
-        let status = std::process::Command::new("pacman").args(["-Sy"]).status()?;
+        if !self.wait_for_pacman_lock_clear()? {
+            return Err(CoreutilsError::ExecutionFailed(
+                "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
+            ));
+        }
+        let status = std::process::Command::new("pacman")
+            .args(["-Sy"])
+            .status()?;
         if status.success() {
             Ok(())
         } else {
-            Err(CoreutilsError::ExecutionFailed("pacman -Sy failed (could not refresh package databases)".into()))
+            Err(CoreutilsError::ExecutionFailed(
+                "pacman -Sy failed (could not refresh package databases)".into(),
+            ))
         }
     }
 
     fn install_package(&self, package: &str) -> Result<()> {
         if self.dry_run {
             log::info!("[dry-run] pacman -S --noconfirm {}", package);
-            log::info!("[dry-run] <aur-helper> -S --noconfirm {} (fallback)", package);
+            log::info!(
+                "[dry-run] <aur-helper> -S --noconfirm {} (fallback)",
+                package
+            );
             return Ok(());
         }
         // If already installed, do nothing (avoids invoking AUR helpers as root)
@@ -108,10 +142,14 @@ impl Worker for System {
             return Ok(());
         }
         if !self.wait_for_pacman_lock_clear()? {
-            return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
+            return Err(CoreutilsError::ExecutionFailed(
+                "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
+            ));
         }
         // Try pacman, then fall back to AUR helper(s)
-        let status = std::process::Command::new("pacman").args(["-S", "--noconfirm", package]).status()?;
+        let status = std::process::Command::new("pacman")
+            .args(["-S", "--noconfirm", package])
+            .status()?;
         if status.success() {
             // Double-check installation actually succeeded
             if self.check_installed(package)? {
@@ -130,13 +168,29 @@ impl Worker for System {
         for h in available_iter.by_ref() {
             // Validate package name to prevent command injection
             if !is_valid_package_name(package) {
-                return Err(CoreutilsError::ExecutionFailed(format!("Invalid package name: {}", package)));
+                return Err(CoreutilsError::ExecutionFailed(format!(
+                    "Invalid package name: {}",
+                    package
+                )));
             }
             // Use proper argument array instead of string interpolation
             let status = std::process::Command::new("sudo")
-                .args(["-u", "builder", "--", h, "-S", "--noconfirm", "--needed", package])
+                .args([
+                    "-u",
+                    "builder",
+                    "--",
+                    h,
+                    "-S",
+                    "--noconfirm",
+                    "--needed",
+                    package,
+                ])
                 .status();
-            if let Ok(s) = status { if s.success() { return Ok(()); } }
+            if let Ok(s) = status {
+                if s.success() {
+                    return Ok(());
+                }
+            }
             tried_any = true;
         }
         if !tried_any {
@@ -153,20 +207,32 @@ impl Worker for System {
     }
 
     fn remove_package(&self, package: &str) -> Result<()> {
-        if self.dry_run { log::info!("[dry-run] pacman -R --noconfirm {}", package); return Ok(()); }
-        if !self.wait_for_pacman_lock_clear()? {
-            return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
+        if self.dry_run {
+            log::info!("[dry-run] pacman -R --noconfirm {}", package);
+            return Ok(());
         }
-        let status = std::process::Command::new("pacman").args(["-R", "--noconfirm", package]).status()?;
+        if !self.wait_for_pacman_lock_clear()? {
+            return Err(CoreutilsError::ExecutionFailed(
+                "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
+            ));
+        }
+        let status = std::process::Command::new("pacman")
+            .args(["-R", "--noconfirm", package])
+            .status()?;
         if status.success() {
             Ok(())
         } else {
-            Err(CoreutilsError::ExecutionFailed(format!("Failed to remove '{}' (pacman -R failed)", package)))
+            Err(CoreutilsError::ExecutionFailed(format!(
+                "Failed to remove '{}' (pacman -R failed)",
+                package
+            )))
         }
     }
 
     fn check_installed(&self, package: &str) -> Result<bool> {
-        let status = std::process::Command::new("pacman").args(["-Qi", package]).status()?;
+        let status = std::process::Command::new("pacman")
+            .args(["-Qi", package])
+            .status()?;
         Ok(status.success())
     }
 
@@ -176,11 +242,15 @@ impl Worker for System {
 
     fn list_files(&self, dir: &Path) -> Result<Vec<PathBuf>> {
         let mut out = Vec::new();
-        if !dir.exists() { return Ok(out); }
+        if !dir.exists() {
+            return Ok(out);
+        }
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() { out.push(path); }
+            if path.is_file() {
+                out.push(path);
+            }
         }
         Ok(out)
     }
@@ -188,7 +258,9 @@ impl Worker for System {
     fn replace_file_with_symlink(&self, source: &Path, target: &Path) -> Result<()> {
         // Validate paths to prevent directory traversal attacks
         if !is_safe_path(source) || !is_safe_path(target) {
-            return Err(CoreutilsError::ExecutionFailed("Invalid path: contains directory traversal".into()));
+            return Err(CoreutilsError::ExecutionFailed(
+                "Invalid path: contains directory traversal".into(),
+            ));
         }
         // Use symlink_metadata to avoid TOCTOU race conditions
         let metadata = fs::symlink_metadata(target);
@@ -197,7 +269,11 @@ impl Worker for System {
             .as_ref()
             .map(|m| m.file_type().is_symlink())
             .unwrap_or(false);
-        let current_dest = if is_symlink { fs::read_link(target).ok() } else { None };
+        let current_dest = if is_symlink {
+            fs::read_link(target).ok()
+        } else {
+            None
+        };
         log::info!(
             "replace_file_with_symlink pre-state: target={}, existed={}, is_symlink={}, current_dest={}",
             target.display(),
@@ -224,7 +300,9 @@ impl Worker for System {
             let desired = fs::canonicalize(source).unwrap_or_else(|_| source.to_path_buf());
             let mut resolved_current = current_dest.clone().unwrap_or_default();
             if resolved_current.is_relative() {
-                if let Some(parent) = target.parent() { resolved_current = parent.join(resolved_current); }
+                if let Some(parent) = target.parent() {
+                    resolved_current = parent.join(resolved_current);
+                }
             }
             let resolved_current = fs::canonicalize(&resolved_current).unwrap_or(resolved_current);
             if resolved_current == desired {
@@ -250,7 +328,11 @@ impl Worker for System {
                 // to the regular-file branch.
                 let backup = backup_path(target);
                 if resolved_current.exists() {
-                    log::info!("Backing up (from symlink) {} -> {}", target.display(), backup.display());
+                    log::info!(
+                        "Backing up (from symlink) {} -> {}",
+                        target.display(),
+                        backup.display()
+                    );
                     let _ = fs::copy(&resolved_current, &backup);
                     if let Ok(meta) = fs::metadata(&resolved_current) {
                         let perm = meta.permissions();
@@ -286,20 +368,29 @@ impl Worker for System {
                 fs::remove_file(target)?;
             } else {
                 // If metadata failed, the file might have been removed - handle gracefully
-                log::warn!("Target file {} disappeared during operation", target.display());
+                log::warn!(
+                    "Target file {} disappeared during operation",
+                    target.display()
+                );
             }
         }
         // Ensure parent exists
-        if let Some(parent) = target.parent() { fs::create_dir_all(parent)?; }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
         // Remove leftover target then symlink
         let _ = fs::remove_file(target);
         unix_fs::symlink(source, target)?;
-        log::info!("Symlink created: {} -> {}", target.display(), source.display());
+        log::info!(
+            "Symlink created: {} -> {}",
+            target.display(),
+            source.display()
+        );
         // Audit log the symlink creation
         let _ = AUDIT.log_operation(
             "CREATE_SYMLINK",
             &format!("{} -> {}", target.display(), source.display()),
-            true
+            true,
         );
         Ok(())
     }
@@ -308,7 +399,11 @@ impl Worker for System {
         let backup = backup_path(target);
         if backup.exists() {
             if self.dry_run {
-                log::info!("[dry-run] would restore {} from {}", target.display(), backup.display());
+                log::info!(
+                    "[dry-run] would restore {} from {}",
+                    target.display(),
+                    backup.display()
+                );
                 return Ok(());
             }
             log::info!("Restoring {} <- {}", target.display(), backup.display());
@@ -316,11 +411,7 @@ impl Worker for System {
             let _ = fs::remove_file(target);
             fs::rename(backup, target)?;
             // Audit log the restoration
-            let _ = AUDIT.log_operation(
-                "RESTORE_FILE",
-                &format!("{}", target.display()),
-                true
-            );
+            let _ = AUDIT.log_operation("RESTORE_FILE", &format!("{}", target.display()), true);
         } else {
             log::warn!("No backup for {}, leaving as-is", target.display());
         }
@@ -329,7 +420,10 @@ impl Worker for System {
 }
 
 fn backup_path(target: &Path) -> PathBuf {
-    let name = target.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+    let name = target
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("backup");
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
     parent.join(format!(".{}{}", name, paths::BACKUP_SUFFIX))
 }
@@ -355,7 +449,8 @@ fn is_valid_package_name(name: &str) -> bool {
     if name.is_empty() || name.starts_with('-') {
         return false;
     }
-    name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '+' || c == '.')
+    name.chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '+' || c == '.')
 }
 
 // Validate paths to prevent directory traversal attacks

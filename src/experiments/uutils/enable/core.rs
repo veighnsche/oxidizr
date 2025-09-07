@@ -1,14 +1,24 @@
 use crate::error::{CoreutilsError, Result};
-use crate::utils::worker::Worker;
 use crate::experiments::uutils::model::UutilsExperiment;
+use crate::utils::worker::Worker;
 
 impl UutilsExperiment {
     /// Enables the uutils experiment by installing the package and setting up symlinks.
-    pub fn enable<W: Worker>(&self, worker: &W, _assume_yes: bool, update_lists: bool) -> Result<()> {
+    pub fn enable<W: Worker>(
+        &self,
+        worker: &W,
+        _assume_yes: bool,
+        update_lists: bool,
+    ) -> Result<()> {
         if !self.check_compatible(worker)? {
-            return Err(CoreutilsError::Incompatible("Unsupported Arch release".into()));
+            return Err(CoreutilsError::Incompatible(
+                "Unsupported Arch release".into(),
+            ));
         }
-        if update_lists { log::info!("Updating package lists..."); worker.update_packages()?; }
+        if update_lists {
+            log::info!("Updating package lists...");
+            worker.update_packages()?;
+        }
 
         log::info!("Installing package: {}", self.package);
         worker.install_package(&self.package)?;

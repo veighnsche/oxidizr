@@ -1,13 +1,16 @@
 use crate::error::{CoreutilsError, Result};
-use crate::utils::worker::Worker;
 use crate::experiments::uutils::model::UutilsExperiment;
-use std::path::PathBuf;
+use crate::utils::worker::Worker;
 use std::env;
 use std::path::Path;
+use std::path::PathBuf;
 
 impl UutilsExperiment {
     /// Handles applet collection for non-coreutils families.
-    pub fn handle_non_coreutils_applets<W: Worker>(&self, worker: &W) -> Result<Vec<(String, PathBuf)>> {
+    pub fn handle_non_coreutils_applets<W: Worker>(
+        &self,
+        worker: &W,
+    ) -> Result<Vec<(String, PathBuf)>> {
         log::info!(
             "Preparing applets for family '{}' under {}",
             self.name,
@@ -17,8 +20,14 @@ impl UutilsExperiment {
         let existing = worker.list_files(&self.bin_directory)?;
         if !existing.is_empty() {
             for f in existing {
-                let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
-                if filename.is_empty() { continue; }
+                let filename = f
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                if filename.is_empty() {
+                    continue;
+                }
                 applets.push((filename, f.clone()));
             }
         } else {
@@ -75,13 +84,13 @@ impl UutilsExperiment {
                 }
             }
             if applets.is_empty() {
-                return Err(CoreutilsError::ExecutionFailed(
-                    format!(
-                        "No '{}' applet binaries found or synthesized under {}. \
+                return Err(CoreutilsError::ExecutionFailed(format!(
+                    "No '{}' applet binaries found or synthesized under {}. \
                          Ensure '{}' installed correctly; if installed via AUR, verify that the helper completed successfully.",
-                        self.name, self.bin_directory.display(), self.package
-                    )
-                ));
+                    self.name,
+                    self.bin_directory.display(),
+                    self.package
+                )));
             }
         }
         Ok(applets)

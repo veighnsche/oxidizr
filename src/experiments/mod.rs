@@ -23,13 +23,27 @@ impl<'a> Experiment<'a> {
         }
     }
 
-    pub fn enable<W: Worker>(&self, worker: &W, assume_yes: bool, update_lists: bool, no_compatibility_check: bool) -> Result<()> {
+    pub fn enable<W: Worker>(
+        &self,
+        worker: &W,
+        assume_yes: bool,
+        update_lists: bool,
+        no_compatibility_check: bool,
+    ) -> Result<()> {
         match self {
             Experiment::Uutils(u) => {
-                if no_compatibility_check || u.check_compatible(worker)? { u.enable(worker, assume_yes, update_lists) } else { Ok(()) }
+                if no_compatibility_check || u.check_compatible(worker)? {
+                    u.enable(worker, assume_yes, update_lists)
+                } else {
+                    Ok(())
+                }
             }
             Experiment::SudoRs(s) => {
-                if no_compatibility_check || s.check_compatible(worker)? { s.enable(worker, assume_yes, update_lists) } else { Ok(()) }
+                if no_compatibility_check || s.check_compatible(worker)? {
+                    s.enable(worker, assume_yes, update_lists)
+                } else {
+                    Ok(())
+                }
             }
         }
     }

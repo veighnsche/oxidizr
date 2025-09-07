@@ -1,5 +1,5 @@
-use coreutils_switch::cli::handle_cli;
 use coreutils_switch::Result;
+use coreutils_switch::cli::handle_cli;
 
 fn main() -> Result<()> {
     let _ = env_logger::builder().is_test(false).try_init();
@@ -8,6 +8,6 @@ fn main() -> Result<()> {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }
-    
+
     Ok(())
 }

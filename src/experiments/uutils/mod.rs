@@ -1,7 +1,7 @@
-pub mod model;
 pub mod constants;
-pub mod enable;
 pub mod disable;
+pub mod enable;
+pub mod model;
 pub mod targets;
 pub mod utils;
 

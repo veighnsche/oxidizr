@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -40,6 +41,7 @@ func main() {
 		veryVerbose = flag.Bool("vv", false, "Very verbose (trace) output")
 		quiet       = flag.Bool("q", false, "Quiet output (only critical errors and final summary)")
 		testFilter  = flag.String("test-filter", "", "Run a single test YAML file instead of all tests")
+		testCI      = flag.Bool("test-ci", false, "Run local CI tests with act")
 	)
 	flag.Parse()
 	log.SetFlags(0)
@@ -62,6 +64,32 @@ func main() {
 	if !isRoot() {
 		warn("requires root privileges to interact with Docker reliably. Re-run with: sudo go run . [flags]")
 		os.Exit(1)
+	}
+
+	// Developer-friendly default: with no action flags, perform build+run using the Go runner
+	if *testCI {
+		if !have("act") {
+			log.Println("'act' is not installed or not in your PATH.")
+			log.Println("Please install it to run local CI tests: https://github.com/nektos/act#installation")
+			os.Exit(1)
+		}
+
+		repoRoot, err := detectRepoRoot()
+		if err != nil {
+			log.Fatalf("Failed to detect repository root: %v", err)
+		}
+
+		log.Println("Running CI 'test-orch' job locally with act...")
+		// Specify the runner image to make act non-interactive
+		cmd := exec.Command("act", "-j", "test-orch", "-P", "ubuntu-latest=catthehacker/ubuntu:act-latest")
+		cmd.Dir = repoRoot
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			log.Fatalf("act command failed: %v", err)
+		}
+		os.Exit(0)
 	}
 
 	// Developer-friendly default: with no action flags, perform build+run using the Go runner

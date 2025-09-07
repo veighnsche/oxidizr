@@ -20,7 +20,7 @@ pub mod aur_helpers {
     pub const YAY: &str = "yay";
     pub const TRIZEN: &str = "trizen";
     pub const PAMAC: &str = "pamac";
-    
+
     pub const DEFAULT_HELPERS: [&str; 4] = [PARU, YAY, TRIZEN, PAMAC];
 }
 
@@ -33,7 +33,7 @@ pub mod security {
 
 pub mod timeouts {
     use std::time::Duration;
-    
+
     pub const PACMAN_LOCK_CHECK_INTERVAL: Duration = Duration::from_millis(500);
     pub const DEFAULT_WAIT_LOCK_SECS: u64 = 30;
     pub const DOCKER_RUN_TIMEOUT: Duration = Duration::from_secs(1800); // 30 minutes

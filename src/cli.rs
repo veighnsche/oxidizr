@@ -23,14 +23,18 @@ impl AurHelperArg {
     }
 }
 use crate::error::Result;
-use crate::experiments::{all_experiments, Experiment};
+use crate::experiments::{Experiment, all_experiments};
 use crate::utils::worker::System;
 use clap::{Parser, Subcommand, ValueEnum};
-use std::path::PathBuf;
 use std::io::{self, Write};
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "oxidizr-arch style coreutils switching (scaffold)")]
+#[command(
+    author,
+    version,
+    about = "oxidizr-arch style coreutils switching (scaffold)"
+)]
 pub struct Cli {
     /// Skip confirmation prompts (dangerous; intended for automation/tests)
     /// Accept legacy alias --yes for compatibility with test suites
@@ -110,7 +114,11 @@ pub fn handle_cli() -> Result<()> {
         .package_manager
         .clone()
         .unwrap_or_else(|| cli.aur_helper.as_helper_str().to_string());
-    let worker = System { aur_helper: effective_helper, dry_run: cli.dry_run, wait_lock_secs: cli.wait_lock };
+    let worker = System {
+        aur_helper: effective_helper,
+        dry_run: cli.dry_run,
+        wait_lock_secs: cli.wait_lock,
+    };
     let update_lists = !cli.no_update;
 
     // Build experiment selection
@@ -128,7 +136,10 @@ pub fn handle_cli() -> Result<()> {
     let mut exps: Vec<Experiment> = all_experiments(&worker);
     if !cli.all {
         // Filter by provided names
-        exps = exps.into_iter().filter(|e| selection.contains(&e.name())).collect();
+        exps = exps
+            .into_iter()
+            .filter(|e| selection.contains(&e.name()))
+            .collect();
     }
 
     if exps.is_empty() {
@@ -138,16 +149,29 @@ pub fn handle_cli() -> Result<()> {
 
     match cli.command {
         Commands::Enable => {
-            if !cli.dry_run { enforce_root()?; }
-            if !cli.assume_yes && !confirm("Enable and switch to Rust replacements?")? { return Ok(()); }
+            if !cli.dry_run {
+                enforce_root()?;
+            }
+            if !cli.assume_yes && !confirm("Enable and switch to Rust replacements?")? {
+                return Ok(());
+            }
             for e in &exps {
-                e.enable(&worker, cli.assume_yes, update_lists, cli.no_compatibility_check)?;
+                e.enable(
+                    &worker,
+                    cli.assume_yes,
+                    update_lists,
+                    cli.no_compatibility_check,
+                )?;
                 println!("Enabled experiment: {}", e.name());
             }
         }
         Commands::Disable => {
-            if !cli.dry_run { enforce_root()?; }
-            if !cli.assume_yes && !confirm("Disable and restore system-provided tools?")? { return Ok(()); }
+            if !cli.dry_run {
+                enforce_root()?;
+            }
+            if !cli.assume_yes && !confirm("Disable and restore system-provided tools?")? {
+                return Ok(());
+            }
             for e in &exps {
                 e.disable(&worker, update_lists)?;
                 println!("Disabled experiment: {}", e.name());
@@ -175,7 +199,9 @@ fn enforce_root() -> Result<()> {
     {
         use nix::unistd::Uid;
         if !Uid::effective().is_root() {
-            return Err(crate::error::CoreutilsError::Other("This command must be run as root".into()));
+            return Err(crate::error::CoreutilsError::Other(
+                "This command must be run as root".into(),
+            ));
         }
     }
     Ok(())
@@ -185,7 +211,9 @@ fn confirm(prompt: &str) -> Result<bool> {
     print!("{} [y/N]: ", prompt);
     io::stdout().flush().ok();
     let mut s = String::new();
-    if io::stdin().read_line(&mut s).is_err() { return Ok(false); }
+    if io::stdin().read_line(&mut s).is_err() {
+        return Ok(false);
+    }
     let ans = s.trim().to_ascii_lowercase();
     Ok(ans == "y" || ans == "yes")
 }
