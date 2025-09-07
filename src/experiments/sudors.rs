@@ -40,7 +40,7 @@ impl<'a> SudoRsExperiment<'a> {
     pub fn enable<W: Worker>(
         &self,
         worker: &W,
-        _assume_yes: bool,
+        assume_yes: bool,
         update_lists: bool,
     ) -> Result<()> {
         if !self.check_compatible(worker)? {
@@ -49,10 +49,10 @@ impl<'a> SudoRsExperiment<'a> {
             ));
         }
         if update_lists {
-            worker.update_packages()?;
+            worker.update_packages(assume_yes)?;
         }
         // Install sudo-rs
-        worker.install_package("sudo-rs")?;
+        worker.install_package("sudo-rs", assume_yes)?;
         // Replace sudo, su, visudo with binaries provided by sudo-rs. The Arch package layout may
         // install either into /usr/lib/cargo/bin/<name> or as /usr/bin/<name>-rs. Detect robustly.
         for (name, target) in [
@@ -81,9 +81,9 @@ impl<'a> SudoRsExperiment<'a> {
         Ok(())
     }
 
-    pub fn disable<W: Worker>(&self, worker: &W, update_lists: bool) -> Result<()> {
+    pub fn disable<W: Worker>(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
         if update_lists {
-            worker.update_packages()?;
+            worker.update_packages(assume_yes)?;
         }
         // Restore original binaries; visudo target lives in /usr/sbin per tests
         for name in ["sudo", "su", "visudo"] {
@@ -94,7 +94,7 @@ impl<'a> SudoRsExperiment<'a> {
             };
             worker.restore_file(&target)?;
         }
-        worker.remove_package("sudo-rs")?;
+        worker.remove_package("sudo-rs", assume_yes)?;
         Ok(())
     }
 

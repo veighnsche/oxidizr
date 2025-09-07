@@ -19,7 +19,10 @@ import (
 	"github.com/moby/term"
 )
 
-func BuildArchImage(tag, contextDir string, noCache, pull bool, verbose bool) error {
+func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, verbose bool) error {
+	if baseImage == "" {
+		baseImage = "archlinux:base-devel"
+	}
 	if verbose {
 		log.Println("RUN>", "docker build -t", tag, contextDir)
 	}
@@ -39,6 +42,9 @@ func BuildArchImage(tag, contextDir string, noCache, pull bool, verbose bool) er
 		NoCache:    noCache,
 		PullParent: pull,
 		Dockerfile: "docker/Dockerfile",
+		BuildArgs: map[string]*string{
+			"BASE_IMAGE": &baseImage,
+		},
 	}
 	resp, err := cli.ImageBuild(ctx, buildCtx, opts)
 	if err != nil {

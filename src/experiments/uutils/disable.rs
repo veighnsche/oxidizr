@@ -6,10 +6,10 @@ use crate::utils::worker::Worker;
 
 impl UutilsExperiment {
     /// Disables the uutils experiment by restoring backups and removing the package.
-    pub fn disable<W: Worker>(&self, worker: &W, update_lists: bool) -> Result<()> {
+    pub fn disable<W: Worker>(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
         if update_lists {
             log::info!("Updating package lists...");
-            worker.update_packages()?;
+            worker.update_packages(assume_yes)?;
         }
 
         if self.name == "coreutils" {
@@ -41,7 +41,7 @@ impl UutilsExperiment {
             }
         }
         log::info!("Removing package: {}", self.package);
-        worker.remove_package(&self.package)?;
+        worker.remove_package(&self.package, assume_yes)?;
         Ok(())
     }
 }

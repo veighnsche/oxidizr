@@ -7,7 +7,7 @@ impl UutilsExperiment {
     pub fn enable<W: Worker>(
         &self,
         worker: &W,
-        _assume_yes: bool,
+        assume_yes: bool,
         update_lists: bool,
     ) -> Result<()> {
         if !self.check_compatible(worker)? {
@@ -17,11 +17,11 @@ impl UutilsExperiment {
         }
         if update_lists {
             log::info!("Updating package lists...");
-            worker.update_packages()?;
+            worker.update_packages(assume_yes)?;
         }
 
         log::info!("Installing package: {}", self.package);
-        worker.install_package(&self.package)?;
+        worker.install_package(&self.package, assume_yes)?;
 
         let applets = if self.name == "coreutils" {
             self.handle_coreutils_applets(worker)?

@@ -15,9 +15,9 @@ pub trait Worker {
     fn distribution(&self) -> Result<Distribution>;
 
     // Package management
-    fn update_packages(&self) -> Result<()>;
-    fn install_package(&self, package: &str) -> Result<()>;
-    fn remove_package(&self, package: &str) -> Result<()>;
+    fn update_packages(&self, assume_yes: bool) -> Result<()>;
+    fn install_package(&self, package: &str, assume_yes: bool) -> Result<()>;
+    fn remove_package(&self, package: &str, assume_yes: bool) -> Result<()>;
     fn check_installed(&self, package: &str) -> Result<bool>;
 
     // Filesystem and process helpers
@@ -105,7 +105,7 @@ impl Worker for System {
         })
     }
 
-    fn update_packages(&self) -> Result<()> {
+    fn update_packages(&self, assume_yes: bool) -> Result<()> {
         if self.dry_run {
             log::info!("[dry-run] pacman -Sy");
             return Ok(());
@@ -115,9 +115,11 @@ impl Worker for System {
                 "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
             ));
         }
-        let status = std::process::Command::new("pacman")
-            .args(["-Sy"])
-            .status()?;
+        let mut args = vec!["-Sy"];
+        if assume_yes {
+            args.push("--noconfirm");
+        }
+        let status = std::process::Command::new("pacman").args(&args).status()?;
         if status.success() {
             Ok(())
         } else {
@@ -127,7 +129,7 @@ impl Worker for System {
         }
     }
 
-    fn install_package(&self, package: &str) -> Result<()> {
+    fn install_package(&self, package: &str, assume_yes: bool) -> Result<()> {
         if self.dry_run {
             log::info!("[dry-run] pacman -S --noconfirm {}", package);
             log::info!(
@@ -147,25 +149,33 @@ impl Worker for System {
             ));
         }
         // Try pacman, then fall back to AUR helper(s)
-        let status = std::process::Command::new("pacman")
-            .args(["-S", "--noconfirm", package])
-            .status()?;
-        if status.success() {
-            // Double-check installation actually succeeded
-            if self.check_installed(package)? {
-                return Ok(());
-            } else {
-                return Err(CoreutilsError::ExecutionFailed(format!(
-                    "pacman reported success installing '{}' but package not found via 'pacman -Qi'",
-                    package
-                )));
-            }
+        let mut args = vec!["-S"];
+        if assume_yes {
+            args.push("--noconfirm");
+        }
+        args.push(package);
+
+        // We don't check the status here. If pacman fails (e.g., package not found),
+        // we want to fall through to the AUR helper logic.
+        let _ = std::process::Command::new("pacman").args(&args).status();
+
+        // Check if the package is installed now. If so, we're done.
+        if self.check_installed(package)? {
+            return Ok(());
         }
         // Choose helper: prefer configured, else detect installed. Run helpers as non-root 'builder'.
         let candidates = aur_helper_candidates(&self.aur_helper);
         let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
         let mut tried_any = false;
         for h in available_iter.by_ref() {
+            let mut aur_args = vec!["-u", "builder", "--", h, "-S", "--needed"];
+            if assume_yes {
+                aur_args.push("--noconfirm");
+                aur_args.push("--batchinstall");
+            }
+            aur_args.push(package);
+
+
             // Validate package name to prevent command injection
             if !is_valid_package_name(package) {
                 return Err(CoreutilsError::ExecutionFailed(format!(
@@ -175,16 +185,7 @@ impl Worker for System {
             }
             // Use proper argument array instead of string interpolation
             let status = std::process::Command::new("sudo")
-                .args([
-                    "-u",
-                    "builder",
-                    "--",
-                    h,
-                    "-S",
-                    "--noconfirm",
-                    "--needed",
-                    package,
-                ])
+                .args(aur_args)
                 .status();
             if let Ok(s) = status
                 && s.success()
@@ -206,9 +207,15 @@ impl Worker for System {
         )))
     }
 
-    fn remove_package(&self, package: &str) -> Result<()> {
+    fn remove_package(&self, package: &str, assume_yes: bool) -> Result<()> {
         if self.dry_run {
             log::info!("[dry-run] pacman -R --noconfirm {}", package);
+            return Ok(());
+        }
+
+        // If not installed, do nothing.
+        if !self.check_installed(package)? {
+            log::info!("Package '{}' not installed, skipping removal", package);
             return Ok(());
         }
         if !self.wait_for_pacman_lock_clear()? {
@@ -216,9 +223,12 @@ impl Worker for System {
                 "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
             ));
         }
-        let status = std::process::Command::new("pacman")
-            .args(["-R", "--noconfirm", package])
-            .status()?;
+        let mut args = vec!["-R"];
+        if assume_yes {
+            args.push("--noconfirm");
+        }
+        args.push(package);
+        let status = std::process::Command::new("pacman").args(&args).status()?;
         if status.success() {
             Ok(())
         } else {

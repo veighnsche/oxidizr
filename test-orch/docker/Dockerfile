@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Builder stage for compiling the Go runner
+ARG BASE_IMAGE=archlinux:base-devel
 FROM golang:1.21 as builder
 
 WORKDIR /build
@@ -15,16 +16,18 @@ RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o /isolated-runner .
 
 # Final stage
-FROM archlinux:base-devel
+FROM ${BASE_IMAGE}
 
 
 ENV LANG=C.UTF-8
 
 # Refresh system and install essentials used by our scripts
 RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm reflector && \
+    reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist && \
     pacman -S --noconfirm --needed sudo git curl rustup which findutils && \
     # Create non-root builder user for building AUR packages
-    useradd -m builder && \
+    (id -u builder &>/dev/null || useradd -m builder) && \
     install -d -m 0755 -o root -g root /etc/sudoers.d && \
     printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/99-builder && chmod 0440 /etc/sudoers.d/99-builder && \
     # Pre-seed rustup for root and builder (some AUR prepare() steps require cargo)

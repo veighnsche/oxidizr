@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -98,7 +99,9 @@ func executeScriptBlock(script, workDir string) error {
 		return fmt.Errorf("failed to set script permissions: %w", err)
 	}
 
-	scriptContent := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n\n%s", script)
+	// Prepend AUR helper for installs, and always use --noconfirm
+	scriptWithAur := strings.ReplaceAll(script, "oxidizr-arch enable", "paru -S --needed --batchinstall --noconfirm && oxidizr-arch enable")
+	scriptContent := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n\n%s", scriptWithAur)
 	if _, err := tmpFile.WriteString(scriptContent); err != nil {
 		tmpFile.Close()
 		return fmt.Errorf("failed to write to temp script: %w", err)

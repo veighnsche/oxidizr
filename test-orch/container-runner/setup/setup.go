@@ -66,7 +66,7 @@ func installDependencies() error {
 }
 
 func setupUsers() error {
-	if _, err := os.Stat("/home/builder"); os.IsNotExist(err) {
+	if err := util.RunCmd("id", "-u", "builder"); err != nil {
 		if err := util.RunCmd("useradd", "-m", "builder"); err != nil {
 			return fmt.Errorf("failed to create builder user: %w", err)
 		}
@@ -78,7 +78,7 @@ func setupUsers() error {
 		return fmt.Errorf("failed to write sudoers file: %w", err)
 	}
 
-	if _, err := os.Stat("/home/spread"); os.IsNotExist(err) {
+	if err := util.RunCmd("id", "-u", "spread"); err != nil {
 		if err := util.RunCmd("useradd", "-m", "spread"); err != nil {
 			return fmt.Errorf("failed to create spread user: %w", err)
 		}

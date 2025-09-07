@@ -48,10 +48,10 @@ impl<'a> Experiment<'a> {
         }
     }
 
-    pub fn disable<W: Worker>(&self, worker: &W, update_lists: bool) -> Result<()> {
+    pub fn disable<W: Worker>(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
         match self {
-            Experiment::Uutils(u) => u.disable(worker, update_lists),
-            Experiment::SudoRs(s) => s.disable(worker, update_lists),
+            Experiment::Uutils(u) => u.disable(worker, assume_yes, update_lists),
+            Experiment::SudoRs(s) => s.disable(worker, assume_yes, update_lists),
         }
     }
 

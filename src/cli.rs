@@ -170,7 +170,7 @@ pub fn handle_cli() -> Result<()> {
                 return Ok(());
             }
             for e in &exps {
-                e.disable(&worker, update_lists)?;
+                e.disable(&worker, cli.assume_yes, update_lists)?;
                 println!("Disabled experiment: {}", e.name());
             }
         }
