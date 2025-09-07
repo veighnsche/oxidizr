@@ -39,14 +39,7 @@ _BINS_LIST="${_REPO_ROOT}/tests/lib/rust-coreutils-bins.txt"
 # Package query helpers (Arch)
 pkg_installed() {
   local pkg="$1"
-  if command -v paru >/dev/null 2>&1; then
-    paru -Qi "$pkg" >/dev/null 2>&1 && return 0
-  fi
-  if command -v yay >/dev/null 2>&1; then
-    yay -Qi "$pkg" >/dev/null 2>&1 && return 0
-  fi
-  pacman -Qi "$pkg" >/dev/null 2>&1 && return 0
-  return 1
+  pacman -Qi "$pkg" >/dev/null 2>&1
 }
 
 _note_if_missing_backup() {
@@ -123,11 +116,6 @@ ensure_coreutils_installed() {
   if [ -x "$unified_a" ] || [ -x "$unified_b" ]; then
     have_unified=1
   fi
-  # Workaround: Manually create symlink for 'arch' if it doesn't exist
-  if [ ! -L "/usr/bin/arch" ] && [ -x "/usr/bin/uu-arch" ]; then
-    echo "Creating symlink for /usr/bin/arch as workaround" >&2
-    ln -sf "/usr/bin/uu-arch" "/usr/bin/arch" || true
-  fi
   # Minimal required set that uutils reliably provides; keep tests stable
   local REQUIRED_BINS=(ls cp mv rm ln mkdir rmdir touch date readlink echo)
   _is_required() { local x="$1"; shift; for e in "$@"; do [ "$e" = "$x" ] && return 0; done; return 1; }
@@ -149,11 +137,6 @@ ensure_coreutils_installed() {
         echo "Expected symlink for $target (unified dispatcher available)" >&2; exit 1
       fi
       if [ "$have_per_applet" -eq 1 ]; then
-        # Special case for 'arch': tolerate missing symlink if per-applet binary exists
-        if [ "$bin" = "arch" ]; then
-          echo "Note: symlink for $target not found but tolerated for 'arch'" >&2
-          continue
-        fi
         _debug_link_state "$bin" "$target" "$have_unified" "$have_per_applet" "$cand1" "$cand2" "$cand3"
         echo "Expected symlink for $target (per-applet binary present)" >&2; exit 1
       fi
@@ -167,7 +150,7 @@ ensure_coreutils_installed() {
       # If not in the strict subset and unified dispatcher exists, don't over-assert on destination
       if [ "$have_unified" -eq 1 ] && ! _is_required "$bin" "${REQUIRED_BINS[@]}"; then
         _note_if_missing_backup "$target"
-        $bin --help 2>&1 | NOMATCH 'www.gnu.org/software/coreutils'
+        ($bin --help 2>&1 || true) | NOMATCH 'www.gnu.org/software/coreutils'
         continue
       fi
       if [ "$dest" = "/usr/bin/coreutils" ] || [ "$dest" = "/usr/bin/uu-coreutils" ]; then
@@ -252,8 +235,9 @@ ensure_diffutils_absent() {
   if pkg_installed uutils-diffutils; then
     echo "uutils-diffutils unexpectedly installed" >&2; exit 1
   fi
-  # Reflects current file’s assertions referencing find
-  [ ! -L "/usr/bin/find" ] || { echo "Unexpected symlink for /usr/bin/find" >&2; exit 1; }
-  [ ! -e "/usr/bin/.find.oxidizr.bak" ] || { echo "Unexpected .find.oxidizr.bak (diffutils)" >&2; exit 1; }
-  find --version 2>&1 | head -n 1 | MATCH 'GNU'
+  [ ! -L "/usr/bin/diff" ] || { echo "Unexpected symlink for /usr/bin/diff" >&2; exit 1; }
+  [ ! -e "/usr/bin/.diff.oxidizr.bak" ] || { echo "Unexpected .diff.oxidizr.bak" >&2; exit 1; }
+  if command -v diff >/dev/null; then
+    diff --version 2>&1 | head -n 1 | MATCH 'GNU'
+  fi
 }

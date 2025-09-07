@@ -39,6 +39,7 @@ func main() {
 		verbose     = flag.Bool("v", false, "Verbose output")
 		veryVerbose = flag.Bool("vv", false, "Very verbose (trace) output")
 		quiet       = flag.Bool("q", false, "Quiet output (only critical errors and final summary)")
+		testFilter  = flag.String("test-filter", "", "Run a single test YAML file instead of all tests")
 	)
 	flag.Parse()
 	log.SetFlags(0)
@@ -135,24 +136,29 @@ func main() {
 			if ok {
 				var hostScript string
 				var entryCmd string
-				// Propagate verbosity into container for entrypoint.sh to honor
-				envPrefix := "env VERBOSE="
+				// Propagate verbosity and test filter into container
+				envVars := "env VERBOSE="
 				switch verbosityLevel {
 				case 0:
-					envPrefix += "0"
+					envVars += "0"
 				case 1:
-					envPrefix += "1"
+					envVars += "1"
 				case 2:
-					envPrefix += "2"
+					envVars += "2"
 				default:
-					envPrefix += "3"
+					envVars += "3"
 				}
+
+				if *testFilter != "" {
+					envVars += fmt.Sprintf(" TEST_FILTER=%s", *testFilter)
+				}
+
 				if *archTestSudo {
 					hostScript = filepath.Join(rootDir, "test-orch/docker/run_sudo_tests.sh")
-					entryCmd = envPrefix + " bash /workspace/test-orch/docker/run_sudo_tests.sh"
+					entryCmd = envVars + " bash /workspace/test-orch/docker/run_sudo_tests.sh"
 				} else {
 					hostScript = filepath.Join(rootDir, "test-orch/docker/entrypoint.sh")
-					entryCmd = envPrefix + " bash /workspace/test-orch/docker/entrypoint.sh"
+					entryCmd = envVars + " bash /workspace/test-orch/docker/entrypoint.sh"
 				}
 				if _, err := os.Stat(hostScript); err != nil {
 					warn("required script not found at ", hostScript)

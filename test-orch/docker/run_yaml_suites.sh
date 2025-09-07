@@ -14,7 +14,18 @@ PROJECT_ROOT=${PROJECT_ROOT:-$(pwd)}
 cd "$PROJECT_ROOT"
 
 shopt -s nullglob
-mapfile -t TASKS < <(find tests -maxdepth 2 -mindepth 2 -type f -name task.yaml | sort)
+
+if [[ -n "${TEST_FILTER:-}" ]]; then
+  echo "[yaml-runner] Running single test specified by TEST_FILTER: ${TEST_FILTER}"
+  if [[ ! -f "${TEST_FILTER}" ]]; then
+    echo "[yaml-runner] Error: Test file not found: ${TEST_FILTER}" >&2
+    exit 1
+  fi
+  TASKS=("${TEST_FILTER}")
+else
+  mapfile -t TASKS < <(find tests -maxdepth 2 -mindepth 2 -type f -name task.yaml | sort)
+fi
+
 TOTAL=${#TASKS[@]}
 
 if [[ ${#TASKS[@]} -eq 0 ]]; then

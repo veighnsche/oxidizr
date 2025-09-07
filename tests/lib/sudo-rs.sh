@@ -5,14 +5,7 @@ set -euo pipefail
 
 pkg_installed() {
   local pkg="$1"
-  if command -v paru >/dev/null 2>&1; then
-    paru -Qi "$pkg" >/dev/null 2>&1 && return 0
-  fi
-  if command -v yay >/dev/null 2>&1; then
-    yay -Qi "$pkg" >/dev/null 2>&1 && return 0
-  fi
-  pacman -Qi "$pkg" >/dev/null 2>&1 && return 0
-  return 1
+  pacman -Qi "$pkg" >/dev/null 2>&1
 }
 
 ensure_sudors_installed() {
