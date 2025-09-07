@@ -18,7 +18,7 @@ if ! command -v cargo >/dev/null 2>&1; then
     source "/root/.cargo/env"
   fi
 fi
-rustup default stable || true
+rustup default stable
 cargo build --release
 ln -sf "$PWD/target/release/oxidizr-arch" /usr/local/bin/oxidizr-arch
 oxidizr-arch --help >/dev/null

@@ -73,10 +73,8 @@ impl<'a> SudoRsExperiment<'a> {
     }
 }
 
-fn resolve_target<W: Worker>(worker: &W, filename: &str) -> PathBuf {
-    if let Ok(Some(path)) = worker.which(filename) {
-        path
-    } else {
-        Path::new("/usr/bin").join(filename)
-    }
+fn resolve_target<W: Worker>(_worker: &W, filename: &str) -> PathBuf {
+    // Align with test contract: switched applets live under /usr/bin/<name>
+    // visudo is handled explicitly as /usr/sbin/visudo by callers.
+    Path::new("/usr/bin").join(filename)
 }

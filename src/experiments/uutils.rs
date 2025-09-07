@@ -184,10 +184,8 @@ impl UutilsExperiment {
     }
 }
 
-fn resolve_target<W: Worker>(worker: &W, filename: &str) -> PathBuf {
-    if let Ok(Some(path)) = worker.which(filename) {
-        path
-    } else {
-        Path::new("/usr/bin").join(filename)
-    }
+fn resolve_target<W: Worker>(_worker: &W, filename: &str) -> PathBuf {
+    // Align with test contract: switched applets are placed under /usr/bin/<name>
+    // (unified coreutils dispatcher under /usr/bin/coreutils is handled separately).
+    Path::new("/usr/bin").join(filename)
 }

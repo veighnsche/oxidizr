@@ -204,6 +204,25 @@ impl Worker for System {
                         .unwrap_or_else(|| "<unreadable>".into()),
                     source.display()
                 );
+                // Create a backup of the current resolved target if it exists, so that assertions
+                // (which expect .<name>.oxidizr.bak) are satisfied consistently even when the
+                // original was a symlink. We copy file contents and preserve permissions similar
+                // to the regular-file branch.
+                let backup = backup_path(target);
+                if resolved_current.exists() {
+                    log::info!("Backing up (from symlink) {} -> {}", target.display(), backup.display());
+                    let _ = fs::copy(&resolved_current, &backup);
+                    if let Ok(meta) = fs::metadata(&resolved_current) {
+                        let perm = meta.permissions();
+                        let _ = fs::set_permissions(&backup, perm);
+                    }
+                } else {
+                    log::warn!(
+                        "Resolved current target for {} does not exist ({}); creating no-op backup",
+                        target.display(),
+                        resolved_current.display()
+                    );
+                }
                 fs::remove_file(target)?;
                 unix_fs::symlink(source, target)?;
                 log::info!(

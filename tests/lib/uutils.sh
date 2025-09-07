@@ -56,6 +56,16 @@ _note_if_missing_backup() {
   fi
 }
 
+_require_backup() {
+  local file="$1"
+  local backup_path
+  backup_path="$(dirname "$file")/.""$(basename "$file")"".oxidizr.bak"
+  if [ ! -e "$backup_path" ]; then
+    echo "Missing backup for $(basename "$file"): expected ${backup_path}" >&2
+    exit 1
+  fi
+}
+
 ensure_coreutils_installed() {
   pkg_installed uutils-coreutils || { echo "uutils-coreutils not installed" >&2; exit 1; }
   local unified_a="/usr/bin/coreutils"
@@ -108,7 +118,11 @@ ensure_coreutils_installed() {
         exit 1
       fi
     fi
-    _note_if_missing_backup "$target"
+    if _is_required "$bin" "${REQUIRED_BINS[@]}"; then
+      _require_backup "$target"
+    else
+      _note_if_missing_backup "$target"
+    fi
     # Assert it's not GNU by checking the version line (concise), but do not print it
     local _ver
     _ver="$($bin --version 2>&1 | head -n 1 || true)"

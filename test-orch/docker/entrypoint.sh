@@ -18,12 +18,8 @@ show_coreutils_snapshot() {
       dest=$(readlink -f "/usr/bin/$a" || true)
       echo "[snapshot:$label] /usr/bin/$a -> ${dest}" || true
     fi
-    # Prefer running via absolute path to avoid shell hashing issues
-    if [ -x "/usr/bin/$a" ]; then
-      "/usr/bin/$a" --version 2>&1 | head -n 1 || true
-    else
-      "$a" --version 2>&1 | head -n 1 || true
-    fi
+    # Run via shell-resolved path to surface hashing/PATH issues
+    "$a" --version 2>&1 | head -n 1
   done
   echo "[snapshot:$label] ==================================="
 }
@@ -67,18 +63,30 @@ cd /root/project/oxidizr-arch
 source tests/lib/uutils.sh
 source tests/lib/sudo-rs.sh
 
+# Optional: run YAML suites (Spread-style execute blocks) inside Docker when requested
+# Trigger via environment variable RUN_SPREAD_SUITES=1 or by creating a sentinel file
+# either at /workspace/.run_spread_suites or in the project root.
+if [ "${RUN_SPREAD_SUITES:-0}" = "1" ] || \
+   [ -f "/workspace/.run_spread_suites" ] || \
+   [ -f "/root/project/oxidizr-arch/.run_spread_suites" ]; then
+  echo "[entrypoint] RUN_SPREAD_SUITES requested; executing YAML suites..."
+  bash "/root/project/oxidizr-arch/test-orch/docker/run_yaml_suites.sh"
+  echo "[entrypoint] YAML suites finished. Exiting entrypoint."
+  exit 0
+fi
+
 # Show GNU state before enabling uutils
 show_coreutils_snapshot pre-enable
 
 # Concise demo sequence requested: ls --version, enable, ls --version
 # Print the first line only to keep it tidy.
-{ /usr/bin/ls --version 2>/dev/null || ls --version; } | head -n 1 || true
+ls --version 2>&1 | head -n 1
 echo "enable"
 
 oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none enable
 
 # After enabling, show ls version again (first line)
-{ /usr/bin/ls --version 2>/dev/null || ls --version; } | head -n 1 || true
+ls --version 2>&1 | head -n 1
 
 # Show uutils state after enabling
 show_coreutils_snapshot post-enable
@@ -89,23 +97,23 @@ show_coreutils_snapshot post-enable
 
 # Ensure required toolsets are installed after enabling (quiet with summary)
 echo "[assert] coreutils installed: running..."
-if ensure_coreutils_installed >/dev/null 2>&1; then echo "[assert] coreutils installed: OK"; else echo "[assert] coreutils installed: FAIL"; fi
+ensure_coreutils_installed
 echo "[assert] diffutils installed (if supported): running..."
-if ensure_diffutils_installed_if_supported >/dev/null 2>&1; then echo "[assert] diffutils installed: OK or skipped"; else echo "[assert] diffutils installed: FAIL"; fi
+ensure_diffutils_installed_if_supported
 echo "[assert] sudo-rs installed: running..."
-if ensure_sudors_installed >/dev/null 2>&1; then echo "[assert] sudo-rs installed: OK"; else echo "[assert] sudo-rs installed: FAIL"; fi
+ensure_sudors_installed
 
 # 9) Disable and assertions
 echo "disable"
 oxidizr-arch --assume-yes --experiments coreutils,sudo-rs --package-manager none disable
 # After disabling, show ls version once more (first line)
-{ /usr/bin/ls --version 2>/dev/null || ls --version; } | head -n 1 || true
+ls --version 2>&1 | head -n 1
 show_coreutils_snapshot post-disable
 echo "[assert] coreutils absent: running..."
-if ensure_coreutils_absent >/dev/null 2>&1; then echo "[assert] coreutils absent: OK"; else echo "[assert] coreutils absent: FAIL"; fi
+ensure_coreutils_absent
 echo "[assert] diffutils absent: running..."
-if ensure_diffutils_absent >/dev/null 2>&1; then echo "[assert] diffutils absent: OK"; else echo "[assert] diffutils absent: FAIL"; fi
+ensure_diffutils_absent
 echo "[assert] sudo-rs absent: running..."
-if ensure_sudors_absent >/dev/null 2>&1; then echo "[assert] sudo-rs absent: OK"; else echo "[assert] sudo-rs absent: FAIL"; fi
+ensure_sudors_absent
 
 echo "All assertions passed under Docker Arch container."

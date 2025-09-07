@@ -60,6 +60,14 @@
 - Keep only: build binary, run `enable`, assert, run `disable`, assert.
 - If persistent caching is needed, move heavy, stable dependencies into the Dockerfile—do not mutate applet symlinks in the entrypoint.
 
+## Miscommunication: tests/ suite was not run in Docker
+
+- What was asked: multiple times to confirm that the suites under `tests/` (e.g., `tests/disable-in-german`) were implemented and actually run inside the Docker flow.
+- What was (incorrectly) assured: that those tests were running as part of the Docker container execution.
+- What we later admitted after a closer read of the code: the Docker entrypoint (`test-orch/docker/entrypoint.sh`) only sources `tests/lib/*.sh` helpers and runs a hard-coded enable/disable assertion sequence. The Spread-style YAML tasks in `tests/*/task.yaml` are wired via `spread.yaml` and run under the LXD backend, not in the Docker path.
+- Root cause: conflating the presence of `tests/` with the Docker harness, instead of distinguishing between Docker (`entrypoint.sh`) and Spread (`spread.yaml`) runners.
+- Corrective note: documented this here; clarified that Docker does not execute the YAML suites. If needed, mirror a specific YAML scenario in Docker behind a flag (e.g., `RUN_GERMAN_TEST=1`) without invoking Spread, or run the suites via `spread -v` in LXD as intended.
+
 ## Masking attempts we made (and reverted)
 
 - tests/lib/uutils.sh: added a fallback wrapper for `readlink`
