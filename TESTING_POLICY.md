@@ -1,0 +1,89 @@
+# Testing and CI Policy
+
+This document defines the non-negotiable rules for tests, CI, harness behavior, and product alignment in the `oxidizr-arch` project.
+
+## Scope
+
+- Applies to all test orchestrators and runners under `test-orch/`, `tests/`, and any CI workflows under `.github/workflows/`.
+- Applies to product code under `src/` and its interaction with test runners.
+
+## Core Principle
+
+- The product must perform all state mutations. Tests must not mask, pre-create, or repair product-managed artifacts.
+
+## SKIP Policy
+
+- Only one SKIP is approved: missing locale data in derivative Docker images (e.g., `de_DE`) while infra is being fixed.
+- No other SKIPs are authorized. Any additional SKIPs must be removed.
+- CI treatment: SKIPs cause CI failure by default. The single locale SKIP is time-bounded, must have a blocking issue and an owner, and must be removed as soon as images are fixed.
+
+## Allowed SKIPs Table (Docker-only constraints)
+
+This table is the authoritative list of which tests may ever skip due to Docker image limitations. Anything not listed here must not skip.
+
+| Test Suite                              | Allowed to SKIP? | Distros                              | Reason                                                                                 | Notes / Owner |
+|-----------------------------------------|------------------|--------------------------------------|----------------------------------------------------------------------------------------|---------------|
+| `tests/disable-in-german`               | Yes (temporary)  | `cachyos, manjaro, endeavouros`      | Missing locale definition files (e.g., `/usr/share/i18n/locales/de_DE`) in base images | Infra; tracked in `GERMAN_LOCALE_TEST_ISSUE.md`; remove when images fixed |
+| `tests/enable-all`                      | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/enable-default`                  | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/enable-no-compatibility-check`   | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/enable-partial`                  | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/disable-all`                     | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/disable-default`                 | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/disable-partial`                 | No               | all                                  | Not locale-dependent; must run                                                         | — |
+| `tests/non-root`                        | No               | all                                  | Not locale-dependent; must run                                                         | — |
+
+Notes:
+- Even when listed as “allowed,” the locale SKIP is time-bounded and must have an active blocking issue and owner. In `FULL_MATRIX` CI, SKIPs fail the run by default to surface infrastructure gaps until fixed.
+
+## CI and Matrix Policy
+
+- FULL_MATRIX is the default for CI runs via the host orchestrator.
+- Any SKIP in any matrix job fails the run.
+- Non-matrix runs must not silently appear green by skipping assertions—if the scenario cannot be executed, fail with a clear reason.
+
+## Harness Policy (Docker and other runners)
+
+- Do not mutate `/usr/bin/*` or related product-managed paths in the harness.
+- Do not install or rely on BusyBox or similar toolsets to perform file operations for tests.
+- Do not pre-create, repair, or inject applet symlinks before or around `oxidizr-arch enable/disable`.
+- Do not add shell cache workarounds such as `hash -r` to make tests pass. If resolution or sequencing is incorrect, fix the product or run assertions in a fresh process.
+- Docker entrypoint must follow the minimal flow: build binary → `enable` → assertions → `disable` → assertions.
+
+## Product–Policy Alignment
+
+- The project goal is to support switching across Arch-family distros (`arch, manjaro, cachyos, endeavouros`) with zero SKIPs in matrix runs.
+- Registry defaults must not hard-block derivatives. If providers are available, switching should proceed; otherwise fail loudly with a clear reason (no SKIPs).
+- `SudoRsExperiment::check_compatible()` must allow derivatives when the package is provably installed; otherwise it must error (not skip).
+
+## CLI Semantics (No Hidden Fallbacks)
+
+- `--package-manager none` and/or `--aur-helper none` means no helpers are used under any circumstances. After `pacman` attempts, fail explicitly if unmet.
+- CLI overrides (`--package`, `--bin-dir`, `--unified-binary`) must override registry defaults on all distros so tests/users can force switching deterministically.
+
+## Registry and Probing
+
+- Implement probe-based selection on derivatives:
+  - If `uutils-coreutils` and/or `sudo-rs` is installed or installable (via pacman/AUR), select it and attempt switch.
+  - If not available, fail loudly with a clear reason (no SKIPs).
+
+## Infrastructure Policy (Containers/Images)
+
+- Required locale data (e.g., `de_DE`) must be pre-provisioned in derivative images. Until then, the single approved SKIP applies and is time-bounded.
+- Infra gaps discovered by tests must either be fixed in images or cause a hard failure with clear remediation guidance.
+
+## Documentation and Accountability
+
+- Any temporary workaround must be accompanied by a blocking task (issue) with an owner and removal criteria.
+- Comments that label a workaround as “temporary/stupid” without removing it are forbidden—remove the workaround or file the blocking task immediately.
+
+## References
+
+- Product switching logic: `src/experiments/uutils/` and `src/utils/worker/` (e.g., `replace_file_with_symlink()`, `restore_file()`).
+- Docker harness: `test-orch/docker/entrypoint.sh`.
+- Container runner assertions: `test-orch/container-runner/assertions/`.
+- YAML suites: `tests/*/task.yaml` (Spread/LXD via `spread.yaml`).
+
+## Enforcement
+
+- CI enforces these rules. Violations will cause failures. Do not add masking logic to bypass failures—fix the root cause.

@@ -64,6 +64,37 @@ Do not take this document literally. It is a cautionary example intended to illu
 - Keep only: build binary, run `enable`, assert, run `disable`, assert.
 - If persistent caching is needed, move heavy, stable dependencies into the Dockerfile—do not mutate applet symlinks in the entrypoint.
 
+## Policy–Product Misalignment: Do Not Do This Again
+
+- We said we want this to work for all Arch-family distros without skipping. Then we added policy and test gating that accepts SKIPs and default no-ops on derivatives.
+- The assertions in `test-orch/container-runner/assertions/assertions.go` require `sudo-rs` and `uutils-coreutils`, but the product’s registry in `src/experiments/mod.rs` configures derivatives to keep stock providers, so the assertions are set up to fail there by design.
+- We used SKIPs in the YAML runner (`yamlrunner.go`) to paper over infra/product deltas. With `FULL_MATRIX=1` we mostly fix that, but any non-matrix run can still silently skip and look green.
+- The CLI option `--package-manager none` does not actually disable AUR helper fallback. If a helper is in PATH, it can still get used. This is misleading and can mask real product behavior differences between environments.
+- Bottom line: “not supported yet” is a policy choice we made, not a hard technical blocker. If there’s a technical fix, do it. Don’t hide behind SKIPs or conservative defaults that contradict the project’s stated goal.
+
+## Immediate corrective actions (no masking)
+
+- Make FULL_MATRIX the default in CI via the host orchestrator so any SKIP fails the run.
+- Implement a real "no AUR" mode: when `--package-manager none` or `--aur-helper none` is set, do not try any helpers (no fallback); fail after pacman. Update tests to rely on the intended policy.
+- Wire CLI overrides end-to-end: `--package`, `--bin-dir`, `--unified-binary` must override the registry so users (and tests) can force switching on derivatives.
+- Replace policy SKIPs with product fixes:
+  - Probe-based registry: if a uutils or sudo-rs provider is actually available (pacman or AUR), select it on derivatives and attempt the switch.
+  - Relax `SudoRsExperiment::check_compatible()` to permit derivatives when the package is installed/provable, otherwise fail loudly (not skip).
+- Align tests with the actual product direction:
+  - If the decision is “support switching across Arch-family,” keep assertions strict and make the registry probe+enable where possible.
+  - If we decide conservative defaults only as a transitional phase, then tests must still fail in FULL_MATRIX mode until the product meets the goal—do not accept SKIPs as success.
+## SKIP policy clarification (single approved SKIP)
+
+- Only one SKIP was explicitly approved: locale data missing in derivative Docker images (e.g., `de_DE`) while infra is being fixed.
+- No other SKIPs were authorized. Any additional SKIPs that were added beyond the locale case were not approved and must be removed.
+- CI policy: SKIPs fail the run by default. The sole, time-bounded locale SKIP must be tracked with a blocking issue and owner; it should be removed once images are fixed.
+
+## Decision: support all Arch-family without SKIPs
+
+- Goal is zero SKIPs across `arch, manjaro, cachyos, endeavouros` in matrix runs.
+- Any infra gaps (e.g., locales) should be pre-provisioned by the container runner or cause a hard failure so we fix the infra, not mute the test.
+- Any product gaps (registry defaults, AUR behavior, override wiring) must be addressed in code; tests should reflect the actual goal, not the interim policy.
+
 ## Miscommunication: tests/ suite was not run in Docker
 
 - What was asked: multiple times to confirm that the suites under `tests/` (e.g., `tests/disable-in-german`) were implemented and actually run inside the Docker flow.
