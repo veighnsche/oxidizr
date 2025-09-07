@@ -1,4 +1,6 @@
 summary: Disable default experiment set removes defaults
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

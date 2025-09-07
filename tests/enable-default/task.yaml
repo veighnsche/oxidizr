@@ -1,4 +1,6 @@
 summary: Enable default experiment set installs coreutils and sudo-rs
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

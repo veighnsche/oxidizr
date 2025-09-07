@@ -40,8 +40,12 @@ impl UutilsExperiment {
                 worker.restore_file(&target)?;
             }
         }
-        log::info!("Removing package: {}", self.package);
-        worker.remove_package(&self.package, assume_yes)?;
+        if self.package_name.starts_with("uutils-") {
+            log::info!("Removing package: {}", self.package_name);
+            worker.remove_package(&self.package_name, assume_yes)?;
+        } else {
+            log::info!("Skipping removal of core package: {}", self.package_name);
+        }
         Ok(())
     }
 }

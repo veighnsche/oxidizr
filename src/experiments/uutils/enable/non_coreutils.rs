@@ -17,20 +17,33 @@ impl UutilsExperiment {
             self.bin_directory.display()
         );
         let mut applets = Vec::new();
-        let existing = worker.list_files(&self.bin_directory)?;
-        if !existing.is_empty() {
-            for f in existing {
-                let filename = f
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                if filename.is_empty() {
-                    continue;
-                }
-                applets.push((filename, f.clone()));
+        let known: &[&str] = match self.name.as_str() {
+            "findutils" => &["find", "xargs"],
+            _ => &[],
+        };
+
+        if known.is_empty() {
+            log::warn!(
+                "No applets declared for family '{}' and no files under {}",
+                self.name,
+                self.bin_directory.display()
+            );
+            return Ok(applets);
+        }
+
+        for name in known {
+            if let Ok(Some(path)) = worker.which(name) {
+                applets.push((name.to_string(), path));
+            } else {
+                 log::warn!(
+                    "No binary found for '{}' in known locations for family '{}'",
+                    name,
+                    self.name
+                );
             }
-        } else {
+        }
+
+        if applets.is_empty() {
             let known: &[&str] = match self.name.as_str() {
                 "findutils" => &["find", "xargs"],
                 _ => &[],
@@ -89,7 +102,7 @@ impl UutilsExperiment {
                          Ensure '{}' installed correctly; if installed via AUR, verify that the helper completed successfully.",
                     self.name,
                     self.bin_directory.display(),
-                    self.package
+                    self.package_name
                 )));
             }
         }

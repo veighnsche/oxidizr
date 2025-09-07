@@ -8,7 +8,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"context"
+	"sync"
 	"time"
+
+	"github.com/fatih/color"
 
 	"host-orchestrator/dockerutil"
 )
@@ -31,7 +35,7 @@ func main() {
 		archBuild   = flag.Bool("arch-build", false, "Build the Arch Docker image used for isolated tests")
 		archRun     = flag.Bool("run", false, "Run the Docker container to execute tests via the Go runner")
 		archShell   = flag.Bool("shell", false, "Open an interactive shell inside the Docker container")
-		distros     = flag.String("distros", "arch", "Comma-separated list of distributions to test (e.g., arch,manjaro)")
+		distros     = flag.String("distros", "arch,manjaro,cachyos,endeavoros", "Comma-separated list of distributions to test. Defaults to all. E.g., --distros=arch")
 		dockerCtx   = flag.String("docker-context", "test-orch", "Docker build context directory (relative or absolute)")
 		rootDirFlag = flag.String("root-dir", "", "Host directory to mount at /workspace (defaults to git root or repo root)")
 		noCache     = flag.Bool("no-cache", false, "Build without using cache")
@@ -43,6 +47,7 @@ func main() {
 		quiet       = flag.Bool("q", false, "Quiet output (only critical errors and final summary)")
 		testFilter  = flag.String("test-filter", "", "Run a single test YAML file instead of all tests")
 		testCI      = flag.Bool("test-ci", false, "Run local CI tests with act")
+		concurrency = flag.Int("concurrency", 4, "Number of distributions to test in parallel")
 	)
 	flag.Parse()
 	log.SetFlags(0)
@@ -125,66 +130,87 @@ func main() {
 	distroList := strings.Split(*distros, ",")
 
 	if ok && (*archBuild || *archRun || *archShell) {
-		for _, distro := range distroList {
-			baseImage, imageOk := distroMap[distro]
-			if !imageOk {
-				warn(fmt.Sprintf("Unknown distribution '%s', skipping.", distro))
-				continue
-			}
-			distroImageTag := fmt.Sprintf("oxidizr-%s:latest", distro)
-			section(fmt.Sprintf("Processing distribution: %s (image: %s)", distro, distroImageTag))
+		var wg sync.WaitGroup
+		colorPalette := []*color.Color{
+			color.New(color.FgCyan),
+			color.New(color.FgGreen),
+			color.New(color.FgYellow),
+			color.New(color.FgBlue),
+			color.New(color.FgMagenta),
+			color.New(color.FgRed),
+		}
 
-			// Resolve docker context dir relative to current working dir/repo
-			ctxDir := *dockerCtx
-			if !filepath.IsAbs(ctxDir) {
-				// Try to resolve relative to repo root for convenience
-				if root, err := detectRepoRoot(); err == nil {
-					ctxDir = filepath.Join(root, ctxDir)
-				} else {
-					// Fallback to current working directory
-					if wd, err2 := os.Getwd(); err2 == nil {
-						ctxDir = filepath.Join(wd, *dockerCtx)
-					}
-				}
-			}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-			// If one-shot, we implicitly build
-			doBuild := *archBuild
-			if doBuild {
-				if !quietMode {
-					log.Printf("==> Building test environment (%s)...\n", distroImageTag)
-				}
-				if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2); err != nil {
-					warn("docker build failed: ", err)
-					ok = false
-				}
-			}
+		errs := make(chan error, len(distroList))
+		sem := make(chan struct{}, *concurrency)
 
-			// If running, ensure image exists (auto-build if missing unless user explicitly disabled by not using --arch or --arch-build)
-			doRun := *archRun
-			if doRun {
-				// Resolve rootDir to mount
-				rootDir := *rootDirFlag
-				if rootDir == "" {
+		for i, distroName := range distroList {
+			wg.Add(1)
+			go func(distro string, col *color.Color) {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				defer wg.Done()
+
+				baseImage, imageOk := distroMap[distro]
+				if !imageOk {
+					errs <- fmt.Errorf("unknown distribution '%s', skipping", distro)
+					return
+				}
+				distroImageTag := fmt.Sprintf("oxidizr-%s:latest", distro)
+				prefix := col.Sprintf("[%s]", distro)
+
+				log.Printf("%s Processing...", prefix)
+
+				// Resolve docker context dir relative to current working dir/repo
+				ctxDir := *dockerCtx
+				if !filepath.IsAbs(ctxDir) {
+					// Try to resolve relative to repo root for convenience
 					if root, err := detectRepoRoot(); err == nil {
-						rootDir = root
+						ctxDir = filepath.Join(root, ctxDir)
 					} else {
-						// Fall back two directories up from docker context (/workspace expected to contain repo root)
-						rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
+						// Fallback to current working directory
+						if wd, err2 := os.Getwd(); err2 == nil {
+							ctxDir = filepath.Join(wd, *dockerCtx)
+						}
 					}
 				}
 
-				// Auto-build if the image tag is missing
-				if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
-					section("Docker image not found; building")
-					if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2); err2 != nil {
-						warn("docker build failed: ", err2)
-						ok = false
+				// If one-shot, we implicitly build
+				doBuild := *archBuild
+				if doBuild {
+					log.Printf("%s Building test environment (%s)...", prefix, distroImageTag)
+					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix, col); err != nil {
+						errs <- fmt.Errorf("%s docker build failed: %w", prefix, err)
+						return
 					}
 				}
-				// Decide which non-interactive path to run
-				if ok {
-					// Propagate verbosity and test filter into container
+
+				// If running, ensure image exists (auto-build if missing unless user explicitly disabled by not using --arch or --arch-build)
+				doRun := *archRun
+				if doRun {
+					// Resolve rootDir to mount
+					rootDir := *rootDirFlag
+					if rootDir == "" {
+						if root, err := detectRepoRoot(); err == nil {
+							rootDir = root
+						} else {
+							// Fall back two directories up from docker context (/workspace expected to contain repo root)
+							rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
+						}
+					}
+
+					// Auto-build if the image tag is missing
+					if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
+						log.Printf("%s Docker image not found; building...", prefix)
+						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix, col); err2 != nil {
+							errs <- fmt.Errorf("%s docker build failed: %w", prefix, err2)
+							return
+						}
+					}
+
+					// Decide which non-interactive path to run
 					var envVars []string
 					switch verbosityLevel {
 					case 0:
@@ -195,49 +221,38 @@ func main() {
 						envVars = append(envVars, "VERBOSE=2")
 					default:
 						envVars = append(envVars, "VERBOSE=3")
+						// Propagate verbosity to the Rust binary's logger
+						envVars = append(envVars, "RUST_LOG=info")
 					}
 
 					if *testFilter != "" {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}
 
-					if ok {
-						if !quietMode {
-							log.Println("==> Starting tests...")
-						}
-						if err := dockerutil.RunArchContainer(distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1); err != nil {
-							warn("docker run failed: ", err)
-							ok = false
-						}
+					log.Printf("%s Starting tests...", prefix)
+					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1, prefix, col); err != nil {
+						errs <- fmt.Errorf("%s docker run failed: %w", prefix, err)
+						cancel() // Cancel all other running tests
+						return
 					}
+					log.Printf("%s Tests finished successfully.", prefix)
 				}
-			}
 
-			// If interactive shell is requested
-			if ok && *archShell {
-				// Resolve rootDir to mount
-				rootDir := *rootDirFlag
-				if rootDir == "" {
-					if root, err := detectRepoRoot(); err == nil {
-						rootDir = root
-					} else {
-						rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
-					}
+				// If interactive shell is requested
+				if *archShell {
+					// Shell mode is not parallelized as it's interactive
+					log.Printf("Skipping interactive shell for %s in parallel mode.", distro)
 				}
-				// Auto-build if the image tag is missing
-				if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
-					section("Docker image not found; building")
-					if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2); err2 != nil {
-						warn("docker build failed: ", err2)
-						ok = false
-					}
-				}
-				if ok {
-					if err := dockerutil.RunArchInteractiveShell(distroImageTag, rootDir, verbosityLevel >= 2); err != nil {
-						warn("interactive shell failed: ", err)
-						ok = false
-					}
-				}
+			}(distroName, colorPalette[i%len(colorPalette)])
+		}
+
+		wg.Wait()
+		close(errs)
+
+		for err := range errs {
+			if err != nil {
+				warn(err.Error())
+				ok = false
 			}
 		}
 	}

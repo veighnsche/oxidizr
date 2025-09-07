@@ -9,6 +9,7 @@ pub mod test_utils;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Distribution {
     pub id: String,
+    pub id_like: String,
     pub release: String,
 }
 

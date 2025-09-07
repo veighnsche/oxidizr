@@ -1,4 +1,6 @@
-summary: Disable only coreutils and keep sudo-rs enabled
+summary: Disable only coreutils, leaving sudo-rs enabled
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

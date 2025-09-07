@@ -18,14 +18,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /isolated-runner .
 # Final stage
 FROM ${BASE_IMAGE}
 
-
 ENV LANG=C.UTF-8
 
 # Refresh system and install essentials used by our scripts
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm reflector && \
     reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist && \
-    pacman -S --noconfirm --needed sudo git curl rustup which findutils && \
+    pacman -S --noconfirm --needed sudo git curl rustup which findutils glibc glibc-locales && \
     # Create non-root builder user for building AUR packages
     (id -u builder &>/dev/null || useradd -m builder) && \
     install -d -m 0755 -o root -g root /etc/sudoers.d && \
@@ -35,6 +34,10 @@ RUN pacman -Syu --noconfirm && \
     su - builder -c 'rustup default stable || true' && \
     # Reduce image size a bit
     pacman -Scc --noconfirm || true
+
+# Set DNS servers to fix network issues
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 8.8.4.4" >> /etc/resolv.conf
 
 # Working directory where we will mount the repo
 WORKDIR /workspace

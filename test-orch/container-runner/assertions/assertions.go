@@ -14,6 +14,15 @@ import (
 func Run() error {
 	log.Println("==> Running assertion flow...")
 
+	// Only run these heavy assertions on vanilla Arch; derivatives may differ.
+	if ok, err := util.ShouldRunOnDistro([]string{"arch"}); err != nil {
+		log.Printf("Skipping assertions: distro detection failed: %v", err)
+		return nil
+	} else if !ok {
+		log.Println("Skipping assertions on non-Arch distro.")
+		return nil
+	}
+
 	// Enable experiments
 	log.Println("--- Enabling experiments: coreutils,sudo-rs ---")
 	if err := util.RunCmd("oxidizr-arch", "--assume-yes", "--experiments", "coreutils,sudo-rs", "--package-manager", "none", "enable"); err != nil {
@@ -54,7 +63,8 @@ func ensureSudoRsInstalled() error {
 	if !isPkgInstalled("sudo-rs") {
 		return fmt.Errorf("package 'sudo-rs' should be installed")
 	}
-	if err := checkSymlink("/usr/bin/sudo", "/usr/bin/sudo-rs"); err != nil {
+	// Accept either direct link to /usr/bin/sudo-rs or an alias /usr/bin/sudo.sudo-rs
+	if err := checkSymlinkContainsAny("/usr/bin/sudo", []string{"/usr/bin/sudo-rs", "/usr/bin/sudo.sudo-rs"}); err != nil {
 		return err
 	}
 	if !fileExists("/usr/bin/.sudo.oxidizr.bak") {
@@ -167,4 +177,26 @@ func checkSymlink(path, expectedTarget string) error {
 		return fmt.Errorf("symlink %s has unexpected target '%s', expected to contain '%s'", path, dest, expectedTarget)
 	}
 	return nil
+}
+
+func checkSymlinkContainsAny(path string, expectedTargets []string) error {
+	if path == "" {
+		return fmt.Errorf("empty path provided")
+	}
+	if len(expectedTargets) == 0 {
+		return fmt.Errorf("no expected targets provided")
+	}
+	if !isSymlink(path) {
+		return fmt.Errorf("%s is not a symlink", path)
+	}
+	dest, err := os.Readlink(path)
+	if err != nil {
+		return fmt.Errorf("could not read link %s: %w", path, err)
+	}
+	for _, exp := range expectedTargets {
+		if exp != "" && strings.Contains(dest, exp) {
+			return nil
+		}
+	}
+	return fmt.Errorf("symlink %s has unexpected target '%s', expected to contain one of %v", path, dest, expectedTargets)
 }

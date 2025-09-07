@@ -20,8 +20,8 @@ impl UutilsExperiment {
             worker.update_packages(assume_yes)?;
         }
 
-        log::info!("Installing package: {}", self.package);
-        worker.install_package(&self.package, assume_yes)?;
+        log::info!("Installing package: {}", self.package_name);
+        worker.install_package(&self.package_name, assume_yes)?;
 
         let applets = if self.name == "coreutils" {
             self.handle_coreutils_applets(worker)?
@@ -35,7 +35,7 @@ impl UutilsExperiment {
                  Hints: ensure '{}' is installed; verify presence under {} or cargo-style /usr/lib/cargo/bin/<family>/.",
                 self.name,
                 self.bin_directory.display(),
-                self.package,
+                self.package_name,
                 self.bin_directory.display()
             )));
         }

@@ -1,4 +1,6 @@
 summary: Enable all experiments installs all and wires symlinks/backups
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

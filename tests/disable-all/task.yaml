@@ -1,4 +1,6 @@
-summary: Disable all experiments removes all managed packages and restores system
+summary: Disable all experiments
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

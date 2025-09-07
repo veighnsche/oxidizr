@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct UutilsExperiment {
     pub name: String,                    // e.g., "coreutils"
-    pub package: String,                 // e.g., "uutils-coreutils"
+    pub package_name: String,            // e.g., "uutils-coreutils"
     pub unified_binary: Option<PathBuf>, // e.g., /usr/bin/coreutils
     pub bin_directory: PathBuf,          // e.g., /usr/lib/uutils/coreutils
 }
@@ -16,6 +16,6 @@ impl UutilsExperiment {
     /// Checks if the current system is compatible with this experiment (Arch Linux).
     pub fn check_compatible<W: Worker>(&self, worker: &W) -> Result<bool> {
         let d: Distribution = worker.distribution()?;
-        Ok(d.id.eq_ignore_ascii_case("arch"))
+        Ok(d.id.eq_ignore_ascii_case("arch") || d.id_like.contains("arch"))
     }
 }

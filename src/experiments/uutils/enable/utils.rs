@@ -12,7 +12,7 @@ impl UutilsExperiment {
             "Preparing to link {} applet(s) for '{}' (package: {})",
             applets.len(),
             self.name,
-            self.package
+            self.package_name
         );
         for (i, (filename, src)) in applets.iter().enumerate().take(8) {
             let target =

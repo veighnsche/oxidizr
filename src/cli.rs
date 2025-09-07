@@ -133,7 +133,7 @@ pub fn handle_cli() -> Result<()> {
         default_experiments()
     };
 
-    let mut exps: Vec<Experiment> = all_experiments(&worker);
+    let mut exps: Vec<Experiment<System>> = all_experiments(&worker);
     if !cli.all {
         // Filter by provided names
         exps.retain(|e| selection.contains(&e.name()));

@@ -3,12 +3,19 @@ use crate::utils::Distribution;
 use crate::utils::worker::Worker;
 use std::path::{Path, PathBuf};
 
-pub struct SudoRsExperiment<'a> {
-    pub system: &'a dyn Worker,
+pub struct SudoRsExperiment<'a, W: Worker> {
+    pub system: &'a W,
+    pub package_name: String,
 }
 
 // Prefer cargo-style install location, but accept Arch packaging under /usr/bin/*-rs.
-fn find_sudors_source(name: &str) -> Option<PathBuf> {
+fn find_sudors_source<W: Worker>(worker: &W, name: &str) -> Option<PathBuf> {
+    // On derivatives, the 'sudo' package is the source of truth.
+    if !worker.distribution().map(|d| d.id.eq_ignore_ascii_case("arch")).unwrap_or(false) {
+        if let Ok(Some(path)) = worker.which(name) {
+            return Some(path);
+        }
+    }
     let candidates = [
         PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
         PathBuf::from(format!("/usr/bin/{}-rs", name)),
@@ -22,7 +29,7 @@ fn find_sudors_source(name: &str) -> Option<PathBuf> {
     None
 }
 
-impl<'a> SudoRsExperiment<'a> {
+impl<'a, W: Worker> SudoRsExperiment<'a, W> {
     pub fn name(&self) -> &'static str {
         "sudo-rs"
     }
@@ -31,13 +38,13 @@ impl<'a> SudoRsExperiment<'a> {
         vec!["rolling".into()]
     }
 
-    pub fn check_compatible<W: Worker>(&self, worker: &W) -> Result<bool> {
+    pub fn check_compatible(&self, worker: &W) -> Result<bool> {
         let d: Distribution = worker.distribution()?;
-        Ok(d.id.eq_ignore_ascii_case("arch")
-            && self.supported_releases().iter().any(|r| r == &d.release))
+        // This experiment is only for vanilla Arch, as derivatives have their own sudo.
+        Ok(d.id.eq_ignore_ascii_case("arch"))
     }
 
-    pub fn enable<W: Worker>(
+    pub fn enable(
         &self,
         worker: &W,
         assume_yes: bool,
@@ -52,7 +59,7 @@ impl<'a> SudoRsExperiment<'a> {
             worker.update_packages(assume_yes)?;
         }
         // Install sudo-rs
-        worker.install_package("sudo-rs", assume_yes)?;
+        self.system.install_package(&self.package_name, assume_yes)?;
         // Replace sudo, su, visudo with binaries provided by sudo-rs. The Arch package layout may
         // install either into /usr/lib/cargo/bin/<name> or as /usr/bin/<name>-rs. Detect robustly.
         for (name, target) in [
@@ -61,7 +68,7 @@ impl<'a> SudoRsExperiment<'a> {
             ("visudo", PathBuf::from("/usr/sbin/visudo")),
         ] {
             log::info!("Preparing sudo-rs applet '{}'", name);
-            let source = find_sudors_source(name);
+            let source = find_sudors_source(worker, name);
             let source = source.ok_or_else(|| {
                 CoreutilsError::ExecutionFailed(format!(
                     "Could not find installed sudo-rs binary for '{0}'. \
@@ -70,18 +77,27 @@ impl<'a> SudoRsExperiment<'a> {
                     name
                 ))
             })?;
+            // Create a stable alias in /usr/bin so that readlink(1) shows '/usr/bin/<name>.sudo-rs'.
+            let alias = PathBuf::from(format!("/usr/bin/{}.sudo-rs", name));
             log::info!(
-                "Linking sudo-rs '{}' from {} -> {}",
+                "Creating alias for sudo-rs '{}': {} -> {}",
                 name,
-                source.display(),
-                target.display()
+                alias.display(),
+                source.display()
             );
-            worker.replace_file_with_symlink(&source, &target)?;
+            worker.replace_file_with_symlink(&source, &alias)?;
+            log::info!(
+                "Linking sudo-rs '{}' via alias: {} -> {}",
+                name,
+                target.display(),
+                alias.display()
+            );
+            worker.replace_file_with_symlink(&alias, &target)?;
         }
         Ok(())
     }
 
-    pub fn disable<W: Worker>(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
+    pub fn disable(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
         if update_lists {
             worker.update_packages(assume_yes)?;
         }
@@ -94,11 +110,15 @@ impl<'a> SudoRsExperiment<'a> {
             };
             worker.restore_file(&target)?;
         }
-        worker.remove_package("sudo-rs", assume_yes)?;
+        if self.package_name == "sudo-rs" {
+            self.system.remove_package(&self.package_name, assume_yes)?;
+        } else {
+            log::info!("Skipping removal of core package: {}", self.package_name);
+        }
         Ok(())
     }
 
-    pub fn list_targets<W: Worker>(&self, worker: &W) -> Result<Vec<PathBuf>> {
+    pub fn list_targets(&self, worker: &W) -> Result<Vec<PathBuf>> {
         Ok(["sudo", "su", "visudo"]
             .iter()
             .map(|n| resolve_target(worker, n))

@@ -13,8 +13,11 @@ The host orchestrator is responsible for managing Docker operations for the oxid
 ## Usage
 
 ```bash
-# Build and run tests (default behavior)
+# Build and run tests across all supported distributions (default behavior)
 sudo go run .
+
+# Run tests on a single distribution (e.g., arch)
+sudo go run . --distros=arch
 
 # Build Docker image only
 sudo go run . --arch-build
@@ -34,7 +37,9 @@ sudo go run . --test-filter="disable-all"
 
 ## Command Line Options
 
-- `--arch-build`: Build the Arch Docker image
+- `--distros`: Comma-separated list of distributions to test. Defaults to all. E.g., `--distros=arch`
+- `--concurrency`: Number of distributions to test in parallel (default: 4)
+- `--arch-build`: Build the Docker image for the specified distributions
 - `--run`: Run tests in Docker container
 - `--shell`: Open interactive shell in container
 - `--image-tag`: Docker image tag (default: oxidizr-arch:latest)

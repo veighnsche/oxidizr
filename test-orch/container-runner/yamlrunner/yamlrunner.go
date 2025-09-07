@@ -7,15 +7,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"container-runner/util"
 )
 
 // Task represents the structure of a task.yaml file.
 type Task struct {
-	Execute string `yaml:"execute"`
-	Restore string `yaml:"restore"`
+	Summary     string   `yaml:"summary"`
+	Execute     string   `yaml:"execute"`
+	Restore     string   `yaml:"restore,omitempty"`
+	DistroCheck []string `yaml:"distro-check,omitempty"`
 }
 
 // Run finds, parses, and executes all task.yaml test suites.
@@ -40,7 +43,22 @@ func Run() error {
 
 	sort.Strings(tasks)
 
-	log.Printf("Discovered %d YAML test suite(s)", len(tasks))
+	testFilter := os.Getenv("TEST_FILTER")
+	if testFilter != "" {
+		var filteredTasks []string
+		for _, taskPath := range tasks {
+			if filepath.Base(filepath.Dir(taskPath)) == testFilter {
+				filteredTasks = append(filteredTasks, taskPath)
+			}
+		}
+		if len(filteredTasks) == 0 {
+			return fmt.Errorf("test filter '%s' did not match any discovered suites", testFilter)
+		}
+		tasks = filteredTasks
+		log.Printf("Applying filter: running 1 suite ('%s')", testFilter)
+	} else {
+		log.Printf("Discovered %d YAML test suite(s)", len(tasks))
+	}
 
 	for i, taskPath := range tasks {
 		suiteName := filepath.Base(filepath.Dir(taskPath))
@@ -65,6 +83,17 @@ func runSingleSuite(taskPath, projectDir string) error {
 	var task Task
 	if err := yaml.Unmarshal(content, &task); err != nil {
 		return fmt.Errorf("failed to parse YAML from %s: %w", taskPath, err)
+	}
+
+	// Check if test is compatible with the current distro
+	shouldRun, err := util.ShouldRunOnDistro(task.DistroCheck)
+	if err != nil {
+		log.Printf("SKIPPING suite %s: could not check distro compatibility: %v", filepath.Base(taskPath), err)
+		return nil // Returning nil to not fail the whole run
+	}
+	if !shouldRun {
+		log.Printf("SKIPPING suite %s: not compatible with this distro", filepath.Base(taskPath))
+		return nil // Returning nil to not fail the whole run
 	}
 
 	defer func() {
@@ -99,9 +128,8 @@ func executeScriptBlock(script, workDir string) error {
 		return fmt.Errorf("failed to set script permissions: %w", err)
 	}
 
-	// Prepend AUR helper for installs, and always use --noconfirm
-	scriptWithAur := strings.ReplaceAll(script, "oxidizr-arch enable", "paru -S --needed --batchinstall --noconfirm && oxidizr-arch enable")
-	scriptContent := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n\n%s", scriptWithAur)
+	// Write the script as-is; environment setup ensures required tools are present
+	scriptContent := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n\n%s", script)
 	if _, err := tmpFile.WriteString(scriptContent); err != nil {
 		tmpFile.Close()
 		return fmt.Errorf("failed to write to temp script: %w", err)

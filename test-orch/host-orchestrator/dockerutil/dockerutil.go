@@ -2,6 +2,7 @@ package dockerutil
 
 import (
 	"archive/tar"
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -16,10 +17,33 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/fatih/color"
 	"github.com/moby/term"
+	"strings"
 )
 
-func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, verbose bool) error {
+// prefixWriter is a helper to prepend a prefix to each line of output.
+type prefixWriter struct {
+	prefix string
+	w      io.Writer
+	col    *color.Color
+}
+
+func (pw *prefixWriter) Write(p []byte) (n int, err error) {
+	// Simple case: if no newline, just write the bytes
+	if !strings.Contains(string(p), "\n") {
+		return pw.w.Write(p)
+	}
+
+	// Split lines and prepend prefix
+	lines := strings.Split(strings.TrimRight(string(p), "\n"), "\n")
+	for _, line := range lines {
+		fmt.Fprintf(pw.w, "%s %s\n", pw.col.Sprint(pw.prefix), line)
+	}
+	return len(p), nil
+}
+
+func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, verbose bool, prefix string, col *color.Color) error {
 	if baseImage == "" {
 		baseImage = "archlinux:base-devel"
 	}
@@ -53,7 +77,9 @@ func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, verbo
 	defer resp.Body.Close()
 	if verbose {
 		fd, isTerm := term.GetFdInfo(os.Stdout)
-		if err := jsonmessage.DisplayJSONMessagesStream(resp.Body, os.Stdout, fd, isTerm, nil); err != nil {
+		// Use a custom writer to prefix output lines
+		prefixedStdout := &prefixWriter{prefix: prefix, w: os.Stdout, col: col}
+		if err := jsonmessage.DisplayJSONMessagesStream(resp.Body, prefixedStdout, fd, isTerm, nil); err != nil {
 			return fmt.Errorf("render build output: %w", err)
 		}
 	} else {
@@ -117,12 +143,12 @@ func RunArchInteractiveShell(tag, rootDir string, verbose bool) error {
 	return nil
 }
 
-func RunArchContainer(tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, verbose bool) error {
-	containerName := "oxidizr-arch-test"
+func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, verbose bool, prefix string, col *color.Color) error {
+	containerName := fmt.Sprintf("oxidizr-arch-test-%s", strings.ReplaceAll(tag, ":", "-"))
 	if verbose {
 		log.Println("RUN>", "docker run", "-v", rootDir+":/workspace", "--name", containerName, tag, command)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
 	_ = exec.Command("docker", "rm", "-f", containerName).Run()
@@ -144,8 +170,21 @@ func RunArchContainer(tag, rootDir, command string, envVars []string, keepContai
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		// Pipe stdout and stderr to a scanner that prefixes each line
+		stdoutPipe, _ := cmd.StdoutPipe()
+		stderrPipe, _ := cmd.StderrPipe()
+		go func() {
+			scanner := bufio.NewScanner(stdoutPipe)
+			for scanner.Scan() {
+				log.Printf("%s %s", col.Sprint(prefix), scanner.Text())
+			}
+		}()
+		go func() {
+			scanner := bufio.NewScanner(stderrPipe)
+			for scanner.Scan() {
+				log.Printf("%s %s", col.Sprint(prefix), scanner.Text())
+			}
+		}()
 	} else {
 		cmd.Stdout = io.Discard
 		cmd.Stderr = io.Discard

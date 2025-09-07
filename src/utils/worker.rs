@@ -60,47 +60,21 @@ pub struct System {
 
 impl Worker for System {
     fn distribution(&self) -> Result<Distribution> {
-        // Parse /etc/os-release for ID and ID_LIKE. Normalize Arch-like
-        // derivatives (Manjaro, EndeavourOS, Artix) to id = "arch".
+        // Parse /etc/os-release for ID and ID_LIKE.
         let content = fs::read_to_string("/etc/os-release").unwrap_or_default();
         let mut id: Option<String> = None;
         let mut id_like: Option<String> = None;
         for line in content.lines() {
-            if id.is_none()
-                && let Some(rest) = line.strip_prefix("ID=")
-            {
+            if let Some(rest) = line.strip_prefix("ID=") {
                 id = Some(rest.trim_matches('"').to_string());
             }
-            if id_like.is_none()
-                && let Some(rest) = line.strip_prefix("ID_LIKE=")
-            {
+            if let Some(rest) = line.strip_prefix("ID_LIKE=") {
                 id_like = Some(rest.trim_matches('"').to_string());
             }
         }
-        let id_lower = id
-            .unwrap_or_else(|| "arch".to_string())
-            .to_ascii_lowercase();
-        let id_like_lower = id_like.unwrap_or_default().to_ascii_lowercase();
-        // Include common Arch derivatives
-        let arch_markers = [
-            "arch",
-            "manjaro",
-            "endeavouros",
-            "artix",
-            "garuda",
-            "rebornos",
-            "rebornos",
-            "reborn",
-        ];
-        let is_arch_like = arch_markers.iter().any(|m| id_lower.contains(m))
-            || arch_markers.iter().any(|m| id_like_lower.contains(m));
-        let norm_id = if is_arch_like {
-            "arch".to_string()
-        } else {
-            id_lower
-        };
         Ok(Distribution {
-            id: norm_id,
+            id: id.unwrap_or_else(|| "arch".to_string()),
+            id_like: id_like.unwrap_or_default(),
             release: "rolling".to_string(),
         })
     }
@@ -155,42 +129,35 @@ impl Worker for System {
         }
         args.push(package);
 
-        // We don't check the status here. If pacman fails (e.g., package not found),
-        // we want to fall through to the AUR helper logic.
-        let _ = std::process::Command::new("pacman").args(&args).status();
-
-        // Check if the package is installed now. If so, we're done.
-        if self.check_installed(package)? {
+        // Try to install with pacman. If it succeeds, we're done.
+        let pacman_status = std::process::Command::new("pacman").args(&args).status()?;
+        if pacman_status.success() && self.check_installed(package)? {
             return Ok(());
         }
+
+        // If pacman failed or the package is still not installed, try the AUR helper.
         // Choose helper: prefer configured, else detect installed. Run helpers as non-root 'builder'.
         let candidates = aur_helper_candidates(&self.aur_helper);
         let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
         let mut tried_any = false;
         for h in available_iter.by_ref() {
-            let mut aur_args = vec!["-u", "builder", "--", h, "-S", "--needed"];
+            let mut aur_cmd_str = h.to_string();
             if assume_yes {
-                aur_args.push("--noconfirm");
-                aur_args.push("--batchinstall");
+                // Batch install must come before the operation for paru
+                aur_cmd_str.push_str(" --batchinstall --noconfirm");
             }
-            aur_args.push(package);
+            aur_cmd_str.push_str(" -S --needed");
+            aur_cmd_str.push_str(&format!(" {}", package));
 
+            log::info!("Running AUR helper: su - builder -c '{}'", aur_cmd_str);
+            let aur_status = std::process::Command::new("su")
+                .args(["-", "builder", "-c", &aur_cmd_str])
+                .status()?;
 
-            // Validate package name to prevent command injection
-            if !is_valid_package_name(package) {
-                return Err(CoreutilsError::ExecutionFailed(format!(
-                    "Invalid package name: {}",
-                    package
-                )));
-            }
-            // Use proper argument array instead of string interpolation
-            let status = std::process::Command::new("sudo")
-                .args(aur_args)
-                .status();
-            if let Ok(s) = status
-                && s.success()
-            {
-                return Ok(());
+            if aur_status.success() {
+                if self.check_installed(package)? {
+                    return Ok(());
+                }
             }
             tried_any = true;
         }
@@ -266,6 +233,10 @@ impl Worker for System {
     }
 
     fn replace_file_with_symlink(&self, source: &Path, target: &Path) -> Result<()> {
+        if source == target {
+            log::info!("Source and target are the same ({}), skipping symlink.", source.display());
+            return Ok(());
+        }
         // Validate paths to prevent directory traversal attacks
         if !is_safe_path(source) || !is_safe_path(target) {
             return Err(CoreutilsError::ExecutionFailed(

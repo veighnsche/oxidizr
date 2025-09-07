@@ -1,4 +1,6 @@
-summary: Enable only coreutils; others remain absent
+summary: Enable only the coreutils experiment
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

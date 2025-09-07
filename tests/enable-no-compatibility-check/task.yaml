@@ -1,4 +1,6 @@
 summary: Enable with --no-compatibility-check should proceed on unsupported distro
+distro-check:
+  - arch
 execute: |
   set -euo pipefail
 

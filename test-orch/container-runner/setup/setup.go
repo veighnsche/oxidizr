@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"container-runner/util"
@@ -53,6 +54,10 @@ func stageWorkspace() error {
 }
 
 func installDependencies() error {
+	// CachyOS has a problematic extra repo file that can interfere with finding AUR packages.
+	// We remove it to ensure a clean, standard Arch environment for testing.
+	_ = os.Remove("/var/lib/pacman/sync/cachyos-extra.db")
+
 	if err := util.RunCmd("pacman", "-Syy", "--noconfirm"); err != nil {
 		return fmt.Errorf("pacman sync failed: %w", err)
 	}
@@ -62,6 +67,7 @@ func installDependencies() error {
 	if err := util.RunCmd("pacman", args...); err != nil {
 		return fmt.Errorf("failed to install packages: %w", err)
 	}
+
 	return nil
 }
 
@@ -92,11 +98,31 @@ func installAurHelper() error {
 }
 
 func setupRust() error {
-	if err := util.RunCmd("rustup", "default", "stable"); err != nil {
-		log.Printf("Warning: failed to set default rust toolchain for root: %v", err)
-	}
-	if err := util.RunCmd("su", "-", "builder", "-c", "rustup default stable"); err != nil {
-		log.Printf("Warning: failed to set default rust toolchain for builder: %v", err)
+	log.Println("==> Setting up Rust toolchain...")
+	util.RunCmd("rustup", "default", "stable")
+	// Also set for builder user
+	util.RunCmd("su", "-", "builder", "-c", "rustup default stable")
+
+	// Ensure an AUR helper is installed (paru)
+	log.Println("==> Ensuring AUR helper (paru) is installed...")
+	if _, err := exec.LookPath("paru"); err != nil {
+		log.Println("paru not found, installing from AUR...")
+		// Install dependencies for building packages
+		util.RunCmd("pacman", "-S", "--noconfirm", "--needed", "base-devel", "git")
+		// As root, create and set permissions for the build directory
+		util.RunCmd("mkdir", "-p", "/home/builder/build")
+		util.RunCmd("chown", "-R", "builder:builder", "/home/builder/build")
+
+		// As the non-root 'builder' user, clone and build paru
+		buildCmd := "cd /home/builder/build && git clone https://aur.archlinux.org/paru-bin.git && cd paru-bin && makepkg -s --noconfirm"
+		util.RunCmd("su", "-", "builder", "-c", buildCmd)
+
+		// As root, install the built package
+		// Note: The exact package version might change, so we use a wildcard.
+		installCmd := "pacman -U --noconfirm /home/builder/build/paru-bin/paru-bin-*.pkg.tar.zst"
+		util.RunCmd("sh", "-c", installCmd)
+	} else {
+		log.Println("paru is already installed.")
 	}
 	return nil
 }
