@@ -25,13 +25,6 @@ RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm reflector && \
     reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist && \
     pacman -S --noconfirm --needed sudo git curl rustup which findutils glibc glibc-locales && \
-    # Create non-root builder user for building AUR packages
-    (id -u builder &>/dev/null || useradd -m builder) && \
-    install -d -m 0755 -o root -g root /etc/sudoers.d && \
-    printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/99-builder && chmod 0440 /etc/sudoers.d/99-builder && \
-    # Pre-seed rustup for root and builder (some AUR prepare() steps require cargo)
-    rustup default stable || true && \
-    su - builder -c 'rustup default stable || true' && \
     # Reduce image size a bit
     pacman -Scc --noconfirm || true
 

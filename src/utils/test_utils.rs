@@ -13,6 +13,7 @@ impl Default for MockWorker {
         Self {
             distribution: Distribution {
                 id: "arch".to_string(),
+                id_like: "arch".to_string(),
                 release: "rolling".to_string(),
             },
         }
@@ -24,15 +25,15 @@ impl Worker for MockWorker {
         Ok(self.distribution.clone())
     }
 
-    fn update_packages(&self) -> Result<()> {
+    fn update_packages(&self, _assume_yes: bool) -> Result<()> {
         Ok(())
     }
 
-    fn install_package(&self, _package: &str) -> Result<()> {
+    fn install_package(&self, _package: &str, _assume_yes: bool) -> Result<()> {
         Ok(())
     }
 
-    fn remove_package(&self, _package: &str) -> Result<()> {
+    fn remove_package(&self, _package: &str, _assume_yes: bool) -> Result<()> {
         Ok(())
     }
 

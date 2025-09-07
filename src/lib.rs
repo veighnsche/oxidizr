@@ -25,7 +25,7 @@ mod tests {
     fn test_check_compatible_scaffold() {
         let exp = UutilsExperiment {
             name: "coreutils".into(),
-            package: "uutils-coreutils".into(),
+            package_name: "uutils-coreutils".into(),
             unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
             bin_directory: PathBuf::from("/usr/lib/uutils/coreutils"),
         };

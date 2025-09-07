@@ -5,14 +5,20 @@ distro-check:
   - cachyos
   - endeavouros
 execute: |-
-  # Attempt to generate German locale, but don't fail if it's not available
+  set -euo pipefail
+
+  # Attempt to generate German locale; in FULL_MATRIX mode, treat failure as hard error
   if sed -i 's/^#de_DE.UTF-8/de_DE.UTF-8/' /etc/locale.gen && locale-gen; then
     # Enable German locale (portable across distros)
     export LC_ALL=de_DE.UTF-8
     export LANGUAGE=de_DE.UTF-8
     export LANG=de_DE.UTF-8
   else
-    echo "Warning: de_DE.UTF-8 locale not available, skipping locale-specific tests."
+    if [ "${FULL_MATRIX:-0}" = "1" ]; then
+      echo "de_DE.UTF-8 locale not available in FULL_MATRIX mode" >&2
+      exit 1
+    fi
+    echo "Warning: de_DE.UTF-8 locale not available, falling back to C.UTF-8."
     export LC_ALL=C.UTF-8
     export LANGUAGE=C.UTF-8
     export LANG=C.UTF-8
@@ -31,9 +37,21 @@ execute: |-
       echo "coreutils should be disabled, but ls is still pointing to uutils"
       exit 1
   fi
-  if ! readlink /usr/bin/sudo | grep -q "/usr/bin/sudo.sudo-rs"; then
-      echo "sudo-rs should be enabled, but sudo is not pointing to sudo-rs"
-      exit 1
+  # On vanilla Arch, sudo-rs is enabled; on derivatives it may not be. Assert accordingly.
+  if pacman -Qi sudo-rs >/dev/null 2>&1; then
+      if ! readlink /usr/bin/sudo | grep -q "/usr/bin/sudo.sudo-rs"; then
+          echo "sudo-rs should be enabled, but sudo is not pointing to sudo-rs"
+          exit 1
+      fi
+  else
+      if readlink /usr/bin/sudo | grep -q "/usr/bin/sudo.sudo-rs"; then
+          echo "sudo should not be pointing to sudo-rs on this distro"
+          exit 1
+      fi
+      if [ -L /usr/bin/sudo ]; then
+          echo "/usr/bin/sudo should not be a symlink when sudo-rs is not installed"
+          exit 1
+      fi
   fi
 restore: |
   if [ -z "${CI:-}" ]; then
