@@ -217,88 +217,30 @@ func runArchContainer(tag, rootDir, entrypoint string, keepContainer bool, timeo
     ctx, cancel := context.WithTimeout(context.Background(), timeout)
     defer cancel()
 
-    // For verbose runs, prefer the Docker CLI to ensure reliable streaming to this terminal.
+    // Always use Docker CLI for consistency. Stream output in verbose mode; discard in quiet.
+    // Best-effort remove any stale container with the same name to avoid conflicts
+    _ = exec.Command("docker", "rm", "-f", containerName).Run()
+    args := []string{"run"}
+    if !keepContainer { args = append(args, "--rm") }
+    args = append(args,
+        "-v", fmt.Sprintf("%s:/workspace", rootDir),
+        "--workdir", "/workspace",
+        "--name", containerName,
+        tag,
+        entrypoint,
+    )
+    cmd := exec.CommandContext(ctx, "docker", args...)
     if verbose {
-        // Best-effort remove any stale container with the same name to avoid conflicts
-        _ = exec.Command("docker", "rm", "-f", containerName).Run()
-        args := []string{"run"}
-        if !keepContainer { args = append(args, "--rm") }
-        args = append(args,
-            "-v", fmt.Sprintf("%s:/workspace", rootDir),
-            "--workdir", "/workspace",
-            "--name", containerName,
-            tag,
-            entrypoint,
-        )
-        cmd := exec.CommandContext(ctx, "docker", args...)
         cmd.Stdout = os.Stdout
         cmd.Stderr = os.Stderr
-        if err := cmd.Run(); err != nil {
-            return fmt.Errorf("docker run (CLI) failed: %w", err)
-        }
-        return nil
+    } else {
+        cmd.Stdout = io.Discard
+        cmd.Stderr = io.Discard
     }
-
-    // SDK path (non-verbose): run quietly but still enforce timeout and cleanup.
-    cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-    if err != nil {
-        return fmt.Errorf("docker client: %w", err)
+    if err := cmd.Run(); err != nil {
+        return fmt.Errorf("docker run (CLI) failed: %w", err)
     }
-
-    // Ensure image exists
-    exists, err := imageExists(ctx, cli, tag)
-    if err != nil {
-        return err
-    }
-    if !exists {
-        return fmt.Errorf("image %s not found", tag)
-    }
-
-	// Create container
-	cfg := &container.Config{
-		Image: tag,
-		// Use bash -lc to execute the provided entrypoint string, mirroring CLI usage
-		Cmd: strslice.StrSlice([]string{"/bin/bash", "-lc", entrypoint}),
-		Tty: false,
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-	hostCfg := &container.HostConfig{
-		Binds: []string{fmt.Sprintf("%s:/workspace", rootDir)},
-	}
-	created, err := cli.ContainerCreate(ctx, cfg, hostCfg, nil, nil, containerName)
-	if err != nil {
-		return fmt.Errorf("container create: %w", err)
-	}
-	// Ensure cleanup if not kept
-	if !keepContainer {
-		defer func() {
-			timeout := 5 * time.Second
-			cctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-			_ = cli.ContainerRemove(cctx, created.ID, container.RemoveOptions{Force: true})
-		}()
-	}
-
-	if err := cli.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("container start: %w", err)
-	}
-
-	// Wait for completion or timeout
-	statusCh, errCh := cli.ContainerWait(ctx, created.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			return fmt.Errorf("container wait: %w", err)
-		}
-	case status := <-statusCh:
-		if status.StatusCode != 0 {
-			return fmt.Errorf("container exited with status %d", status.StatusCode)
-		}
-	case <-ctx.Done():
-		return fmt.Errorf("docker run timed out after %s", timeout)
-	}
-	return nil
+    return nil
 }
 
 // imageExists checks if a Docker image tag exists locally via SDK

@@ -4,11 +4,14 @@ execute: |
   source "$(dirname "$0")/../lib/uutils.sh"
   source "$(dirname "$0")/../lib/sudo-rs.sh"
 
-  # Enable German locale (Ubuntu style)
-  if grep -q '^# *de_DE.UTF-8 UTF-8' /etc/locale.gen; then
-    sudo sed -i 's/^# *\(de_DE.UTF-8 UTF-8\)/\1/' /etc/locale.gen
-    sudo locale-gen
+  # Enable German locale (portable across distros)
+  if grep -E -q '^#?\s*de_DE\.UTF-8\s+UTF-8' /etc/locale.gen; then
+    sudo sed -i 's/^#\s*\(de_DE\.UTF-8\s\+UTF-8\)/\1/' /etc/locale.gen
+  else
+    echo 'de_DE.UTF-8 UTF-8' | sudo tee -a /etc/locale.gen >/dev/null
   fi
+  # Generate locales if possible, but do not fail the suite if the generator is absent
+  sudo locale-gen || true
   export LC_ALL=de_DE.UTF-8
   export LANGUAGE=de_DE.UTF-8
   export LANG=de_DE.UTF-8

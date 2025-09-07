@@ -15,15 +15,25 @@ cd "$PROJECT_ROOT"
 
 shopt -s nullglob
 mapfile -t TASKS < <(find tests -maxdepth 2 -mindepth 2 -type f -name task.yaml | sort)
+TOTAL=${#TASKS[@]}
 
 if [[ ${#TASKS[@]} -eq 0 ]]; then
   echo "[yaml-runner] No tasks found under tests/*/task.yaml" >&2
   exit 1
 fi
 
+echo
+echo "[progress] Discovered ${TOTAL} YAML test suite(s)"
+echo
+
+idx=0
 for task in "${TASKS[@]}"; do
+  idx=$((idx+1))
   suite_dir=$(dirname "$task")
   suite_name=$(basename "$suite_dir")
+  echo
+  echo "[progress] (${idx}/${TOTAL}) START suite: ${suite_name}"
+  echo
   echo "[yaml-runner] === Running suite: ${suite_name} (${task}) ==="
 
   tmp_script="${suite_dir}/.exec_${RANDOM}$$.sh"
@@ -53,13 +63,22 @@ for task in "${TASKS[@]}"; do
   # absolute path inside the suite directory so that $(dirname "$0") in the script
   # resolves to the suite directory, matching Spread semantics.
   if ! ( cd "$PROJECT_ROOT" && bash "$tmp_script" ); then
+    echo
     echo "[yaml-runner] !!! Suite failed: ${suite_name}" >&2
+    echo
+    echo "[progress] (${idx}/${TOTAL}) FAIL  suite: ${suite_name}" >&2
+    echo
     exit 1
   fi
 
   rm -f "$tmp_script"
+  echo
   echo "[yaml-runner] === Suite passed: ${suite_name} ==="
+  echo
+  echo "[progress] (${idx}/${TOTAL}) DONE  suite: ${suite_name}"
   echo
 done
 
+echo
 echo "[yaml-runner] All YAML test suites completed successfully."
+echo

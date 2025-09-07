@@ -3,7 +3,6 @@ set -euo pipefail
 
 # Ensure a sane PATH that prefers /usr/bin for coreutils
 export PATH="/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}"
-export RUST_LOG="info"
 
 # Helper: show how selected coreutils resolve and which implementation they are
 show_coreutils_snapshot() {
@@ -29,13 +28,32 @@ show_coreutils_snapshot() {
 logv() { [ "${VERBOSE}" -ge 1 ] && echo "$*" || true; }
 logvv() { [ "${VERBOSE}" -ge 2 ] && echo "$*" || true; }
 
+# Suppress command output at normal verbosity; show only at VERBOSE>=2
+runq() {
+  if [ "${VERBOSE}" -ge 2 ]; then
+    "$@"
+  else
+    "$@" >/dev/null 2>&1 || return $?
+  fi
+}
+
+# Map VERBOSE to RUST_LOG unless user explicitly provided RUST_LOG
+if [ -z "${RUST_LOG:-}" ]; then
+  case "${VERBOSE}" in
+    0) export RUST_LOG="error" ;;
+    1) export RUST_LOG="error" ;;
+    2) export RUST_LOG="warn" ;;
+    *) export RUST_LOG="info" ;;
+  esac
+fi
+
 # 1) Stage workspace into /root/project/oxidizr-arch for paths expected by tests
 mkdir -p /root/project/oxidizr-arch
 cp -a /workspace/. /root/project/oxidizr-arch/
 
 # 2) Ensure base tools (most are already installed via Dockerfile)
-pacman -Syy --noconfirm
-pacman -S --noconfirm --needed base-devel sudo git curl rustup which findutils
+runq pacman -Syy --noconfirm
+runq pacman -S --noconfirm --needed base-devel sudo git curl rustup which findutils
 
 # 3) Ensure non-root builder user exists (Dockerfile already created it, but be idempotent)
 id -u builder >/dev/null 2>&1 || useradd -m builder
@@ -50,8 +68,8 @@ if ! command -v paru >/dev/null 2>&1; then
 fi
 
 # 4) Prepare rust toolchains (for building the project only)
-rustup default stable || true
-su - builder -c 'rustup default stable || true'
+runq rustup default stable || true
+runq su - builder -c 'rustup default stable || true'
 
 # Note: Do not pre-mutate /usr/bin applets here. The product (oxidizr-arch)
 # performs safe, syscall-based switching during 'enable'.
@@ -64,12 +82,12 @@ else
   ls -la /root/project/oxidizr-arch || true
   exit 1
 fi
-rustup default stable
+rustup default stable >/dev/null 2>&1 || true
 : "${CARGO_BUILD_JOBS:=2}"
 logv "[build] cargo build --release -j ${CARGO_BUILD_JOBS}"
-cargo build --release -j "${CARGO_BUILD_JOBS}"
-ln -sf "$PWD/target/release/oxidizr-arch" /usr/local/bin/oxidizr-arch
-oxidizr-arch --help >/dev/null
+runq cargo build --release -j "${CARGO_BUILD_JOBS}"
+runq ln -sf "$PWD/target/release/oxidizr-arch" /usr/local/bin/oxidizr-arch
+runq oxidizr-arch --help
 
 # 8) Enable and assertions
 cd /root/project/oxidizr-arch

@@ -104,12 +104,13 @@ impl Worker for System {
         // Try pacman, then fall back to AUR helper(s)
         let status = std::process::Command::new("pacman").args(["-S", "--noconfirm", package]).status()?;
         if status.success() { return Ok(()); }
-        // Choose helper: prefer configured, else detect installed
+        // Choose helper: prefer configured, else detect installed. Run helpers as non-root 'builder'.
         let candidates = aur_helper_candidates(&self.aur_helper);
         let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
         let mut tried_any = false;
         for h in available_iter.by_ref() {
-            let status = std::process::Command::new(h).args(["-S", "--noconfirm", package]).status();
+            let cmd = format!("{} -S --noconfirm --needed {}", h, package);
+            let status = std::process::Command::new("su").args(["-", "builder", "-c"]).arg(&cmd).status();
             if let Ok(s) = status { if s.success() { return Ok(()); } }
             tried_any = true;
         }

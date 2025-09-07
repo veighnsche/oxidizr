@@ -66,6 +66,9 @@ func main() {
 	// Developer-friendly default: with no action flags, perform one-shot build+run
 	if !*smokeDocker && !*archBuild && !*archRun && !*archAll && !*archShell && !*archTestSudo && !*archShellTestSudo {
 		*archAll = true
+		if !quietMode {
+			log.Println("Defaulting to: build+run Docker Arch tests (--arch)")
+		}
 	}
 
 	ok := true
@@ -159,9 +162,15 @@ func main() {
 					}
 					ok = false
 				} else {
-					if err := runArchContainer(*imageTag, rootDir, entryCmd, *keepCtr, *timeout, verbosityLevel >= 2); err != nil {
+					if !quietMode {
+						log.Println("Starting Docker tests (YAML suites then assertions)...")
+					}
+					if err := runArchContainer(*imageTag, rootDir, entryCmd, *keepCtr, *timeout, verbosityLevel >= 1); err != nil {
 						warn("docker run failed: ", err)
 						ok = false
+					}
+					if ok && !quietMode {
+						log.Println("Docker tests completed.")
 					}
 				}
 			}
