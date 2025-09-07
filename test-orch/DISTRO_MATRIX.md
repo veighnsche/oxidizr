@@ -76,7 +76,7 @@ Detection details (implemented): see `container-runner/setup/rust.go` and relate
 
 - `disable-in-german` YAML suite
   - Run on Arch Linux where `de_DE.UTF-8` can be generated.
-  - On derivatives (CachyOS/Manjaro/EndeavourOS), expect skip/fail-fast under FULL_MATRIX due to missing locale definitions.
+  - On derivatives (CachyOS/Manjaro/EndeavourOS), this suite is the single allowed SKIP due to missing locale definitions. See `TESTING_POLICY.md` (Allowed SKIPs Table). This SKIP is temporary and tracked until images are fixed.
 - AUR-dependent steps
   - Should work across all distros; installation is skipped when a helper (e.g., `paru`) is preinstalled.
 - Build and assertions

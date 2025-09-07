@@ -73,7 +73,7 @@ Common flags (global):
 
 # Packaging / AUR selection
 --package-manager paru                 # force helper instead of auto-detect
---aur-helper auto|none|paru|yay|...    # value-enum alternative
+--aur-helper auto|paru|yay|...         # select helper; an AUR helper is assumed to exist if AUR is required
 --package uutils-coreutils             # override package name per experiment
 --bin-dir /usr/lib/uutils/coreutils    # override replacement bin directory
 --unified-binary /usr/bin/coreutils    # override unified dispatcher path
@@ -94,9 +94,9 @@ sudo oxidizr-arch --experiments coreutils disable
 
 Notes:
 
-- On Arch derivatives, the `sudo-rs` experiment is considered incompatible and is skipped unless `--no-compatibility-check` is provided. The defaults still ensure the system remains usable on derivatives (e.g., stock `sudo`).
-- AUR fallback behavior: after attempting `pacman -S`, any available AUR helpers found in `PATH` (e.g., `paru`, `yay`) are tried in order. The CLI currently doesn’t provide a strict “disable AUR” mode; to avoid AUR usage, ensure no helper is installed/available in `PATH` and rely solely on pacman. You can influence helper choice/order via `--package-manager` or `--aur-helper`.
-- Override flags (`--package`, `--bin-dir`, `--unified-binary`) are parsed by the CLI but not yet plumbed into all experiments; current defaults come from the registry in `src/experiments/mod.rs`. Expect overrides to be ignored until wiring is completed.
+- On Arch-family derivatives, we run the same assertions. If a provider is available via pacman or AUR, switching proceeds; otherwise the command fails with a clear error (no SKIPs). Use `--no-compatibility-check` only for debugging.
+- AUR helpers: we assume an AUR helper (`paru` or `yay`) is available when AUR packages are required. In containers, the runner ensures a helper exists. On user systems, install one before running commands that require AUR. If no helper is available when needed, the command fails with guidance.
+- Override flags (`--package`, `--bin-dir`, `--unified-binary`) are parsed by the CLI and are being wired end-to-end to override registry defaults across distros.
 
 ## Experiments
 
@@ -111,6 +111,20 @@ Notes:
 - sudo-rs (`SudoRsExperiment`)
   - Arch only: installs `sudo-rs` and wires stable aliases like `/usr/bin/sudo.sudo-rs`, then links `/usr/bin/sudo -> /usr/bin/sudo.sudo-rs` and similarly for `su`. `visudo` target lives in `/usr/sbin/visudo` (`src/experiments/sudors.rs`).
   - Derivatives: experiment is incompatible → skipped by default.
+
+## Enable/Disable behavior matrix (uutils-*)
+
+This table documents what happens to `uutils-*` packages and applet symlinks depending on whether the packages were already present on the system.
+
+| Initial state of `uutils-*` | On `enable` | On `disable` |
+|-----------------------------|-------------|--------------|
+| Already installed by user   | - Package installation is skipped (detected via `pacman -Qi`)<br>- Backups created next to targets as `.<name>.oxidizr.bak`<br>- Applets under `/usr/bin/<applet>` are switched to the installed provider (split or unified binary) | - Applet targets are restored from backups<br>- `uutils-*` packages are uninstalled (current policy) |
+| Not installed               | - Package is installed via pacman; if not in pacman, the available AUR helper is used<br>- Backups created next to targets as `.<name>.oxidizr.bak`<br>- Applets under `/usr/bin/<applet>` are switched to the installed provider | - Applet targets are restored from backups<br>- `uutils-*` packages are uninstalled |
+
+Notes:
+- Applies to `uutils-coreutils` and `uutils-findutils` experiments.
+- `sudo-rs` follows the same disable removal policy: on `disable`, the `sudo-rs` package is removed after restoring targets.
+- Path selection during `enable` can be adjusted with overrides like `--bin-dir` and `--unified-binary`; uninstall behavior is controlled by the experiment and currently removes the provider package on `disable`.
 
 ## Safety model
 
@@ -175,7 +189,7 @@ See `test-orch/host-orchestrator/README.md` and `test-orch/container-runner/READ
 ## Known notes
 
 - Root is required for non-dry-run `enable`/`disable` since targets live under `/usr/bin` and `/usr/sbin`.
-- On Arch derivatives, locale data may be stripped in minimal Docker images. Locale-dependent suites (e.g., `tests/disable-in-german/`) are designed to fail fast in full-matrix mode if locales are missing. See `FULL_MATRIX_TESTING_PLAN.md`.
+- On Arch derivatives, locale data may be stripped in minimal Docker images. The only permitted SKIP is the locale-dependent suite (`tests/disable-in-german/`) on CachyOS/Manjaro/EndeavourOS due to missing locale definition files. See `TESTING_POLICY.md` (Allowed SKIPs Table) and `FULL_MATRIX_TESTING_PLAN.md`.
 
 ## License
 

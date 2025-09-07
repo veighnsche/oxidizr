@@ -1,10 +1,10 @@
-# Full Matrix Testing Plan (No Skips)
+# Full Matrix Testing Plan (Strict, with a Single Allowed SKIP)
 
 Goal
 
 - Ensure every target distribution runs the complete test suite (YAML suites under `tests/` and the heavy Go assertions in `test-orch/container-runner/assertions/`) with zero silent skips.
 - Target matrix (initial): arch, manjaro, cachyos, endeavouros. Extendable via a single flag.
-- Any skip in matrix mode must fail the run.
+- Any SKIP in matrix mode fails the run, except the single allowed SKIP: `tests/disable-in-german` may skip on `cachyos, manjaro, endeavouros` due to missing locale definition files in their base Docker images (see `TESTING_POLICY.md`).
 
 Current gaps (sources of false positives)
 
@@ -21,10 +21,10 @@ Planned changes (implementation checklist)
 
 1) Container Runner (in-container)
 
-- yamlrunner: explicit PASS/FAIL/SKIP
+- yamlrunner: explicit PASS/FAIL/SKIP (with one exception)
   - Introduce a `SuiteResult { Name, Status, Reason }` and aggregate results in `yamlrunner.Run()`.
   - In `runSingleSuite()`, return `Status = SKIP` when distro check fails or is indeterminate; return `FAIL` on execution error; return `PASS` only on success.
-  - Add env toggle `FULL_MATRIX=1` (or `NO_SKIP=1`). When set, treat any SKIP as a hard error (convert to FAIL) and set a distinct exit code.
+  - Add env toggle `FULL_MATRIX=1` (or `NO_SKIP=1`). When set, treat any SKIP as a hard error (convert to FAIL) and set a distinct exit code, except the single allowed SKIP (`disable-in-german` on derivatives listed above).
   - Emit a JSON summary to `projectDir/artifacts/yaml-results.json` and a human summary.
 
 - assertions: run everywhere and tighten checks
@@ -83,7 +83,7 @@ Planned changes (implementation checklist)
 
 Acceptance criteria
 
-- All four distros complete both YAML suites and heavy assertions with no SKIPs.
+- All four distros complete YAML suites and heavy assertions with no SKIPs, except that `disable-in-german` is allowed to SKIP on `cachyos, manjaro, endeavouros` due to missing locale definition files in their base Docker images, as documented in `TESTING_POLICY.md`.
 - `host-orchestrator` exits nonzero if any suite or assertion is SKIP/FAIL in `--require-full-matrix` mode.
 - Missing coreutils symlinks cause failures (not warnings) when below the threshold.
 - German-locale suite reliably runs (locale pre-provisioned) or fails loudly in full-matrix mode.

@@ -34,13 +34,10 @@ The application logic will be made distribution-aware.
 
 ### Test Orchestration (`test-orch`) Changes
 
-The test runner will be made intelligent enough to skip tests that are not applicable to the current environment.
+Run the same assertions across the Arch-family (arch, manjaro, cachyos, endeavouros) without gating to make tests pass. Do not use YAML `distro-check` to skip supported distros. Only the locale-dependent suite has a temporary SKIP on derivatives.
 
--   **`test-orch/host-orchestrator/main.go`**: The `--concurrency` flag will be correctly implemented and used to limit parallel test runs, preventing resource exhaustion and providing stable test results.
--   **`test-orch/container-runner/`**: We will implement a `distro-check` key in the test YAML files.
-    -   The Go-based runner inside the container will read this key.
-    -   It will compare the key's value against the container's actual distribution (read from `/etc/os-release`).
-    -   If there is no match, the runner will **skip** the test suite and log a message, rather than running it and failing.
--   **`tests/**/*.yaml`**: We will add the `distro-check: [arch]` key to all test files that are specific to vanilla Arch Linux. This ensures tests for features like `sudo-rs` or the installation of `uutils-coreutils` only run where they are supposed to.
+-  **`test-orch/host-orchestrator/main.go`**: Use `--concurrency` to limit parallel runs and ensure stability.
+-  **`test-orch/container-runner/`**: Use explicit PASS/FAIL/SKIP semantics with `FULL_MATRIX=1` turning SKIP into FAIL, except for the single allowed SKIP (`disable-in-german` on derivatives due to missing locale definitions).
+-  **`tests/**/*.yaml`**: Do not gate suites to `arch` via `distro-check`. Instead, assert equivalently across the Arch-family. For locale-dependent tests, fail loud if locales are missing in `FULL_MATRIX` or skip only as permitted by policy.
 
-By implementing this comprehensive plan, we will create a robust and reliable testing matrix that correctly handles the nuances of each Arch-based distribution.
+By implementing this comprehensive plan, we will create a robust and reliable testing matrix that runs uniformly across the Arch-family, avoids masking with skips, and fails loudly on unmet prerequisites (except for the single, tracked locale SKIP).

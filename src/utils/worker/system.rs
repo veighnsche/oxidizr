@@ -95,7 +95,10 @@ impl Worker for System {
             );
             return Ok(());
         }
-        // If already installed, do nothing (avoids invoking AUR helpers as root)
+        // If already installed, do nothing.
+        // This ensures we DO NOT re-install pre-existing packages (e.g., user preinstalled
+        // uutils-coreutils or sudo-rs). Experiments will proceed to switch symlinks to the
+        // already-installed provider without reinstallation.
         if self.check_installed(package)? {
             log::info!("Package '{}' already installed (skipping)", package);
             return Ok(());
@@ -157,6 +160,11 @@ impl Worker for System {
     }
 
     fn remove_package(&self, package: &str, assume_yes: bool) -> Result<()> {
+        // NOTE: Experiments may call this during `disable` (e.g., uutils-* and sudo-rs).
+        // Current semantics: if the package is installed, we uninstall it regardless of
+        // whether it was originally installed by the user or by a prior `enable` run.
+        // If we want a more conservative behavior (e.g., optional purge flag), wire it at
+        // the experiment layer and gate calls into this function accordingly.
         if self.dry_run {
             log::info!("[dry-run] pacman -R --noconfirm {}", package);
             return Ok(());
@@ -359,6 +367,10 @@ impl Worker for System {
     }
 
     fn restore_file(&self, target: &Path) -> Result<()> {
+        // Restores the original file for `target` from its side-by-side backup
+        // (.<name>.oxidizr.bak) if present. This undoes the applet symlink installed during
+        // `enable` without uninstalling any packages by itself. Package removal (if any)
+        // is orchestrated by experiment code.
         let backup = backup_path(target);
         if backup.exists() {
             if self.dry_run {

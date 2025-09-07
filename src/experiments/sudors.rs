@@ -110,6 +110,9 @@ impl<'a, W: Worker> SudoRsExperiment<'a, W> {
             };
             worker.restore_file(&target)?;
         }
+        // Package removal policy: uninstall sudo-rs on disable.
+        // NOTE: This removes the package even if it was present before `enable`.
+        // To change this behavior, gate removal behind a CLI flag at the experiment layer.
         if self.package_name == "sudo-rs" {
             self.system.remove_package(&self.package_name, assume_yes)?;
         } else {

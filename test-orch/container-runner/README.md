@@ -72,6 +72,8 @@ Some Arch derivative images (e.g., CachyOS, Manjaro, EndeavourOS) ship stripped 
 
 Rationale: keep images minimal and avoid mutating system locales during tests. We log what’s present and adapt tests rather than forcing locale generation.
 
+Reference policy: see `TESTING_POLICY.md` (Allowed SKIPs Table). The `disable-in-german` suite is the only permitted SKIP on derivatives due to missing locale definitions; it is temporary and tracked.
+
 ## Interaction with Dockerfile
 
 The Dockerfile provides only the minimal base packages. User management, Rust toolchain configuration, AUR helper installation, and locale generation are intentionally handled by the runner. This keeps images simple and reproducible, and centralizes logic in code instead of image layers.

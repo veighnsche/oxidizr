@@ -34,12 +34,12 @@ This table is the authoritative list of which tests may ever skip due to Docker 
 | `tests/non-root`                        | No               | all                                  | Not locale-dependent; must run                                                         | — |
 
 Notes:
-- Even when listed as “allowed,” the locale SKIP is time-bounded and must have an active blocking issue and owner. In `FULL_MATRIX` CI, SKIPs fail the run by default to surface infrastructure gaps until fixed.
+- The locale SKIP is the only SKIP not treated as a failure in `FULL_MATRIX` CI. It is strictly time-bounded and must have an active blocking issue and owner. All other SKIPs fail the run.
 
 ## CI and Matrix Policy
 
 - FULL_MATRIX is the default for CI runs via the host orchestrator.
-- Any SKIP in any matrix job fails the run.
+- Any SKIP in any matrix job fails the run, except the single allowed SKIP listed above (`tests/disable-in-german` on CachyOS/Manjaro/EndeavourOS due to missing locale files). That specific SKIP is permitted (tracked) and does not fail the run.
 - Non-matrix runs must not silently appear green by skipping assertions—if the scenario cannot be executed, fail with a clear reason.
 
 ## Harness Policy (Docker and other runners)
@@ -52,20 +52,20 @@ Notes:
 
 ## Product–Policy Alignment
 
-- The project goal is to support switching across Arch-family distros (`arch, manjaro, cachyos, endeavouros`) with zero SKIPs in matrix runs.
-- Registry defaults must not hard-block derivatives. If providers are available, switching should proceed; otherwise fail loudly with a clear reason (no SKIPs).
-- `SudoRsExperiment::check_compatible()` must allow derivatives when the package is provably installed; otherwise it must error (not skip).
+- Goal: support switching across Arch-family distros (`arch, manjaro, cachyos, endeavouros`) with zero SKIPs in matrix runs (except the single locale SKIP).
+- Do not distro-gate the Arch-family to make tests pass; run the same assertions across the family. Gate only OSes we explicitly do not support or have never tested.
+- Registry defaults must not hard-block derivatives. If providers are available (via pacman/AUR), switching proceeds; otherwise fail loudly with a clear reason (no SKIPs).
+- `SudoRsExperiment::check_compatible()` should allow derivatives when the package is installed/available; otherwise error (not skip).
 
-## CLI Semantics (No Hidden Fallbacks)
+## Packaging & AUR Semantics
 
-- `--package-manager none` and/or `--aur-helper none` means no helpers are used under any circumstances. After `pacman` attempts, fail explicitly if unmet.
+- Assume an AUR helper (e.g., `paru`, `yay`) is available on systems that require AUR packages. In CI, the container-runner ensures a helper exists; on user systems, users must install one.
 - CLI overrides (`--package`, `--bin-dir`, `--unified-binary`) must override registry defaults on all distros so tests/users can force switching deterministically.
 
 ## Registry and Probing
 
-- Implement probe-based selection on derivatives:
-  - If `uutils-coreutils` and/or `sudo-rs` is installed or installable (via pacman/AUR), select it and attempt switch.
-  - If not available, fail loudly with a clear reason (no SKIPs).
+- Always attempt switching on supported Arch-family distros. Use `pacman` first; when packages are only in AUR, use the available helper. If installation fails, fail loudly with a clear reason (no SKIPs).
+- Probing is for visibility and better messages (e.g., detect that `sudo-rs` is missing), not for gating or skipping.
 
 ## Infrastructure Policy (Containers/Images)
 

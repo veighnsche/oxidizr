@@ -75,14 +75,15 @@ Do not take this document literally. It is a cautionary example intended to illu
 ## Immediate corrective actions (no masking)
 
 - Make FULL_MATRIX the default in CI via the host orchestrator so any SKIP fails the run.
-- Implement a real "no AUR" mode: when `--package-manager none` or `--aur-helper none` is set, do not try any helpers (no fallback); fail after pacman. Update tests to rely on the intended policy.
+- AUR helpers are assumed available when required (e.g., `paru`, `yay`). In CI, the runner ensures a helper exists; on user systems, users must install one. If a helper is missing when needed, commands must fail loudly with clear guidance. There is no "no AUR" mode.
 - Wire CLI overrides end-to-end: `--package`, `--bin-dir`, `--unified-binary` must override the registry so users (and tests) can force switching on derivatives.
 - Replace policy SKIPs with product fixes:
-  - Probe-based registry: if a uutils or sudo-rs provider is actually available (pacman or AUR), select it on derivatives and attempt the switch.
-  - Relax `SudoRsExperiment::check_compatible()` to permit derivatives when the package is installed/provable, otherwise fail loudly (not skip).
+  - Probe-based behavior: attempt installation via pacman first, then AUR via the available helper; use probing to improve messages and selection, not to gate or skip. If install is not possible, fail loudly (no SKIP).
+- Relax `SudoRsExperiment::check_compatible()` to permit derivatives when the package is installed/provable, otherwise fail loudly (not skip).
 - Align tests with the actual product direction:
   - If the decision is “support switching across Arch-family,” keep assertions strict and make the registry probe+enable where possible.
   - If we decide conservative defaults only as a transitional phase, then tests must still fail in FULL_MATRIX mode until the product meets the goal—do not accept SKIPs as success.
+
 ## SKIP policy clarification (single approved SKIP)
 
 - Only one SKIP was explicitly approved: locale data missing in derivative Docker images (e.g., `de_DE`) while infra is being fixed.
