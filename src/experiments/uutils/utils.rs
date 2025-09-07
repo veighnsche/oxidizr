@@ -7,7 +7,7 @@ pub fn resolve_target<W: Worker>(worker: &W, filename: &str) -> PathBuf {
         return found;
     }
     if cfg!(test) {
-        Path::new("bin").join(filename)
+        Path::new("/tmp").join("bin").join(filename)
     } else {
         Path::new("/usr/bin").join(filename)
     }

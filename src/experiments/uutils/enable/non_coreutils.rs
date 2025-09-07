@@ -3,6 +3,8 @@ use crate::utils::worker::Worker;
 use crate::experiments::uutils::model::UutilsExperiment;
 use std::path::PathBuf;
 use std::fs;
+use std::env;
+use std::path::Path;
 
 impl UutilsExperiment {
     /// Handles applet collection for non-coreutils families.
@@ -89,11 +91,13 @@ impl UutilsExperiment {
     /// Gets candidate paths for non-coreutils binaries.
     pub fn get_non_coreutils_candidates(&self, name: &str) -> [PathBuf; 4] {
         if cfg!(test) {
+            let out_dir = env::var("OUT_DIR").unwrap();
+            let base_dir = Path::new(&out_dir).join("bin");
             [
-                PathBuf::from(format!("bin/uu-{}", name)),
-                PathBuf::from(format!("bin/{}/{}", self.name, name)),
-                PathBuf::from(format!("bin/{}", name)),
-                PathBuf::from(format!("bin/{}", name)),
+                base_dir.join(format!("uu-{}", name)),
+                base_dir.join(format!("{}/{}", self.name, name)),
+                base_dir.join(format!("{}", name)),
+                base_dir.join(format!("{}", name)),
             ]
         } else {
             [

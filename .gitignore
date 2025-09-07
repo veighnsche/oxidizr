@@ -6,3 +6,9 @@ test-orch/isolated-runner.exe
 test-orch/*.test
 test-orch/coverage*.out
 test-orch/go.sum
+
+# Ignore temporary directories and files created during testing
+bin/
+tmp/
+*.bak
+*.oxidizr.bak

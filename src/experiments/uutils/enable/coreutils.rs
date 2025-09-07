@@ -4,6 +4,8 @@ use crate::experiments::uutils::constants::{COREUTILS_UNIFIED_PATH, COREUTILS_UN
 use crate::experiments::uutils::model::UutilsExperiment;
 use std::path::{Path, PathBuf};
 use std::fs;
+use std::env;
+use std::process;
 
 impl UutilsExperiment {
     /// Handles applet collection for coreutils family.
@@ -34,7 +36,8 @@ impl UutilsExperiment {
         }
 
         let default_path = if cfg!(test) {
-            PathBuf::from("bin/coreutils")
+            let out_dir = env::var("OUT_DIR").unwrap();
+            PathBuf::from(out_dir).join("bin/coreutils")
         } else {
             PathBuf::from(COREUTILS_UNIFIED_PATH)
         };
@@ -113,7 +116,8 @@ impl UutilsExperiment {
                     );
                     // Use a relative path in test mode
                     let fallback_path = if cfg!(test) {
-                        PathBuf::from("bin/uu-arch")
+                        let out_dir = env::var("OUT_DIR").unwrap();
+                        PathBuf::from(out_dir).join("bin/uu-arch")
                     } else {
                         PathBuf::from("/usr/bin/uu-arch")
                     };
