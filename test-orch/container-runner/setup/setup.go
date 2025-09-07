@@ -6,10 +6,13 @@ import (
 
 // Run prepares the container for tests, mirroring the setup steps from the old entrypoint.sh.
 func Run() error {
-	log.Println("==> Staging workspace...")
-	if err := stageWorkspace(); err != nil {
-		return err
-	}
+    if err := preflight(); err != nil {
+        return err
+    }
+    log.Println("==> Staging workspace...")
+    if err := stageWorkspace(); err != nil {
+        return err
+    }
 
 	log.Println("==> Installing system dependencies...")
 	if err := installDependencies(); err != nil {

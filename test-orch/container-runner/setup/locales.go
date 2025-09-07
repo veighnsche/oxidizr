@@ -70,15 +70,19 @@ func setupLocales() error {
 		}
 	}
 
-	// Validate presence in locale archive
-	if err := util.RunCmd("sh", "-lc", `localedef --list-archive | grep -q '^de_DE\.UTF-8$'`); err != nil {
-		log.Println("[locales] de_DE.UTF-8 not present in archive after generation attempts")
-		if os.Getenv("FULL_MATRIX") == "1" {
-			return fmt.Errorf("de_DE.UTF-8 not present after generation under FULL_MATRIX")
-		}
-	} else {
-		log.Println("[locales] de_DE.UTF-8 present in archive")
-	}
+	// Validate presence using either name and multiple sources
+    // 1) localedef --list-archive often lists 'de_DE.utf8'
+    // 2) locale -a also lists generated locales
+    validateCmd := `localedef --list-archive | grep -Eq '^de_DE\.(UTF-8|utf8)$' || locale -a | grep -Eq '^de_DE\.(UTF-8|utf8)$'`
+    if err := util.RunCmd("sh", "-lc", validateCmd); err != nil {
+        log.Println("[locales] de_DE UTF-8 locale not detected by validators after generation attempts")
+        if os.Getenv("FULL_MATRIX") == "1" {
+            return fmt.Errorf("de_DE UTF-8 locale not detected after generation under FULL_MATRIX")
+        }
+        log.Println("[locales] continuing despite missing detection (FULL_MATRIX=0)")
+    } else {
+        log.Println("[locales] de_DE UTF-8 locale present")
+    }
 
 	return nil
 }

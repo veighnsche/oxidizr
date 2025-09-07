@@ -20,7 +20,7 @@ func runInContainer() error {
 
 	// Always run Rust unit tests by default as part of the matrix run
 	log.Println("==> Running Rust unit tests (cargo test)...")
-	if err := util.RunCmd("sh", "-lc", "cd /root/project/oxidizr-arch && cargo test -q"); err != nil {
+	if err := util.RunCmd("sh", "-lc", "cd /workspace && cargo test -q"); err != nil {
 		return fmt.Errorf("rust unit tests failed: %w", err)
 	}
 

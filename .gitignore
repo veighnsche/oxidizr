@@ -12,3 +12,18 @@ bin/
 tmp/
 *.bak
 *.oxidizr.bak
+
+# Test orchestrator caches and build outputs
+# Caches are bind-mounted to speed up container runs; do not commit them
+.cache/
+.cache/test-orch/
+.cache/test-orch/cargo/
+.cache/test-orch/cargo-target/
+.cache/test-orch/pacman/
+.cache/test-orch/aur-build/
+
+# Local builds of the Go runners (if built outside Docker)
+test-orch/container-runner/isolated-runner
+test-orch/container-runner/isolated-runner.exe
+test-orch/host-orchestrator/host-orchestrator
+test-orch/host-orchestrator/host-orchestrator.exe

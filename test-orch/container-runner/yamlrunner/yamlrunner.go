@@ -23,7 +23,7 @@ type Task struct {
 
 // Run finds, parses, and executes all task.yaml test suites.
 func Run() error {
-	projectDir := "/root/project/oxidizr-arch"
+	projectDir := "/workspace"
 	testsDir := filepath.Join(projectDir, "tests")
 
 	var tasks []string

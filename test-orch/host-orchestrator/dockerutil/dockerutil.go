@@ -161,6 +161,29 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		args = append(args, "-e", env)
 	}
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", rootDir))
+
+	// Add persistent cache mounts to speed up repeated runs
+	cacheRoot := filepath.Join(rootDir, ".cache", "test-orch")
+	// Derive a distro key from the tag, e.g., oxidizr-cachyos:latest -> cachyos
+	distroKey := strings.TrimPrefix(tag, "oxidizr-")
+	if i := strings.Index(distroKey, ":"); i >= 0 {
+		distroKey = distroKey[:i]
+	}
+	cargoReg := filepath.Join(cacheRoot, "cargo", "registry")
+	cargoGit := filepath.Join(cacheRoot, "cargo", "git")
+	cargoTarget := filepath.Join(cacheRoot, "cargo-target", distroKey)
+	pacmanCache := filepath.Join(cacheRoot, "pacman")
+	aurBuild := filepath.Join(cacheRoot, "aur-build")
+	// Ensure directories exist
+	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild} {
+		_ = os.MkdirAll(d, 0o755)
+	}
+	// Bind mounts
+	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoReg, "/root/.cargo/registry"))
+	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoGit, "/root/.cargo/git"))
+	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoTarget, "/workspace/target"))
+	args = append(args, "-v", fmt.Sprintf("%s:%s", pacmanCache, "/var/cache/pacman"))
+	args = append(args, "-v", fmt.Sprintf("%s:%s", aurBuild, "/home/builder/build"))
 	args = append(args, "--workdir", "/workspace")
 	args = append(args, "--name", containerName)
 	args = append(args, tag)

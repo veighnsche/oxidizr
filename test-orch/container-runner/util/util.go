@@ -23,3 +23,9 @@ func RunCmdQuiet(name string, args ...string) error {
 	cmd.Stderr = io.Discard
 	return cmd.Run()
 }
+
+// Has reports whether a command exists in PATH.
+func Has(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
