@@ -11,7 +11,11 @@ execute: |
 
   # Verify coreutils is installed
   pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }
-  [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink"; exit 1; }
+  if grep -q '^ID=arch$' /etc/os-release; then
+    [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink"; exit 1; }
+  else
+    [ ! -L /usr/bin/date ] || { echo "/usr/bin/date should not be a symlink on this distro"; exit 1; }
+  fi
   
   # Verify others are absent
   ! pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should not be installed"; exit 1; }

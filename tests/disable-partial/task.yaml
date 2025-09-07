@@ -15,8 +15,15 @@ execute: |
   [ ! -L /usr/bin/date ] || { echo "/usr/bin/date should not be a symlink"; exit 1; }
   
   # Verify sudo-rs is still installed
-  pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should be installed"; exit 1; }
-  [ -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should be a symlink"; exit 1; }
+  if grep -q '^ID=arch$' /etc/os-release; then
+    # On vanilla Arch we use sudo-rs and wire the symlink
+    pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should be installed"; exit 1; }
+    [ -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should be a symlink"; exit 1; }
+  else
+    # On derivatives we keep the stock sudo and do not symlink via sudo-rs
+    pacman -Qi sudo >/dev/null 2>&1 || { echo "sudo should be installed on this distro"; exit 1; }
+    [ ! -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should not be a symlink on this distro"; exit 1; }
+  fi
 restore: |
   if [ -z "${CI:-}" ]; then
     oxidizr-arch disable --yes --all || true
