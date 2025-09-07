@@ -4,12 +4,12 @@ execute: |
   source "$(dirname "$0")/../lib/uutils.sh"
   source "$(dirname "$0")/../lib/sudo-rs.sh"
 
-  oxidizr-arch enable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs
+  oxidizr-arch enable --yes --no-compatibility-check --experiments coreutils,findutils,sudo-rs
 
   ensure_coreutils_installed
   ensure_findutils_installed
   ensure_sudors_installed
 restore: |
   if [ -z "${CI:-}" ]; then
-    oxidizr-arch disable --yes --no-compatibility-check --experiments coreutils findutils sudo-rs || true
+    oxidizr-arch disable --yes --no-compatibility-check --experiments coreutils,findutils,sudo-rs || true
   fi

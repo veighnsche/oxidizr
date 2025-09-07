@@ -83,6 +83,38 @@ for task in "${TASKS[@]}"; do
   fi
 
   rm -f "$tmp_script"
+
+  # Run the restore block to clean up
+  tmp_restore_script="${suite_dir}/.restore_${RANDOM}$$.sh"
+  {
+    echo "#!/usr/bin/env bash"
+    echo "set -euo pipefail"
+    # Extract restore block
+    awk '
+      /^restore:[[:space:]]*\|[[:space:]]*$/ { in_restore=1; next }
+      in_restore && /^[^[:space:]]/ { in_restore=0 } # next top-level key ends block
+      in_restore { sub(/^[[:space:]]{2}/, ""); print }
+    ' "$task"
+  } > "$tmp_restore_script"
+
+  if [ -s "$tmp_restore_script" ]; then
+    chmod +x "$tmp_restore_script"
+    if [ "${VERBOSE:-1}" -ge 2 ]; then
+      echo "[yaml-runner] --- restore script preview (first 10 lines) ---"
+      head -n 10 "$tmp_restore_script" || true
+      echo "[yaml-runner] ----------------------------------------------"
+    fi
+    echo "[yaml-runner] --- Running restore for suite: ${suite_name} ---"
+    if ! ( cd "$PROJECT_ROOT" && bash "$tmp_restore_script" ); then
+      echo
+      echo "[yaml-runner] !!! Restore failed for suite: ${suite_name}" >&2
+      echo
+      # Do not exit, to allow other tests to run, but log the failure.
+    else
+      echo "[yaml-runner] --- Restore completed for suite: ${suite_name} ---"
+    fi
+    rm -f "$tmp_restore_script"
+  fi
   echo
   echo "[yaml-runner] === Suite passed: ${suite_name} ==="
   echo

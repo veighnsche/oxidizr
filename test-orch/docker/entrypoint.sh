@@ -61,6 +61,9 @@ install -d -m 0755 -o root -g root /etc/sudoers.d
 printf 'builder ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/99-builder
 chmod 0440 /etc/sudoers.d/99-builder
 
+# Ensure 'spread' user exists for non-root tests
+id -u spread >/dev/null 2>&1 || useradd -m spread
+
 # 3b) Install AUR helper (paru-bin) as builder for suites requiring AUR packages
 if ! command -v paru >/dev/null 2>&1; then
   logv "[prepare] Installing paru-bin (AUR helper) for test suites"
@@ -86,7 +89,7 @@ rustup default stable >/dev/null 2>&1 || true
 : "${CARGO_BUILD_JOBS:=2}"
 logv "[build] cargo build --release -j ${CARGO_BUILD_JOBS}"
 runq cargo build --release -j "${CARGO_BUILD_JOBS}"
-runq ln -sf "$PWD/target/release/oxidizr-arch" /usr/local/bin/oxidizr-arch
+runq install -m 0755 "$PWD/target/release/oxidizr-arch" /usr/local/bin/oxidizr-arch
 runq oxidizr-arch --help
 
 # 8) Enable and assertions
