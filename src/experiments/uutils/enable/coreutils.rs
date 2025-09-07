@@ -176,7 +176,20 @@ impl UutilsExperiment {
                 (name, name)
             };
             if link_as == "arch" {
-                let candidates = self.get_coreutils_candidates(probe_name);
+                let mut candidates = self.get_coreutils_candidates(probe_name).to_vec();
+                // Filter out candidates that are already symlinked to the unified binary
+                let unified_binary_name = if cfg!(test) {
+                    "bin/coreutils"
+                } else {
+                    COREUTILS_UNIFIED_PATH
+                };
+                candidates.retain(|candidate| {
+                    if let Ok(dest) = std::fs::read_link(candidate) {
+                        !dest.ends_with(unified_binary_name)
+                    } else {
+                        true
+                    }
+                });
                 if let Some(found) = candidates.iter().find(|p| p.exists()) {
                     log::info!(
                         "Per-applet source selected for '{}': {}",

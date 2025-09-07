@@ -17,9 +17,8 @@ pub use crate::utils::worker;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::experiments::UutilsExperiment;
-    use crate::utils::worker::{System, Worker};
+    use crate::utils::test_utils::MockWorker;
     use std::path::PathBuf;
 
     #[test]
@@ -30,12 +29,8 @@ mod tests {
             unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
             bin_directory: PathBuf::from("/usr/lib/uutils/coreutils"),
         };
-        let sys = System {
-            aur_helper: "paru".into(),
-            dry_run: true,
-            wait_lock_secs: None,
-        };
-        let ok = exp.check_compatible(&sys).expect("compat check");
+        let worker = MockWorker::default();
+        let ok = exp.check_compatible(&worker).unwrap();
         assert!(ok);
     }
 }

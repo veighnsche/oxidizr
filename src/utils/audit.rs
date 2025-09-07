@@ -9,6 +9,12 @@ pub struct AuditLogger {
     log_path: String,
 }
 
+impl Default for AuditLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuditLogger {
     pub fn new() -> Self {
         Self {
@@ -28,7 +34,7 @@ impl AuditLogger {
         );
 
         // Try to write to system log, fall back to user log if permission denied
-        if let Err(_) = self.write_to_file(&self.log_path, &log_entry) {
+        if self.write_to_file(&self.log_path, &log_entry).is_err() {
             let user_log = format!(
                 "{}/.oxidizr-arch-audit.log",
                 std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())

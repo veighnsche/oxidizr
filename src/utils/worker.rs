@@ -66,15 +66,15 @@ impl Worker for System {
         let mut id: Option<String> = None;
         let mut id_like: Option<String> = None;
         for line in content.lines() {
-            if id.is_none() {
-                if let Some(rest) = line.strip_prefix("ID=") {
-                    id = Some(rest.trim_matches('"').to_string());
-                }
+            if id.is_none()
+                && let Some(rest) = line.strip_prefix("ID=")
+            {
+                id = Some(rest.trim_matches('"').to_string());
             }
-            if id_like.is_none() {
-                if let Some(rest) = line.strip_prefix("ID_LIKE=") {
-                    id_like = Some(rest.trim_matches('"').to_string());
-                }
+            if id_like.is_none()
+                && let Some(rest) = line.strip_prefix("ID_LIKE=")
+            {
+                id_like = Some(rest.trim_matches('"').to_string());
             }
         }
         let id_lower = id
@@ -186,10 +186,10 @@ impl Worker for System {
                     package,
                 ])
                 .status();
-            if let Ok(s) = status {
-                if s.success() {
-                    return Ok(());
-                }
+            if let Ok(s) = status
+                && s.success()
+            {
+                return Ok(());
             }
             tried_any = true;
         }
@@ -299,10 +299,10 @@ impl Worker for System {
             // Try to canonicalize both sides for robust comparison (handles relative symlink targets)
             let desired = fs::canonicalize(source).unwrap_or_else(|_| source.to_path_buf());
             let mut resolved_current = current_dest.clone().unwrap_or_default();
-            if resolved_current.is_relative() {
-                if let Some(parent) = target.parent() {
-                    resolved_current = parent.join(resolved_current);
-                }
+            if resolved_current.is_relative()
+                && let Some(parent) = target.parent()
+            {
+                resolved_current = parent.join(resolved_current);
             }
             let resolved_current = fs::canonicalize(&resolved_current).unwrap_or(resolved_current);
             if resolved_current == desired {
@@ -462,10 +462,10 @@ fn is_safe_path(path: &Path) -> bool {
         }
     }
     // Check for absolute paths that go outside expected directories
-    if let Some(path_str) = path.to_str() {
-        if path_str.contains("/../") || path_str.contains("..\\") {
-            return false;
-        }
+    if let Some(path_str) = path.to_str()
+        && (path_str.contains("/../") || path_str.contains("..\\"))
+    {
+        return false;
     }
     true
 }

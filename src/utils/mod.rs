@@ -2,6 +2,9 @@ pub mod audit;
 pub mod command;
 pub mod worker;
 
+#[cfg(test)]
+pub mod test_utils;
+
 // Distribution metadata used by experiments for compatibility gating
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Distribution {

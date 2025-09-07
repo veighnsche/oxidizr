@@ -33,7 +33,7 @@ impl<'a> SudoRsExperiment<'a> {
 
     pub fn check_compatible<W: Worker>(&self, worker: &W) -> Result<bool> {
         let d: Distribution = worker.distribution()?;
-        Ok(d.id.to_ascii_lowercase() == "arch"
+        Ok(d.id.eq_ignore_ascii_case("arch")
             && self.supported_releases().iter().any(|r| r == &d.release))
     }
 

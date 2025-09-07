@@ -104,8 +104,8 @@ impl UutilsExperiment {
             [
                 base_dir.join(format!("uu-{}", name)),
                 base_dir.join(format!("{}/{}", self.name, name)),
-                base_dir.join(format!("{}", name)),
-                base_dir.join(format!("{}", name)),
+                base_dir.join(name),
+                base_dir.join(name),
             ]
         } else {
             [

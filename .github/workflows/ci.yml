@@ -79,5 +79,9 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Make Go available to sudo
+        run: |
+          go_path=$(which go)
+          sudo ln -sf "$go_path" /usr/local/bin/go
       - name: Run orchestrated tests
         run: cd test-orch/host-orchestrator && sudo go run .

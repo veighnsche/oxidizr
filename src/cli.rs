@@ -136,10 +136,7 @@ pub fn handle_cli() -> Result<()> {
     let mut exps: Vec<Experiment> = all_experiments(&worker);
     if !cli.all {
         // Filter by provided names
-        exps = exps
-            .into_iter()
-            .filter(|e| selection.contains(&e.name()))
-            .collect();
+        exps.retain(|e| selection.contains(&e.name()));
     }
 
     if exps.is_empty() {

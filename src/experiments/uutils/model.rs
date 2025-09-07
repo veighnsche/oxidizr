@@ -16,6 +16,6 @@ impl UutilsExperiment {
     /// Checks if the current system is compatible with this experiment (Arch Linux).
     pub fn check_compatible<W: Worker>(&self, worker: &W) -> Result<bool> {
         let d: Distribution = worker.distribution()?;
-        Ok(d.id.to_ascii_lowercase() == "arch")
+        Ok(d.id.eq_ignore_ascii_case("arch"))
     }
 }
