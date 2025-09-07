@@ -19,10 +19,6 @@ func Run() error {
 		return err
 	}
 
-	log.Println("==> Setting up locales...")
-	if err := setupLocales(); err != nil {
-		return err
-	}
 
 	log.Println("==> Setting up users...")
 	if err := setupUsers(); err != nil {

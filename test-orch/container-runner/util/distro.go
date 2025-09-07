@@ -11,21 +11,9 @@ func ShouldRunOnDistro(distros []string) (bool, error) {
 		return true, nil // No check means compatible with all
 	}
 
-	content, err := os.ReadFile("/etc/os-release")
+	currentDistro, err := CurrentDistroID()
 	if err != nil {
-		return false, fmt.Errorf("could not read /etc/os-release: %w", err)
-	}
-
-	var currentDistro string
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.HasPrefix(line, "ID=") {
-			currentDistro = strings.Trim(strings.Split(line, "=")[1], `"`)
-			break
-		}
-	}
-
-	if currentDistro == "" {
-		return false, fmt.Errorf("could not determine distro from /etc/os-release")
+		return false, err
 	}
 
 	for _, d := range distros {
@@ -35,4 +23,24 @@ func ShouldRunOnDistro(distros []string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// CurrentDistroID returns the lowercase ID from /etc/os-release (e.g., "arch", "manjaro", "cachyos", "endeavouros").
+func CurrentDistroID() (string, error) {
+	content, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return "", fmt.Errorf("could not read /etc/os-release: %w", err)
+	}
+
+	var id string
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.HasPrefix(line, "ID=") {
+			id = strings.Trim(strings.Split(line, "=")[1], `"`)
+			break
+		}
+	}
+	if id == "" {
+		return "", fmt.Errorf("could not determine distro from /etc/os-release")
+	}
+	return strings.ToLower(id), nil
 }

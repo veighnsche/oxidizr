@@ -17,6 +17,12 @@ func setupUsers() error {
 		}
 	}
 
+	// When using persistent mounts, /home/builder may pre-exist and be owned by root.
+	// Ensure the builder user's home directory is owned by builder so tools like rustup can write ~/.rustup
+	if err := util.RunCmd("chown", "-R", "builder:builder", "/home/builder"); err != nil {
+		return fmt.Errorf("failed to set ownership on /home/builder: %w", err)
+	}
+
 	sudoersFile := "/etc/sudoers.d/99-builder"
 	content := []byte("builder ALL=(ALL) NOPASSWD: ALL\n")
 	if err := os.WriteFile(sudoersFile, content, 0440); err != nil {
@@ -33,7 +39,17 @@ func setupUsers() error {
 
 // installAurHelper ensures that an AUR helper (paru) is installed in the container.
 func installAurHelper() error {
+	// Check multiple ways to detect paru (some distros have it pre-installed)
+	paruFound := false
 	if _, err := exec.LookPath("paru"); err == nil {
+		paruFound = true
+	} else if err := util.RunCmd("which", "paru"); err == nil {
+		paruFound = true
+	} else if err := util.RunCmd("paru", "--version"); err == nil {
+		paruFound = true
+	}
+	
+	if paruFound {
 		log.Println("paru is already installed.")
 		return nil
 	}
@@ -51,8 +67,12 @@ func installAurHelper() error {
 		return err
 	}
 
+	// Clean up any previous partial clones to make this step idempotent
+	_ = util.RunCmd("su", "-", "builder", "-c", "rm -rf /home/builder/build/paru-bin")
+
 	// As the non-root 'builder' user, clone and build paru
-	buildCmd := "cd /home/builder/build && git clone https://aur.archlinux.org/paru-bin.git && cd paru-bin && makepkg -s --noconfirm"
+	// Use || true to handle the case where paru-bin already exists (persistent cache)
+	buildCmd := "cd /home/builder/build && (git clone https://aur.archlinux.org/paru-bin.git || true) && cd paru-bin && git pull --rebase && makepkg -s --noconfirm -f"
 	if err := util.RunCmd("su", "-", "builder", "-c", buildCmd); err != nil {
 		return fmt.Errorf("failed to build paru: %w", err)
 	}

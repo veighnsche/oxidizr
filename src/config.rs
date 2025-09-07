@@ -11,7 +11,8 @@ pub mod paths {
 
 pub mod packages {
     pub const UUTILS_COREUTILS: &str = "uutils-coreutils";
-    pub const UUTILS_FINDUTILS: &str = "uutils-findutils";
+    // Use the binary AUR package to avoid provider prompts during non-interactive installations
+    pub const UUTILS_FINDUTILS: &str = "uutils-findutils-bin";
     pub const SUDO_RS: &str = "sudo-rs";
 }
 

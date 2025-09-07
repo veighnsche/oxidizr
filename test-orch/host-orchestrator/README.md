@@ -28,31 +28,49 @@ sudo go run . --run
 # Open interactive shell in container
 sudo go run . --shell
 
-# Run with verbose output
-sudo go run . -v
+# Quick smoke test to validate Docker + Arch base image
+sudo go run . --smoke-arch-docker
 
-# Run specific test filter
-sudo go run . --test-filter="disable-all"
+# Run the GitHub Actions 'test-orch' job locally with act
+sudo go run . --test-ci
+
+# Run with verbose or very verbose output
+sudo go run . -v
+sudo go run . -vv
+
+# Quiet mode (only critical errors and final summary)
+sudo go run . -q
+
+# Run a single YAML test suite by name
+sudo go run . --test-filter="disable-in-german"
+
+# Increase parallelism of distro runs
+sudo go run . --concurrency=6
 ```
 
 ## Command Line Options
 
-- `--distros`: Comma-separated list of distributions to test. Defaults to all. E.g., `--distros=arch`
-- `--concurrency`: Number of distributions to test in parallel (default: 4)
-- `--arch-build`: Build the Docker image for the specified distributions
-- `--run`: Run tests in Docker container
-- `--shell`: Open interactive shell in container
-- `--image-tag`: Docker image tag (default: oxidizr-arch:latest)
-- `--docker-context`: Docker build context directory
-- `--root-dir`: Host directory to mount at /workspace
-- `--no-cache`: Build without using cache
-- `--pull`: Always pull newer base image during build
-- `--keep-container`: Don't remove container after run
-- `--timeout`: Timeout for docker run (default: 30m)
-- `--test-filter`: Run specific test YAML file
-- `-v`: Verbose output
-- `-vv`: Very verbose (trace) output
-- `-q`: Quiet output
+- `--smoke-arch-docker` (bool): Run a short Arch Docker smoke test (pacman + DNS). Default: `false`
+- `--arch-build` (bool): Build the Docker image used for isolated tests. Default: `false`
+- `--run` (bool): Run the Docker container to execute tests via the Go runner. Default: `false`
+- `--shell` (bool): Open an interactive shell inside the Docker container. Default: `false`
+- `--distros` (string): Comma-separated list of distributions to test. Default: `arch,manjaro,cachyos,endeavouros`
+- `--docker-context` (string): Docker build context directory. Default: `test-orch`
+- `--root-dir` (string): Host directory to mount at `/workspace`. Defaults to repo root when omitted
+- `--no-cache` (bool): Build without using cache. Default: `false`
+- `--pull` (bool): Always attempt to pull a newer base image during build. Default: `false`
+- `--keep-container` (bool): Do not remove container after run (omit `--rm`). Default: `false`
+- `--timeout` (duration): Timeout for `docker run`. Default: `30m`
+- `--test-filter` (string): Run a single test YAML suite (e.g., `disable-all`). Default: empty (run all)
+- `--test-ci` (bool): Run the CI `test-orch` job locally using `act`. Default: `false`
+- `--concurrency` (int): Number of distributions to test in parallel. Default: `4`
+- `-v` (bool): Verbose output (level 2)
+- `-vv` (bool): Very verbose/trace output (level 3)
+- `-q` (bool): Quiet output (level 0)
+
+Notes:
+- When no action flags are provided, the default behavior is to perform `--arch-build` and `--run`.
+- Root privileges are required on hosts not configured with a `docker` group for reliable Docker access.
 
 ## Requirements
 

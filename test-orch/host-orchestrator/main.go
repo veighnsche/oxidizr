@@ -35,7 +35,7 @@ func main() {
 		archBuild   = flag.Bool("arch-build", false, "Build the Arch Docker image used for isolated tests")
 		archRun     = flag.Bool("run", false, "Run the Docker container to execute tests via the Go runner")
 		archShell   = flag.Bool("shell", false, "Open an interactive shell inside the Docker container")
-		distros     = flag.String("distros", "arch,manjaro,cachyos,endeavoros", "Comma-separated list of distributions to test. Defaults to all. E.g., --distros=arch")
+		distros     = flag.String("distros", "arch,manjaro,cachyos,endeavouros", "Comma-separated list of distributions to test. Defaults to all. E.g., --distros=arch")
 		dockerCtx   = flag.String("docker-context", "test-orch", "Docker build context directory (relative or absolute)")
 		rootDirFlag = flag.String("root-dir", "", "Host directory to mount at /workspace (defaults to git root or repo root)")
 		noCache     = flag.Bool("no-cache", false, "Build without using cache")
@@ -121,10 +121,10 @@ func main() {
 
 	// Orchestrate Docker Arch image build/run/shell if requested, but only if previous checks passed
 	distroMap := map[string]string{
-		"arch":       "archlinux:base-devel",
-		"manjaro":    "manjarolinux/base",
-		"cachyos":    "cachyos/cachyos:latest",
-		"endeavoros": "alex5402/endeavouros",
+		"arch":        "archlinux:base-devel",
+		"manjaro":     "manjarolinux/base",
+		"cachyos":     "cachyos/cachyos:latest",
+		"endeavouros": "alex5402/endeavouros",
 	}
 
 	distroList := strings.Split(*distros, ",")
@@ -153,13 +153,19 @@ func main() {
 				defer func() { <-sem }()
 				defer wg.Done()
 
-				baseImage, imageOk := distroMap[distro]
+				// Normalize distro aliases
+				d := strings.ToLower(strings.TrimSpace(distro))
+				if d == "endeavoros" || d == "endeavouros" {
+					d = "endeavouros"
+				}
+
+				baseImage, imageOk := distroMap[d]
 				if !imageOk {
 					errs <- fmt.Errorf("unknown distribution '%s', skipping", distro)
 					return
 				}
-				distroImageTag := fmt.Sprintf("oxidizr-%s:latest", distro)
-				prefix := col.Sprintf("[%s]", distro)
+				distroImageTag := fmt.Sprintf("oxidizr-%s:latest", d)
+				prefix := col.Sprintf("[%s]", d)
 
 				log.Printf("%s Processing...", prefix)
 

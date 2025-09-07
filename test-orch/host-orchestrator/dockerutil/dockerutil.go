@@ -173,7 +173,8 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	cargoGit := filepath.Join(cacheRoot, "cargo", "git")
 	cargoTarget := filepath.Join(cacheRoot, "cargo-target", distroKey)
 	pacmanCache := filepath.Join(cacheRoot, "pacman")
-	aurBuild := filepath.Join(cacheRoot, "aur-build")
+	// Make AUR build cache per-distro to avoid concurrent access and cross-distro conflicts
+	aurBuild := filepath.Join(cacheRoot, "aur-build", distroKey)
 	// Ensure directories exist
 	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild} {
 		_ = os.MkdirAll(d, 0o755)

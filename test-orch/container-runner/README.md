@@ -19,16 +19,13 @@ The runner performs a well-defined sequence of setup phases inside the container
 2. System dependencies (`setup/deps.go`)
    - Installs: `base-devel sudo git curl rustup which findutils`
    - Removes CachyOS-specific repo cache if present to ensure standard behavior
-3. Locales (`setup/locales.go`)
-   - Ensures `/etc/locale.gen` contains `en_US.UTF-8`, `de_DE.UTF-8`, `C.UTF-8`
-   - Attempts to generate locales via `locale-gen`
-   - Best-effort remediation if `de_DE` definition is missing on derivative images
-4. Users (`setup/users.go`)
+3. Users (`setup/users.go`)
    - Ensures `builder` and `spread` users exist
    - Writes `/etc/sudoers.d/99-builder` with passwordless sudo for CI tasks
-5. Rust and AUR helper (`setup/rust.go`)
+4. AUR helper (`setup/users.go#installAurHelper`)
+   - Installs `paru-bin` from AUR when not present (skips if preinstalled)
+5. Rust toolchain (`setup/rust.go`)
    - Sets `rustup default stable` for root and `builder`
-   - Installs `paru-bin` from AUR when not present
 6. Build (`setup/build.go`)
    - `cargo build --release` and installs `/usr/local/bin/oxidizr-arch`
 
@@ -42,12 +39,24 @@ This program is designed to be executed inside Docker containers by the host orc
 
 # Show help
 ./container-runner --help
+
+# Run only a specific YAML suite
+./container-runner --test-filter="disable-in-german"
+
+# Enforce full-matrix semantics (fail fast on skipped suites)
+./container-runner --full-matrix
 ```
+
+## Command Line Options
+
+- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-in-german`). Default: empty (run all)
+- `--full-matrix` (bool): Fail on skipped suites (equivalent to setting `FULL_MATRIX=1`). Default: `false`
 
 ## Environment Variables
 
-- `VERBOSE`: Controls logging verbosity (0-3)
-- `TEST_FILTER`: Run specific test YAML file instead of all tests
+- `VERBOSE`: Controls logging verbosity (0-3). Propagated by the host orchestrator.
+- `TEST_FILTER`: Run specific test YAML file instead of all tests. Set automatically when `--test-filter` is used.
+- `FULL_MATRIX`: When `1`, fail fast on missing prerequisites or skipped suites. Set automatically when `--full-matrix` is used.
 
 ## Commands
 
@@ -56,13 +65,12 @@ This program is designed to be executed inside Docker containers by the host orc
 
 ## Locale handling
 
-Some Arch derivative images (e.g., CachyOS, Manjaro, EndeavourOS) may ship stripped locale data. The runner:
+Some Arch derivative images (e.g., CachyOS, Manjaro, EndeavourOS) ship stripped locale data and lack the `de_DE` definition. The runner does not modify locales anymore; it only probes/logs their presence during preflight. YAML suites gate themselves accordingly:
 
-- Populates `/etc/locale.gen` with `en_US.UTF-8`, `de_DE.UTF-8`, and `C.UTF-8`
-- Runs `locale-gen`
-- If German locale definition files are missing (e.g., `/usr/share/i18n/locales/de_DE`), it attempts a best-effort remediation by reinstalling `glibc-locales` and preparing `locale.gen`. If locale generation still fails, YAML tests are responsible for failing fast in FULL_MATRIX mode.
+- `disable-in-german` runs only on Arch. On derivatives, it is allowed to skip even with `FULL_MATRIX=1`.
+- All other suites run across all distros regardless of locale availability.
 
-Rationale: keep the Dockerfile minimal and put environment logic in the runner, where it can be logged, retried, and tested.
+Rationale: keep images minimal and avoid mutating system locales during tests. We log what’s present and adapt tests rather than forcing locale generation.
 
 ## Interaction with Dockerfile
 

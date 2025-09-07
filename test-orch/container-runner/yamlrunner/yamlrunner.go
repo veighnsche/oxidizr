@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -74,7 +75,19 @@ func Run() error {
 		if skipped {
 			log.Printf("[%d/%d] SKIP suite: %s", i+1, len(tasks), suiteName)
 			if fullMatrix {
-				return fmt.Errorf("suite '%s' was skipped in FULL_MATRIX mode", suiteName)
+				// Allow a special-case skip in FULL_MATRIX: 'disable-in-german' may skip on non-Arch
+				if suiteName == "disable-in-german" {
+					if distroID, derr := util.CurrentDistroID(); derr == nil {
+						if strings.EqualFold(distroID, "arch") {
+							return fmt.Errorf("suite '%s' was skipped on arch in FULL_MATRIX mode", suiteName)
+						}
+						log.Printf("[FULL_MATRIX] allowed skip: '%s' not applicable on %s", suiteName, distroID)
+					} else {
+						return fmt.Errorf("suite '%s' was skipped and distro could not be determined in FULL_MATRIX mode: %v", suiteName, derr)
+					}
+				} else {
+					return fmt.Errorf("suite '%s' was skipped in FULL_MATRIX mode", suiteName)
+				}
 			}
 			continue
 		}
