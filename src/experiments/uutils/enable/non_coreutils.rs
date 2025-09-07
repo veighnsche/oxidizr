@@ -1,0 +1,107 @@
+use crate::error::{CoreutilsError, Result};
+use crate::utils::worker::Worker;
+use crate::experiments::uutils::model::UutilsExperiment;
+use std::path::PathBuf;
+use std::fs;
+
+impl UutilsExperiment {
+    /// Handles applet collection for non-coreutils families.
+    pub fn handle_non_coreutils_applets<W: Worker>(&self, worker: &W) -> Result<Vec<(String, PathBuf)>> {
+        log::info!(
+            "Preparing applets for family '{}' under {}",
+            self.name,
+            self.bin_directory.display()
+        );
+        let mut applets = Vec::new();
+        let existing = worker.list_files(&self.bin_directory)?;
+        if !existing.is_empty() {
+            for f in existing {
+                let filename = f.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                if filename.is_empty() { continue; }
+                applets.push((filename, f.clone()));
+            }
+        } else {
+            let known: &[&str] = match self.name.as_str() {
+                "findutils" => &["find", "xargs"],
+                _ => &[],
+            };
+            if known.is_empty() {
+                log::warn!(
+                    "No applets declared for family '{}' and no files under {}",
+                    self.name,
+                    self.bin_directory.display()
+                );
+            }
+            if let Some(parent) = self.bin_directory.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::create_dir_all(&self.bin_directory);
+            for name in known {
+                let candidates = self.get_non_coreutils_candidates(name);
+                if let Some(real) = candidates.iter().find(|p| p.exists()) {
+                    let canonical_src = self.bin_directory.join(name);
+                    if canonical_src.exists() {
+                        let _ = std::fs::remove_file(&canonical_src);
+                    }
+                    match std::fs::copy(real, &canonical_src) {
+                        Ok(_) => {
+                            if let Ok(meta) = std::fs::metadata(real) {
+                                let perm = meta.permissions();
+                                let _ = std::fs::set_permissions(&canonical_src, perm);
+                            }
+                            log::info!(
+                                "Synthesized canonical source (copied) {} <- {}",
+                                canonical_src.display(),
+                                real.display()
+                            );
+                            applets.push((name.to_string(), canonical_src));
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "Failed to copy {} to canonical source {}: {}",
+                                real.display(),
+                                canonical_src.display(),
+                                e
+                            );
+                        }
+                    }
+                } else {
+                    log::warn!(
+                        "No binary found for '{}' in known locations for family '{}'",
+                        name,
+                        self.name
+                    );
+                }
+            }
+            if applets.is_empty() {
+                return Err(CoreutilsError::ExecutionFailed(
+                    format!(
+                        "No '{}' applet binaries found or synthesized under {}. \
+                         Ensure '{}' installed correctly; if installed via AUR, verify that the helper completed successfully.",
+                        self.name, self.bin_directory.display(), self.package
+                    )
+                ));
+            }
+        }
+        Ok(applets)
+    }
+
+    /// Gets candidate paths for non-coreutils binaries.
+    pub fn get_non_coreutils_candidates(&self, name: &str) -> [PathBuf; 4] {
+        if cfg!(test) {
+            [
+                PathBuf::from(format!("bin/uu-{}", name)),
+                PathBuf::from(format!("bin/{}/{}", self.name, name)),
+                PathBuf::from(format!("bin/{}", name)),
+                PathBuf::from(format!("bin/{}", name)),
+            ]
+        } else {
+            [
+                PathBuf::from(format!("/usr/bin/uu-{}", name)),
+                PathBuf::from(format!("/usr/lib/cargo/bin/{}/{}", self.name, name)),
+                PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
+                PathBuf::from(format!("/usr/bin/{}", name)),
+            ]
+        }
+    }
+}

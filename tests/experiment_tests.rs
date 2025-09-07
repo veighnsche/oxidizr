@@ -7,6 +7,7 @@ use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use std::os::unix::fs::PermissionsExt;
+use std::io::Write;
 
 struct MockWorker {
     root: TempDir,
@@ -17,11 +18,11 @@ struct MockWorker {
 #[test]
 fn backup_preserves_permissions_bits() -> Result<()> {
     let mut w = MockWorker::new();
-    let bin_dir = w.path_in_root("/usr/lib/uutils/coreutils");
+    let bin_dir = w.path_in_root("uutils/coreutils");
     fs::create_dir_all(&bin_dir)?;
     let date_rust = bin_dir.join("date"); fs::write(&date_rust, b"rust-date")?;
 
-    let date = w.path_in_root("/usr/bin/date");
+    let date = w.path_in_root("bin/date");
     fs::create_dir_all(date.parent().unwrap())?;
     fs::write(&date, b"system-date")?;
     // set sticky bit on target (01000)
@@ -34,13 +35,13 @@ fn backup_preserves_permissions_bits() -> Result<()> {
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
+        unified_binary: Some(w.path_in_root("bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
 
     exp.enable(&w, true, false)?;
 
-    let backup = backup_path(&date);
+    let backup = w.root_path().join(".date.oxidizr.bak");
     assert!(backup.exists());
     let backup_mode = fs::metadata(&backup)?.permissions().mode();
     assert_eq!(backup_mode & 0o7000, (mode | 0o1000) & 0o7000);
@@ -50,22 +51,22 @@ fn backup_preserves_permissions_bits() -> Result<()> {
 #[test]
 fn reentrant_enable_is_idempotent() -> Result<()> {
     let mut w = MockWorker::new();
-    let bin_dir = w.path_in_root("/usr/lib/uutils/coreutils");
+    let bin_dir = w.path_in_root("uutils/coreutils");
     fs::create_dir_all(&bin_dir)?;
     let date_rust = bin_dir.join("date"); fs::write(&date_rust, b"rust-date")?;
-    let date = w.path_in_root("/usr/bin/date"); fs::create_dir_all(date.parent().unwrap())?; fs::write(&date, b"system-date")?;
+    let date = w.path_in_root("bin/date"); fs::create_dir_all(date.parent().unwrap())?; fs::write(&date, b"system-date")?;
     w.add_which("date", date.clone());
 
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
+        unified_binary: Some(w.path_in_root("bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
 
     // First enable
     exp.enable(&w, true, false)?;
-    let backup = backup_path(&date);
+    let backup = w.root_path().join(".date.oxidizr.bak");
     assert!(fs::symlink_metadata(&date)?.file_type().is_symlink());
     assert!(backup.exists());
     let meta1 = fs::metadata(&backup)?;
@@ -87,7 +88,7 @@ impl MockWorker {
 
     fn root_path(&self) -> &Path { self.root.path() }
 
-    fn path_in_root(&self, rel: &str) -> PathBuf { self.root.path().join(rel.trim_start_matches('/')) }
+    fn path_in_root(&self, rel: &str) -> PathBuf { self.root.path().join(rel) }
 
     fn add_which(&mut self, name: &str, path: PathBuf) { self.which_map.push((name.to_string(), path)); }
 }
@@ -100,60 +101,80 @@ impl Worker for MockWorker {
     fn check_installed(&self, _package: &str) -> Result<bool> { Ok(true) }
 
     fn which(&self, name: &str) -> Result<Option<PathBuf>> {
+        println!("[MockWorker] which called for: {}", name);
         for (n, p) in &self.which_map { if n == name { return Ok(Some(p.clone())); } }
         Ok(None)
     }
 
     fn list_files(&self, dir: &Path) -> Result<Vec<PathBuf>> {
+        println!("[MockWorker] list_files called for: {}", dir.display());
         let mut out = vec![];
         if !dir.exists() { return Ok(out); }
-        for e in fs::read_dir(dir)? { let p = e?.path(); if p.is_file() { out.push(p); } }
+        for e in fs::read_dir(dir)? { 
+            let p = e?.path(); 
+            if p.is_file() { 
+                println!("[MockWorker] found file: {}", p.display());
+                out.push(p); 
+            } 
+        }
         Ok(out)
     }
 
     fn replace_file_with_symlink(&self, source: &Path, target: &Path) -> Result<()> {
-        if fs::symlink_metadata(target).map(|m| m.file_type().is_symlink()).unwrap_or(false) { return Ok(()); }
+        println!("[MockWorker] replace_file_with_symlink called: source={} target={}", source.display(), target.display());
+        if fs::symlink_metadata(target).map(|m| m.file_type().is_symlink()).unwrap_or(false) { 
+            println!("[MockWorker] target already a symlink, skipping");
+            return Ok(()); 
+        }
         if target.exists() {
             let backup = backup_path(target);
+            println!("[MockWorker] creating backup: {}", backup.display());
             fs::copy(target, &backup)?;
             let meta = fs::metadata(target)?;
             fs::set_permissions(&backup, meta.permissions())?;
+            println!("[MockWorker] removing original file: {}", target.display());
             fs::remove_file(target)?;
         }
-        if let Some(parent) = target.parent() { fs::create_dir_all(parent)?; }
+        if let Some(parent) = target.parent() { 
+            println!("[MockWorker] creating parent dir: {}", parent.display());
+            fs::create_dir_all(parent)?; 
+        }
         let _ = fs::remove_file(target);
+        println!("[MockWorker] creating symlink: {} -> {}", source.display(), target.display());
         unix_fs::symlink(source, target)?;
         Ok(())
     }
 
     fn restore_file(&self, target: &Path) -> Result<()> {
+        println!("[MockWorker] restore_file called for: {}", target.display());
         let backup = backup_path(target);
         if backup.exists() {
+            println!("[MockWorker] backup exists, restoring: {}", backup.display());
             let _ = fs::remove_file(target);
             fs::rename(backup, target)?;
+        } else {
+            println!("[MockWorker] no backup found for: {}", target.display());
         }
         Ok(())
     }
 }
 
 fn backup_path(target: &Path) -> PathBuf {
-    let name = target.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    parent.join(format!(".{}.oxidizr.bak", name))
+    target.parent().unwrap().join(format!(".{}.oxidizr.bak", target.file_name().unwrap().to_str().unwrap()))
 }
 
 #[test]
 fn enable_creates_symlinks_and_backups_unified() -> Result<()> {
     // Arrange experiment
     let mut w = MockWorker::new();
-    let bin_dir = w.path_in_root("/usr/lib/uutils/coreutils");
+    let bin_dir = w.path_in_root("uutils/coreutils");
     fs::create_dir_all(&bin_dir)?;
     // replacement binaries
     let date_rust = bin_dir.join("date"); fs::write(&date_rust, b"rust-date")?;
     let sort_rust = bin_dir.join("sort"); fs::write(&sort_rust, b"rust-sort")?;
 
-    // targets in /usr/bin
-    let usr_bin = w.path_in_root("/usr/bin"); fs::create_dir_all(&usr_bin)?;
+    // targets in bin
+    let usr_bin = w.path_in_root("bin"); fs::create_dir_all(&usr_bin)?;
     let date = usr_bin.join("date"); fs::write(&date, b"system-date")?;
     let sort = usr_bin.join("sort"); fs::write(&sort, b"system-sort")?;
 
@@ -164,7 +185,7 @@ fn enable_creates_symlinks_and_backups_unified() -> Result<()> {
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
+        unified_binary: Some(w.path_in_root("bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
 
@@ -175,8 +196,10 @@ fn enable_creates_symlinks_and_backups_unified() -> Result<()> {
     assert!(fs::symlink_metadata(&date)?.file_type().is_symlink());
     assert!(fs::symlink_metadata(&sort)?.file_type().is_symlink());
     // backups exist
-    assert!(backup_path(&date).exists());
-    assert!(backup_path(&sort).exists());
+    let backup_date = w.root_path().join(".date.oxidizr.bak");
+    let backup_sort = w.root_path().join(".sort.oxidizr.bak");
+    assert!(backup_date.exists());
+    assert!(backup_sort.exists());
 
     Ok(())
 }
@@ -185,21 +208,22 @@ fn enable_creates_symlinks_and_backups_unified() -> Result<()> {
 fn disable_restores_originals() -> Result<()> {
     // Arrange as in previous test
     let mut w = MockWorker::new();
-    let bin_dir = w.path_in_root("/usr/lib/uutils/coreutils");
+    let bin_dir = w.path_in_root("uutils/coreutils");
     fs::create_dir_all(&bin_dir)?;
     let date_rust = bin_dir.join("date"); fs::write(&date_rust, b"rust-date")?;
-    let date = w.path_in_root("/usr/bin/date"); fs::create_dir_all(date.parent().unwrap())?; fs::write(&date, b"system-date")?;
+    let date = w.path_in_root("bin/date"); fs::create_dir_all(date.parent().unwrap())?; fs::write(&date, b"system-date")?;
     w.add_which("date", date.clone());
     let exp = UutilsExperiment {
         name: "coreutils".into(),
         package: "uutils-coreutils".into(),
-        unified_binary: Some(PathBuf::from("/usr/bin/coreutils")),
+        unified_binary: Some(w.path_in_root("bin/coreutils")),
         bin_directory: bin_dir.clone(),
     };
     exp.enable(&w, true, false)?;
     // precondition: target is symlink, backup exists
     assert!(fs::symlink_metadata(&date)?.file_type().is_symlink());
-    assert!(backup_path(&date).exists());
+    let backup = w.root_path().join(".date.oxidizr.bak");
+    assert!(backup.exists());
 
     // Act
     exp.disable(&w, false)?;

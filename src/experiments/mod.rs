@@ -1,12 +1,14 @@
-pub mod uutils;
 pub mod sudors;
+pub mod uutils;
+
+pub use uutils::UutilsExperiment;
+pub use uutils::enable::*;
 
 use crate::error::Result;
 use crate::utils::worker::Worker;
 use std::path::PathBuf;
 
 pub use sudors::SudoRsExperiment;
-pub use uutils::UutilsExperiment;
 
 pub enum Experiment<'a> {
     Uutils(UutilsExperiment),

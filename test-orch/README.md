@@ -31,11 +31,11 @@ From the repository root:
 
 ```bash
 # Zero-flag: just run it (builds image if needed, then runs tests)
-go run ./testing/isolated-runner
+go run ./test-orch
 
 # Or with the compiled runner
-(cd testing/isolated-runner && go build -o isolated-runner)
-./testing/isolated-runner/isolated-runner
+(cd test-orch && go build -o isolated-runner)
+./test-orch/isolated-runner
 
 ```
 
@@ -43,10 +43,10 @@ If you prefer not to build the binary:
 
 ```bash
 # Build image only
-go run ./testing/isolated-runner --arch-build
+go run ./test-orch --arch-build
 
 # Run tests (auto-builds the image if missing)
-go run ./testing/isolated-runner --arch-run
+go run ./test-orch --arch-run
 ```
 
 ## Useful options
@@ -56,7 +56,7 @@ The runner supports several flags (see `main.go`):
 - `--smoke-arch-docker` — Run a short Arch smoke test (`pacman` + DNS) with the public `archlinux:base-devel` image.
 - `--arch-build` — Build the isolated Arch Docker image in `docker/`.
 - `--arch-run` — Run the container and execute `docker/entrypoint.sh` to perform assertions.
-- `--arch` — One-shot: build the image if needed, then run the tests.
+- (no flags) — One-shot: build the image if needed, then run the tests.
 - `--image-tag` — Image tag to build/run (default: `oxidizr-arch:latest`).
 - `--docker-context` — Docker build context directory (default: `testing/isolated-runner/docker`).
 - `--root-dir` — Host directory to mount at `/workspace` (defaults to the repository root; auto-detected via Git when possible).
@@ -77,11 +77,11 @@ go run ./testing/isolated-runner \
   --arch-build --no-cache --pull --image-tag oxidizr-arch:latest
 
 # Zero-flag build+run with a custom tag
-go run ./testing/isolated-runner \
+go run ./test-orch \
   --image-tag oxidizr-arch:dev
 
 # Run with an explicit repo root (if auto-detection fails)
-go run ./testing/isolated-runner \
+go run ./test-orch \
   --arch-run --root-dir "$PWD" --image-tag oxidizr-arch:latest
 ```
 

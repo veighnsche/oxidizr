@@ -47,9 +47,9 @@ impl<'a> SudoRsExperiment<'a> {
             log::info!("Preparing sudo-rs applet '{}'", name);
             let source = find_sudors_source(name);
             let source = source.ok_or_else(|| CoreutilsError::ExecutionFailed(format!(
-                "Could not find installed sudo-rs binary for '{}'. \
+                "Could not find installed sudo-rs binary for '{0}'. \
                  Checked: /usr/lib/cargo/bin/{0} and /usr/bin/{0}-rs. \
-                 Hints: ensure 'sudo-rs' is installed and provides '{}' on this distro.",
+                 Hints: ensure 'sudo-rs' is installed and provides '{0}' on this distro.",
                 name
             )))?;
             log::info!("Linking sudo-rs '{}' from {} -> {}", name, source.display(), target.display());

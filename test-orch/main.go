@@ -25,7 +25,7 @@ func main() {
 		smokeDocker = flag.Bool("smoke-arch-docker", false, "Run a short Arch docker smoke test (pacman + DNS)")
 		archBuild   = flag.Bool("arch-build", false, "Build the Arch Docker image used for isolated tests")
 		archRun     = flag.Bool("arch-run", false, "Run the Arch Docker container to execute tests via entrypoint.sh")
-		archAll     = flag.Bool("arch", false, "Build the Arch Docker image if needed, then run the tests (one-shot)")
+		// Removed --arch flag: always Arch; default behavior (no flags) performs build+run
 		archShell   = flag.Bool("arch-shell", false, "Open an interactive shell inside the Arch Docker container with the repo mounted at /workspace")
 		archTestSudo = flag.Bool("arch-test-sudo", false, "Run automated sudo/sudo-rs enable/disable assertions inside the Arch container")
 		archShellTestSudo = flag.Bool("arch-shell-test-sudo", false, "Run automated sudo/sudo-rs assertions, then drop into an interactive shell")
@@ -63,11 +63,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Developer-friendly default: with no action flags, perform one-shot build+run
-	if !*smokeDocker && !*archBuild && !*archRun && !*archAll && !*archShell && !*archTestSudo && !*archShellTestSudo {
-		*archAll = true
+	// Developer-friendly default: with no action flags, perform build+run
+	if !*smokeDocker && !*archBuild && !*archRun && !*archShell && !*archTestSudo && !*archShellTestSudo {
+		*archBuild = true
+		*archRun = true
 		if !quietMode {
-			log.Println("Defaulting to: build+run Docker Arch tests (--arch)")
+			log.Println("Defaulting to: build+run Docker Arch tests")
 		}
 	}
 
@@ -84,7 +85,7 @@ func main() {
 	}
 
 	// Orchestrate Docker Arch image build/run/shell if requested, but only if previous checks passed
-	if ok && (*archBuild || *archRun || *archAll || *archShell || *archTestSudo || *archShellTestSudo) {
+	if ok && (*archBuild || *archRun || *archShell || *archTestSudo || *archShellTestSudo) {
 		// Resolve docker context dir relative to current working dir/repo
 		ctxDir := *dockerCtx
 		if !filepath.IsAbs(ctxDir) {
@@ -99,8 +100,8 @@ func main() {
 			}
 		}
 
-		// If one-shot, we implicitly build first
-		doBuild := *archBuild || *archAll
+		// If one-shot, we implicitly build
+		doBuild := *archBuild
 		if doBuild {
 			if err := buildArchImage(*imageTag, ctxDir, *noCache, *pullBase, verbosityLevel >= 2); err != nil {
 				warn("docker build failed: ", err)
@@ -109,7 +110,7 @@ func main() {
 		}
 
 		// If running, ensure image exists (auto-build if missing unless user explicitly disabled by not using --arch or --arch-build)
-		doRun := *archRun || *archAll || *archTestSudo
+		doRun := *archRun || *archTestSudo
 		if doRun {
 			// Resolve rootDir to mount
 			rootDir := *rootDirFlag
