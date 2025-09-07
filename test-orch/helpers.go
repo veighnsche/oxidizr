@@ -10,6 +10,23 @@ import (
 	"time"
 )
 
+// Verbosity controls
+// 0 = quiet (only final summary and critical errors)
+// 1 = normal (default)
+// 2 = verbose (-v)
+// 3 = trace (-vv)
+var (
+	quietMode      bool
+	verbosityLevel = 1
+)
+
+func setQuiet(q bool) { quietMode = q }
+func setVerbosity(lvl int) {
+	if lvl < 0 { lvl = 0 }
+	if lvl > 3 { lvl = 3 }
+	verbosityLevel = lvl
+}
+
 func have(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
@@ -52,13 +69,26 @@ func isRoot() bool {
 }
 
 func warn(v ...interface{}) {
+	if quietMode {
+		return
+	}
 	log.Println("WARN:", fmt.Sprint(v...))
 }
 
 func section(title string) {
+	if quietMode || verbosityLevel < 2 {
+		return
+	}
 	log.Println()
 	log.Println("==>", title)
 	time.Sleep(10 * time.Millisecond) // keep logs readable
 }
 
 func prefixRun() string { return "RUN>" }
+
+// vlog prints when the current verbosity is >= level (0..3)
+func vlog(level int, v ...interface{}) {
+	if verbosityLevel >= level {
+		log.Println(v...)
+	}
+}

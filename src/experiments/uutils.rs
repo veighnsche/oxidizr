@@ -81,6 +81,11 @@ impl UutilsExperiment {
                 for line in COREUTILS_BINS.lines() {
                     let name = line.trim();
                     if name.is_empty() { continue; }
+                    // INTENTIONAL TEST BREAKAGE: skip 'readlink' to verify tests catch missing required applet
+                    if name == "readlink" {
+                        log::warn!("[INTENTIONAL BREAKAGE] Skipping applet: {}", name);
+                        continue;
+                    }
                     applets.push((name.to_string(), Path::new("/usr/bin/coreutils").to_path_buf()));
                 }
             } else {
@@ -93,6 +98,11 @@ impl UutilsExperiment {
                 for line in COREUTILS_BINS.lines() {
                     let name = line.trim();
                     if name.is_empty() { continue; }
+                    // INTENTIONAL TEST BREAKAGE: skip 'readlink' to verify tests catch missing required applet
+                    if name == "readlink" {
+                        log::warn!("[INTENTIONAL BREAKAGE] Skipping applet: {}", name);
+                        continue;
+                    }
                     // Probe multiple candidate locations per applet
                     let candidates: [PathBuf; 4] = [
                         self.bin_directory.join(name),

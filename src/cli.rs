@@ -33,55 +33,56 @@ use std::io::{self, Write};
 #[command(author, version, about = "oxidizr-arch style coreutils switching (scaffold)")]
 pub struct Cli {
     /// Skip confirmation prompts (dangerous; intended for automation/tests)
-    #[arg(long)]
+    /// Accept legacy alias --yes for compatibility with test suites
+    #[arg(long, alias = "yes", global = true)]
     pub assume_yes: bool,
 
     /// Do not run pacman -Sy before actions
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub no_update: bool,
 
     /// Select all known experiments from the registry
-    #[arg(long, short = 'a')]
+    #[arg(long, short = 'a', global = true)]
     pub all: bool,
 
     /// Select which experiments to operate on (comma separated or repeatable)
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', global = true)]
     pub experiments: Vec<String>,
 
     /// Backward compatibility: single experiment selection (deprecated)
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub experiment: Option<String>,
 
     /// Skip compatibility checks (dangerous)
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub no_compatibility_check: bool,
 
     /// AUR helper to use for package operations (auto-detect by default)
-    #[arg(long, value_enum, default_value_t = AurHelperArg::Auto)]
+    #[arg(long, value_enum, default_value_t = AurHelperArg::Auto, global = true)]
     pub aur_helper: AurHelperArg,
 
     /// Force a specific package manager (AUR helper) instead of auto-detect (e.g., paru, yay, trizen, pamac)
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub package_manager: Option<String>,
 
     /// Override package name (Arch/AUR). Defaults depend on experiment.
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub package: Option<String>,
 
     /// Override bin directory containing replacement binaries
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub bin_dir: Option<PathBuf>,
 
     /// Optional unified dispatch binary path (e.g., /usr/bin/coreutils)
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub unified_binary: Option<PathBuf>,
 
     /// Dry-run: print planned actions without making changes
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub dry_run: bool,
 
     /// Wait for pacman database lock to clear, in seconds (polling). If unset, fail fast when lock is present.
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub wait_lock: Option<u64>,
 
     #[command(subcommand)]

@@ -26,7 +26,7 @@ for task in "${TASKS[@]}"; do
   suite_name=$(basename "$suite_dir")
   echo "[yaml-runner] === Running suite: ${suite_name} (${task}) ==="
 
-  tmp_script=$(mktemp)
+  tmp_script="${suite_dir}/.exec_${RANDOM}$$.sh"
   {
     echo "#!/usr/bin/env bash"
     echo "set -euo pipefail"
@@ -39,13 +39,23 @@ for task in "${TASKS[@]}"; do
   } > "$tmp_script"
   chmod +x "$tmp_script"
 
-  # Display a short preview for debugging (first 10 lines)
-  echo "[yaml-runner] --- execute script preview (first 10 lines) ---"
-  head -n 10 "$tmp_script" || true
-  echo "[yaml-runner] ---------------------------------------------"
+  # Normalize legacy flags used by historical suites
+  sed -i -e 's/\b--yes\b/--assume-yes/g' "$tmp_script"
 
-  # Run the extracted script with PROJECT_ROOT as CWD
-  ( cd "$PROJECT_ROOT" && bash "$tmp_script" )
+  # Display a short preview for debugging (first 10 lines)
+  if [ "${VERBOSE:-1}" -ge 2 ]; then
+    echo "[yaml-runner] --- execute script preview (first 10 lines) ---"
+    head -n 10 "$tmp_script" || true
+    echo "[yaml-runner] ---------------------------------------------"
+  fi
+
+  # Run the extracted script with PROJECT_ROOT as CWD. We execute the script from its
+  # absolute path inside the suite directory so that $(dirname "$0") in the script
+  # resolves to the suite directory, matching Spread semantics.
+  if ! ( cd "$PROJECT_ROOT" && bash "$tmp_script" ); then
+    echo "[yaml-runner] !!! Suite failed: ${suite_name}" >&2
+    exit 1
+  fi
 
   rm -f "$tmp_script"
   echo "[yaml-runner] === Suite passed: ${suite_name} ==="
