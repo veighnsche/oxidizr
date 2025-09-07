@@ -87,7 +87,11 @@ impl Worker for System {
             return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
         }
         let status = std::process::Command::new("pacman").args(["-Sy"]).status()?;
-        if status.success() { Ok(()) } else { Err(CoreutilsError::ExecutionFailed("pacman -Sy failed".into())) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err(CoreutilsError::ExecutionFailed("pacman -Sy failed (could not refresh package databases)".into()))
+        }
     }
 
     fn install_package(&self, package: &str) -> Result<()> {
@@ -97,13 +101,26 @@ impl Worker for System {
             return Ok(());
         }
         // If already installed, do nothing (avoids invoking AUR helpers as root)
-        if self.check_installed(package)? { return Ok(()); }
+        if self.check_installed(package)? {
+            log::info!("Package '{}' already installed (skipping)", package);
+            return Ok(());
+        }
         if !self.wait_for_pacman_lock_clear()? {
             return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
         }
         // Try pacman, then fall back to AUR helper(s)
         let status = std::process::Command::new("pacman").args(["-S", "--noconfirm", package]).status()?;
-        if status.success() { return Ok(()); }
+        if status.success() {
+            // Double-check installation actually succeeded
+            if self.check_installed(package)? {
+                return Ok(());
+            } else {
+                return Err(CoreutilsError::ExecutionFailed(format!(
+                    "pacman reported success installing '{}' but package not found via 'pacman -Qi'",
+                    package
+                )));
+            }
+        }
         // Choose helper: prefer configured, else detect installed. Run helpers as non-root 'builder'.
         let candidates = aur_helper_candidates(&self.aur_helper);
         let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
@@ -120,7 +137,11 @@ impl Worker for System {
                 candidates.join(", ")
             )));
         }
-        Err(CoreutilsError::ExecutionFailed(format!("Failed to install {} via pacman or any available AUR helper (checked configured and common helpers)", package)))
+        Err(CoreutilsError::ExecutionFailed(format!(
+            "Failed to install '{}' via pacman or any available AUR helper (checked configured and common helpers). \
+             Ensure an AUR helper is installed (e.g., paru, yay) and that networking is functional.",
+            package
+        )))
     }
 
     fn remove_package(&self, package: &str) -> Result<()> {
@@ -129,7 +150,11 @@ impl Worker for System {
             return Err(CoreutilsError::ExecutionFailed("pacman database lock present at /var/lib/pacman/db.lck; retry later".into()));
         }
         let status = std::process::Command::new("pacman").args(["-R", "--noconfirm", package]).status()?;
-        if status.success() { Ok(()) } else { Err(CoreutilsError::ExecutionFailed(format!("Failed to remove {}", package))) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err(CoreutilsError::ExecutionFailed(format!("Failed to remove '{}' (pacman -R failed)", package)))
+        }
     }
 
     fn check_installed(&self, package: &str) -> Result<bool> {

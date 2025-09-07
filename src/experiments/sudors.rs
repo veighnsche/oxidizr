@@ -14,6 +14,7 @@ fn find_sudors_source(name: &str) -> Option<PathBuf> {
         PathBuf::from(format!("/usr/bin/{}-rs", name)),
     ];
     for c in candidates {
+        log::debug!("checking sudo-rs candidate for '{}': {}", name, c.display());
         if Path::new(&c).exists() { return Some(c); }
     }
     None
@@ -43,11 +44,15 @@ impl<'a> SudoRsExperiment<'a> {
             ("su", resolve_target(worker, "su")),
             ("visudo", PathBuf::from("/usr/sbin/visudo")),
         ] {
+            log::info!("Preparing sudo-rs applet '{}'", name);
             let source = find_sudors_source(name);
             let source = source.ok_or_else(|| CoreutilsError::ExecutionFailed(format!(
-                "Could not find installed sudo-rs binary for '{}'; looked for /usr/lib/cargo/bin/{} and /usr/bin/{}-rs",
-                name, name, name
+                "Could not find installed sudo-rs binary for '{}'. \
+                 Checked: /usr/lib/cargo/bin/{0} and /usr/bin/{0}-rs. \
+                 Hints: ensure 'sudo-rs' is installed and provides '{}' on this distro.",
+                name
             )))?;
+            log::info!("Linking sudo-rs '{}' from {} -> {}", name, source.display(), target.display());
             worker.replace_file_with_symlink(&source, &target)?;
         }
         Ok(())
