@@ -60,13 +60,23 @@ func Run() error {
 		log.Printf("Discovered %d YAML test suite(s)", len(tasks))
 	}
 
+	fullMatrix := os.Getenv("FULL_MATRIX") == "1"
+
 	for i, taskPath := range tasks {
 		suiteName := filepath.Base(filepath.Dir(taskPath))
 		log.Printf("[%d/%d] START suite: %s", i+1, len(tasks), suiteName)
 
-		if err := runSingleSuite(taskPath, projectDir); err != nil {
+		skipped, err := runSingleSuite(taskPath, projectDir)
+		if err != nil {
 			log.Printf("[%d/%d] FAIL suite: %s", i+1, len(tasks), suiteName)
 			return err
+		}
+		if skipped {
+			log.Printf("[%d/%d] SKIP suite: %s", i+1, len(tasks), suiteName)
+			if fullMatrix {
+				return fmt.Errorf("suite '%s' was skipped in FULL_MATRIX mode", suiteName)
+			}
+			continue
 		}
 		log.Printf("[%d/%d] PASS suite: %s", i+1, len(tasks), suiteName)
 	}
@@ -74,26 +84,26 @@ func Run() error {
 	return nil
 }
 
-func runSingleSuite(taskPath, projectDir string) error {
+func runSingleSuite(taskPath, projectDir string) (bool, error) {
 	content, err := os.ReadFile(taskPath)
 	if err != nil {
-		return fmt.Errorf("failed to read task file %s: %w", taskPath, err)
+		return false, fmt.Errorf("failed to read task file %s: %w", taskPath, err)
 	}
 
 	var task Task
 	if err := yaml.Unmarshal(content, &task); err != nil {
-		return fmt.Errorf("failed to parse YAML from %s: %w", taskPath, err)
+		return false, fmt.Errorf("failed to parse YAML from %s: %w", taskPath, err)
 	}
 
 	// Check if test is compatible with the current distro
 	shouldRun, err := util.ShouldRunOnDistro(task.DistroCheck)
 	if err != nil {
 		log.Printf("SKIPPING suite %s: could not check distro compatibility: %v", filepath.Base(taskPath), err)
-		return nil // Returning nil to not fail the whole run
+		return true, nil // skipped
 	}
 	if !shouldRun {
 		log.Printf("SKIPPING suite %s: not compatible with this distro", filepath.Base(taskPath))
-		return nil // Returning nil to not fail the whole run
+		return true, nil // skipped
 	}
 
 	defer func() {
@@ -107,10 +117,10 @@ func runSingleSuite(taskPath, projectDir string) error {
 
 	if task.Execute != "" {
 		log.Println("--- Running execute block ---")
-		return executeScriptBlock(task.Execute, projectDir)
+		return false, executeScriptBlock(task.Execute, projectDir)
 	}
 
-	return nil
+	return false, nil
 }
 
 func executeScriptBlock(script, workDir string) error {

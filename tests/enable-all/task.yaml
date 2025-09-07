@@ -1,6 +1,9 @@
 summary: Enable all experiments installs all and wires symlinks/backups
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 

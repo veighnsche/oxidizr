@@ -6,6 +6,10 @@
 - Real implementation of switching coreutils: `src/experiments/uutils.rs` and `src/utils/worker.rs`
 - The orchestrator invokes `oxidizr-arch --assume-yes --all ... enable` to flip applets.
 
+## How to read this document (Disclaimer)
+
+Do not take this document literally. It is a cautionary example intended to illustrate how tests can sometimes pass for the wrong reasons (e.g., by masking real product flaws with harness workarounds). Use it to audit both code and tests for sequencing issues, environment mutations, or helper injections that hide bugs instead of exercising the product’s real behavior.
+
 ## What happened
 
 - While debugging Docker test failures, an LLM suggested installing `busybox` in the container and using it to perform file operations (`cp`, `ln`, `rm`) when flipping applet symlinks.

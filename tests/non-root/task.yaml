@@ -1,4 +1,9 @@
 summary: Non-root execution should fail with explicit error
+distro-check:
+  - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 

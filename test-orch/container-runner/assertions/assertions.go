@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"container-runner/util"
@@ -14,12 +15,20 @@ import (
 func Run() error {
 	log.Println("==> Running assertion flow...")
 
-	// Only run these heavy assertions on vanilla Arch; derivatives may differ.
-	if ok, err := util.ShouldRunOnDistro([]string{"arch"}); err != nil {
+	// Run on Arch-family by default; in FULL_MATRIX mode, treat incompatibility as failure.
+	archFamily := []string{"arch", "manjaro", "cachyos", "endeavourOS", "endeavouros", "endeavoros"}
+	fullMatrix := os.Getenv("FULL_MATRIX") == "1"
+	if ok, err := util.ShouldRunOnDistro(archFamily); err != nil {
+		if fullMatrix {
+			return fmt.Errorf("assertions: distro detection failed: %w", err)
+		}
 		log.Printf("Skipping assertions: distro detection failed: %v", err)
 		return nil
 	} else if !ok {
-		log.Println("Skipping assertions on non-Arch distro.")
+		if fullMatrix {
+			return fmt.Errorf("assertions: unsupported distro in FULL_MATRIX mode")
+		}
+		log.Println("Skipping assertions on non-Arch-family distro.")
 		return nil
 	}
 
@@ -94,24 +103,42 @@ func ensureCoreutilsInstalled() error {
 	if err != nil {
 		return fmt.Errorf("could not read coreutils bin list: %w", err)
 	}
+	// Minimum symlink coverage threshold (default 10). Can override via COREUTILS_MIN_SYMLINKS env.
+	minSymlinks := 10
+	if v := os.Getenv("COREUTILS_MIN_SYMLINKS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			minSymlinks = n
+		}
+	}
+
+	symlinkCount := 0
+	checkedCount := 0
 	for _, bin := range bins {
 		target := "/usr/bin/" + bin
+		checkedCount++
 		if !isSymlink(target) {
-			log.Printf("Warning: %s is not a symlink, skipping.", target)
 			continue
 		}
+		symlinkCount++
 		if !fileExists("/usr/bin/." + bin + ".oxidizr.bak") {
 			return fmt.Errorf("backup file for %s not found", target)
 		}
 		out, err := exec.Command(target, "--version").Output()
 		if err != nil {
-			log.Printf("Warning: failed to run %s --version: %v", target, err)
-			continue
+			// If the binary cannot run, treat as failure in assertions
+			return fmt.Errorf("failed to run %s --version: %w", target, err)
 		}
 		if strings.Contains(string(out), "GNU") {
 			return fmt.Errorf("%s appears to be GNU version", target)
 		}
 	}
+	if symlinkCount == 0 {
+		return fmt.Errorf("no coreutils applet symlinks detected; enable likely failed")
+	}
+	if symlinkCount < minSymlinks {
+		return fmt.Errorf("insufficient coreutils coverage: have %d symlinks, require at least %d", symlinkCount, minSymlinks)
+	}
+	log.Printf("Coreutils coverage: %d/%d symlinks (min %d)", symlinkCount, checkedCount, minSymlinks)
 	return nil
 }
 

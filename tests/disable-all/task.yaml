@@ -1,6 +1,9 @@
 summary: Disable all experiments
-distro-check:
+distro-check: 
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 

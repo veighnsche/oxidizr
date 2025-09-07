@@ -1,6 +1,9 @@
 summary: Enable default experiment set installs coreutils and sudo-rs
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 

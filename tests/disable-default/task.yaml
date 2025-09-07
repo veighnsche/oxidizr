@@ -1,6 +1,9 @@
 summary: Disable default experiment set removes defaults
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 

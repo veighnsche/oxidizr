@@ -1,6 +1,9 @@
 summary: Enable with --no-compatibility-check should proceed on unsupported distro
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 

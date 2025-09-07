@@ -6,6 +6,7 @@ import (
 
 	"container-runner/assertions"
 	"container-runner/setup"
+	"container-runner/util"
 	"container-runner/yamlrunner"
 )
 
@@ -15,6 +16,12 @@ func runInContainer() error {
 
 	if err := setup.Run(); err != nil {
 		return fmt.Errorf("environment setup failed: %w", err)
+	}
+
+	// Always run Rust unit tests by default as part of the matrix run
+	log.Println("==> Running Rust unit tests (cargo test)...")
+	if err := util.RunCmd("sh", "-lc", "cd /root/project/oxidizr-arch && cargo test -q"); err != nil {
+		return fmt.Errorf("rust unit tests failed: %w", err)
 	}
 
 	log.Println("==> Running YAML test suites...")

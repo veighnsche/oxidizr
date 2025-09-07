@@ -1,6 +1,9 @@
 summary: Enable only the coreutils experiment
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |
   set -euo pipefail
 
