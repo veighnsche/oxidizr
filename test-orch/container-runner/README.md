@@ -40,23 +40,20 @@ This program is designed to be executed inside Docker containers by the host orc
 # Show help
 ./container-runner --help
 
-# Run only a specific YAML suite
-./container-runner --test-filter="disable-in-german"
+# Run only a specific YAML suite (example)
+./container-runner --test-filter="disable-all"
 
-# Enforce full-matrix semantics (fail fast on skipped suites)
-./container-runner --full-matrix
+# Fail-on-skip is the default; no extra flags needed
 ```
 
 ## Command Line Options
 
-- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-in-german`). Default: empty (run all)
-- `--full-matrix` (bool): Fail on skipped suites (equivalent to setting `FULL_MATRIX=1`). Default: `false`
+- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-all`). Default: empty (run all)
 
 ## Environment Variables
 
 - `VERBOSE`: Controls logging verbosity (0-3). Propagated by the host orchestrator.
 - `TEST_FILTER`: Run specific test YAML file instead of all tests. Set automatically when `--test-filter` is used.
-- `FULL_MATRIX`: When `1`, fail fast on missing prerequisites or skipped suites. Set automatically when `--full-matrix` is used.
 
 ## Commands
 
@@ -65,12 +62,7 @@ This program is designed to be executed inside Docker containers by the host orc
 
 ## Locale and parallel-run handling
 
-Locales are baked into the Docker image at build time (see `test-orch/docker/Dockerfile`), including `de_DE.UTF-8`. The runner may probe/log locale status for visibility, but tests must not SKIP due to locale availability.
-
-- `disable-in-german` must run across the Arch-family and must not SKIP. Any failure is treated as a hard error to be fixed (infra or product), not skipped.
-- All other suites run across all distros.
-
-Rationale: bake deterministic prerequisites into images for reproducible CI. Address any parallel-run nondeterminism by deflaking tests or serializing in CI configuration, not by skipping.
+Locales are baked into the Docker image at build time (see `test-orch/docker/Dockerfile`), including `de_DE.UTF-8`. The runner may probe/log locale status for visibility. Tests must not SKIP due to locale availability. All suites run across supported Arch-family distros without exceptions; any SKIP is a failure that must be fixed in infra or product. There is no special "full matrix" mode; fail-on-skip is the default.
 
 ## Interaction with Dockerfile
 

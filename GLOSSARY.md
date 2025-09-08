@@ -55,7 +55,7 @@ Authoritative dictionary of terminology used across code (`src/`), orchestration
 ## Orchestration & Runners
 
 - __Host Orchestrator__ (`test-orch/host-orchestrator/`)
-  - Go program that builds images, runs containers, mounts caches, propagates env (`FULL_MATRIX`, `VERBOSE`), and aggregates results.
+  - Go program that builds images, runs containers, mounts caches, propagates env (`VERBOSE`), and aggregates results.
   - Key functions: `dockerutil.BuildArchImage()`, `dockerutil.RunArchContainer()`.
 
 - __Container Runner__ (`test-orch/container-runner/`)
@@ -92,13 +92,8 @@ Authoritative dictionary of terminology used across code (`src/`), orchestration
 
 ## CI, Matrix, and Policy
 
-- __FULL_MATRIX__
-  - Environment/flag causing the runner/host orchestrator to treat SKIPs as failures and enforce strict coverage.
-  - Default: propagated by host orchestrator into containers.
-
-- __Allowed SKIPs Table__ (`TESTING_POLICY.md`)
-  - Single permitted SKIP: `tests/disable-in-german` when the matrix runs distros in parallel due to known test flakiness (affects `arch, manjaro, cachyos, endeavouros`).
-  - All other suites must not skip. In FULL_MATRIX CI, SKIPs fail the run, except the single permitted one.
+- __SKIP Policy__
+  - No exceptions. All suites run on supported Arch-family distros (`arch, manjaro, cachyos, endeavouros`). Any SKIP indicates an issue to fix in infra or product and fails the run.
 
 - __Masking__
   - Any harness change that hides product bugs (e.g., BusyBox file ops, pre-creating applets, `hash - r`). Forbidden by policy.
@@ -117,8 +112,7 @@ Authoritative dictionary of terminology used across code (`src/`), orchestration
 - __Locale Definitions__
   - Files under `/usr/share/i18n/locales/` (e.g., `de_DE`), required to generate `de_DE.UTF-8`. Often missing in derivative base images.
 
-- __disable-in-german Suite__
-  - Parallel-sensitive scenario. Only allowed SKIP when the matrix runs distros in parallel due to known flakiness across the Arch-family (including Arch). Passes in isolation/serialized. See `GERMAN_LOCALE_TEST_ISSUE.md` (historical locale analysis and correction).
+  
 
 ## CLI Flags (Selected)
 
@@ -187,10 +181,8 @@ Authoritative dictionary of terminology used across code (`src/`), orchestration
 - `src/utils/worker/system.rs` — FS and package operations
 - `src/utils/worker/helpers.rs` — path safety (`is_safe_path`), helpers
 - `TESTING_POLICY.md` — SKIP policy and harness rules
-- `FULL_MATRIX_TESTING_PLAN.md` — enforcement details and acceptance criteria
 - `DISTRO_IMAGES.md` — base images, mounts, known gaps
-- `test-orch/host-orchestrator/*` — Docker build/run, caching mounts, FULL_MATRIX propagation
+- `test-orch/host-orchestrator/*` — Docker build/run, caching mounts
 - `test-orch/container-runner/*` — setup, YAML runner, assertions, distro detection
 - `test-orch/DISTRO_MATRIX.md` — per-distro environment differences
-- `GERMAN_LOCALE_TEST_ISSUE.md` — analysis of missing `de_DE` on derivatives
 - `WHY_LLMS_ARE_STUPID.md` — cautionary notes, masking anti-patterns

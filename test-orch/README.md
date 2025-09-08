@@ -130,13 +130,11 @@ Notes:
 The container-runner (executed inside the container) supports:
 
 Command line options:
-- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-in-german`). Default: empty (run all)
-- `--full-matrix` (bool): Fail on skipped suites (equivalent to setting `FULL_MATRIX=1`). Default: `false`
+- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-all`). Default: empty (run all)
 
 Environment variables:
 - `VERBOSE`: Controls logging verbosity (0-3). Propagated by the host orchestrator.
 - `TEST_FILTER`: Run specific test YAML file. Set automatically when `--test-filter` is used.
-- `FULL_MATRIX`: When `1`, fail fast on missing prerequisites or skipped suites.
 
 Commands:
 - `internal-runner`: Execute the full test suite including YAML tests and assertions
@@ -144,12 +142,7 @@ Commands:
 
 ## Locale and parallel-run handling
 
-The runner avoids modifying locales and only probes/logs their presence during preflight for visibility. Most suites are independent of locale status and run across all distros.
-
-- `disable-in-german` has a known flakiness when the matrix runs distros in parallel. This suite may SKIP in parallel runs across the Arch-family (including Arch) but passes when run in isolation/serialized.
-- All other suites run across all distros.
-
-Rationale: keep images minimal and avoid mutating system locales during tests; address nondeterminism by deflaking or serializing the affected suite rather than masking with harness logic.
+The runner avoids modifying locales and only probes/logs their presence during preflight for visibility. All suites run across the supported Arch-family distros with no exceptions. Any SKIP indicates an issue in infra or product and must be fixed; do not mask nondeterminism by skipping. Fail-on-skip is the default; there is no special flag or mode to enable it.
 
 ## Interactive shell helper
 

@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -61,8 +60,6 @@ func Run() error {
 		log.Printf("Discovered %d YAML test suite(s)", len(tasks))
 	}
 
-	fullMatrix := os.Getenv("FULL_MATRIX") == "1"
-
 	for i, taskPath := range tasks {
 		suiteName := filepath.Base(filepath.Dir(taskPath))
 		log.Printf("[%d/%d] START suite: %s", i+1, len(tasks), suiteName)
@@ -74,22 +71,8 @@ func Run() error {
 		}
 		if skipped {
 			log.Printf("[%d/%d] SKIP suite: %s", i+1, len(tasks), suiteName)
-			if fullMatrix {
-				// Allow a special-case skip in FULL_MATRIX: 'disable-in-german' may skip on non-Arch
-				if suiteName == "disable-in-german" {
-					if distroID, derr := util.CurrentDistroID(); derr == nil {
-						if strings.EqualFold(distroID, "arch") {
-							return fmt.Errorf("suite '%s' was skipped on arch in FULL_MATRIX mode", suiteName)
-						}
-						log.Printf("[FULL_MATRIX] allowed skip: '%s' not applicable on %s", suiteName, distroID)
-					} else {
-						return fmt.Errorf("suite '%s' was skipped and distro could not be determined in FULL_MATRIX mode: %v", suiteName, derr)
-					}
-				} else {
-					return fmt.Errorf("suite '%s' was skipped in FULL_MATRIX mode", suiteName)
-				}
-			}
-			continue
+			// Skips are not allowed; treat as failure by default
+			return fmt.Errorf("suite '%s' was skipped; skipping is disallowed and indicates an infra/product issue. Before adding any masking/skip logic, read WHY_LLMS_ARE_STUPID.md and avoid false positives.", suiteName)
 		}
 		log.Printf("[%d/%d] PASS suite: %s", i+1, len(tasks), suiteName)
 	}
@@ -111,11 +94,11 @@ func runSingleSuite(taskPath, projectDir string) (bool, error) {
 	// Check if test is compatible with the current distro
 	shouldRun, err := util.ShouldRunOnDistro(task.DistroCheck)
 	if err != nil {
-		log.Printf("SKIPPING suite %s: could not check distro compatibility: %v", filepath.Base(taskPath), err)
+		log.Printf("SKIPPING suite %s: could not check distro compatibility: %v. Before introducing any masking or skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.", filepath.Base(taskPath), err)
 		return true, nil // skipped
 	}
 	if !shouldRun {
-		log.Printf("SKIPPING suite %s: not compatible with this distro", filepath.Base(taskPath))
+		log.Printf("SKIPPING suite %s: not compatible with this distro. If tempted to bypass this check, read WHY_LLMS_ARE_STUPID.md to avoid programming in false positives.", filepath.Base(taskPath))
 		return true, nil // skipped
 	}
 

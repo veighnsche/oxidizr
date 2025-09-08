@@ -41,8 +41,8 @@ sudo go run . -vv
 # Quiet mode (only critical errors and final summary)
 sudo go run . -q
 
-# Run a single YAML test suite by name
-sudo go run . --test-filter="disable-in-german"
+# Run a single YAML test suite by name (example)
+sudo go run . --test-filter="disable-all"
 
 # Increase parallelism of distro runs
 sudo go run . --concurrency=6
@@ -61,7 +61,7 @@ sudo go run . --concurrency=6
 - `--pull` (bool): Always attempt to pull a newer base image during build. Default: `false`
 - `--keep-container` (bool): Do not remove container after run (omit `--rm`). Default: `false`
 - `--timeout` (duration): Timeout for `docker run`. Default: `30m`
-- `--test-filter` (string): Run a single test YAML suite (e.g., `disable-all`). Default: empty (run all)
+- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-all`). Default: empty (run all)
 - `--test-ci` (bool): Run the CI `test-orch` job locally using `act`. Default: `false`
 - `--concurrency` (int): Number of distributions to test in parallel. Default: `4`
 - `-v` (bool): Verbose output (level 2)

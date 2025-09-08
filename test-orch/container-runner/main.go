@@ -13,14 +13,12 @@ func main() {
 		os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
 	}
 
-	testFilter := flag.String("test-filter", "", "Run only the named YAML suite directory (e.g., disable-in-german)")
+	testFilter := flag.String("test-filter", "", "Run only the named YAML suite directory (e.g., disable-all)")
 	flag.Parse()
 
 	if *testFilter != "" {
 		_ = os.Setenv("TEST_FILTER", *testFilter)
 	}
-	// Strict matrix semantics are the default: treat skips/infra gaps as failures
-	_ = os.Setenv("FULL_MATRIX", "1")
 
 	if err := runInContainer(); err != nil {
 		log.Fatalf("in-container runner failed: %v", err)

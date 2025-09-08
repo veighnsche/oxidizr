@@ -14,14 +14,14 @@ func preflight() error {
 
 	// Minimal requirement: we only need pacman to be present before we install dependencies.
 	if !util.Has("pacman") {
-		return fmt.Errorf("missing required tool in base image: pacman")
+		return fmt.Errorf("missing required tool in base image: pacman. Before adding masking/skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.")
 	}
 
 	// Basic network sanity (DNS + HTTPS). If curl is not available yet, skip here;
 	// it will be installed during dependency setup.
 	if util.Has("curl") {
 		if err := util.RunCmd("sh", "-lc", "curl -sSf https://archlinux.org >/dev/null"); err != nil {
-			return fmt.Errorf("network check failed (HTTPS to archlinux.org): %w", err)
+			return fmt.Errorf("network check failed (HTTPS to archlinux.org): %w. Before adding masking/skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.", err)
 		}
 	} else {
 		log.Println("Preflight: curl not present yet; skipping network check until after dependencies")
@@ -39,7 +39,7 @@ func preflight() error {
 		// Enforce baked-in German locale (policy): both the definition file and a listed locale must exist
 		if !(filePresent && cmdPresent) {
 			return fmt.Errorf(
-				"preflight: missing German locale (de_DE). filePresent=%t, listedInLocaleA=%t. Expected de_DE.UTF-8 to be baked into the image. Rebuild the image from test-orch/docker/Dockerfile and ensure locale-gen runs at build time.",
+				"preflight: missing German locale (de_DE). filePresent=%t, listedInLocaleA=%t. Expected de_DE.UTF-8 to be baked into the image. Rebuild the image from test-orch/docker/Dockerfile and ensure locale-gen runs at build time. Before adding masking/skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.",
 				filePresent, cmdPresent,
 			)
 		}

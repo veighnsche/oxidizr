@@ -14,7 +14,7 @@ This document defines the non-negotiable rules for tests, CI, harness behavior, 
 ## SKIP Policy
 
 - Zero SKIPs are authorized. Any SKIP is a failure.
-- CI treatment: Any SKIP fails the run in FULL_MATRIX mode and must be fixed. Do not mask nondeterminism with SKIPs.
+- CI treatment: Any SKIP fails the run and must be fixed. Do not mask nondeterminism with SKIPs.
 
 Note: Locales are baked into Docker images (see `test-orch/docker/Dockerfile`). Locale-related failures are infra bugs and must be fixed in image builds.
 
@@ -24,7 +24,7 @@ None. All suites must run; any SKIP is a failure to be fixed.
 
 ## CI and Matrix Policy
 
-- FULL_MATRIX is the default for CI runs via the host orchestrator.
+- Matrix runs across supported Arch-family distros are the default for CI via the host orchestrator.
 - Any SKIP in any matrix job fails the run. Non-matrix runs must not silently appear green by skipping assertions—if the scenario cannot be executed, fail with a clear reason.
 
 ## Harness Policy (Docker and other runners)

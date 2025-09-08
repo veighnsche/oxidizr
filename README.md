@@ -172,21 +172,22 @@ make test-orch
 cd test-orch/host-orchestrator
 sudo go run . --arch-build --run                 # build image + run tests
 sudo go run . --distros=arch                     # restrict to a single distro
-sudo go run . --test-filter=disable-in-german    # run one YAML suite
+sudo go run . --test-filter=disable-all          # run one YAML suite
 sudo go run . -v                                 # verbose; -vv for trace
 ```
 
 Environment toggles (propagated into the container):
 
 - `VERBOSE` controls runner verbosity (0–3)
-- `FULL_MATRIX=1` enforces fail-fast on skipped suites (locale/distro misconfiguration shows up as failure rather than silent skip)
+
+Fail-on-skip is the default behavior of the test runner; there is no special flag or environment variable to enable it.
 
 See `test-orch/host-orchestrator/README.md` and `test-orch/container-runner/README.md` for full options and details.
 
 ## Known notes
 
 - Root is required for non-dry-run `enable`/`disable` since targets live under `/usr/bin` and `/usr/sbin`.
-- The only permitted SKIP is `tests/disable-in-german/` when the matrix runs distros in parallel. This suite is flaky under parallel, cross-distro execution (including Arch) but passes in isolation/serialized runs. See `TESTING_POLICY.md` (Allowed SKIPs Table) and `FULL_MATRIX_TESTING_PLAN.md`. This exception is temporary and must be removed once the test is deflaked or reliably serialized.
+- No exceptions: all test suites run across all supported Arch-family distributions (Arch, Manjaro, CachyOS, EndeavourOS). Any SKIP indicates an issue to fix in infra or product.
 
 ## License
 

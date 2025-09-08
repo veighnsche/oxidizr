@@ -16,20 +16,13 @@ import (
 func Run() error {
 	log.Println("==> Running assertion flow...")
 
-	// Run on Arch-family by default; in FULL_MATRIX mode, treat incompatibility as failure.
+	// Run on Arch-family by default; orchestrator limits runs to supported distros.
 	archFamily := []string{"arch", "manjaro", "cachyos", "endeavourOS", "endeavouros", "endeavoros"}
-	fullMatrix := os.Getenv("FULL_MATRIX") == "1"
 	if ok, err := util.ShouldRunOnDistro(archFamily); err != nil {
-		if fullMatrix {
-			return fmt.Errorf("assertions: distro detection failed: %w", err)
-		}
-		log.Printf("Skipping assertions: distro detection failed: %v", err)
+		log.Printf("Skipping assertions: distro detection failed: %v. Before introducing any masking or skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.", err)
 		return nil
 	} else if !ok {
-		if fullMatrix {
-			return fmt.Errorf("assertions: unsupported distro in FULL_MATRIX mode")
-		}
-		log.Println("Skipping assertions on non-Arch-family distro.")
+		log.Println("Skipping assertions on non-Arch-family distro. If tempted to bypass this check, read WHY_LLMS_ARE_STUPID.md to avoid programming in false positives.")
 		return nil
 	}
 

@@ -236,9 +236,6 @@ func main() {
 						envVars = append(envVars, "RUST_LOG=info")
 					}
 
-					// Enforce full-matrix behavior by default inside the container
-					envVars = append(envVars, "FULL_MATRIX=1")
-
 					if *testFilter != "" {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}

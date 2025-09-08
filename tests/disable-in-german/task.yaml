@@ -1,26 +1,24 @@
 summary: Disable only coreutils under a German locale, leaving sudo-rs enabled
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |-
   set -euo pipefail
 
   # Verify German locale is available (baked at image build time)
-  if locale -a | grep -qi '^de_DE\.utf8$'; then
-    export LC_ALL=de_DE.UTF-8
-    export LANGUAGE=de_DE.UTF-8
-    export LANG=de_DE.UTF-8
-  else
+  if ! locale -a | grep -qi '^de_DE\.utf8$'; then
     echo "Required locale de_DE.UTF-8 is missing. Fix the Docker image (bake locales) and retry." >&2
     exit 1
   fi
 
+  # Enable under default locale
   oxidizr-arch enable --yes
-  oxidizr-arch disable --yes --experiments coreutils
 
-  # Restore English for assertions
-  export LC_ALL=C.UTF-8
-  export LANGUAGE=
-  export LANG=C.UTF-8
+  # Disable coreutils under a German locale only (scoped to this single command)
+  LC_ALL=de_DE.UTF-8 LANGUAGE=de_DE.UTF-8 LANG=de_DE.UTF-8 \
+    oxidizr-arch disable --yes --experiments coreutils
 
   # Assertions
   if readlink /usr/bin/ls | grep -q uutils; then
