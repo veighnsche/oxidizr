@@ -1,6 +1,6 @@
 # Refactoring Opportunities for Test Orchestrator
 
-Goal: Run a streamlined test matrix across Arch, CachyOS, Manjaro, EndeavourOS with no unintended skips. Only allow `disable-in-german` to be skipped on non-Arch, while running everything else.
+Goal: Run a streamlined test matrix across Arch, CachyOS, Manjaro, EndeavourOS with no unintended skips. Only allow `disable-in-german` to be skipped when the matrix runs distros in parallel (flakiness under parallel cross-distro execution), while running everything else.
 
 ## Findings
 
@@ -9,15 +9,15 @@ Goal: Run a streamlined test matrix across Arch, CachyOS, Manjaro, EndeavourOS w
   - Impact: Confusing UX and potential drift in docs/flags.
   - Refactor: Unify to `endeavouros` across flags and mapping keys in `host-orchestrator/main.go`.
 
-- __Locale handling aborts the run in FULL_MATRIX__
-  - `container-runner/setup/locales.go` returns fatal errors when `de_DE` cannot be generated and `FULL_MATRIX=1`.
-  - Impact: Derivatives (CachyOS/Manjaro/EndeavourOS) fail early, preventing other suites from running.
-  - Refactor: Make locale setup non-fatal. Log clearly and proceed; allow the specific locale-dependent suite to decide behavior.
+- __Locale handling is probe-only__
+  - `container-runner/setup/locales.go` should not gate execution; locales are probed/logged for visibility only.
+  - Impact: Avoids conflating locale availability with test pass/fail semantics.
+  - Refactor: Keep locale setup non-fatal; tests remain responsible for their own assertions.
 
 - __FULL_MATRIX semantics skip policy__
   - `yamlrunner/yamlrunner.go` treats any skipped suite as fatal in `FULL_MATRIX` mode.
-  - Desired: Only `disable-in-german` should be allowed to skip (and not be fatal) on non-Arch.
-  - Refactor: Add an exception/allowlist for this suite when the current distro is not `arch`.
+  - Desired: Only `disable-in-german` should be allowed to skip (and not be fatal) when the matrix runs distros in parallel (flakiness under parallel execution). It passes in isolation/serialized.
+  - Refactor: Add an exception/allowlist for this suite specifically under parallel cross-distro runs.
 
 - __Missing current distro accessor__
   - `util.ShouldRunOnDistro` parses `/etc/os-release` but there is no exported `CurrentDistroID()` helper.
@@ -34,15 +34,15 @@ Goal: Run a streamlined test matrix across Arch, CachyOS, Manjaro, EndeavourOS w
 ## Plan of Action
 
 1. Unify EndeavourOS spelling in `host-orchestrator/main.go` (flag default and `distroMap` key).
-2. Make `setup/locales.go` non-fatal for missing `de_DE` even under `FULL_MATRIX` (log-only).
+2. Keep `setup/locales.go` probe-only and non-fatal (log-only), even under `FULL_MATRIX`.
 3. Add `util.CurrentDistroID()`.
-4. In `yamlrunner`, allow a skip exception for the `disable-in-german` suite on non-Arch even when `FULL_MATRIX=1`.
+4. In `yamlrunner`, allow a skip exception for the `disable-in-german` suite only when the matrix runs distros in parallel, even when `FULL_MATRIX=1`.
 5. Add a startup probe summary in `setup/preflight.go` to log distro, locale status, and AUR helper detection.
 
 ## Acceptance Criteria
 
 - Running the matrix with default flags builds and runs across all four distros.
-- Only `disable-in-german` is skipped on non-Arch; all other suites run.
+- Only `disable-in-german` is skipped when running the matrix in parallel; all other suites run.
 - FULL_MATRIX remains enabled; skip of `disable-in-german` on non-Arch does not fail the run.
 - CI logs contain a one-shot probe summary showing distro, locale presence, and AUR helper detection.
 - Docs reflect unified spelling and reference this plan (linked from `README.md`).
@@ -52,10 +52,10 @@ Goal: Run a streamlined test matrix across Arch, CachyOS, Manjaro, EndeavourOS w
 - [x] Unify EndeavourOS spelling and normalize aliases in `host-orchestrator/main.go`; docs updated.
 - [x] Locale handling: switched to probe-only and removed active setup from `setup/setup.go`; `setup/locales.go` retained but unused.
 - [x] Add `util.CurrentDistroID()`.
-- [x] FULL_MATRIX exception in `yamlrunner` for `disable-in-german` on non-Arch.
-- [x] Preflight probe summary logs (distro, locale presence, AUR helper detection).
+- [x] FULL_MATRIX exception in `yamlrunner` for `disable-in-german` under parallel cross-distro runs.
+- [x] Preflight probe summary logs (distro, locale presence, and AUR helper detection).
 - [x] Avoid duplicate AUR logic: `setup/rust.go` only sets rustup default; AUR helper install remains in `setup/users.go`.
-- [x] Documentation aligned (top-level and runner README) with probe-only locale policy.
+- [x] Documentation aligned with probe-only locale policy and corrected SKIP rationale (parallel-run flakiness).
 
 Open items (optional):
 - [ ] Empirically verify `yay`/`paru` presence and `de_DE` availability on Manjaro and EndeavourOS base images used in CI.

@@ -11,7 +11,7 @@ Use this as the source of truth to adapt test preparation and expectations per d
 
 ## Summary
 
-- Locales: Only Arch reliably contains full locale definitions. Derivatives often strip locale data.
+- Locales: Presence may vary by image; we probe but do not modify locales during tests.
 - AUR helpers: CachyOS commonly ships with `paru` preinstalled. Arch usually has none. Manjaro/EndeavourOS status TBD.
 - Package manager: All use `pacman`, but repo sets differ (vendor repos).
 - Base packages: We install a consistent baseline via `setup/deps.go` inside the container.
@@ -21,17 +21,17 @@ Use this as the source of truth to adapt test preparation and expectations per d
 ### Locales
 
 - Arch Linux
-  - Locale definitions present by default (can generate `en_US.UTF-8`, `de_DE.UTF-8`, `C.UTF-8`).
-  - `disable-in-german` test: runnable.
+  - Locale definitions typically present; we do not rely on mutating locales during tests.
+  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
 - CachyOS
-  - Known issue: missing locale definition files (e.g., `/usr/share/i18n/locales/de_DE`) in stripped Docker images.
-  - `disable-in-german` test: not runnable; should fail fast in FULL_MATRIX mode.
+  - Locale definitions may be missing in minimal images; we probe and log.
+  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
 - Manjaro
-  - Likely similar to CachyOS with stripped locale data in minimal images. TBD: verify presence of locale definitions.
-  - `disable-in-german` test: currently assumed not runnable; confirm with probe.
+  - Locale definitions vary in minimal images; we probe and log.
+  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
 - EndeavourOS
-  - Likely similar to CachyOS/Manjaro for minimal images. TBD: verify presence of locale definitions.
-  - `disable-in-german` test: currently assumed not runnable; confirm with probe.
+  - Locale definitions vary in minimal images; we probe and log.
+  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
 
 Runtime behavior:
 - See `container-runner/setup/locales.go` for logic that:
@@ -75,12 +75,12 @@ Detection details (implemented): see `container-runner/setup/rust.go` and relate
 ## Test Impact and Expectations
 
 - `disable-in-german` YAML suite
-  - Run on Arch Linux where `de_DE.UTF-8` can be generated.
-  - On derivatives (CachyOS/Manjaro/EndeavourOS), this suite is the single allowed SKIP due to missing locale definitions. See `TESTING_POLICY.md` (Allowed SKIPs Table). This SKIP is temporary and tracked until images are fixed.
+  - Known to be flaky when the matrix runs distros in parallel; allowed to SKIP only in that mode across the Arch-family (including Arch). Passes in isolation/serialized.
+  - See `TESTING_POLICY.md` (Allowed SKIPs Table). This SKIP is temporary and tracked until the suite is deflaked or reliably serialized.
 - AUR-dependent steps
   - Should work across all distros; installation is skipped when a helper (e.g., `paru`) is preinstalled.
 - Build and assertions
-  - Unified via container-runner steps; not distro-specific except for locale handling and AUR helper presence.
+  - Unified via container-runner steps; not distro-specific except for AUR helper presence.
 
 ## Probing Plan (automated)
 

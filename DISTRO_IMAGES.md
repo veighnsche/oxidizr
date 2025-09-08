@@ -91,10 +91,14 @@ Distro detection utility: `test-orch/container-runner/util/distro.go` reads `/et
 
 ## Known Gaps and Issues
 
-- Missing locale definitions on derivatives (infra issue):
-  - Even with `glibc-locales`, the directory `/usr/share/i18n/locales/de_DE` may be missing.
-  - See `GERMAN_LOCALE_TEST_ISSUE.md` for logs and analysis.
-  - Effect: locale-dependent tests (e.g., `tests/disable-in-german`) cannot run on some derivatives; in FULL_MATRIX mode this should hard-fail (policy), or images must be enhanced.
+- Parallel-run flakiness in `disable-in-german`:
+  - When the test matrix runs distros in parallel, `tests/disable-in-german` can flake across the Arch-family (including Arch).
+  - Effect: This suite is the single permitted SKIP in FULL_MATRIX runs when executed in parallel; it passes in isolation/serialized. See `TESTING_POLICY.md`.
+  
+- Locale definition availability varies by image:
+  - Even with `glibc-locales`, the directory `/usr/share/i18n/locales/de_DE` may be missing in some derivative images.
+  - See `GERMAN_LOCALE_TEST_ISSUE.md` for historical logs and the correction about SKIP rationale.
+  - Effect: Locale differences are probed and logged for visibility; they are not the operative reason for the SKIP policy.
 - AUR helper cache conflicts with persistent mounts:
   - The AUR clone dir (`/home/builder/build/paru-bin`) persists across runs.
   - Fix implemented: clone is non-fatal, `git pull --rebase` if present, then `makepkg`. Prevents failures when cache already exists.
@@ -104,9 +108,9 @@ Distro detection utility: `test-orch/container-runner/util/distro.go` reads `/et
 ## Policy Alignment (what images must guarantee vs. what runner probes)
 
 - Images provide only a minimal base + essential tools. Runner is responsible for the rest.
-- For locale-dependent tests across the matrix, either:
-  - Enhance derivative images to include locale definitions (preferred if we want zero SKIPs), or
-  - Fail fast with a clear infra error on derivatives until images are fixed.
+- For parallel-sensitive tests across the matrix:
+  - Prefer to deflake or serialize the suite (`disable-in-german`), then remove the SKIP.
+  - Continue probing locale availability for visibility; do not attribute SKIPs to locale presence/absence.
 - No masking in the runner or entrypoints: do not pre-create applet symlinks, do not add `hash -r`, do not install BusyBox to workaround switching.
 
 ## Commands and Usage

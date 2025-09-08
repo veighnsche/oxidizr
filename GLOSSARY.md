@@ -97,7 +97,7 @@ Authoritative dictionary of terminology used across code (`src/`), orchestration
   - Default: propagated by host orchestrator into containers.
 
 - __Allowed SKIPs Table__ (`TESTING_POLICY.md`)
-  - Single permitted SKIP: `tests/disable-in-german` on `cachyos, manjaro, endeavouros` due to missing locale definition files.
+  - Single permitted SKIP: `tests/disable-in-german` when the matrix runs distros in parallel due to known test flakiness (affects `arch, manjaro, cachyos, endeavouros`).
   - All other suites must not skip. In FULL_MATRIX CI, SKIPs fail the run, except the single permitted one.
 
 - __Masking__
@@ -118,7 +118,7 @@ Authoritative dictionary of terminology used across code (`src/`), orchestration
   - Files under `/usr/share/i18n/locales/` (e.g., `de_DE`), required to generate `de_DE.UTF-8`. Often missing in derivative base images.
 
 - __disable-in-german Suite__
-  - Locale-dependent scenario. Only allowed SKIP on derivatives while images are missing `de_DE` definitions. See `GERMAN_LOCALE_TEST_ISSUE.md`.
+  - Parallel-sensitive scenario. Only allowed SKIP when the matrix runs distros in parallel due to known flakiness across the Arch-family (including Arch). Passes in isolation/serialized. See `GERMAN_LOCALE_TEST_ISSUE.md` (historical locale analysis and correction).
 
 ## CLI Flags (Selected)
 

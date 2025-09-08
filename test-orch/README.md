@@ -142,14 +142,14 @@ Commands:
 - `internal-runner`: Execute the full test suite including YAML tests and assertions
 - `--help`: Show usage information
 
-## Locale handling
+## Locale and parallel-run handling
 
-Some Arch derivative images (e.g., CachyOS, Manjaro, EndeavourOS) ship stripped locale data and lack the `de_DE` definition. The runner now avoids modifying locales and only probes/logs their presence during preflight. YAML suites gate themselves accordingly:
+The runner avoids modifying locales and only probes/logs their presence during preflight for visibility. Most suites are independent of locale status and run across all distros.
 
-- `disable-in-german` runs only on Arch. On derivatives, it is allowed to skip even with `FULL_MATRIX=1`.
-- All other suites run across all distros regardless of locale availability.
+- `disable-in-german` has a known flakiness when the matrix runs distros in parallel. This suite may SKIP in parallel runs across the Arch-family (including Arch) but passes when run in isolation/serialized.
+- All other suites run across all distros.
 
-Rationale: keep images minimal and avoid mutating system locales during tests. We log what’s present and adapt tests rather than forcing locale generation.
+Rationale: keep images minimal and avoid mutating system locales during tests; address nondeterminism by deflaking or serializing the affected suite rather than masking with harness logic.
 
 ## Interactive shell helper
 

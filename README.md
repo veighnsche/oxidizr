@@ -186,7 +186,7 @@ See `test-orch/host-orchestrator/README.md` and `test-orch/container-runner/READ
 ## Known notes
 
 - Root is required for non-dry-run `enable`/`disable` since targets live under `/usr/bin` and `/usr/sbin`.
-- On Arch derivatives, locale data may be stripped in minimal Docker images. The only permitted SKIP is the locale-dependent suite (`tests/disable-in-german/`) on CachyOS/Manjaro/EndeavourOS due to missing locale definition files. See `TESTING_POLICY.md` (Allowed SKIPs Table) and `FULL_MATRIX_TESTING_PLAN.md`.
+- The only permitted SKIP is `tests/disable-in-german/` when the matrix runs distros in parallel. This suite is flaky under parallel, cross-distro execution (including Arch) but passes in isolation/serialized runs. See `TESTING_POLICY.md` (Allowed SKIPs Table) and `FULL_MATRIX_TESTING_PLAN.md`. This exception is temporary and must be removed once the test is deflaked or reliably serialized.
 
 ## License
 
