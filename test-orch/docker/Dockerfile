@@ -53,5 +53,8 @@ WORKDIR /workspace
 # Copy the compiled Go runner from the builder stage, make it executable, and set it as the entrypoint.
 COPY --from=builder /isolated-runner /usr/local/bin/isolated-runner
 COPY docker/setup_shell.sh /usr/local/bin/setup_shell.sh
-RUN chmod +x /usr/local/bin/isolated-runner && chmod +x /usr/local/bin/setup_shell.sh
+COPY container-runner/demos/demo-utilities.sh /usr/local/bin/demo-utilities.sh
+RUN chmod +x /usr/local/bin/isolated-runner \
+    && chmod +x /usr/local/bin/setup_shell.sh \
+    && chmod +x /usr/local/bin/demo-utilities.sh
 ENTRYPOINT ["/usr/local/bin/isolated-runner"]

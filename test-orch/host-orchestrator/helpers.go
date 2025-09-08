@@ -33,8 +33,10 @@ func computeBuildHash(ctxDir string) (string, error) {
     // Inputs that affect the in-container runner image
     inputs := []string{
         filepath.Join(ctxDir, "docker/Dockerfile"),
+        filepath.Join(ctxDir, "docker/setup_shell.sh"),
         filepath.Join(ctxDir, "container-runner"), // binary name if present (ignored if not)
         filepath.Join(ctxDir, "container-runner/"), // source tree
+        filepath.Join(ctxDir, "container-runner/demos/"), // demo scripts copied into image
     }
     h := sha256.New()
     seen := make(map[string]bool)

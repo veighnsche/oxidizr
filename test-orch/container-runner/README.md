@@ -60,6 +60,24 @@ This program is designed to be executed inside Docker containers by the host orc
 - `internal-runner`: Execute the full test suite including YAML tests and assertions
 - `--help`: Show usage information
 
+## Demos
+
+The repository contains a demo that exercises core utilities and sudo, but it is intentionally not part of the YAML test suite. Do not place demos under `tests/`. Demos should live under `test-orch/container-runner/demos/` and be invoked explicitly.
+
+Run the demo manually inside the container image:
+
+```bash
+# Inside the running container shell (from host orchestrator --shell)
+# A login hint will be printed automatically.
+demo-utilities.sh --cleanup
+```
+
+Notes:
+- The demo expects the standard container-runner environment (users, sudoers, toolchain).
+- `--cleanup` removes temporary files at the end (skipped in CI by default).
+- The demo does not enable/disable oxidizr-arch for you. If you want to compare behavior, run
+  `oxidizr-arch enable --yes` or `oxidizr-arch disable --yes --all` manually, then re-run the demo.
+
 ## Locale and parallel-run handling
 
 Locales are baked into the Docker image at build time (see `test-orch/docker/Dockerfile`), including `de_DE.UTF-8`. The runner may probe/log locale status for visibility. Tests must not SKIP due to locale availability. All suites run across supported Arch-family distros without exceptions; any SKIP is a failure that must be fixed in infra or product. There is no special "full matrix" mode; fail-on-skip is the default.
@@ -70,9 +88,10 @@ The Dockerfile pre-provisions prerequisites for deterministic execution, includi
 
 ## Interactive shell helper
 
-When launching an interactive container shell, `docker/setup_shell.sh` can be used to compile a release build and symlink it into `/usr/local/bin/oxidizr-arch` for convenience:
+When launching an interactive container shell, the host orchestrator `--shell` path will automatically run `setup_shell.sh`, compile a release build, symlink it into `/usr/local/bin/oxidizr-arch`, and print a hint for running the demo.
 
 ```bash
+# You can re-run it manually if needed
 /usr/local/bin/setup_shell.sh
 ```
 

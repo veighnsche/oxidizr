@@ -25,8 +25,12 @@ sudo go run . --arch-build
 # Run tests in existing image
 sudo go run . --run
 
-# Open interactive shell in container
+# Open interactive shell in container (single distro only)
+# Defaults to arch when not specified
 sudo go run . --shell
+
+# Or specify one distro explicitly
+sudo go run . --shell --distros=manjaro
 
 # Quick smoke test to validate Docker + Arch base image
 sudo go run . --smoke-arch-docker
@@ -54,6 +58,10 @@ sudo go run . --concurrency=6
 - `--arch-build` (bool): Build the Docker image used for isolated tests. Default: `false`
 - `--run` (bool): Run the Docker container to execute tests via the Go runner. Default: `false`
 - `--shell` (bool): Open an interactive shell inside the Docker container. Default: `false`
+- Notes for `--shell`:
+  - Defaults to `arch` when `--distros` is left at the default multi-value.
+  - Only a single distro is allowed (e.g., `--distros=cachyos`). Multiple values will exit with an error.
+  - Automatically runs `setup_shell.sh` and drops you into `bash -l`, printing a hint to run the demo.
 - `--distros` (string): Comma-separated list of distributions to test. Default: `arch,manjaro,cachyos,endeavouros`
 - `--docker-context` (string): Docker build context directory. Default: `test-orch`
 - `--root-dir` (string): Host directory to mount at `/workspace`. Defaults to repo root when omitted

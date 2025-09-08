@@ -27,6 +27,10 @@ func Run() error {
 	testsDir := filepath.Join(projectDir, "tests")
 
 	var tasks []string
+	// POLICY: Do NOT skip or exclude any subdirectories under tests/ during discovery.
+	// Skips are prohibited by project policy. If something under tests/ is not a real test,
+	// delete or MOVE it out of tests/ instead of masking via code.
+	// See WHY_LLMS_ARE_STUPID.md and TESTING_POLICY.md for details.
 	err := filepath.Walk(testsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -64,15 +68,10 @@ func Run() error {
 		suiteName := filepath.Base(filepath.Dir(taskPath))
 		log.Printf("[%d/%d] START suite: %s", i+1, len(tasks), suiteName)
 
-		skipped, err := runSingleSuite(taskPath, projectDir)
+		err := runSingleSuite(taskPath, projectDir)
 		if err != nil {
 			log.Printf("[%d/%d] FAIL suite: %s", i+1, len(tasks), suiteName)
 			return err
-		}
-		if skipped {
-			log.Printf("[%d/%d] SKIP suite: %s", i+1, len(tasks), suiteName)
-			// Skips are not allowed; treat as failure by default
-			return fmt.Errorf("suite '%s' was skipped; skipping is disallowed and indicates an infra/product issue. Before adding any masking/skip logic, read WHY_LLMS_ARE_STUPID.md and avoid false positives.", suiteName)
 		}
 		log.Printf("[%d/%d] PASS suite: %s", i+1, len(tasks), suiteName)
 	}
@@ -80,26 +79,24 @@ func Run() error {
 	return nil
 }
 
-func runSingleSuite(taskPath, projectDir string) (bool, error) {
+func runSingleSuite(taskPath, projectDir string) error {
 	content, err := os.ReadFile(taskPath)
 	if err != nil {
-		return false, fmt.Errorf("failed to read task file %s: %w", taskPath, err)
+		return fmt.Errorf("failed to read task file %s: %w", taskPath, err)
 	}
 
 	var task Task
 	if err := yaml.Unmarshal(content, &task); err != nil {
-		return false, fmt.Errorf("failed to parse YAML from %s: %w", taskPath, err)
+		return fmt.Errorf("failed to parse YAML from %s: %w", taskPath, err)
 	}
 
 	// Check if test is compatible with the current distro
 	shouldRun, err := util.ShouldRunOnDistro(task.DistroCheck)
 	if err != nil {
-		log.Printf("SKIPPING suite %s: could not check distro compatibility: %v. Before introducing any masking or skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.", filepath.Base(taskPath), err)
-		return true, nil // skipped
+		return fmt.Errorf("distro compatibility check failed for %s: %w", filepath.Base(taskPath), err)
 	}
 	if !shouldRun {
-		log.Printf("SKIPPING suite %s: not compatible with this distro. If tempted to bypass this check, read WHY_LLMS_ARE_STUPID.md to avoid programming in false positives.", filepath.Base(taskPath))
-		return true, nil // skipped
+		return fmt.Errorf("suite %s is not compatible with this distro", filepath.Base(taskPath))
 	}
 
 	defer func() {
@@ -113,10 +110,10 @@ func runSingleSuite(taskPath, projectDir string) (bool, error) {
 
 	if task.Execute != "" {
 		log.Println("--- Running execute block ---")
-		return false, executeScriptBlock(task.Execute, projectDir)
+		return executeScriptBlock(task.Execute, projectDir)
 	}
 
-	return false, nil
+	return nil
 }
 
 func executeScriptBlock(script, workDir string) error {

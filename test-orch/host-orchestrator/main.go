@@ -146,6 +146,72 @@ func main() {
 		errs := make(chan error, len(distroList))
 		sem := make(chan struct{}, *concurrency)
 
+		// Handle interactive shell in a single, non-parallel flow, then return.
+		if *archShell {
+			// Resolve requested distro for shell: default to 'arch' when the flag is at its default
+			// multi-value, and enforce a single explicit distro otherwise.
+			distrosStr := strings.TrimSpace(*distros)
+			defaultSet := "arch,manjaro,cachyos,endeavouros"
+			if strings.EqualFold(strings.ReplaceAll(distrosStr, " ", ""), strings.ReplaceAll(defaultSet, " ", "")) {
+				distrosStr = "arch"
+			}
+			if strings.Contains(distrosStr, ",") {
+				log.Fatalf("--shell accepts a single distro (got %q). Use --distros=arch (default) or a single value.", *distros)
+			}
+
+			d := strings.ToLower(strings.TrimSpace(distrosStr))
+			if d == "endeavoros" || d == "endeavouros" {
+				d = "endeavouros"
+			}
+			baseImage, imageOk := distroMap[d]
+			if !imageOk {
+				warn(fmt.Sprintf("unknown distribution '%s' for --shell", d))
+				os.Exit(1)
+			}
+
+			// Resolve docker context dir relative to repo root when possible
+			ctxDir := *dockerCtx
+			if !filepath.IsAbs(ctxDir) {
+				if root, err := detectRepoRoot(); err == nil {
+					ctxDir = filepath.Join(root, ctxDir)
+				} else if wd, err2 := os.Getwd(); err2 == nil {
+					ctxDir = filepath.Join(wd, *dockerCtx)
+				}
+			}
+
+			// Compute content hash for tag
+			hash := "latest"
+			if h, err := computeBuildHash(ctxDir); err == nil && h != "" {
+				hash = h
+			}
+			tag := fmt.Sprintf("oxidizr-%s:%s", d, hash)
+
+			// Resolve rootDir to mount
+			rootDir := *rootDirFlag
+			if rootDir == "" {
+				if root, err := detectRepoRoot(); err == nil {
+					rootDir = root
+				} else {
+					rootDir = filepath.Clean(filepath.Join(ctxDir, "..", ".."))
+				}
+			}
+
+			// Ensure image exists; auto-build if missing
+			if err := runSilent("docker", "image", "inspect", tag); err != nil {
+				log.Printf("[shell/%s] Docker image not found; building...", d)
+				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, "[shell]", color.New(color.FgCyan)); err2 != nil {
+					log.Fatalf("docker build failed for --shell: %v", err2)
+				}
+			}
+
+			// Launch interactive shell (this pre-runs setup_shell.sh then drops into bash -l)
+			if err := dockerutil.RunArchInteractiveShell(tag, rootDir, verbosityLevel >= 2); err != nil {
+				log.Fatalf("interactive shell failed: %v", err)
+			}
+			// After shell exits, return without running any parallel tasks
+			return
+		}
+
 		for i, distroName := range distroList {
 			wg.Add(1)
 			go func(distro string, col *color.Color) {
