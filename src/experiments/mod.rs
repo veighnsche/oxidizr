@@ -1,6 +1,7 @@
 pub mod coreutils;
 pub mod findutils;
 pub mod sudors;
+pub mod util;
 
 use crate::checks::Distribution;
 use crate::error::{Error, Result};
@@ -170,6 +171,25 @@ pub fn check_download_prerequisites(
                     )
                     .into(),
                 ));
+            }
+            // Gate on actual package presence in the repo to avoid ambiguous 'not found' failures
+            match worker.repo_has_package(package) {
+                Ok(true) => {
+                    log::info!("✅ Package '{}' present in repositories (pacman -Si)", package);
+                }
+                Ok(false) => {
+                    log::error!(
+                        "❌ Package '{}' not found in repositories (pacman -Si). Mirrors may be out of sync or the repo set is incomplete.",
+                        package
+                    );
+                    return Err(Error::ExecutionFailed(format!(
+                        "package '{}' not found in repositories (pacman -Si). Try 'pacman -Syy' to refresh, switch mirrors, or rerun later.",
+                        package
+                    )));
+                }
+                Err(e) => {
+                    log::warn!("Warning: failed to probe repo for '{}': {}", package, e);
+                }
             }
         }
         UUTILS_FINDUTILS => {

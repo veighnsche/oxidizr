@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -33,7 +34,14 @@ func preflight() error {
 	if distroID, err := util.CurrentDistroID(); err == nil {
 		// Check for German locale presence via file and locale -a list
 		_, fileErr := os.Stat("/usr/share/i18n/locales/de_DE")
-		filePresent := fileErr == nil
+		var filePresent bool
+		if fileErr == nil {
+			filePresent = true
+		} else if errors.Is(fileErr, os.ErrNotExist) {
+			filePresent = false
+		} else {
+			return fmt.Errorf("preflight: failed to stat de_DE locale definition: %w", fileErr)
+		}
 		cmdPresent := util.RunCmdQuiet("sh", "-lc", "locale -a | grep -qi '^de_DE\\.'") == nil
 
 		// Enforce baked-in German locale (policy): both the definition file and a listed locale must exist

@@ -1,6 +1,7 @@
 use crate::checks::{Distribution, is_supported_distro};
 use crate::error::{Error, Result};
 use crate::experiments::{check_download_prerequisites, SUDO_RS};
+use crate::experiments::util::{resolve_usrbin, restore_targets, verify_removed};
 use crate::system::Worker;
 use std::path::{Path, PathBuf};
 
@@ -80,7 +81,7 @@ impl SudoRsExperiment {
                 source.display()
             );
             worker.replace_file_with_symlink(&source, &alias)?;
-            // Verify alias symlink presence for visibility
+            // Verify alias symlink presence for visibility; treat mismatches as hard errors
             match std::fs::symlink_metadata(&alias) {
                 Ok(m) if m.file_type().is_symlink() => {
                     log::info!(
@@ -89,16 +90,19 @@ impl SudoRsExperiment {
                     );
                 }
                 Ok(_) => {
-                    log::error!(
-                        "❌ Expected: '{}' alias symlink present, Received: not a symlink",
-                        name
-                    );
+                    return Err(Error::ExecutionFailed(format!(
+                        "alias for '{}' not a symlink: {}",
+                        name,
+                        alias.display()
+                    )));
                 }
-                Err(_) => {
-                    log::error!(
-                        "❌ Expected: '{}' alias symlink present, Received: missing",
-                        name
-                    );
+                Err(e) => {
+                    return Err(Error::ExecutionFailed(format!(
+                        "alias for '{}' missing: {} (err: {})",
+                        name,
+                        alias.display(),
+                        e
+                    )));
                 }
             }
             
@@ -109,7 +113,7 @@ impl SudoRsExperiment {
                 alias.display()
             );
             worker.replace_file_with_symlink(&alias, &target)?;
-            // Verify target symlink presence for visibility
+            // Verify target symlink presence; treat mismatches as hard errors
             match std::fs::symlink_metadata(&target) {
                 Ok(m) if m.file_type().is_symlink() => {
                     log::info!(
@@ -118,16 +122,19 @@ impl SudoRsExperiment {
                     );
                 }
                 Ok(_) => {
-                    log::error!(
-                        "❌ Expected: '{}' linked via alias, Received: not a symlink",
-                        name
-                    );
+                    return Err(Error::ExecutionFailed(format!(
+                        "target for '{}' not a symlink: {}",
+                        name,
+                        target.display()
+                    )));
                 }
-                Err(_) => {
-                    log::error!(
-                        "❌ Expected: '{}' linked via alias, Received: missing",
-                        name
-                    );
+                Err(e) => {
+                    return Err(Error::ExecutionFailed(format!(
+                        "target for '{}' missing: {} (err: {})",
+                        name,
+                        target.display(),
+                        e
+                    )));
                 }
             }
         }
@@ -141,21 +148,22 @@ impl SudoRsExperiment {
             worker.update_packages(assume_yes)?;
         }
         
-        // Restore original binaries
-        for name in ["sudo", "su", "visudo"] {
-            let target = if name == "visudo" {
-                PathBuf::from("/usr/sbin/visudo")
-            } else {
-                self.resolve_target(name)
-            };
-            worker.restore_file(&target)?;
-            // Verify restored (not a symlink)
-            match std::fs::symlink_metadata(&target) {
+        // Restore original binaries (fail fast on mismatches)
+        let targets = vec![
+            self.resolve_target("sudo"),
+            self.resolve_target("su"),
+            PathBuf::from("/usr/sbin/visudo"),
+        ];
+        restore_targets(worker, &targets)?;
+        // Verify restored (not a symlink)
+        for (name, target) in [("sudo", &targets[0]), ("su", &targets[1]), ("visudo", &targets[2])] {
+            match std::fs::symlink_metadata(target) {
                 Ok(m) if m.file_type().is_symlink() => {
-                    log::error!(
-                        "❌ Expected: '{}' restored to non-symlink, Received: still a symlink",
-                        name
-                    );
+                    return Err(Error::ExecutionFailed(format!(
+                        "{} was expected restored to non-symlink but is still a symlink: {}",
+                        name,
+                        target.display()
+                    )));
                 }
                 Ok(_) => {
                     log::info!(
@@ -163,11 +171,13 @@ impl SudoRsExperiment {
                         name
                     );
                 }
-                Err(_) => {
-                    log::error!(
-                        "❌ Expected: '{}' restored to system binary, Received: missing",
-                        name
-                    );
+                Err(e) => {
+                    return Err(Error::ExecutionFailed(format!(
+                        "{} missing after restore: {} (err: {})",
+                        name,
+                        target.display(),
+                        e
+                    )));
                 }
             }
         }
@@ -184,19 +194,7 @@ impl SudoRsExperiment {
         worker.remove_package(&self.package_name, assume_yes)?;
         
         // Verify absence
-        if worker.check_installed(&self.package_name)? {
-            log::error!(
-                "❌ Expected: '{}' absent after removal, Received: present",
-                self.package_name
-            );
-            return Err(Error::ExecutionFailed(
-                "sudo-rs still appears installed after removal".into(),
-            ));
-        }
-        log::info!(
-            "✅ Expected: '{}' absent after removal, Received: absent",
-            self.package_name
-        );
+        verify_removed(worker, &self.package_name)?;
         
         Ok(())
     }
@@ -234,6 +232,6 @@ impl SudoRsExperiment {
     }
     
     fn resolve_target(&self, filename: &str) -> PathBuf {
-        Path::new("/usr/bin").join(filename)
+        resolve_usrbin(filename)
     }
 }

@@ -1,6 +1,7 @@
 use crate::checks::{Distribution, is_supported_distro};
 use crate::error::{Error, Result};
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
+use crate::experiments::util::{create_symlinks, log_applets_summary, resolve_usrbin, restore_targets, verify_removed};
 use crate::system::Worker;
 use std::path::{Path, PathBuf};
 
@@ -61,8 +62,8 @@ impl CoreutilsExperiment {
             applets.len()
         );
         
-        self.log_applets_summary(&applets);
-        self.create_symlinks(worker, &applets)?;
+        log_applets_summary("coreutils", &applets, 8);
+        create_symlinks(worker, &applets, |name| self.resolve_target(name))?;
         
         Ok(())
     }
@@ -74,15 +75,16 @@ impl CoreutilsExperiment {
         }
         
         // Restore all coreutils applets
+        let mut targets: Vec<PathBuf> = Vec::new();
         for line in COREUTILS_BINS_LIST.lines() {
             let filename = line.trim();
             if filename.is_empty() {
                 continue;
             }
             let target = self.resolve_target(filename);
-            log::info!("[disable] Restoring {} (if backup exists)", target.display());
-            worker.restore_file(&target)?;
+            targets.push(target);
         }
+        restore_targets(worker, &targets)?;
         
         Ok(())
     }
@@ -96,20 +98,7 @@ impl CoreutilsExperiment {
         worker.remove_package(&self.package_name, assume_yes)?;
         
         // Verify absence explicitly
-        if worker.check_installed(&self.package_name)? {
-            log::error!(
-                "❌ Expected: '{}' absent after removal, Received: present",
-                self.package_name
-            );
-            return Err(Error::ExecutionFailed(format!(
-                "❌ Expected: '{}' absent after removal, Received: present",
-                self.package_name
-            )));
-        }
-        log::info!(
-            "✅ Expected: '{}' absent after removal, Received: absent",
-            self.package_name
-        );
+        verify_removed(worker, &self.package_name)?;
         
         Ok(())
     }
@@ -179,40 +168,14 @@ impl CoreutilsExperiment {
     }
     
     fn create_symlinks(&self, worker: &Worker, applets: &[(String, PathBuf)]) -> Result<()> {
-        for (filename, src) in applets {
-            let target = self.resolve_target(filename);
-            log::info!(
-                "Symlinking {} -> {}",
-                src.display(),
-                target.display()
-            );
-            worker.replace_file_with_symlink(src, &target)?;
-        }
-        Ok(())
+        create_symlinks(worker, applets, |name| self.resolve_target(name))
     }
     
     fn log_applets_summary(&self, applets: &[(String, PathBuf)]) {
-        log::info!(
-            "Preparing to link {} applet(s) for coreutils",
-            applets.len()
-        );
-        for (i, (filename, src)) in applets.iter().enumerate().take(8) {
-            let target = self.resolve_target(filename);
-            log::info!(
-                "  [{}] {} -> {}{}",
-                i + 1,
-                src.display(),
-                target.display(),
-                if i + 1 == 8 && applets.len() > 8 {
-                    " (…truncated)"
-                } else {
-                    ""
-                }
-            );
-        }
+        log_applets_summary("coreutils", applets, 8);
     }
     
     fn resolve_target(&self, filename: &str) -> PathBuf {
-        Path::new("/usr/bin").join(filename)
+        resolve_usrbin(filename)
     }
 }
