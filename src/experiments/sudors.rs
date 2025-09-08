@@ -10,21 +10,22 @@ pub struct SudoRsExperiment<'a, W: Worker> {
 
 // Prefer cargo-style install location, but accept Arch packaging under /usr/bin/*-rs.
 fn find_sudors_source<W: Worker>(worker: &W, name: &str) -> Option<PathBuf> {
-    // On derivatives, the 'sudo' package is the source of truth.
-    if !worker.distribution().map(|d| d.id.eq_ignore_ascii_case("arch")).unwrap_or(false) {
-        if let Ok(Some(path)) = worker.which(name) {
-            return Some(path);
-        }
-    }
+    // Always resolve to sudo-rs-provided binaries. Do not fall back to the system 'sudo'.
+    // Prefer explicit locations, then consult PATH for '*-rs'.
+    let rs_name = format!("{}-rs", name);
     let candidates = [
         PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
-        PathBuf::from(format!("/usr/bin/{}-rs", name)),
+        PathBuf::from(format!("/usr/bin/{}", rs_name)),
     ];
     for c in candidates {
         log::debug!("checking sudo-rs candidate for '{}': {}", name, c.display());
         if Path::new(&c).exists() {
             return Some(c);
         }
+    }
+    if let Ok(Some(path)) = worker.which(&rs_name) {
+        log::debug!("found sudo-rs on PATH for '{}': {}", name, path.display());
+        return Some(path);
     }
     None
 }

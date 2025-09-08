@@ -7,9 +7,8 @@ use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use which::which;
 
-use super::helpers::{aur_helper_candidates, backup_path, is_safe_path, pacman_locked};
+use super::helpers::{backup_path, is_safe_path, pacman_locked};
 use super::traits::Worker;
 
 impl System {
@@ -89,10 +88,6 @@ impl Worker for System {
     fn install_package(&self, package: &str, assume_yes: bool) -> Result<()> {
         if self.dry_run {
             log::info!("[dry-run] pacman -S --noconfirm {}", package);
-            log::info!(
-                "[dry-run] <aur-helper> -S --noconfirm {} (fallback)",
-                package
-            );
             return Ok(());
         }
         // If already installed, do nothing.
@@ -115,46 +110,14 @@ impl Worker for System {
         }
         args.push(package);
 
-        // Try to install with pacman. If it succeeds, we're done.
+        // Try to install with pacman (official repos only). If it succeeds, we're done.
         let pacman_status = std::process::Command::new("pacman").args(&args).status()?;
         if pacman_status.success() && self.check_installed(package)? {
             return Ok(());
         }
-
-        // If pacman failed or the package is still not installed, try the AUR helper.
-        // Choose helper: prefer configured, else detect installed. Run helpers as non-root 'builder'.
-        let candidates = aur_helper_candidates(&self.aur_helper);
-        let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
-        let mut tried_any = false;
-        for h in available_iter.by_ref() {
-            let mut aur_cmd_str = h.to_string();
-            if assume_yes {
-                // Batch install must come before the operation for paru
-                aur_cmd_str.push_str(" --batchinstall --noconfirm");
-            }
-            aur_cmd_str.push_str(" -S --needed");
-            aur_cmd_str.push_str(&format!(" {}", package));
-
-            log::info!("Running AUR helper: su - builder -c '{}'", aur_cmd_str);
-            let aur_status = std::process::Command::new("su")
-                .args(["-", "builder", "-c", &aur_cmd_str])
-                .status()?;
-
-            if aur_status.success() {
-                if self.check_installed(package)? {
-                    return Ok(());
-                }
-            }
-            tried_any = true;
-        }
-        if !tried_any {
-            return Err(CoreutilsError::ExecutionFailed(format!(
-                "No AUR helper found. Tried: {}. Install an AUR helper (e.g., paru or yay) or pass --package-manager to specify one.",
-                candidates.join(", ")
-            )));
-        }
+        // Official-only policy: do not attempt AUR fallback.
         Err(CoreutilsError::ExecutionFailed(format!(
-            "Failed to install '{}' via pacman or any available AUR helper (checked configured and common helpers).              Ensure an AUR helper is installed (e.g., paru, yay) and that networking is functional.",
+            "Failed to install '{}' from official repositories (pacman -S). Package may be unavailable in configured repos or mirrors.",
             package
         )))
     }
