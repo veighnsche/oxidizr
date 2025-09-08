@@ -1,11 +1,11 @@
-# oxidizr-arch v2 - Streamlined Implementation
+# oxidizr-arch — Streamlined Implementation
 
 A clean rewrite of the oxidizr-arch package management and symlink switching system, maintaining full CLI backward compatibility while improving internal structure.
 
 ## Architecture
 
 ```
-src-2/
+src/
 ├── cli/                  # Command-line interface
 │   ├── parser.rs        # Clap CLI definitions (backward compatible)
 │   └── handler.rs       # Command execution logic
@@ -52,25 +52,24 @@ All original flags and commands are preserved:
 
 ```bash
 # Enable experiments
-oxidizr-arch-v2 enable --experiments=coreutils,findutils
+oxidizr-arch enable --experiments=coreutils,findutils
 
 # Disable (restore only)
-oxidizr-arch-v2 disable --experiments=sudo-rs
+oxidizr-arch disable --experiments=sudo-rs
 
 # With prompts skipped
-oxidizr-arch-v2 enable --all -y
+oxidizr-arch enable --all -y
 
 # Dry run mode
-oxidizr-arch-v2 enable --dry-run
+oxidizr-arch enable --dry-run
 
 # Skip compatibility check
-oxidizr-arch-v2 enable --skip-compatibility-check
+oxidizr-arch enable --skip-compatibility-check
 ```
 
 ## Building
 
 ```bash
-cd src-2
 cargo build --release
 ```
 
@@ -79,7 +78,6 @@ cargo build --release
 Tests use temporary directories to avoid permission issues:
 
 ```bash
-cd src-2
 cargo test
 ```
 

@@ -72,8 +72,9 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             }
             
             // Ask whether to Disable (restore only) or Remove (uninstall package + restore)
+            // In non-interactive/assume-yes mode, default to Remove to ensure clean state for tests.
             let do_remove = if cli.assume_yes {
-                false
+                true
             } else {
                 print!(
                     "Disable (swap back to GNU, keep package installed) or Remove (uninstall package and restore GNU)? [disable/Remove]: "

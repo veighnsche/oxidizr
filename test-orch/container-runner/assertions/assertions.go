@@ -29,36 +29,48 @@ func Run() error {
 	// Enable experiments
 	log.Println("--- Enabling experiments: coreutils,sudo-rs ---")
 	if err := util.RunCmd("oxidizr-arch", "--assume-yes", "--experiments", "coreutils,sudo-rs", "--package-manager", "none", "enable"); err != nil {
+		log.Printf("❌ Enable experiments (coreutils,sudo-rs): %v", err)
 		return fmt.Errorf("failed to enable experiments: %w", err)
 	}
+	log.Println("✅ Enable experiments: coreutils,sudo-rs")
 
 	// Assertions after enabling
 	log.Println("--- Asserting sudo-rs is installed ---")
 	if err := ensureSudoRsInstalled(); err != nil {
+		log.Printf("❌ sudo-rs installed: %v", err)
 		return err
 	}
+	log.Println("✅ sudo-rs installed")
 	log.Println("--- Asserting coreutils is installed ---")
 	if err := ensureCoreutilsInstalled(); err != nil {
+		log.Printf("❌ coreutils installed: %v", err)
 		return err
 	}
+	log.Println("✅ coreutils installed")
 
 	// Disable experiments
 	log.Println("--- Disabling experiments: coreutils,sudo-rs ---")
 	if err := util.RunCmd("oxidizr-arch", "--assume-yes", "--experiments", "coreutils,sudo-rs", "--package-manager", "none", "disable"); err != nil {
+		log.Printf("❌ Disable experiments (coreutils,sudo-rs): %v", err)
 		return fmt.Errorf("failed to disable experiments: %w", err)
 	}
+	log.Println("✅ Disable experiments: coreutils,sudo-rs")
 
 	// Assertions after disabling
 	log.Println("--- Asserting sudo-rs is absent ---")
 	if err := ensureSudoRsAbsent(); err != nil {
+		log.Printf("❌ sudo-rs absent: %v", err)
 		return err
 	}
+	log.Println("✅ sudo-rs absent")
 	log.Println("--- Asserting coreutils is absent ---")
 	if err := ensureCoreutilsAbsent(); err != nil {
+		log.Printf("❌ coreutils absent: %v", err)
 		return err
 	}
+	log.Println("✅ coreutils absent")
 
-	log.Println("All assertions passed.")
+	log.Println("✅ All assertions passed.")
 	return nil
 }
 

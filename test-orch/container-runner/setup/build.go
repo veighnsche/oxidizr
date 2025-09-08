@@ -26,26 +26,28 @@ func buildProject() error {
 	_ = os.Chdir(projectDir)
 	defer os.Chdir(originalDir)
 
-	// Build stamp: skip if current git commit hash matches stamp and binary exists
-	var currentHash string
-	if err := util.RunCmdQuiet("git", "rev-parse", "HEAD"); err == nil {
-		// Capture via shell to get output
-		// Using sh -lc to capture command output into a file for comparison
-		_ = util.RunCmd("sh", "-lc", "git rev-parse HEAD > /tmp/.cur_hash 2>/dev/null")
-		if b, err2 := os.ReadFile("/tmp/.cur_hash"); err2 == nil {
-			currentHash = strings.TrimSpace(string(b))
-		}
-	}
-	
-	destPath := fmt.Sprintf("/usr/local/bin/%s", binaryName)
-	if currentHash != "" {
-		if b, err := os.ReadFile(stampPath); err == nil && strings.TrimSpace(string(b)) == currentHash {
-			if _, err2 := os.Stat(destPath); err2 == nil {
-				// Up-to-date; skip rebuild
-				return util.RunCmdQuiet(binaryName, "--help")
-			}
-		}
-	}
+	// Build stamp: skip if current git commit hash matches stamp and binary exists,
+    // unless forced via FORCE_RUST_REBUILD=1
+    force := os.Getenv("FORCE_RUST_REBUILD") == "1"
+    var currentHash string
+    if err := util.RunCmdQuiet("git", "rev-parse", "HEAD"); err == nil {
+        // Capture via shell to get output
+        // Using sh -lc to capture command output into a file for comparison
+        _ = util.RunCmd("sh", "-lc", "git rev-parse HEAD > /tmp/.cur_hash 2>/dev/null")
+        if b, err2 := os.ReadFile("/tmp/.cur_hash"); err2 == nil {
+            currentHash = strings.TrimSpace(string(b))
+        }
+    }
+    
+    destPath := fmt.Sprintf("/usr/local/bin/%s", binaryName)
+    if !force && currentHash != "" {
+        if b, err := os.ReadFile(stampPath); err == nil && strings.TrimSpace(string(b)) == currentHash {
+            if _, err2 := os.Stat(destPath); err2 == nil {
+                // Up-to-date; skip rebuild
+                return util.RunCmdQuiet(binaryName, "--help")
+            }
+        }
+    }
 
 	buildJobs := os.Getenv("CARGO_BUILD_JOBS")
 	if buildJobs == "" {

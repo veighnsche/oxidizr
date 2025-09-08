@@ -17,23 +17,31 @@ func runInContainer() error {
 	log.Println("Starting Go orchestrator inside container...")
 
 	if err := setup.Run(); err != nil {
+		log.Printf("❌ Setup failed: %v", err)
 		return fmt.Errorf("environment setup failed: %w", err)
 	}
+	log.Println("✅ Setup complete")
 
 	// Always run Rust unit tests by default as part of the matrix run
 	log.Println("==> Running Rust unit tests (cargo test)...")
 	if err := util.RunCmd("sh", "-lc", "cd /workspace && cargo test -q"); err != nil {
+		log.Printf("❌ Rust unit tests failed: %v", err)
 		return fmt.Errorf("rust unit tests failed: %w", err)
 	}
+	log.Println("✅ Rust unit tests passed")
 
 	log.Println("==> Running YAML test suites...")
 	if err := yamlrunner.Run(); err != nil {
+		log.Printf("❌ YAML test suites failed: %v", err)
 		return fmt.Errorf("YAML test suites failed: %w", err)
 	}
+	log.Println("✅ YAML test suites passed")
 
 	if err := assertions.Run(); err != nil {
+		log.Printf("❌ Assertions failed: %v", err)
 		return fmt.Errorf("assertions failed: %w", err)
 	}
+	log.Println("✅ Assertions passed")
 
 	log.Println("Go orchestrator finished successfully.")
 	// Write analytics report to the mounted workspace so it persists on host

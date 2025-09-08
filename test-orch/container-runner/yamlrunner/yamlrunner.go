@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sort"
 
 	"gopkg.in/yaml.v3"
@@ -19,6 +20,10 @@ type Task struct {
 	Execute     string   `yaml:"execute"`
 	Restore     string   `yaml:"restore,omitempty"`
 	DistroCheck []string `yaml:"distro-check,omitempty"`
+	// Optional expected outcome of the suite's execute block.
+	// Valid values: "pass" (default), "fail" (or "xfail").
+	// When set to fail/xfail, a non-zero exit from the execute block counts as PASS.
+	Expect      string   `yaml:"expect,omitempty"`
 }
 
 // Run finds, parses, and executes all task.yaml test suites.
@@ -70,10 +75,10 @@ func Run() error {
 
 		err := runSingleSuite(taskPath, projectDir)
 		if err != nil {
-			log.Printf("[%d/%d] FAIL suite: %s", i+1, len(tasks), suiteName)
+			log.Printf("[%d/%d] ❌ FAIL suite: %s", i+1, len(tasks), suiteName)
 			return err
 		}
-		log.Printf("[%d/%d] PASS suite: %s", i+1, len(tasks), suiteName)
+		log.Printf("[%d/%d] ✅ PASS suite: %s", i+1, len(tasks), suiteName)
 	}
 
 	return nil
@@ -110,7 +115,26 @@ func runSingleSuite(taskPath, projectDir string) error {
 
 	if task.Execute != "" {
 		log.Println("--- Running execute block ---")
-		return executeScriptBlock(task.Execute, projectDir)
+		execErr := executeScriptBlock(task.Execute, projectDir)
+		// Interpret outcome based on optional Expect field
+		expectFail := strings.EqualFold(task.Expect, "fail") || strings.EqualFold(task.Expect, "xfail")
+		suiteName := filepath.Base(filepath.Dir(taskPath))
+		if expectFail {
+			if execErr != nil {
+				log.Printf("✅ Expected failure occurred for suite: %s", suiteName)
+				return nil
+			}
+			// expected to fail but passed
+			log.Printf("❌ Suite was expected to fail but passed: %s", suiteName)
+			return fmt.Errorf("suite %s expected to fail but passed", suiteName)
+		}
+		// Default expectation: pass
+		if execErr != nil {
+			log.Printf("❌ Suite failed (expected pass): %s (err: %v)", suiteName, execErr)
+			return execErr
+		}
+		log.Printf("✅ Suite passed (expected pass): %s", suiteName)
+		return nil
 	}
 
 	return nil
@@ -131,8 +155,17 @@ func executeScriptBlock(script, workDir string) error {
 		return fmt.Errorf("failed to set script permissions: %w", err)
 	}
 
-	// Write the script as-is; environment setup ensures required tools are present
-	scriptContent := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n\n%s", script)
+	// Write the script with a strict prelude and traps for better visibility on failures
+    // - ERR trap: prints a red X and the failing command/line (when not masked by conditionals)
+    // - EXIT trap: prints a red X and exit code if the script exits non-zero (covers e.g. exit 1 in blocks)
+    scriptContent := fmt.Sprintf(`#!/usr/bin/env bash
+set -Eeuo pipefail
+on_err() { echo "❌ Test script failed at line $LINENO: $BASH_COMMAND" >&2; }
+on_exit() { local ec=$?; if [ $ec -ne 0 ]; then echo "❌ Test script exited with code $ec" >&2; fi; }
+trap on_err ERR
+trap on_exit EXIT
+
+%s`, script)
 	if _, err := tmpFile.WriteString(scriptContent); err != nil {
 		tmpFile.Close()
 		return fmt.Errorf("failed to write to temp script: %w", err)

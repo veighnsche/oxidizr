@@ -52,39 +52,84 @@ impl Worker {
 
     /// Check if official repositories (e.g., [extra]) are available
     pub fn extra_repo_available(&self) -> Result<bool> {
-        // Try pacman-conf -l first
-        let output = std::process::Command::new("pacman-conf")
-            .args(["-l"])
-            .output();
-            
-        if let Ok(out) = output {
+        // 1) Prefer a concise repo list to avoid false positives (e.g., NoExtract)
+        if let Ok(out) = std::process::Command::new("pacman-conf")
+            .args(["--repo-list"]) // lists repo names, one per line
+            .output()
+        {
             let stdout = String::from_utf8_lossy(&out.stdout);
-            let ok = out.status.success() && stdout.to_ascii_lowercase().contains("[extra]");
-            let _ = PROVENANCE.log(
-                "worker",
-                "extra_repo_available",
-                if ok { "detected" } else { "not_detected" },
-                "pacman-conf -l",
-                &stdout,
-                out.status.code(),
-            );
             if out.status.success() {
-                return Ok(ok);
+                let found = stdout
+                    .lines()
+                    .map(|s| s.trim().to_ascii_lowercase())
+                    .any(|l| l == "extra");
+                let _ = PROVENANCE.log(
+                    "worker",
+                    "extra_repo_available.repo_list",
+                    if found { "detected" } else { "not_detected" },
+                    "pacman-conf --repo-list",
+                    &stdout,
+                    out.status.code(),
+                );
+                if found {
+                    return Ok(true);
+                }
+                // Do not return false yet; fall through to additional heuristics
             }
         }
-        
-        // Fallback: read /etc/pacman.conf
+
+        // 2) Probe pacman sync DB for the 'extra' repo directly. Requires that callers refreshed (-Sy).
+        if let Ok(status) = std::process::Command::new("pacman")
+            .args(["-Sl", "extra"]) // list packages in 'extra'
+            .status()
+        {
+            let _ = PROVENANCE.log(
+                "worker",
+                "extra_repo_available.pacman_sl",
+                if status.success() { "detected" } else { "not_detected" },
+                "pacman -Sl extra",
+                "",
+                status.code(),
+            );
+            if status.success() {
+                return Ok(true);
+            }
+        }
+
+        // 3) Fallback to full config dump; look for an explicit [extra] section
+        if let Ok(out) = std::process::Command::new("pacman-conf")
+            .args(["-l"]) // list configuration
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if out.status.success() {
+                let found = stdout.to_ascii_lowercase().contains("[extra]");
+                let _ = PROVENANCE.log(
+                    "worker",
+                    "extra_repo_available.conf_dump",
+                    if found { "detected" } else { "not_detected" },
+                    "pacman-conf -l",
+                    &stdout,
+                    out.status.code(),
+                );
+                if found {
+                    return Ok(true);
+                }
+            }
+        }
+
+        // 4) Last resort: parse /etc/pacman.conf for a [extra] section
         let conf = fs::read_to_string("/etc/pacman.conf").unwrap_or_default();
-        let ok = conf.to_ascii_lowercase().contains("[extra]");
+        let found = conf.to_ascii_lowercase().contains("[extra]");
         let _ = PROVENANCE.log(
             "worker",
-            "extra_repo_available.fallback",
-            if ok { "detected" } else { "not_detected" },
+            "extra_repo_available.file_fallback",
+            if found { "detected" } else { "not_detected" },
             "/etc/pacman.conf",
             "",
             None,
         );
-        Ok(ok)
+        Ok(found)
     }
 
     /// Get available AUR helper name if any

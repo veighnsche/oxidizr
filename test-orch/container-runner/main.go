@@ -21,6 +21,6 @@ func main() {
 	}
 
 	if err := runInContainer(); err != nil {
-		log.Fatalf("in-container runner failed: %v", err)
+		log.Fatalf("❌ in-container runner failed: %v", err)
 	}
 }
