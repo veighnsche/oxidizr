@@ -197,3 +197,19 @@ fn resolve_target<W: Worker>(_worker: &W, filename: &str) -> PathBuf {
     // visudo is handled explicitly as /usr/sbin/visudo by callers.
     Path::new("/usr/bin").join(filename)
 }
+
+impl<'a, W: Worker> SudoRsExperiment<'a, W> {
+    /// Removes the sudo-rs package after restoring GNU tools, explicitly and only the exact package.
+    pub fn remove(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
+        self.disable(worker, assume_yes, update_lists)?;
+        log::info!("Removing package: {}", packages::SUDO_RS);
+        self.system.remove_package(packages::SUDO_RS, assume_yes)?;
+        // Verify absence
+        if self.system.check_installed(packages::SUDO_RS)? {
+            return Err(CoreutilsError::ExecutionFailed(
+                "sudo-rs still appears installed after removal".into(),
+            ));
+        }
+        Ok(())
+    }
+}
