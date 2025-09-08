@@ -15,6 +15,7 @@ where
     F: Fn(&str) -> PathBuf,
 {
     let mut pb = progress::new_bar(applets.len() as u64);
+    let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
     for (filename, src) in applets {
         let target = resolve(filename);
         // When progress bar is active, avoid noisy per-item info logs
@@ -48,6 +49,7 @@ where
 /// Restore a list of targets, logging each and surfacing errors with context.
 pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
     let mut pb = progress::new_bar(targets.len() as u64);
+    let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
     for target in targets {
         if pb.is_none() {
             log::info!("[disable] Restoring {} (if backup exists)", target.display());

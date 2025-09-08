@@ -1,5 +1,6 @@
 use crate::Result;
 use crate::logging::PROVENANCE;
+use crate::ui::progress::symlink_info_enabled;
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
@@ -36,7 +37,9 @@ pub fn is_safe_path(path: &Path) -> bool {
 /// Atomically replace a file with a symlink, creating a backup
 pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) -> Result<()> {
     if source == target {
-        log::info!("Source and target are the same ({}), skipping symlink.", source.display());
+        if symlink_info_enabled() {
+            log::info!("Source and target are the same ({}), skipping symlink.", source.display());
+        }
         return Ok(());
     }
 
@@ -60,23 +63,27 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         None
     };
 
-    log::info!(
-        "replace_file_with_symlink pre-state: target={}, existed={}, is_symlink={}, current_dest={}",
-        target.display(),
-        existed,
-        is_symlink,
-        current_dest
-            .as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "<none>".into())
-    );
+    if symlink_info_enabled() {
+        log::info!(
+            "replace_file_with_symlink pre-state: target={}, existed={}, is_symlink={}, current_dest={}",
+            target.display(),
+            existed,
+            is_symlink,
+            current_dest
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "<none>".into())
+        );
+    }
 
     if dry_run {
-        log::info!(
-            "[dry-run] would ensure symlink {} -> {} (updating/replacing as needed)",
-            source.display(),
-            target.display()
-        );
+        if symlink_info_enabled() {
+            log::info!(
+                "[dry-run] would ensure symlink {} -> {} (updating/replacing as needed)",
+                source.display(),
+                target.display()
+            );
+        }
         return Ok(());
     }
 
@@ -93,31 +100,37 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         let resolved_current = fs::canonicalize(&resolved_current).unwrap_or(resolved_current);
         
         if resolved_current == desired {
-            log::info!(
-                "Existing symlink already correct: {} -> {} (no action)",
-                target.display(),
-                resolved_current.display()
-            );
+            if symlink_info_enabled() {
+                log::info!(
+                    "Existing symlink already correct: {} -> {} (no action)",
+                    target.display(),
+                    resolved_current.display()
+                );
+            }
             return Ok(());
         } else {
-            log::info!(
-                "Replacing existing symlink: {} currently -> {}, desired -> {}",
-                target.display(),
-                current_dest
-                    .as_ref()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "<unreadable>".into()),
-                source.display()
-            );
+            if symlink_info_enabled() {
+                log::info!(
+                    "Replacing existing symlink: {} currently -> {}, desired -> {}",
+                    target.display(),
+                    current_dest
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "<unreadable>".into()),
+                    source.display()
+                );
+            }
             
             // Create a backup of the current resolved target if it exists
             let backup = backup_path(target);
             if resolved_current.exists() {
-                log::info!(
-                    "Backing up (from symlink) {} -> {}",
-                    target.display(),
-                    backup.display()
-                );
+                if symlink_info_enabled() {
+                    log::info!(
+                        "Backing up (from symlink) {} -> {}",
+                        target.display(),
+                        backup.display()
+                    );
+                }
                 let _ = fs::copy(&resolved_current, &backup);
                 if let Ok(meta) = fs::metadata(&resolved_current) {
                     let perm = meta.permissions();
@@ -132,11 +145,13 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             }
             fs::remove_file(target)?;
             unix_fs::symlink(source, target)?;
-            log::info!(
-                "Symlink updated: {} -> {}",
-                target.display(),
-                source.display()
-            );
+            if symlink_info_enabled() {
+                log::info!(
+                    "Symlink updated: {} -> {}",
+                    target.display(),
+                    source.display()
+                );
+            }
             return Ok(());
         }
     }
@@ -144,7 +159,9 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     // For regular files: backup then replace with symlink atomically
     if existed {
         let backup = backup_path(target);
-        log::info!("Backing up {} -> {}", target.display(), backup.display());
+        if symlink_info_enabled() {
+            log::info!("Backing up {} -> {}", target.display(), backup.display());
+        }
         // Use metadata we already have to avoid additional TOCTOU
         if let Ok(ref meta) = metadata {
             fs::copy(target, &backup)?;
@@ -168,11 +185,13 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     // Remove leftover target then symlink
     let _ = fs::remove_file(target);
     unix_fs::symlink(source, target)?;
-    log::info!(
-        "Symlink created: {} -> {}",
-        target.display(),
-        source.display()
-    );
+    if symlink_info_enabled() {
+        log::info!(
+            "Symlink created: {} -> {}",
+            target.display(),
+            source.display()
+        );
+    }
     
     // Log the symlink creation
     let _ = PROVENANCE.log_operation(
@@ -189,14 +208,18 @@ pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
     let backup = backup_path(target);
     if backup.exists() {
         if dry_run {
-            log::info!(
-                "[dry-run] would restore {} from {}",
-                target.display(),
-                backup.display()
-            );
+            if symlink_info_enabled() {
+                log::info!(
+                    "[dry-run] would restore {} from {}",
+                    target.display(),
+                    backup.display()
+                );
+            }
             return Ok(());
         }
-        log::info!("Restoring {} <- {}", target.display(), backup.display());
+        if symlink_info_enabled() {
+            log::info!("Restoring {} <- {}", target.display(), backup.display());
+        }
         // Remove symlink or leftover
         let _ = fs::remove_file(target);
         fs::rename(backup, target)?;

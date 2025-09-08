@@ -4,7 +4,7 @@ use crate::experiments::{check_download_prerequisites, SUDO_RS};
 use crate::experiments::util::{resolve_usrbin, restore_targets, verify_removed};
 use crate::ui::progress;
 use crate::system::Worker;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct SudoRsExperiment {
     name: String,
@@ -61,7 +61,8 @@ impl SudoRsExperiment {
             ("su", self.resolve_target("su")),
             ("visudo", PathBuf::from("/usr/sbin/visudo")),
         ];
-        let mut pb = progress::new_bar(items.len() as u64);
+        let pb = progress::new_bar(items.len() as u64);
+        let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
         for (name, target) in items {
             log::info!("Preparing sudo-rs applet '{}'", name);
             

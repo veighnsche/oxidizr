@@ -3,7 +3,7 @@ use crate::error::{Error, Result};
 use crate::experiments::{check_download_prerequisites, UUTILS_FINDUTILS};
 use crate::experiments::util::{create_symlinks, log_applets_summary, resolve_usrbin, restore_targets, verify_removed};
 use crate::system::Worker;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct FindutilsExperiment {
     name: String,
@@ -162,14 +162,6 @@ impl FindutilsExperiment {
         }
         
         Ok(applets)
-    }
-    
-    fn create_symlinks(&self, worker: &Worker, applets: &[(String, PathBuf)]) -> Result<()> {
-        create_symlinks(worker, applets, |name| self.resolve_target(name))
-    }
-    
-    fn log_applets_summary(&self, applets: &[(String, PathBuf)]) {
-        log_applets_summary("findutils", applets, 8);
     }
     
     fn resolve_target(&self, filename: &str) -> PathBuf {
