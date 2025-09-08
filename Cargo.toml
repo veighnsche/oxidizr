@@ -1,7 +1,7 @@
 [package]
 name = "oxidizr-arch"
 version = "0.1.0"
-edition = "2025"
+edition = "2021"
 description = "An oxidizr port to Arch Linux written in Rust"
 repository = ""
 license = "GPL-3.0-or-later"
