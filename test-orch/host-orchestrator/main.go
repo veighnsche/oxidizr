@@ -48,7 +48,6 @@ func main() {
 		testFilter  = flag.String("test-filter", "", "Run a single test YAML file instead of all tests")
 		testCI      = flag.Bool("test-ci", false, "Run local CI tests with act")
 		concurrency = flag.Int("concurrency", 4, "Number of distributions to test in parallel")
-		useSrc2     = flag.Bool("use-src2", false, "Use the streamlined src-2 implementation instead of src")
 	)
 	flag.Parse()
 	log.SetFlags(0)
@@ -305,12 +304,6 @@ func main() {
 
 					if *testFilter != "" {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
-					}
-					
-					// Pass flag to use src-2 implementation instead of src
-					if *useSrc2 {
-						envVars = append(envVars, "USE_SRC2=1")
-						log.Printf("%s Using streamlined src-2 implementation", prefix)
 					}
 
 					log.Printf("%s Starting tests...", prefix)

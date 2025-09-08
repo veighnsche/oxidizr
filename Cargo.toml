@@ -1,7 +1,7 @@
 [package]
 name = "oxidizr-arch"
 version = "0.1.0"
-edition = "2024"
+edition = "2025"
 description = "An oxidizr port to Arch Linux written in Rust"
 repository = ""
 license = "GPL-3.0-or-later"
@@ -9,7 +9,7 @@ keywords = ["coreutils", "cli", "gnu", "uutils"]
 categories = ["command-line-utilities"]
 
 [lib]
-name = "oxidizr_arch"
+name = "oxidizr_arch_v2"
 path = "src/lib.rs"
 
 [[bin]]
@@ -17,16 +17,14 @@ name = "oxidizr-arch"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0"
 thiserror = "1.0"
 clap = { version = "4.4", features = ["derive"] }
 log = "0.4"
-env_logger = "0.10"
-nix = { version = "0.27", features = ["user"] }
-which = "5.0"
+env_logger = "0.11"
+nix = { version = "0.29", features = ["user"] }
+which = "6.0"
 chrono = "0.4"
 lazy_static = "1.4"
-libc = "0.2"
 
 [dev-dependencies]
 assert_cmd = "2.0"
