@@ -1,124 +1,207 @@
+pub mod coreutils;
+pub mod findutils;
 pub mod sudors;
-pub mod uutils;
 
-pub use uutils::UutilsExperiment;
-pub use uutils::enable::*;
-
-use crate::error::Result;
-use crate::utils::worker::Worker;
+use crate::checks::Distribution;
+use crate::error::{Error, Result};
+use crate::logging::PROVENANCE;
+use crate::system::Worker;
+use std::io::{self, Write};
 use std::path::PathBuf;
-use crate::config::packages;
-use crate::config::compat;
 
-pub use sudors::SudoRsExperiment;
+/// Package constants
+pub const UUTILS_COREUTILS: &str = "uutils-coreutils";
+pub const UUTILS_FINDUTILS: &str = "uutils-findutils-bin";
+pub const SUDO_RS: &str = "sudo-rs";
 
-pub enum Experiment<'a, W: Worker> {
-    Uutils(UutilsExperiment),
-    SudoRs(SudoRsExperiment<'a, W>),
+/// Experiment trait for common operations
+pub trait ExperimentOps {
+    fn name(&self) -> &str;
+    fn package_name(&self) -> &str;
+    fn check_compatible(&self, distro: &Distribution) -> Result<bool>;
+    fn enable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()>;
+    fn disable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()>;
+    fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()>;
+    fn list_targets(&self) -> Vec<PathBuf>;
 }
 
-impl<'a, W: Worker> Experiment<'a, W> {
-    pub fn name(&self) -> String {
+/// Unified experiment enum
+pub enum Experiment {
+    Coreutils(coreutils::CoreutilsExperiment),
+    Findutils(findutils::FindutilsExperiment),
+    SudoRs(sudors::SudoRsExperiment),
+}
+
+impl Experiment {
+    pub fn name(&self) -> &str {
         match self {
-            Experiment::Uutils(u) => u.name.clone(),
-            Experiment::SudoRs(_) => "sudo-rs".to_string(),
+            Experiment::Coreutils(e) => e.name(),
+            Experiment::Findutils(e) => e.name(),
+            Experiment::SudoRs(e) => e.name(),
         }
     }
 
     pub fn enable(
         &self,
-        worker: &W,
+        worker: &Worker,
         assume_yes: bool,
         update_lists: bool,
-        no_compatibility_check: bool,
+        skip_compat_check: bool,
     ) -> Result<()> {
-        match self {
-            Experiment::Uutils(u) => {
-                if no_compatibility_check || u.check_compatible(worker)? {
-                    u.enable(worker, assume_yes, update_lists)
-                } else {
-                    Err(crate::error::CoreutilsError::Incompatible(
-                        format!(
-                            "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
-                            worker.distribution()?.id,
-                            compat::SUPPORTED_DISTROS
-                        ),
-                    ))
-                }
-            }
-            Experiment::SudoRs(s) => {
-                if no_compatibility_check || s.check_compatible(worker)? {
-                    s.enable(worker, assume_yes, update_lists)
-                } else {
-                    Err(crate::error::CoreutilsError::Incompatible(
-                        format!(
-                            "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
-                            worker.distribution()?.id,
-                            compat::SUPPORTED_DISTROS
-                        ),
-                    ))
-                }
+        let distro = worker.distribution()?;
+        
+        // Check compatibility unless overridden
+        if !skip_compat_check {
+            let compatible = match self {
+                Experiment::Coreutils(e) => e.check_compatible(&distro)?,
+                Experiment::Findutils(e) => e.check_compatible(&distro)?,
+                Experiment::SudoRs(e) => e.check_compatible(&distro)?,
+            };
+            
+            if !compatible {
+                return Err(Error::Incompatible(format!(
+                    "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
+                    distro.id,
+                    crate::checks::SUPPORTED_DISTROS
+                )));
             }
         }
-    }
-
-    pub fn disable(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
+        
         match self {
-            Experiment::Uutils(u) => u.disable(worker, assume_yes, update_lists),
-            Experiment::SudoRs(s) => s.disable(worker, assume_yes, update_lists),
+            Experiment::Coreutils(e) => e.enable(worker, assume_yes, update_lists),
+            Experiment::Findutils(e) => e.enable(worker, assume_yes, update_lists),
+            Experiment::SudoRs(e) => e.enable(worker, assume_yes, update_lists),
         }
     }
 
-    pub fn remove(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
+    pub fn disable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
         match self {
-            Experiment::Uutils(u) => u.remove(worker, assume_yes, update_lists),
-            Experiment::SudoRs(s) => s.remove(worker, assume_yes, update_lists),
+            Experiment::Coreutils(e) => e.disable(worker, assume_yes, update_lists),
+            Experiment::Findutils(e) => e.disable(worker, assume_yes, update_lists),
+            Experiment::SudoRs(e) => e.disable(worker, assume_yes, update_lists),
         }
     }
 
-    pub fn check_compatible(&self, worker: &W) -> Result<bool> {
+    pub fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
         match self {
-            Experiment::Uutils(u) => u.check_compatible(worker),
-            Experiment::SudoRs(s) => s.check_compatible(worker),
+            Experiment::Coreutils(e) => e.remove(worker, assume_yes, update_lists),
+            Experiment::Findutils(e) => e.remove(worker, assume_yes, update_lists),
+            Experiment::SudoRs(e) => e.remove(worker, assume_yes, update_lists),
         }
     }
 
-    pub fn list_targets(&self, worker: &W) -> Result<Vec<std::path::PathBuf>> {
+    pub fn check_compatible(&self, distro: &Distribution) -> Result<bool> {
         match self {
-            Experiment::Uutils(u) => u.list_targets(worker),
-            Experiment::SudoRs(s) => s.list_targets(worker),
+            Experiment::Coreutils(e) => e.check_compatible(distro),
+            Experiment::Findutils(e) => e.check_compatible(distro),
+            Experiment::SudoRs(e) => e.check_compatible(distro),
+        }
+    }
+
+    pub fn list_targets(&self) -> Vec<PathBuf> {
+        match self {
+            Experiment::Coreutils(e) => e.list_targets(),
+            Experiment::Findutils(e) => e.list_targets(),
+            Experiment::SudoRs(e) => e.list_targets(),
         }
     }
 }
 
-pub fn all_experiments<'a, W: Worker>(worker: &'a W) -> Vec<Experiment<'a, W>> {
-    let dist = worker.distribution().unwrap();
-    let id = dist.id.to_ascii_lowercase();
-    let is_supported_os = compat::is_supported_distro(&id);
-
-    let coreutils_pkg = packages::UUTILS_COREUTILS;
-    let findutils_pkg = packages::UUTILS_FINDUTILS;
-    let sudo_pkg = packages::SUDO_RS;
-
-    let coreutils = UutilsExperiment {
-        name: "coreutils".into(),
-        package_name: coreutils_pkg.to_string(),
-        unified_binary: if is_supported_os { Some(PathBuf::from("/usr/bin/coreutils")) } else { None },
-        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/uutils/coreutils") } else { PathBuf::from("/usr/lib/uutils/coreutils") },
-    };
-
-    let findutils = UutilsExperiment {
-        name: "findutils".into(),
-        package_name: findutils_pkg.to_string(),
-        unified_binary: None,
-        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/cargo/bin/findutils") } else { PathBuf::from("/usr/lib/cargo/bin/findutils") },
-    };
-
-    let sudo = SudoRsExperiment { system: worker, package_name: sudo_pkg.to_string() };
-
+/// Get all available experiments
+pub fn all_experiments() -> Vec<Experiment> {
     vec![
-        Experiment::Uutils(coreutils),
-        Experiment::Uutils(findutils),
-        Experiment::SudoRs(sudo),
+        Experiment::Coreutils(coreutils::CoreutilsExperiment::new()),
+        Experiment::Findutils(findutils::FindutilsExperiment::new()),
+        Experiment::SudoRs(sudors::SudoRsExperiment::new()),
     ]
+}
+
+/// Common download flow implementation with repo gating and prompts
+pub fn check_download_prerequisites(
+    worker: &Worker,
+    package: &str,
+    assume_yes: bool,
+) -> Result<()> {
+    // Check repo capabilities
+    let extra_available = worker.extra_repo_available()?;
+    let aur_helper = worker.aur_helper_name()?;
+    let aur_available = aur_helper.is_some();
+    
+    let _ = PROVENANCE.log(
+        "experiments",
+        "repo_capabilities",
+        "observed",
+        &format!(
+            "extra_available={}, aur_available={}, helper={:?}",
+            extra_available, aur_available, aur_helper
+        ),
+        "",
+        None,
+    );
+
+    // Gate on repo availability
+    if !extra_available && !aur_available {
+        return Err(Error::ExecutionFailed(
+            "You do not have access to extra or AUR repositories.".into(),
+        ));
+    }
+
+    // Per-package repo requirements
+    match package {
+        UUTILS_COREUTILS | SUDO_RS => {
+            if !extra_available {
+                return Err(Error::ExecutionFailed(
+                    "Cannot download because the extra repository is not available.".into(),
+                ));
+            }
+        }
+        UUTILS_FINDUTILS => {
+            if !aur_available {
+                return Err(Error::ExecutionFailed(
+                    "Cannot download uutils-findutils because no AUR helper is installed.".into(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    // Check if already installed and prompt for reuse
+    if worker.check_installed(package)? {
+        let mut reuse = true;
+        if !assume_yes {
+            print!(
+                "Detected {} installed. Use existing instead of downloading? [Y/n]: ",
+                package
+            );
+            io::stdout().flush().ok();
+            let mut s = String::new();
+            if io::stdin().read_line(&mut s).is_ok() {
+                let ans = s.trim().to_ascii_lowercase();
+                reuse = ans.is_empty() || ans == "y" || ans == "yes";
+            }
+        }
+        
+        let _ = PROVENANCE.log(
+            "experiments",
+            "already_installed",
+            if reuse { "reuse" } else { "reinstall_requested" },
+            package,
+            "",
+            None,
+        );
+        
+        if reuse {
+            log::info!(
+                "Using existing installation of '{}' (no download)",
+                package
+            );
+        } else {
+            log::info!(
+                "Reinstall requested for '{}' (will attempt package install)",
+                package
+            );
+        }
+    }
+    
+    Ok(())
 }

@@ -1,7 +1,8 @@
 use thiserror::Error;
 
+/// Core error type for oxidizr-arch operations
 #[derive(Debug, Error)]
-pub enum CoreutilsError {
+pub enum Error {
     #[error("Command not found: {0}")]
     CommandNotFound(String),
 
@@ -21,4 +22,4 @@ pub enum CoreutilsError {
     Other(String),
 }
 
-pub type Result<T> = std::result::Result<T, CoreutilsError>;
+pub type Result<T> = std::result::Result<T, Error>;
