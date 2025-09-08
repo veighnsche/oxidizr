@@ -73,23 +73,30 @@ impl CoreutilsExperiment {
             applets.len()
         );
         
-        // Filter out preserved binaries (do not replace these targets)
-        let original_len = applets.len();
-        let filtered: Vec<(String, PathBuf)> = applets
-            .into_iter()
-            .filter(|(name, _)| !PRESERVE_BINS.contains(&name.as_str()))
-            .collect();
-        let preserved_count = original_len.saturating_sub(filtered.len());
-        if preserved_count > 0 {
-            log::info!(
-                "Preserving {} checksum tool(s) unmodified: {:?}",
-                preserved_count,
-                PRESERVE_BINS
-            );
-        }
-        
-        log_applets_summary("coreutils", &filtered, 8);
-        create_symlinks(worker, &filtered, |name| self.resolve_target(name))?;
+        // Filter out preserved binaries (do not replace these targets) unless the caller explicitly
+        // requested flipping checksum tools too via --flip-checksums.
+        let (to_link, mode_msg) = if worker.flip_checksums {
+            (applets, "flip-checksums: enabled (will also flip checksum tools)")
+        } else {
+            let original_len = applets.len();
+            let filtered: Vec<(String, PathBuf)> = applets
+                .into_iter()
+                .filter(|(name, _)| !PRESERVE_BINS.contains(&name.as_str()))
+                .collect();
+            let preserved_count = original_len.saturating_sub(filtered.len());
+            if preserved_count > 0 {
+                log::info!(
+                    "Preserving {} checksum tool(s) unmodified: {:?}",
+                    preserved_count,
+                    PRESERVE_BINS
+                );
+            }
+            (filtered, "flip-checksums: disabled (preserving checksum tools)")
+        };
+
+        log::info!("{}", mode_msg);
+        log_applets_summary("coreutils", &to_link, 8);
+        create_symlinks(worker, &to_link, |name| self.resolve_target(name))?;
         
         Ok(())
     }

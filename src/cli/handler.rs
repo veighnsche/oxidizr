@@ -17,6 +17,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
         effective_helper,
         cli.dry_run,
         cli.wait_lock,
+        cli.flip_checksums,
     );
     
     let update_lists = !cli.no_update;

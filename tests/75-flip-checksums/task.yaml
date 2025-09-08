@@ -1,0 +1,24 @@
+summary: Flip checksum tools when --flip-checksums is set (override preserve allowlist)
+distro-check:
+  - arch
+  - manjaro
+  - cachyos
+  - endeavouros
+execute: |
+  set -euo pipefail
+
+  # Enable only coreutils and explicitly flip checksum tools as well
+  oxidizr-arch enable --yes --experiments coreutils --flip-checksums
+
+  # Verify package is installed
+  pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }
+
+  # Verify checksum tools are symlinks and not GNU versions
+  for t in b2sum md5sum sha1sum sha224sum sha256sum sha384sum sha512sum; do
+    [ -L "/usr/bin/${t}" ] || { echo "/usr/bin/${t} should be a symlink"; exit 1; }
+    ${t} --version 2>&1 | grep -v "GNU coreutils" >/dev/null || { echo "${t} should not be GNU version"; exit 1; }
+  done
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr-arch disable --yes --experiments coreutils || true
+  fi

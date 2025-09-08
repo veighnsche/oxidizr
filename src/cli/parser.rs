@@ -83,6 +83,11 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub dry_run: bool,
 
+    /// Also flip checksum tools (sha256sum, md5sum, etc.) instead of preserving GNU versions
+    /// Default: false (preserve)
+    #[arg(long = "flip-checksums", global = true)]
+    pub flip_checksums: bool,
+
     /// Wait for pacman database lock to clear, in seconds (polling)
     #[arg(long, global = true)]
     pub wait_lock: Option<u64>,
