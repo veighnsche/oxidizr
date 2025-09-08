@@ -40,8 +40,12 @@ impl<'a, W: Worker> SudoRsExperiment<'a, W> {
 
     pub fn check_compatible(&self, worker: &W) -> Result<bool> {
         let d: Distribution = worker.distribution()?;
-        // This experiment is only for vanilla Arch, as derivatives have their own sudo.
-        Ok(d.id.eq_ignore_ascii_case("arch"))
+        let id = d.id.to_ascii_lowercase();
+        // Supported set with no gating among them: arch, manjaro, cachyos, endeavouros
+        Ok(matches!(
+            id.as_str(),
+            "arch" | "manjaro" | "cachyos" | "endeavouros"
+        ))
     }
 
     pub fn enable(

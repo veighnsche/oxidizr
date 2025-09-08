@@ -16,6 +16,11 @@ impl UutilsExperiment {
     /// Checks if the current system is compatible with this experiment (Arch Linux).
     pub fn check_compatible<W: Worker>(&self, worker: &W) -> Result<bool> {
         let d: Distribution = worker.distribution()?;
-        Ok(d.id.eq_ignore_ascii_case("arch") || d.id_like.contains("arch"))
+        let id = d.id.to_ascii_lowercase();
+        // Supported set with no gating among them: arch, manjaro, cachyos, endeavouros
+        Ok(matches!(
+            id.as_str(),
+            "arch" | "manjaro" | "cachyos" | "endeavouros"
+        ))
     }
 }

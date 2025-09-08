@@ -7,6 +7,7 @@ pub use uutils::enable::*;
 use crate::error::Result;
 use crate::utils::worker::Worker;
 use std::path::PathBuf;
+use crate::config::packages;
 
 pub use sudors::SudoRsExperiment;
 
@@ -72,24 +73,26 @@ impl<'a, W: Worker> Experiment<'a, W> {
 
 pub fn all_experiments<'a, W: Worker>(worker: &'a W) -> Vec<Experiment<'a, W>> {
     let dist = worker.distribution().unwrap();
-    let is_vanilla_arch = dist.id.eq_ignore_ascii_case("arch");
+    let id = dist.id.to_ascii_lowercase();
+    let is_supported_os = matches!(id.as_str(), "arch" | "manjaro" | "cachyos" | "endeavouros");
 
-    let coreutils_pkg = if is_vanilla_arch { "uutils-coreutils" } else { "coreutils" };
-    let findutils_pkg = if is_vanilla_arch { "uutils-findutils" } else { "findutils" };
-    let sudo_pkg = if is_vanilla_arch { "sudo-rs" } else { "sudo" };
+    let coreutils_pkg = if is_supported_os { packages::UUTILS_COREUTILS } else { "coreutils" };
+    // Prefer binary AUR package for findutils when supported, falls back to repo findutils otherwise
+    let findutils_pkg = if is_supported_os { packages::UUTILS_FINDUTILS } else { "findutils" };
+    let sudo_pkg = if is_supported_os { packages::SUDO_RS } else { "sudo" };
 
     let coreutils = UutilsExperiment {
         name: "coreutils".into(),
         package_name: coreutils_pkg.to_string(),
-        unified_binary: if is_vanilla_arch { Some(PathBuf::from("/usr/bin/coreutils")) } else { None },
-        bin_directory: if is_vanilla_arch { PathBuf::from("/usr/lib/uutils/coreutils") } else { PathBuf::from("/usr/bin") },
+        unified_binary: if is_supported_os { Some(PathBuf::from("/usr/bin/coreutils")) } else { None },
+        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/uutils/coreutils") } else { PathBuf::from("/usr/bin") },
     };
 
     let findutils = UutilsExperiment {
         name: "findutils".into(),
         package_name: findutils_pkg.to_string(),
         unified_binary: None,
-        bin_directory: if is_vanilla_arch { PathBuf::from("/usr/lib/cargo/bin/findutils") } else { PathBuf::from("/usr/bin") },
+        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/cargo/bin/findutils") } else { PathBuf::from("/usr/bin") },
     };
 
     let sudo = SudoRsExperiment { system: worker, package_name: sudo_pkg.to_string() };

@@ -1,6 +1,9 @@
 summary: Disable only coreutils under a German locale, leaving sudo-rs enabled
 distro-check:
   - arch
+  - manjaro
+  - cachyos
+  - endeavouros
 execute: |-
   set -euo pipefail
 
@@ -34,22 +37,9 @@ execute: |-
       echo "coreutils should be disabled, but ls is still pointing to uutils"
       exit 1
   fi
-  # On vanilla Arch, sudo-rs is enabled; on derivatives it may not be. Assert accordingly.
-  if pacman -Qi sudo-rs >/dev/null 2>&1; then
-      if ! readlink /usr/bin/sudo | grep -q "/usr/bin/sudo.sudo-rs"; then
-          echo "sudo-rs should be enabled, but sudo is not pointing to sudo-rs"
-          exit 1
-      fi
-  else
-      if readlink /usr/bin/sudo | grep -q "/usr/bin/sudo.sudo-rs"; then
-          echo "sudo should not be pointing to sudo-rs on this distro"
-          exit 1
-      fi
-      if [ -L /usr/bin/sudo ]; then
-          echo "/usr/bin/sudo should not be a symlink when sudo-rs is not installed"
-          exit 1
-      fi
-  fi
+  # sudo-rs must be installed and symlinked across supported distros
+  pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should be installed"; exit 1; }
+  readlink /usr/bin/sudo | grep -q "/usr/bin/sudo.sudo-rs" || { echo "sudo should point to sudo-rs"; exit 1; }
 restore: |
   if [ -z "${CI:-}" ]; then
     oxidizr-arch disable --yes --all || true

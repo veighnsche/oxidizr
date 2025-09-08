@@ -10,31 +10,16 @@ execute: |
   oxidizr-arch enable --yes --all
 
   # Verify packages are installed
-  if grep -q '^ID=arch$' /etc/os-release; then
-    pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }
-    pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should be installed"; exit 1; }
-  else
-    pacman -Qi coreutils >/dev/null 2>&1 || { echo "coreutils should be installed on this distro"; exit 1; }
-    pacman -Qi sudo >/dev/null 2>&1 || { echo "sudo should be installed on this distro"; exit 1; }
-  fi
+  pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }
+  pacman -Qi sudo-rs >/dev/null 2>&1 || { echo "sudo-rs should be installed"; exit 1; }
   
   # Verify symlinks are created
-  if grep -q '^ID=arch$' /etc/os-release; then
-    [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink"; exit 1; }
-    [ -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should be a symlink"; exit 1; }
-  else
-    [ ! -L /usr/bin/date ] || { echo "/usr/bin/date should not be a symlink on this distro"; exit 1; }
-    [ ! -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should not be a symlink on this distro"; exit 1; }
-  fi
+  [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink"; exit 1; }
+  [ -L /usr/bin/sudo ] || { echo "/usr/bin/sudo should be a symlink"; exit 1; }
   
   # Verify backup files
-  if grep -q '^ID=arch$' /etc/os-release; then
-    [ -f /usr/bin/.date.oxidizr.bak ] || { echo "backup file for date should exist"; exit 1; }
-    [ -f /usr/bin/.sudo.oxidizr.bak ] || { echo "backup file for sudo should exist"; exit 1; }
-  else
-    [ ! -f /usr/bin/.date.oxidizr.bak ] || { echo "backup file for date should not exist on this distro"; exit 1; }
-    [ ! -f /usr/bin/.sudo.oxidizr.bak ] || { echo "backup file for sudo should not exist on this distro"; exit 1; }
-  fi
+  [ -f /usr/bin/.date.oxidizr.bak ] || { echo "backup file for date should exist"; exit 1; }
+  [ -f /usr/bin/.sudo.oxidizr.bak ] || { echo "backup file for sudo should exist"; exit 1; }
   
   # Verify commands work and are not GNU versions
   date --version 2>&1 | grep -v "GNU" >/dev/null || { echo "date should not be GNU version"; exit 1; }

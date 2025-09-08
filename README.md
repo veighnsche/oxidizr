@@ -5,13 +5,13 @@ Modernized, distribution-aware CLI for safely switching Arch Linux core utilitie
 
 ## What this project does
 
-The CLI manages “experiments” that switch selected tool families to Rust implementations using a safe symlink strategy and package management on Arch and Arch derivatives:
+The CLI manages “experiments” that switch selected tool families to Rust implementations using a safe symlink strategy and package management. Project policy: no distro gating within the supported Arch-family set (Arch, Manjaro, CachyOS, EndeavourOS). Outside this set, experiments may be treated as incompatible unless you explicitly override checks.
 
-- coreutils → uutils-coreutils (on vanilla Arch) or keep distro defaults (on derivatives)
-- findutils → uutils-findutils (when available on Arch) or distro defaults
-- sudo → sudo-rs (on vanilla Arch only)
+- coreutils → uutils-coreutils
+- findutils → uutils-findutils (or `uutils-findutils-bin`)
+- sudo → sudo-rs
 
-Experiments are distribution-aware and selected from a registry in `src/experiments/mod.rs`. Compatibility is checked per experiment; incompatible ones are skipped unless you explicitly bypass checks.
+Experiments are selected from a registry in `src/experiments/mod.rs`. We do not gate by distro ID within the supported set; the practical guardrail is whether providers can be installed and their binaries discovered. Distros outside the supported set may be incompatible unless you use `--no-compatibility-check`.
 
 ## Highlights
 
@@ -49,7 +49,7 @@ oxidizr-arch check
 # List target paths that would be affected
 oxidizr-arch list-targets
 
-# Enable the default experiment set (coreutils + sudo-rs on Arch)
+# Enable the default experiment set (coreutils + sudo-rs)
 sudo oxidizr-arch enable
 
 # Disable and restore from backups
@@ -94,23 +94,20 @@ sudo oxidizr-arch --experiments coreutils disable
 
 Notes:
 
-- On Arch-family derivatives, we run the same assertions. If a provider is available via pacman or AUR, switching proceeds; otherwise the command fails with a clear error (no SKIPs). Use `--no-compatibility-check` only for debugging.
+- No distro gating within supported set (Arch, Manjaro, CachyOS, EndeavourOS). If a provider can be installed via pacman or an available AUR helper, switching proceeds; otherwise the command fails with a clear error (no SKIPs). Use `--no-compatibility-check` only for debugging or for non-supported distros.
 - AUR helpers: we assume an AUR helper (`paru` or `yay`) is available when AUR packages are required. In containers, the runner ensures a helper exists. On user systems, install one before running commands that require AUR. If no helper is available when needed, the command fails with guidance.
-- Override flags (`--package`, `--bin-dir`, `--unified-binary`) are parsed by the CLI and are being wired end-to-end to override registry defaults across distros.
+- Override flags (`--package`, `--bin-dir`, `--unified-binary`) are parsed by the CLI and are wired end-to-end to override registry defaults across distros.
 
 ## Experiments
 
 - coreutils (`UutilsExperiment`)
-  - Arch: package `uutils-coreutils`; bin dir `/usr/lib/uutils/coreutils`; unified binary candidates include `/usr/lib/uutils/coreutils/coreutils`, `/usr/lib/cargo/bin/coreutils`, `/usr/bin/coreutils.uutils` (`src/experiments/uutils/constants.rs`).
-  - Derivatives: keep distro defaults (`/usr/bin`).
+  - Package `uutils-coreutils`; bin dir `/usr/lib/uutils/coreutils`; unified binary candidates include `/usr/lib/uutils/coreutils/coreutils`, `/usr/lib/cargo/bin/coreutils`, `/usr/bin/coreutils.uutils` (`src/experiments/uutils/constants.rs`).
 
 - findutils (`UutilsExperiment`)
-  - Arch: package `uutils-findutils` (or `uutils-findutils-bin`); paths wired in registry (`src/experiments/mod.rs`).
-  - Derivatives: keep distro defaults.
+  - Package `uutils-findutils` (or `uutils-findutils-bin`); paths wired in registry (`src/experiments/mod.rs`).
 
 - sudo-rs (`SudoRsExperiment`)
-  - Arch only: installs `sudo-rs` and wires stable aliases like `/usr/bin/sudo.sudo-rs`, then links `/usr/bin/sudo -> /usr/bin/sudo.sudo-rs` and similarly for `su`. `visudo` target lives in `/usr/sbin/visudo` (`src/experiments/sudors.rs`).
-  - Derivatives: experiment is incompatible → skipped by default.
+  - Installs `sudo-rs` and wires stable aliases like `/usr/bin/sudo.sudo-rs`, then links `/usr/bin/sudo -> /usr/bin/sudo.sudo-rs` and similarly for `su`. `visudo` target lives in `/usr/sbin/visudo` (`src/experiments/sudors.rs`).
 
 ## Enable/Disable behavior matrix (uutils-*)
 
