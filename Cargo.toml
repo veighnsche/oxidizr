@@ -9,7 +9,7 @@ keywords = ["coreutils", "cli", "gnu", "uutils"]
 categories = ["command-line-utilities"]
 
 [lib]
-name = "oxidizr_arch_v2"
+name = "oxidizr_arch"
 path = "src/lib.rs"
 
 [[bin]]

@@ -9,7 +9,7 @@ mod e2e_tests {
             .args(&["run", "--"])
             .args(args)
             .output()
-            .expect("Failed to execute oxidizr-arch-v2");
+            .expect("Failed to execute oxidizr-arch");
         
         let success = output.status.success();
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();

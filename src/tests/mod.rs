@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use oxidizr_arch_v2::checks::{Distribution, is_supported_distro, check_compatibility};
-    use oxidizr_arch_v2::experiments::{all_experiments, UUTILS_COREUTILS, UUTILS_FINDUTILS, SUDO_RS};
-    use oxidizr_arch_v2::symlink::{backup_path, is_safe_path};
+    use oxidizr_arch::checks::{Distribution, is_supported_distro, check_compatibility};
+    use oxidizr_arch::experiments::{all_experiments, UUTILS_COREUTILS, UUTILS_FINDUTILS, SUDO_RS};
+    use oxidizr_arch::symlink::{backup_path, is_safe_path};
     use std::path::Path;
 
     #[test]
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_experiment_targets() {
-        use oxidizr_arch_v2::experiments::{coreutils::CoreutilsExperiment, findutils::FindutilsExperiment, sudors::SudoRsExperiment};
+        use oxidizr_arch::experiments::{coreutils::CoreutilsExperiment, findutils::FindutilsExperiment, sudors::SudoRsExperiment};
         
         let coreutils = CoreutilsExperiment::new();
         let targets = coreutils.list_targets();
