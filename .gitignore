@@ -15,7 +15,7 @@ tmp/
 
 # Test orchestrator caches and build outputs
 # Caches are bind-mounted to speed up container runs; do not commit them
-.cache/
+.cache
 .cache/test-orch/
 .cache/test-orch/cargo/
 .cache/test-orch/cargo-target/

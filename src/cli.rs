@@ -38,7 +38,7 @@ use std::path::PathBuf;
 pub struct Cli {
     /// Skip confirmation prompts (dangerous; intended for automation/tests)
     /// Accept legacy alias --yes for compatibility with test suites
-    #[arg(long, alias = "yes", global = true)]
+    #[arg(long, short = 'y', alias = "yes", global = true)]
     pub assume_yes: bool,
 
     /// Do not run pacman -Sy before actions
@@ -58,7 +58,7 @@ pub struct Cli {
     pub experiment: Option<String>,
 
     /// Skip compatibility checks (dangerous)
-    #[arg(long, global = true)]
+    #[arg(long = "skip-compatibility-check", alias = "no-compatibility-check", global = true)]
     pub no_compatibility_check: bool,
 
     /// AUR helper to use for package operations (auto-detect by default)
@@ -166,12 +166,37 @@ pub fn handle_cli() -> Result<()> {
             if !cli.dry_run {
                 enforce_root()?;
             }
-            if !cli.assume_yes && !confirm("Disable and restore system-provided tools?")? {
-                return Ok(());
-            }
-            for e in &exps {
-                e.disable(&worker, cli.assume_yes, update_lists)?;
-                println!("Disabled experiment: {}", e.name());
+            // Ask whether to Disable (restore only) or Remove (uninstall package + restore)
+            let do_remove = if cli.assume_yes {
+                false
+            } else {
+                print!(
+                    "Disable (swap back to GNU, keep package installed) or Remove (uninstall package and restore GNU)? [disable/Remove]: "
+                );
+                io::stdout().flush().ok();
+                let mut s = String::new();
+                let _ = io::stdin().read_line(&mut s);
+                let ans = s.trim().to_ascii_lowercase();
+                ans == "remove" || ans == "r"
+            };
+            let _ = crate::utils::audit::AUDIT.log_provenance(
+                "cli",
+                "disable_choice",
+                if do_remove { "remove" } else { "disable" },
+                "",
+                "",
+                None,
+            );
+            if do_remove {
+                for e in &exps {
+                    e.remove(&worker, cli.assume_yes, update_lists)?;
+                    println!("Removed experiment package and restored: {}", e.name());
+                }
+            } else {
+                for e in &exps {
+                    e.disable(&worker, cli.assume_yes, update_lists)?;
+                    println!("Disabled experiment: {}", e.name());
+                }
             }
         }
         Commands::Check => {

@@ -41,6 +41,18 @@ impl Worker for MockWorker {
         Ok(true)
     }
 
+    fn extra_repo_available(&self) -> Result<bool> {
+        Ok(true)
+    }
+
+    fn aur_helper_name(&self) -> Result<Option<String>> {
+        Ok(Some("paru".to_string()))
+    }
+
+    fn repo_has_package(&self, _package: &str) -> Result<bool> {
+        Ok(true)
+    }
+
     fn which(&self, name: &str) -> Result<Option<PathBuf>> {
         Ok(Some(PathBuf::from(format!("/usr/bin/{}", name))))
     }

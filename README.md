@@ -8,7 +8,7 @@ Modernized, distribution-aware CLI for safely switching Arch Linux core utilitie
 The CLI manages “experiments” that switch selected tool families to Rust implementations using a safe symlink strategy and package management. Project policy: no distro gating within the supported Arch-family set (Arch, Manjaro, CachyOS, EndeavourOS). Outside this set, experiments may be treated as incompatible unless you explicitly override checks.
 
 - coreutils → uutils-coreutils
-- findutils → uutils-findutils (or `uutils-findutils-bin`)
+- findutils → uutils-findutils-bin
 - sudo → sudo-rs
 
 Experiments are selected from a registry in `src/experiments/mod.rs`. We do not gate by distro ID within the supported set; the practical guardrail is whether providers can be installed and their binaries discovered. Distros outside the supported set may be incompatible unless you use `--no-compatibility-check`.

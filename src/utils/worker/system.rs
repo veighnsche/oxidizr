@@ -7,8 +7,11 @@ use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use which::which;
 
-use super::helpers::{backup_path, is_safe_path, pacman_locked};
+use super::helpers::{
+    aur_helper_candidates, backup_path, is_safe_path, is_valid_package_name, pacman_locked,
+};
 use super::traits::Worker;
 
 impl System {
@@ -76,6 +79,14 @@ impl Worker for System {
             args.push("--noconfirm");
         }
         let status = std::process::Command::new("pacman").args(&args).status()?;
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "update_packages",
+            if status.success() { "ok" } else { "error" },
+            &format!("pacman {}", args.join(" ")),
+            "",
+            status.code(),
+        );
         if status.success() {
             Ok(())
         } else {
@@ -86,6 +97,12 @@ impl Worker for System {
     }
 
     fn install_package(&self, package: &str, assume_yes: bool) -> Result<()> {
+        if !is_valid_package_name(package) {
+            return Err(CoreutilsError::ExecutionFailed(format!(
+                "Invalid or unsafe package name: {}",
+                package
+            )));
+        }
         if self.dry_run {
             log::info!("[dry-run] pacman -S --noconfirm {}", package);
             return Ok(());
@@ -110,12 +127,66 @@ impl Worker for System {
         }
         args.push(package);
 
-        // Try to install with pacman (official repos only). If it succeeds, we're done.
+        // Try to install with pacman. If it succeeds, we're done.
         let pacman_status = std::process::Command::new("pacman").args(&args).status()?;
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "install_package.pacman",
+            if pacman_status.success() { "ok" } else { "failed_or_unavailable" },
+            &format!("pacman {}", args.join(" ")),
+            "",
+            pacman_status.code(),
+        );
         if pacman_status.success() && self.check_installed(package)? {
             return Ok(());
         }
-        // Official-only policy: do not attempt AUR fallback.
+        // Selective policy: allow AUR fallback only for packages explicitly permitted.
+        if package == "uutils-findutils-bin" {
+            // Choose helper: prefer configured, else detect installed. Run helpers as non-root 'builder'.
+            let candidates = aur_helper_candidates(&self.aur_helper);
+            let mut available_iter = candidates.clone().into_iter().filter(|h| which(h).is_ok());
+            let mut tried_any = false;
+            for h in available_iter.by_ref() {
+                let mut aur_cmd_str = h.to_string();
+                if assume_yes {
+                    // Batch install must come before the operation for paru
+                    aur_cmd_str.push_str(" --batchinstall --noconfirm");
+                }
+                aur_cmd_str.push_str(" -S --needed");
+                aur_cmd_str.push_str(&format!(" {}", package));
+
+                log::info!("Running AUR helper: su - builder -c '{}'", aur_cmd_str);
+                let aur_status = std::process::Command::new("su")
+                    .args(["-", "builder", "-c", &aur_cmd_str])
+                    .status()?;
+                let _ = AUDIT.log_provenance(
+                    "worker.system",
+                    "install_package.aur",
+                    if aur_status.success() { "ok" } else { "error" },
+                    &format!("su - builder -c '{}'", aur_cmd_str),
+                    &format!("helper={}", h),
+                    aur_status.code(),
+                );
+
+                if aur_status.success() {
+                    if self.check_installed(package)? {
+                        return Ok(());
+                    }
+                }
+                tried_any = true;
+            }
+            if !tried_any {
+                return Err(CoreutilsError::ExecutionFailed(format!(
+                    "No AUR helper found. Tried: {}. Install an AUR helper (e.g., paru or yay) or pass --package-manager to specify one.",
+                    candidates.join(", ")
+                )));
+            }
+            return Err(CoreutilsError::ExecutionFailed(format!(
+                "Failed to install '{}' via pacman or any available AUR helper (checked configured and common helpers). Ensure networking and helper are functional.",
+                package
+            )));
+        }
+        // Official-only policy for all other packages: do not attempt AUR fallback.
         Err(CoreutilsError::ExecutionFailed(format!(
             "Failed to install '{}' from official repositories (pacman -S). Package may be unavailable in configured repos or mirrors.",
             package
@@ -128,6 +199,12 @@ impl Worker for System {
         // whether it was originally installed by the user or by a prior `enable` run.
         // If we want a more conservative behavior (e.g., optional purge flag), wire it at
         // the experiment layer and gate calls into this function accordingly.
+        if !is_valid_package_name(package) {
+            return Err(CoreutilsError::ExecutionFailed(format!(
+                "Invalid or unsafe package name for removal: {}",
+                package
+            )));
+        }
         if self.dry_run {
             log::info!("[dry-run] pacman -R --noconfirm {}", package);
             return Ok(());
@@ -149,6 +226,14 @@ impl Worker for System {
         }
         args.push(package);
         let status = std::process::Command::new("pacman").args(&args).status()?;
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "remove_package",
+            if status.success() { "ok" } else { "error" },
+            &format!("pacman {}", args.join(" ")),
+            "",
+            status.code(),
+        );
         if status.success() {
             Ok(())
         } else {
@@ -160,9 +245,15 @@ impl Worker for System {
     }
 
     fn check_installed(&self, package: &str) -> Result<bool> {
-        let status = std::process::Command::new("pacman")
-            .args(["-Qi", package])
-            .status()?;
+        let status = std::process::Command::new("pacman").args(["-Qi", package]).status()?;
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "check_installed",
+            if status.success() { "present" } else { "absent" },
+            &format!("pacman -Qi {}", package),
+            "",
+            status.code(),
+        );
         Ok(status.success())
     }
 
@@ -354,5 +445,83 @@ impl Worker for System {
             log::warn!("No backup for {}, leaving as-is", target.display());
         }
         Ok(())
+    }
+
+    fn extra_repo_available(&self) -> Result<bool> {
+        // Prefer pacman-conf -l, fallback to scanning pacman.conf
+        let output = std::process::Command::new("pacman-conf")
+            .args(["-l"])
+            .output();
+        if let Ok(out) = output {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let ok = out.status.success() && stdout.to_ascii_lowercase().contains("[extra]");
+            let _ = AUDIT.log_provenance(
+                "worker.system",
+                "extra_repo_available",
+                if ok { "detected" } else { "not_detected" },
+                "pacman-conf -l",
+                &stdout,
+                out.status.code(),
+            );
+            if out.status.success() {
+                return Ok(ok);
+            }
+        }
+        // Fallback: read /etc/pacman.conf
+        let conf = fs::read_to_string("/etc/pacman.conf").unwrap_or_default();
+        let ok = conf.to_ascii_lowercase().contains("[extra]");
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "extra_repo_available.fallback",
+            if ok { "detected" } else { "not_detected" },
+            "/etc/pacman.conf",
+            "",
+            None,
+        );
+        Ok(ok)
+    }
+
+    fn aur_helper_name(&self) -> Result<Option<String>> {
+        let cands = aur_helper_candidates(&self.aur_helper);
+        for h in cands {
+            if which(h).is_ok() {
+                let _ = AUDIT.log_provenance(
+                    "worker.system",
+                    "aur_helper_name",
+                    "found",
+                    h,
+                    "",
+                    None,
+                );
+                return Ok(Some(h.to_string()));
+            }
+        }
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "aur_helper_name",
+            "not_found",
+            &self.aur_helper,
+            "",
+            None,
+        );
+        Ok(None)
+    }
+
+    fn repo_has_package(&self, package: &str) -> Result<bool> {
+        if !is_valid_package_name(package) {
+            return Ok(false);
+        }
+        let status = std::process::Command::new("pacman")
+            .args(["-Si", package])
+            .status()?;
+        let _ = AUDIT.log_provenance(
+            "worker.system",
+            "repo_has_package",
+            if status.success() { "yes" } else { "no" },
+            &format!("pacman -Si {}", package),
+            "",
+            status.code(),
+        );
+        Ok(status.success())
     }
 }

@@ -39,3 +39,15 @@ pub mod timeouts {
     pub const DEFAULT_WAIT_LOCK_SECS: u64 = 30;
     pub const DOCKER_RUN_TIMEOUT: Duration = Duration::from_secs(1800); // 30 minutes
 }
+
+/// Compatibility helpers and supported distro list
+pub mod compat {
+    /// Arch-family distros supported by default (without skip flag)
+    pub const SUPPORTED_DISTROS: [&str; 4] = ["arch", "endeavouros", "cachyos", "manjaro"];
+
+    /// Returns true if the provided distro ID is supported by default policy
+    pub fn is_supported_distro(id: &str) -> bool {
+        let id = id.to_ascii_lowercase();
+        SUPPORTED_DISTROS.contains(&id.as_str())
+    }
+}

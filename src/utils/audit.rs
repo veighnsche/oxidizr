@@ -45,6 +45,46 @@ impl AuditLogger {
         Ok(())
     }
 
+    /// Writes a structured provenance entry (JSONL) for executed commands and decisions.
+    /// Fields: timestamp, component, event, decision, inputs, outputs, exit_code
+    pub fn log_provenance(
+        &self,
+        component: &str,
+        event: &str,
+        decision: &str,
+        inputs: &str,
+        outputs: &str,
+        exit_code: Option<i32>,
+    ) -> Result<()> {
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string();
+        fn esc(s: &str) -> String {
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\r', "\\r")
+        }
+        let json = format!(
+            "{{\"timestamp\":\"{}\",\"component\":\"{}\",\"event\":\"{}\",\"decision\":\"{}\",\"inputs\":\"{}\",\"outputs\":\"{}\",\"exit_code\":{}}}\n",
+            esc(&timestamp),
+            esc(component),
+            esc(event),
+            esc(decision),
+            esc(inputs),
+            esc(outputs),
+            exit_code.map(|c| c.to_string()).unwrap_or_else(|| "null".into())
+        );
+
+        // Try system path first, fallback to user log on error
+        if self.write_to_file(&self.log_path, &json).is_err() {
+            let user_log = format!(
+                "{}/.oxidizr-arch-audit.log",
+                std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())
+            );
+            self.write_to_file(&user_log, &json)?;
+        }
+        Ok(())
+    }
+
     fn write_to_file(&self, path: &str, content: &str) -> Result<()> {
         let mut file = OpenOptions::new()
             .create(true)

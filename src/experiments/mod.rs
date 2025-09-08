@@ -8,6 +8,7 @@ use crate::error::Result;
 use crate::utils::worker::Worker;
 use std::path::PathBuf;
 use crate::config::packages;
+use crate::config::compat;
 
 pub use sudors::SudoRsExperiment;
 
@@ -36,14 +37,26 @@ impl<'a, W: Worker> Experiment<'a, W> {
                 if no_compatibility_check || u.check_compatible(worker)? {
                     u.enable(worker, assume_yes, update_lists)
                 } else {
-                    Ok(())
+                    Err(crate::error::CoreutilsError::Incompatible(
+                        format!(
+                            "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
+                            worker.distribution()?.id,
+                            compat::SUPPORTED_DISTROS
+                        ),
+                    ))
                 }
             }
             Experiment::SudoRs(s) => {
                 if no_compatibility_check || s.check_compatible(worker)? {
                     s.enable(worker, assume_yes, update_lists)
                 } else {
-                    Ok(())
+                    Err(crate::error::CoreutilsError::Incompatible(
+                        format!(
+                            "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
+                            worker.distribution()?.id,
+                            compat::SUPPORTED_DISTROS
+                        ),
+                    ))
                 }
             }
         }
@@ -53,6 +66,13 @@ impl<'a, W: Worker> Experiment<'a, W> {
         match self {
             Experiment::Uutils(u) => u.disable(worker, assume_yes, update_lists),
             Experiment::SudoRs(s) => s.disable(worker, assume_yes, update_lists),
+        }
+    }
+
+    pub fn remove(&self, worker: &W, assume_yes: bool, update_lists: bool) -> Result<()> {
+        match self {
+            Experiment::Uutils(u) => u.remove(worker, assume_yes, update_lists),
+            Experiment::SudoRs(s) => s.remove(worker, assume_yes, update_lists),
         }
     }
 
@@ -74,25 +94,24 @@ impl<'a, W: Worker> Experiment<'a, W> {
 pub fn all_experiments<'a, W: Worker>(worker: &'a W) -> Vec<Experiment<'a, W>> {
     let dist = worker.distribution().unwrap();
     let id = dist.id.to_ascii_lowercase();
-    let is_supported_os = matches!(id.as_str(), "arch" | "manjaro" | "cachyos" | "endeavouros");
+    let is_supported_os = compat::is_supported_distro(&id);
 
-    let coreutils_pkg = if is_supported_os { packages::UUTILS_COREUTILS } else { "coreutils" };
-    // Prefer binary AUR package for findutils when supported, falls back to repo findutils otherwise
-    let findutils_pkg = if is_supported_os { packages::UUTILS_FINDUTILS } else { "findutils" };
-    let sudo_pkg = if is_supported_os { packages::SUDO_RS } else { "sudo" };
+    let coreutils_pkg = packages::UUTILS_COREUTILS;
+    let findutils_pkg = packages::UUTILS_FINDUTILS;
+    let sudo_pkg = packages::SUDO_RS;
 
     let coreutils = UutilsExperiment {
         name: "coreutils".into(),
         package_name: coreutils_pkg.to_string(),
         unified_binary: if is_supported_os { Some(PathBuf::from("/usr/bin/coreutils")) } else { None },
-        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/uutils/coreutils") } else { PathBuf::from("/usr/bin") },
+        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/uutils/coreutils") } else { PathBuf::from("/usr/lib/uutils/coreutils") },
     };
 
     let findutils = UutilsExperiment {
         name: "findutils".into(),
         package_name: findutils_pkg.to_string(),
         unified_binary: None,
-        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/cargo/bin/findutils") } else { PathBuf::from("/usr/bin") },
+        bin_directory: if is_supported_os { PathBuf::from("/usr/lib/cargo/bin/findutils") } else { PathBuf::from("/usr/lib/cargo/bin/findutils") },
     };
 
     let sudo = SudoRsExperiment { system: worker, package_name: sudo_pkg.to_string() };

@@ -1,7 +1,10 @@
+use crate::config::packages;
 use crate::error::{CoreutilsError, Result};
 use crate::utils::Distribution;
 use crate::utils::worker::Worker;
+use crate::utils::audit::AUDIT;
 use std::path::{Path, PathBuf};
+use std::io::{self, Write};
 
 pub struct SudoRsExperiment<'a, W: Worker> {
     pub system: &'a W,
@@ -63,7 +66,70 @@ impl<'a, W: Worker> SudoRsExperiment<'a, W> {
         if update_lists {
             worker.update_packages(assume_yes)?;
         }
-        // Install sudo-rs
+        // Repo capability checks and availability gating (official repos only)
+        let extra_available = worker.extra_repo_available()?;
+        let aur_helper = worker.aur_helper_name()?;
+        let aur_available = aur_helper.is_some();
+        let _ = AUDIT.log_provenance(
+            "sudors.enable",
+            "repo_capabilities",
+            "observed",
+            &format!(
+                "extra_available={}, aur_available={}, helper={:?}",
+                extra_available, aur_available, aur_helper
+            ),
+            "",
+            None,
+        );
+
+        if !extra_available && !aur_available {
+            return Err(CoreutilsError::ExecutionFailed(
+                "You do not have access to extra or AUR repositories.".into(),
+            ));
+        }
+        if !extra_available {
+            return Err(CoreutilsError::ExecutionFailed(
+                "Cannot download because the extra repository is not available.".into(),
+            ));
+        }
+
+        // Already-installed detection and prompt to reuse
+        if worker.check_installed(&self.package_name)? {
+            let mut reuse = true;
+            if !assume_yes {
+                print!(
+                    "Detected {} installed. Use existing instead of downloading? [Y/n]: ",
+                    self.package_name
+                );
+                io::stdout().flush().ok();
+                let mut s = String::new();
+                if io::stdin().read_line(&mut s).is_ok() {
+                    let ans = s.trim().to_ascii_lowercase();
+                    reuse = ans.is_empty() || ans == "y" || ans == "yes";
+                }
+            }
+            let _ = AUDIT.log_provenance(
+                "sudors.enable",
+                "already_installed",
+                if reuse { "reuse" } else { "reinstall_requested" },
+                &self.package_name,
+                "",
+                None,
+            );
+            if reuse {
+                log::info!(
+                    "Using existing installation of '{}' (no download)",
+                    self.package_name
+                );
+            } else {
+                log::info!(
+                    "Reinstall requested for '{}' (will attempt package install)",
+                    self.package_name
+                );
+            }
+        }
+
+        // Install sudo-rs (official repos only per worker policy)
         self.system.install_package(&self.package_name, assume_yes)?;
         // Replace sudo, su, visudo with binaries provided by sudo-rs. The Arch package layout may
         // install either into /usr/lib/cargo/bin/<name> or as /usr/bin/<name>-rs. Detect robustly.
@@ -114,14 +180,6 @@ impl<'a, W: Worker> SudoRsExperiment<'a, W> {
                 resolve_target(worker, name)
             };
             worker.restore_file(&target)?;
-        }
-        // Package removal policy: uninstall sudo-rs on disable.
-        // NOTE: This removes the package even if it was present before `enable`.
-        // To change this behavior, gate removal behind a CLI flag at the experiment layer.
-        if self.package_name == "sudo-rs" {
-            self.system.remove_package(&self.package_name, assume_yes)?;
-        } else {
-            log::info!("Skipping removal of core package: {}", self.package_name);
         }
         Ok(())
     }
