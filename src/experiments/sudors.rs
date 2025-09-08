@@ -2,6 +2,7 @@ use crate::checks::{Distribution, is_supported_distro};
 use crate::error::{Error, Result};
 use crate::experiments::{check_download_prerequisites, SUDO_RS};
 use crate::experiments::util::{resolve_usrbin, restore_targets, verify_removed};
+use crate::ui::progress;
 use crate::system::Worker;
 use std::path::{Path, PathBuf};
 
@@ -55,11 +56,13 @@ impl SudoRsExperiment {
         }
         
         // Replace sudo, su, visudo with binaries provided by sudo-rs
-        for (name, target) in [
+        let items = [
             ("sudo", self.resolve_target("sudo")),
             ("su", self.resolve_target("su")),
             ("visudo", PathBuf::from("/usr/sbin/visudo")),
-        ] {
+        ];
+        let mut pb = progress::new_bar(items.len() as u64);
+        for (name, target) in items {
             log::info!("Preparing sudo-rs applet '{}'", name);
             
             let source = self.find_sudors_source(worker, name);
@@ -74,20 +77,24 @@ impl SudoRsExperiment {
             
             // Create a stable alias in /usr/bin so that readlink(1) shows '/usr/bin/<name>.sudo-rs'
             let alias = PathBuf::from(format!("/usr/bin/{}.sudo-rs", name));
-            log::info!(
-                "Creating alias for sudo-rs '{}': {} -> {}",
-                name,
-                alias.display(),
-                source.display()
-            );
+            if pb.is_none() {
+                log::info!(
+                    "Creating alias for sudo-rs '{}': {} -> {}",
+                    name,
+                    alias.display(),
+                    source.display()
+                );
+            }
             worker.replace_file_with_symlink(&source, &alias)?;
             // Verify alias symlink presence for visibility; treat mismatches as hard errors
             match std::fs::symlink_metadata(&alias) {
                 Ok(m) if m.file_type().is_symlink() => {
-                    log::info!(
-                        "✅ Expected: '{}' alias symlink present, Received: symlink",
-                        name
-                    );
+                    if pb.is_none() {
+                        log::info!(
+                            "✅ Expected: '{}' alias symlink present, Received: symlink",
+                            name
+                        );
+                    }
                 }
                 Ok(_) => {
                     return Err(Error::ExecutionFailed(format!(
@@ -106,20 +113,24 @@ impl SudoRsExperiment {
                 }
             }
             
-            log::info!(
-                "Linking sudo-rs '{}' via alias: {} -> {}",
-                name,
-                target.display(),
-                alias.display()
-            );
+            if pb.is_none() {
+                log::info!(
+                    "Linking sudo-rs '{}' via alias: {} -> {}",
+                    name,
+                    target.display(),
+                    alias.display()
+                );
+            }
             worker.replace_file_with_symlink(&alias, &target)?;
             // Verify target symlink presence; treat mismatches as hard errors
             match std::fs::symlink_metadata(&target) {
                 Ok(m) if m.file_type().is_symlink() => {
-                    log::info!(
-                        "✅ Expected: '{}' linked via alias, Received: symlink",
-                        name
-                    );
+                    if pb.is_none() {
+                        log::info!(
+                            "✅ Expected: '{}' linked via alias, Received: symlink",
+                            name
+                        );
+                    }
                 }
                 Ok(_) => {
                     return Err(Error::ExecutionFailed(format!(
@@ -137,7 +148,11 @@ impl SudoRsExperiment {
                     )));
                 }
             }
+
+            // Update bar after finishing both alias and target for this name
+            progress::set_msg_and_inc(&pb, format!("Linking {}", name));
         }
+        progress::finish(pb);
         
         Ok(())
     }

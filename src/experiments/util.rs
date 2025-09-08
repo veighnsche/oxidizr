@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use crate::system::Worker;
+use crate::ui::progress;
 use std::path::{Path, PathBuf};
 
 /// Resolve a target path under /usr/bin
@@ -13,9 +14,13 @@ pub fn create_symlinks<F>(worker: &Worker, applets: &[(String, PathBuf)], resolv
 where
     F: Fn(&str) -> PathBuf,
 {
+    let mut pb = progress::new_bar(applets.len() as u64);
     for (filename, src) in applets {
         let target = resolve(filename);
-        log::info!("Symlinking {} -> {}", src.display(), target.display());
+        // When progress bar is active, avoid noisy per-item info logs
+        if pb.is_none() {
+            log::info!("Symlinking {} -> {}", src.display(), target.display());
+        }
         if let Err(e) = worker.replace_file_with_symlink(src, &target) {
             log::error!(
                 "❌ Failed to create symlink: src={} -> target={}: {}",
@@ -23,6 +28,8 @@ where
                 target.display(),
                 e
             );
+            // Clear the bar on error for better UX
+            progress::finish(pb.take());
             return Err(Error::ExecutionFailed(format!(
                 "failed to symlink {} -> {}: {}",
                 src.display(),
@@ -30,27 +37,42 @@ where
                 e
             )));
         }
+        // Update progress after a successful link
+        progress::set_msg_and_inc(&pb, format!("Linking {}", filename));
     }
+    // Finish the bar if present
+    progress::finish(pb);
     Ok(())
 }
 
 /// Restore a list of targets, logging each and surfacing errors with context.
 pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
+    let mut pb = progress::new_bar(targets.len() as u64);
     for target in targets {
-        log::info!("[disable] Restoring {} (if backup exists)", target.display());
+        if pb.is_none() {
+            log::info!("[disable] Restoring {} (if backup exists)", target.display());
+        }
         if let Err(e) = worker.restore_file(target) {
             log::error!(
                 "❌ Failed to restore {}: {}",
                 target.display(),
                 e
             );
+            progress::finish(pb.take());
             return Err(Error::ExecutionFailed(format!(
                 "failed to restore {}: {}",
                 target.display(),
                 e
             )));
         }
+        // Update progress after a successful restore
+        if let Some(name) = target.file_name().and_then(|s| s.to_str()) {
+            progress::set_msg_and_inc(&pb, format!("Restoring {}", name));
+        } else {
+            progress::set_msg_and_inc(&pb, "Restoring");
+        }
     }
+    progress::finish(pb);
     Ok(())
 }
 
