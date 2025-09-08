@@ -8,15 +8,49 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
 )
 
-func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, verbose bool, prefix string, col *color.Color) error {
+// classifyLine infers an intrinsic verbosity class and scope from a line.
+// Returns (vLevel 0..3, scope "[RUNNER]" or "", content without leading tags).
+func classifyLine(line string) (int, string, string) {
+	// Detect explicit runner-tagged lines like "[v2][RUNNER] message" or "[RUNNER] message"
+	if strings.HasPrefix(line, "[v") {
+		re := regexp.MustCompile(`^\[v([0-3])\]\[RUNNER\]\s+`) // [vN][RUNNER] <space>
+		if m := re.FindStringSubmatch(line); m != nil {
+			lvl := int(m[1][0] - '0')
+			content := re.ReplaceAllString(line, "")
+			return lvl, "[RUNNER]", content
+		}
+	}
+	if strings.HasPrefix(line, "[RUNNER] ") {
+		return 1, "[RUNNER]", strings.TrimPrefix(line, "[RUNNER] ")
+	}
+	// Detect Rust env_logger style levels inside product output
+	// Map: ERROR->v0, WARN->v1, INFO->v1, DEBUG->v2, TRACE->v3
+	switch {
+	case strings.Contains(line, " ERROR "):
+		return 0, "", line
+	case strings.Contains(line, " WARN "):
+		return 1, "", line
+	case strings.Contains(line, " INFO "):
+		return 1, "", line
+	case strings.Contains(line, " DEBUG "):
+		return 2, "", line
+	case strings.Contains(line, " TRACE "):
+		return 3, "", line
+	}
+	// Default for container script/stdout lines
+	return 1, "", line
+}
+
+func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, streamVerbose bool, selectedLevel int, distroTag string, col *color.Color) error {
 	containerName := fmt.Sprintf("oxidizr-arch-test-%s", strings.ReplaceAll(tag, ":", "-"))
-	if verbose {
+	if streamVerbose {
 		log.Println("RUN>", "docker run", "-v", rootDir+":/workspace", "--name", containerName, tag, command)
 	}
 	ctx, cancel := context.WithTimeout(parentCtx, timeout)
@@ -89,13 +123,21 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		(*buf)[maxLines-1] = line
 	}
 
+	pref := col.Sprint(distroTag)
 	doneCh := make(chan struct{}, 2)
 	go func() {
 		scanner := bufio.NewScanner(stdoutPipe)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if verbose {
-				log.Printf("%s %s", col.Sprint(prefix), line)
+			lvl, scope, content := classifyLine(line)
+			if streamVerbose {
+				if lvl <= selectedLevel {
+					if scope != "" {
+						log.Printf("%s[v%d]%s %s", pref, lvl, scope, content)
+					} else {
+						log.Printf("%s[v%d] %s", pref, lvl, content)
+					}
+				}
 			} else {
 				push(&lastStdout, line)
 			}
@@ -106,8 +148,15 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		scanner := bufio.NewScanner(stderrPipe)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if verbose {
-				log.Printf("%s %s", col.Sprint(prefix), line)
+			lvl, scope, content := classifyLine(line)
+			if streamVerbose {
+				if lvl <= selectedLevel {
+					if scope != "" {
+						log.Printf("%s[v%d]%s %s", pref, lvl, scope, content)
+					} else {
+						log.Printf("%s[v%d] %s", pref, lvl, content)
+					}
+				}
 			} else {
 				push(&lastStderr, line)
 			}
@@ -128,7 +177,7 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 			exitCode = ee.ExitCode()
 		}
 		cmdLine := "docker " + strings.Join(args, " ")
-		if verbose {
+		if streamVerbose {
 			return fmt.Errorf("docker run failed (exit code %d): %s: %w", exitCode, cmdLine, runErr)
 		}
 		stdoutTail := strings.Join(lastStdout, "\n")

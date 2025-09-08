@@ -191,30 +191,17 @@ trap on_exit EXIT
 		return err
 	}
 	doneCh := make(chan struct{}, 2)
-	distro := os.Getenv("ANALYTICS_DISTRO")
-	outPrefix := ""
-	if distro != "" {
-		outPrefix = "[" + distro + "]"
-	}
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			if outPrefix != "" {
-				fmt.Fprintln(os.Stdout, outPrefix, scanner.Text())
-			} else {
-				fmt.Fprintln(os.Stdout, scanner.Text())
-			}
+			fmt.Fprintln(os.Stdout, scanner.Text())
 		}
 		doneCh <- struct{}{}
 	}()
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			if outPrefix != "" {
-				fmt.Fprintln(os.Stderr, outPrefix, scanner.Text())
-			} else {
-				fmt.Fprintln(os.Stderr, scanner.Text())
-			}
+			fmt.Fprintln(os.Stderr, scanner.Text())
 		}
 		doneCh <- struct{}{}
 	}()

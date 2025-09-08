@@ -199,8 +199,8 @@ func main() {
 			// Ensure image exists; auto-build if missing
 			if err := runSilent("docker", "image", "inspect", tag); err != nil {
 				shellPrefix := color.New(color.FgCyan).Sprintf("[%s]", d)
-				log.Printf("%s[HOST] Docker image not found; building...", shellPrefix)
-				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, shellPrefix+"[HOST]", color.New(color.FgCyan)); err2 != nil {
+				log.Printf("%s[v1][HOST] Docker image not found; building...", shellPrefix)
+				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, shellPrefix+"[v3][HOST]", color.New(color.FgCyan)); err2 != nil {
 					log.Fatalf("docker build failed for --shell: %v", err2)
 				}
 			}
@@ -251,14 +251,14 @@ func main() {
 					hash = h
 				}
 				distroImageTag := fmt.Sprintf("oxidizr-%s:%s", d, hash)
-				prefix := col.Sprintf("[%s]", d)
+				distroTag := col.Sprintf("[%s]", d)
 
 				// If one-shot, we implicitly build
 				doBuild := *archBuild
 				if doBuild {
-					log.Printf("%s[HOST] Building test environment (%s)...", prefix, distroImageTag)
-					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix+"[HOST]", col); err != nil {
-						errs <- fmt.Errorf("%s docker build failed: %w", prefix, err)
+					log.Printf("%s[v1][HOST] Building test environment (%s)...", distroTag, distroImageTag)
+					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, distroTag+"[v3][HOST]", col); err != nil {
+						errs <- fmt.Errorf("%s docker build failed: %w", distroTag, err)
 						return
 					}
 				}
@@ -279,9 +279,9 @@ func main() {
 
 					// Auto-build if the image tag is missing
 					if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
-						log.Printf("%s[HOST] Docker image not found; building...", prefix)
-						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix+"[HOST]", col); err2 != nil {
-							errs <- fmt.Errorf("%s docker build failed: %w", prefix, err2)
+						log.Printf("%s[v1][HOST] Docker image not found; building...", distroTag)
+						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, distroTag+"[v3][HOST]", col); err2 != nil {
+							errs <- fmt.Errorf("%s docker build failed: %w", distroTag, err2)
 							return
 						}
 					}
@@ -300,31 +300,23 @@ func main() {
 						// Propagate verbosity to the Rust binary's logger
 						envVars = append(envVars, "RUST_LOG=info")
 					}
-
 					if *testFilter != "" {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}
 
-					log.Printf("%s[HOST] Starting tests...", prefix)
-					// Streamed container output will be tagged with distro only (container is default)
-					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1, prefix, col); err != nil {
-						errs <- fmt.Errorf("%s docker run failed: %w", prefix, err)
+					log.Printf("%s[v1][HOST] Starting tests...", distroTag)
+					// Stream and tag per-line with intrinsic levels
+					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1, verbosityLevel, distroTag, col); err != nil {
+						errs <- fmt.Errorf("%s docker run failed: %w", distroTag, err)
 						cancel() // Cancel all other running tests
 						return
 					}
-					log.Printf("%s[HOST] Tests finished successfully.", prefix)
-				}
-
-				// If interactive shell is requested
-				if *archShell {
-					// Shell mode is not parallelized as it's interactive
-					log.Printf("%s[HOST] Skipping interactive shell for %s in parallel mode.", prefix, distro)
+					log.Printf("%s[v1][HOST] Tests finished successfully.", distroTag)
 				}
 			}(distroName, colorPalette[i%len(colorPalette)])
 		}
 
 		wg.Wait()
-// ... (rest of the code remains the same)
 
 		for err := range errs {
 			if err != nil {
