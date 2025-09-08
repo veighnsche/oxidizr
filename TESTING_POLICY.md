@@ -13,36 +13,19 @@ This document defines the non-negotiable rules for tests, CI, harness behavior, 
 
 ## SKIP Policy
 
-- Only one SKIP is approved: the `tests/disable-in-german` suite is flaky under parallel, cross-distro runs and may be skipped when the matrix is executed in parallel.
-- No other SKIPs are authorized. Any additional SKIPs must be removed.
-- CI treatment: SKIPs cause CI failure by default. The single allowed SKIP is time-bounded, must have a blocking issue and an owner, and must be removed as soon as the test is deflaked (or is run serialized/isolated reliably).
+- Zero SKIPs are authorized. Any SKIP is a failure.
+- CI treatment: Any SKIP fails the run in FULL_MATRIX mode and must be fixed. Do not mask nondeterminism with SKIPs.
 
-Note: Previous versions of this policy incorrectly attributed the SKIP to missing German locale definitions on derivative Docker images. That was incorrect; Arch itself can fail this suite when all distros run in parallel. The SKIP exists because of parallel-run nondeterminism, not locale availability.
+Note: Locales are baked into Docker images (see `test-orch/docker/Dockerfile`). Locale-related failures are infra bugs and must be fixed in image builds.
 
 ## Allowed SKIPs Table (Docker-only constraints)
 
-This table is the authoritative list of which tests may ever skip due to Docker image limitations. Anything not listed here must not skip.
-
-| Test Suite                              | Allowed to SKIP? | Distros                              | Reason                                                                                 | Notes / Owner |
-|-----------------------------------------|------------------|--------------------------------------|----------------------------------------------------------------------------------------|---------------|
-| `tests/disable-in-german`               | Yes (temporary)  | `arch, cachyos, manjaro, endeavouros`| Flaky under parallel, cross-distro runs; passes in isolation/serialized execution      | Tracked issue: deflake or serialize; note prior incorrect locale rationale |
-| `tests/enable-all`                      | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/enable-default`                  | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/enable-no-compatibility-check`   | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/enable-partial`                  | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/disable-all`                     | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/disable-default`                 | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/disable-partial`                 | No               | all                                  | Not locale-dependent; must run                                                         | — |
-| `tests/non-root`                        | No               | all                                  | Not locale-dependent; must run                                                         | — |
-
-Notes:
-- The `disable-in-german` SKIP is the only SKIP not treated as a failure in `FULL_MATRIX` CI. It is strictly time-bounded and must have an active blocking issue and owner. All other SKIPs fail the run.
+None. All suites must run; any SKIP is a failure to be fixed.
 
 ## CI and Matrix Policy
 
 - FULL_MATRIX is the default for CI runs via the host orchestrator.
-- Any SKIP in any matrix job fails the run, except the single allowed SKIP listed above (`tests/disable-in-german` when the matrix runs distros in parallel due to test flakiness). That specific SKIP is permitted (tracked) and does not fail the run.
-- Non-matrix runs must not silently appear green by skipping assertions—if the scenario cannot be executed, fail with a clear reason.
+- Any SKIP in any matrix job fails the run. Non-matrix runs must not silently appear green by skipping assertions—if the scenario cannot be executed, fail with a clear reason.
 
 ## Harness Policy (Docker and other runners)
 
@@ -54,7 +37,7 @@ Notes:
 
 ## Product–Policy Alignment
 
-- Goal: support switching across Arch-family distros (`arch, manjaro, cachyos, endeavouros`) with zero SKIPs in matrix runs (except the single SKIP for `tests/disable-in-german` when the matrix is run in parallel due to known flakiness).
+- Goal: support switching across Arch-family distros (`arch, manjaro, cachyos, endeavouros`) with zero SKIPs in matrix runs.
 - Do not distro-gate the Arch-family to make tests pass; run the same assertions across the family. Gate only OSes we explicitly do not support or have never tested.
 - Registry defaults must not hard-block derivatives. If providers are available (via pacman/AUR), switching proceeds; otherwise fail loudly with a clear reason (no SKIPs).
 - `SudoRsExperiment::check_compatible()` should allow derivatives when the package is installed/available; otherwise error (not skip).
@@ -71,7 +54,7 @@ Notes:
 
 ## Infrastructure Policy (Containers/Images)
 
-- Tests must be robust to parallel execution across distros. Known flaky suites must be deflaked or explicitly serialized. Until then, the single approved SKIP applies and is time-bounded.
+- Tests must be robust to parallel execution across distros. Flaky suites must be deflaked or explicitly serialized in CI configuration; do not use SKIPs.
 - Infra gaps discovered by tests must either be fixed in images or cause a hard failure with clear remediation guidance.
 
 ## Documentation and Accountability

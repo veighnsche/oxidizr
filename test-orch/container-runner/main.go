@@ -14,15 +14,13 @@ func main() {
 	}
 
 	testFilter := flag.String("test-filter", "", "Run only the named YAML suite directory (e.g., disable-in-german)")
-	fullMatrix := flag.Bool("full-matrix", false, "Fail on skipped suites (sets FULL_MATRIX=1)")
 	flag.Parse()
 
 	if *testFilter != "" {
 		_ = os.Setenv("TEST_FILTER", *testFilter)
 	}
-	if *fullMatrix {
-		_ = os.Setenv("FULL_MATRIX", "1")
-	}
+	// Strict matrix semantics are the default: treat skips/infra gaps as failures
+	_ = os.Setenv("FULL_MATRIX", "1")
 
 	if err := runInContainer(); err != nil {
 		log.Fatalf("in-container runner failed: %v", err)

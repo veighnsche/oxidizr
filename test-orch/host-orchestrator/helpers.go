@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -22,6 +25,62 @@ var (
 )
 
 func setQuiet(q bool) { quietMode = q }
+
+// computeBuildHash walks selected paths under the docker context directory and returns a short
+// sha256 hex digest. Any change to inputs yields a new tag, so existing images are reused only
+// when inputs are unchanged.
+func computeBuildHash(ctxDir string) (string, error) {
+    // Inputs that affect the in-container runner image
+    inputs := []string{
+        filepath.Join(ctxDir, "docker/Dockerfile"),
+        filepath.Join(ctxDir, "container-runner"), // binary name if present (ignored if not)
+        filepath.Join(ctxDir, "container-runner/"), // source tree
+    }
+    h := sha256.New()
+    seen := make(map[string]bool)
+    for _, p := range inputs {
+        // Expand directories
+        fi, err := os.Stat(p)
+        if err != nil {
+            continue
+        }
+        if fi.IsDir() {
+            filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
+                if err != nil { return nil }
+                if info.IsDir() { return nil }
+                rel, _ := filepath.Rel(ctxDir, path)
+                if seen[rel] { return nil }
+                seen[rel] = true
+                io.WriteString(h, rel)
+                f, err := os.Open(path)
+                if err == nil {
+                    _, _ = io.Copy(h, f)
+                    f.Close()
+                }
+                return nil
+            })
+        } else {
+            rel, _ := filepath.Rel(ctxDir, p)
+            if !seen[rel] {
+                seen[rel] = true
+                io.WriteString(h, rel)
+                f, err := os.Open(p)
+                if err == nil {
+                    _, _ = io.Copy(h, f)
+                    f.Close()
+                }
+            }
+        }
+    }
+    // Stabilize by hashing the filenames set order too
+    var files []string
+    for k := range seen { files = append(files, k) }
+    sort.Strings(files)
+    for _, k := range files { io.WriteString(h, "|"+k) }
+    sum := fmt.Sprintf("%x", h.Sum(nil))
+    if len(sum) > 12 { sum = sum[:12] }
+    return sum, nil
+}
 func setVerbosity(lvl int) {
 	if lvl < 0 { lvl = 0 }
 	if lvl > 3 { lvl = 3 }

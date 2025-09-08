@@ -1,10 +1,10 @@
-# Full Matrix Testing Plan (Strict, with a Single Allowed SKIP)
+# Full Matrix Testing Plan (Strict, Zero SKIPs)
 
 Goal
 
-- Ensure every target distribution runs the complete test suite (YAML suites under `tests/` and the heavy Go assertions in `test-orch/container-runner/assertions/`) with zero silent skips.
+- Ensure every target distribution runs the complete test suite (YAML suites under `tests/` and the heavy Go assertions in `test-orch/container-runner/assertions/`) with zero SKIPs.
 - Target matrix (initial): arch, manjaro, cachyos, endeavouros. Extendable via a single flag.
-- Any SKIP in matrix mode fails the run, except the single allowed SKIP: `tests/disable-in-german` may skip when the matrix runs distros in parallel due to test flakiness under parallel execution (affects `arch, manjaro, cachyos, endeavouros`). See `TESTING_POLICY.md`.
+- Any SKIP in matrix mode fails the run. Locales are baked into images to make runs deterministic.
 
 Current gaps (sources of false positives)
 
@@ -15,16 +15,16 @@ Current gaps (sources of false positives)
 - Coreutils leniency hides failures
   - In `ensureCoreutilsInstalled()`, missing applet symlinks are only warnings, so enable can “pass” with near-zero coverage.
 - Parallel-run nondeterminism
-  - `tests/disable-in-german/task.yaml` exhibits nondeterministic failures only when executed in parallel across distros; it passes reliably when run in isolation/serialized.
+  - Historically affected `tests/disable-in-german/task.yaml`. We will deflake or serialize in CI configuration as needed—do not skip.
 
 Planned changes (implementation checklist)
 
 1) Container Runner (in-container)
 
-- yamlrunner: explicit PASS/FAIL/SKIP (with one exception)
+- yamlrunner: explicit PASS/FAIL/SKIP (no exceptions)
   - Introduce a `SuiteResult { Name, Status, Reason }` and aggregate results in `yamlrunner.Run()`.
   - In `runSingleSuite()`, return `Status = SKIP` when distro check fails or is indeterminate; return `FAIL` on execution error; return `PASS` only on success.
-  - Add env toggle `FULL_MATRIX=1` (or `NO_SKIP=1`). When set, treat any SKIP as a hard error (convert to FAIL) and set a distinct exit code, except the single allowed SKIP (`disable-in-german` when executed in parallel across distros due to known flakiness).
+  - Add env toggle `FULL_MATRIX=1` (or `NO_SKIP=1`). When set, treat any SKIP as a hard error (convert to FAIL) and set a distinct exit code.
   - Emit a JSON summary to `projectDir/artifacts/yaml-results.json` and a human summary.
 
 - assertions: run everywhere and tighten checks
@@ -40,7 +40,7 @@ Planned changes (implementation checklist)
 - setup: pre-provision consistent environment
   - In `test-orch/container-runner/setup/setup.go`:
     - Mirrors: keep `pacman -Syy` and reflector (Arch). For derivatives, validate pacman is usable (Manjaro/CachyOS/EndeavourOS use pacman).
-    - Locales: install `glibc-locales` if not present; ensure `de_DE.UTF-8 UTF-8` and `C.UTF-8` in `/etc/locale.gen`, then run `locale-gen`.
+    - Locales: no runtime locale-gen. `de_DE.UTF-8` is baked into the Docker image; runner may probe/log for visibility only.
     - AUR helper: keep `paru-bin` approach. Verify builder user and permissions across derivatives.
     - Rust: rustup default stable for root and builder.
 
@@ -62,9 +62,9 @@ Planned changes (implementation checklist)
   - Where distro-specific deltas exist, detect at runtime and assert equivalently, not by skipping.
 
 - Parallel-sensitive suite: `tests/disable-in-german/task.yaml`
-  - Not fundamentally blocked by locale provisioning; the dominant issue is nondeterminism under parallel, cross-distro runs.
-  - Mitigation: run this suite serialized or in isolation when deflaking is not yet complete. In `FULL_MATRIX=1`, a SKIP is permitted only for this suite when running the full matrix in parallel.
-  - Optionally keep locale assertions for clarity, but do not attribute SKIP to locale availability.
+  - Not blocked by locale provisioning; locales are pre-baked in images.
+  - Mitigation: deflake and/or serialize in CI configuration if needed. Do not allow SKIPs.
+  - Keep locale assertions for clarity; any locale failure is an image provisioning bug.
 
 - Use `set -euo pipefail` (already present). Keep `|| true` only in restore/cleanup blocks.
 
@@ -83,10 +83,10 @@ Planned changes (implementation checklist)
 
 Acceptance criteria
 
-- All four distros complete YAML suites and heavy assertions with no SKIPs, except that `disable-in-german` is allowed to SKIP when executed in parallel across distros due to known flakiness (affects `arch, manjaro, cachyos, endeavouros`), as documented in `TESTING_POLICY.md`.
+- All four distros complete YAML suites and heavy assertions with no SKIPs.
 - `host-orchestrator` exits nonzero if any suite or assertion is SKIP/FAIL in `--require-full-matrix` mode.
 - Missing coreutils symlinks cause failures (not warnings) when below the threshold.
-- German-locale suite reliably runs (locale pre-provisioned) or fails loudly in full-matrix mode.
+- German-locale suite reliably runs (locale pre-baked) or fails loudly in full-matrix mode.
 - JSON artifacts are generated for postmortem debugging.
 
 Operational notes

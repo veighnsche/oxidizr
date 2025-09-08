@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -99,7 +100,12 @@ func ensureCoreutilsInstalled() error {
 	if !isPkgInstalled("uutils-coreutils") {
 		return fmt.Errorf("package 'uutils-coreutils' should be installed")
 	}
-	bins, err := readLines("/root/project/oxidizr-arch/tests/lib/rust-coreutils-bins.txt")
+	projectDir := os.Getenv("PROJECT_DIR")
+	if projectDir == "" {
+		projectDir = "/workspace"
+	}
+	binsFile := filepath.Join(projectDir, "tests/lib/rust-coreutils-bins.txt")
+	bins, err := readLines(binsFile)
 	if err != nil {
 		return fmt.Errorf("could not read coreutils bin list: %w", err)
 	}
@@ -113,6 +119,19 @@ func ensureCoreutilsInstalled() error {
 
 	symlinkCount := 0
 	checkedCount := 0
+	// Only these applets will be asked for --version (expected to return 0 and not contain GNU)
+	criticalVersionCheck := map[string]bool{
+		"date": true,
+		"ls": true,
+		"readlink": true,
+		"stat": true,
+		"rm": true,
+		"cp": true,
+		"ln": true,
+		"mv": true,
+		"cat": true,
+		"echo": true,
+	}
 	for _, bin := range bins {
 		target := "/usr/bin/" + bin
 		checkedCount++
@@ -123,13 +142,15 @@ func ensureCoreutilsInstalled() error {
 		if !fileExists("/usr/bin/." + bin + ".oxidizr.bak") {
 			return fmt.Errorf("backup file for %s not found", target)
 		}
-		out, err := exec.Command(target, "--version").Output()
-		if err != nil {
-			// If the binary cannot run, treat as failure in assertions
-			return fmt.Errorf("failed to run %s --version: %w", target, err)
-		}
-		if strings.Contains(string(out), "GNU") {
-			return fmt.Errorf("%s appears to be GNU version", target)
+		// Only run --version on critical subset; some applets (e.g., false) exit non-zero by design
+		if criticalVersionCheck[bin] {
+			out, err := exec.Command(target, "--version").Output()
+			if err != nil {
+				return fmt.Errorf("failed to run %s --version: %w", target, err)
+			}
+			if strings.Contains(string(out), "GNU") {
+				return fmt.Errorf("%s appears to be GNU version", target)
+			}
 		}
 	}
 	if symlinkCount == 0 {

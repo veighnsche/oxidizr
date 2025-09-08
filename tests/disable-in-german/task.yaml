@@ -4,21 +4,14 @@ distro-check:
 execute: |-
   set -euo pipefail
 
-  # Attempt to generate German locale; in FULL_MATRIX mode, treat failure as hard error
-  if sed -i 's/^#de_DE.UTF-8/de_DE.UTF-8/' /etc/locale.gen && locale-gen; then
-    # Enable German locale (portable across distros)
+  # Verify German locale is available (baked at image build time)
+  if locale -a | grep -qi '^de_DE\.utf8$'; then
     export LC_ALL=de_DE.UTF-8
     export LANGUAGE=de_DE.UTF-8
     export LANG=de_DE.UTF-8
   else
-    if [ "${FULL_MATRIX:-0}" = "1" ]; then
-      echo "de_DE.UTF-8 locale not available in FULL_MATRIX mode" >&2
-      exit 1
-    fi
-    echo "Warning: de_DE.UTF-8 locale not available, falling back to C.UTF-8."
-    export LC_ALL=C.UTF-8
-    export LANGUAGE=C.UTF-8
-    export LANG=C.UTF-8
+    echo "Required locale de_DE.UTF-8 is missing. Fix the Docker image (bake locales) and retry." >&2
+    exit 1
   fi
 
   oxidizr-arch enable --yes

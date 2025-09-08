@@ -18,15 +18,30 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /isolated-runner .
 # Final stage
 FROM ${BASE_IMAGE}
 
-ENV LANG=C.UTF-8
+# Ensure locale files aren't stripped by pacman (some minimal images set NoExtract)
+RUN sed -i 's/^[[:space:]]*NoExtract/# NoExtract (disabled for locales)/' /etc/pacman.conf
 
 # Refresh system and install essentials used by our scripts
-RUN pacman -Syu --noconfirm && \
+RUN pacman -Syyu --noconfirm && \
     pacman -S --noconfirm reflector && \
     reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist && \
-    pacman -S --noconfirm --needed sudo git curl rustup which findutils glibc glibc-locales && \
+    pacman -S --noconfirm --needed sudo git curl rustup which findutils glibc sed && \
     # Reduce image size a bit
     pacman -Scc --noconfirm || true
+
+# Force reinstall glibc to restore any locale files that may have been stripped previously
+RUN pacman -S --noconfirm --overwrite='*' glibc
+
+# Enable and generate de_DE.UTF-8
+RUN sed -i 's/^[#[:space:]]*de_DE.UTF-8 UTF-8/de_DE.UTF-8 UTF-8/' /etc/locale.gen && \
+    locale-gen
+
+# Persist default locale for non-login shells and child processes
+RUN printf 'LANG=de_DE.UTF-8\nLC_ALL=de_DE.UTF-8\n' > /etc/locale.conf
+
+# Now set environment defaults (after generation)
+ENV LANG=de_DE.UTF-8 \
+    LC_ALL=de_DE.UTF-8
 
 # Set DNS servers to fix network issues
 RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \

@@ -11,7 +11,7 @@ Use this as the source of truth to adapt test preparation and expectations per d
 
 ## Summary
 
-- Locales: Presence may vary by image; we probe but do not modify locales during tests.
+- Locales: `de_DE.UTF-8` is baked into Docker images at build time for deterministic CI. The runner may probe/log locale status but does not generate locales at runtime.
 - AUR helpers: CachyOS commonly ships with `paru` preinstalled. Arch usually has none. Manjaro/EndeavourOS status TBD.
 - Package manager: All use `pacman`, but repo sets differ (vendor repos).
 - Base packages: We install a consistent baseline via `setup/deps.go` inside the container.
@@ -21,23 +21,16 @@ Use this as the source of truth to adapt test preparation and expectations per d
 ### Locales
 
 - Arch Linux
-  - Locale definitions typically present; we do not rely on mutating locales during tests.
-  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
+  - `de_DE.UTF-8` baked into image; runner does not mutate locales at runtime.
 - CachyOS
-  - Locale definitions may be missing in minimal images; we probe and log.
-  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
+  - `de_DE.UTF-8` baked into image; runner does not mutate locales at runtime.
 - Manjaro
-  - Locale definitions vary in minimal images; we probe and log.
-  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
+  - `de_DE.UTF-8` baked into image; runner does not mutate locales at runtime.
 - EndeavourOS
-  - Locale definitions vary in minimal images; we probe and log.
-  - `disable-in-german` test: passes in isolation/serialized; may flake under parallel cross-distro execution.
+  - `de_DE.UTF-8` baked into image; runner does not mutate locales at runtime.
 
 Runtime behavior:
-- See `container-runner/setup/locales.go` for logic that:
-  - Ensures `/etc/locale.gen` contains `en_US.UTF-8`, `de_DE.UTF-8`, `C.UTF-8`
-  - Attempts `locale-gen`
-  - If definitions are missing, attempts best-effort remediation by reinstalling `glibc-locales` and retrying; if still missing, YAML tests must fail fast when `FULL_MATRIX=1`.
+- Locales are provisioned at image build time (see `test-orch/docker/Dockerfile`). Runner may probe/log but does not attempt `locale-gen`.
 
 ### AUR helper preinstallation
 
@@ -75,8 +68,7 @@ Detection details (implemented): see `container-runner/setup/rust.go` and relate
 ## Test Impact and Expectations
 
 - `disable-in-german` YAML suite
-  - Known to be flaky when the matrix runs distros in parallel; allowed to SKIP only in that mode across the Arch-family (including Arch). Passes in isolation/serialized.
-  - See `TESTING_POLICY.md` (Allowed SKIPs Table). This SKIP is temporary and tracked until the suite is deflaked or reliably serialized.
+  - Must run across the Arch-family without SKIPs. Any failure is a hard error (infra or product) to be fixed.
 - AUR-dependent steps
   - Should work across all distros; installation is skipped when a helper (e.g., `paru`) is preinstalled.
 - Build and assertions
@@ -101,6 +93,4 @@ All probe results are logged; add additional probes as needed.
 ## Action Items / TBD
 
 - Verify AUR helper presence on Manjaro and EndeavourOS minimal images.
-- Confirm locale definition availability on Manjaro and EndeavourOS base images used by CI.
-- Decide test matrix expectations: mark locale-dependent tests to run only on distros with locales present, or keep FULL_MATRIX fail-fast semantics.
-- Optionally enhance Docker build for derivatives to include locale data (trade-off: bigger images vs. faithful minimal environments).
+- Ensure Docker builds continue to bake `de_DE.UTF-8` for all Arch-family images used by CI.

@@ -2,9 +2,7 @@
 
 ## Summary
 
-The `tests/disable-in-german/task.yaml` suite exhibits nondeterministic failures when the matrix runs distros in parallel across the Arch-family (Arch, Manjaro, CachyOS, EndeavourOS). Importantly, it passes reliably in isolation or when serialized. The failures often show up in the final phase asserting the `sudo` target and/or post-disable state.
-
-Correction (September 2025): Previous documentation attributed failures on derivatives to missing `de_DE` locale definition files. That attribution was incomplete and led to an incorrect SKIP rationale. The operative reason for the single allowed SKIP is parallel-run flakiness, which can affect Arch as well when executed concurrently with other distros.
+The `tests/disable-in-german/task.yaml` suite must run green across the Arch-family (Arch, Manjaro, CachyOS, EndeavourOS). Failures caused by missing `de_DE` locale definitions are infrastructure issues. Policy is to bake `de_DE.UTF-8` into the Docker images at build time and treat any missing-locale errors as hard failures to be fixed in the image.
 
 ## What the test currently does
 
@@ -17,29 +15,23 @@ Correction (September 2025): Previous documentation attributed failures on deriv
 
 See: `tests/disable-in-german/task.yaml`.
 
-## Root causes
+## Root causes (historical)
 
-- __Parallel-run nondeterminism__: When all distros are executed concurrently, cross-container timing and resource contention produce flakes that this suite is sensitive to. In isolation/serialized runs, the same steps are consistently green.
-- __Distro compatibility for sudo-rs (product context)__: `sudo-rs` enablement used to be Arch-only by default. The test was updated to assert conditionally based on package presence to stay aligned with product behavior.
-- __Locale provisioning variability (non-root cause of SKIP)__: Locale differences exist across images and remain probed for visibility. They are not the operative reason for the SKIP policy.
+- Locale provisioning variability in minimal images caused `locale-gen` to fail when `de_DE` definitions were absent.
+- Some parallel-run nondeterminism made the suite sensitive to timing in cross-distro runs.
+- `sudo-rs` enablement policy used to vary; assertions have since been aligned with package presence.
 
 ## Why failures happen “for everybody”
 
 - On Arch derivatives, `sudo-rs` is not enabled by the product due to compatibility gating. The test still expects it to be enabled. With no `set -euo pipefail`, enable failures are not caught, and the final assertion inevitably fails.
 - On Arch itself, locale generation is typically fine and `sudo-rs` is enabled; failures are less likely. But environment flakiness (locales/mirrors) can still cause sporadic issues.
 
-## Proposed solution
+## Solution (current policy)
 
-- __Deflake or serialize__:
-  - Short-term: run `tests/disable-in-german` serialized or in isolation when executing the full matrix in parallel.
-  - Medium-term: identify and remove sources of nondeterminism in this suite (cross-container contention, ordering assumptions, environment coupling) and then remove the SKIP exception.
-- __Keep the test strict and explicit__:
-  - Retain `set -euo pipefail` so failures abort immediately.
-- __Align assertions with actual package state__:
-  - If `sudo-rs` is installed (`pacman -Qi sudo-rs`), assert `/usr/bin/sudo -> /usr/bin/sudo.sudo-rs`.
-  - If not installed, assert that `/usr/bin/sudo` is not linked to the sudo-rs alias.
-- __Locale handling__:
-  - Keep locale checks as visibility probes; do not attribute SKIPs to locale presence/absence.
+- Bake `de_DE.UTF-8` into Docker images at build time (see `test-orch/docker/Dockerfile`).
+- Retain `set -euo pipefail` so failures abort immediately.
+- Align assertions with actual package state (e.g., `sudo-rs` present -> `sudo` points to `sudo-rs`).
+- No SKIPs are permitted for this suite. Missing locales must be fixed in image builds.
 
 ## Implementation details
 
@@ -50,7 +42,7 @@ See: `tests/disable-in-german/task.yaml`.
 
 ## Expected outcome
 
-- On Arch and derivatives: The suite passes when run in isolation/serialized. In parallel matrix runs, a single SKIP is allowed for this suite until deflaked.
+- On Arch and derivatives: The suite passes in isolation and in parallel matrix runs. Locale errors are not tolerated and must be fixed by image provisioning.
 
 ## Recent Analysis (September 2025) — Correction and historical context
 
@@ -62,12 +54,11 @@ The test has the intended strictness and conditional assertions:
 2. **✅ Conditional sudo-rs assertions**: Check package presence before asserting symlink targets
 3. **✅ Locale probes**: Modify `/etc/locale.gen` and call `locale-gen` when appropriate, but locale availability is not the SKIP rationale
 
-### Correction: Parallel-run flakiness is the operative SKIP reason
+### Note on parallel runs
 
-- In parallel, cross-distro runs, this suite intermittently fails across the family, including Arch.
-- In isolation/serialized runs, it passes reliably.
+- Historical flakes under parallel execution should be deflaked. Do not use SKIPs to mask them.
 
-### Historical hypothesis (kept for reference): Missing locale data in some images
+### Historical failure mode: Missing locale data
 
 Logs have shown errors like:
 
@@ -76,7 +67,7 @@ Logs have shown errors like:
 [cachyos] de_DE.UTF-8 locale not available in FULL_MATRIX mode
 ```
 
-Locale differences remain real across images and are still worth probing for visibility; however, they are not the reason for the SKIP policy. The allowed SKIP exists solely due to parallel-run nondeterminism and will be removed once the suite is deflaked or serialized.
+These are image-provisioning bugs. Our Docker builds now generate the locale during image creation to prevent this.
 
 ## References
 

@@ -164,11 +164,6 @@ func main() {
 					errs <- fmt.Errorf("unknown distribution '%s', skipping", distro)
 					return
 				}
-				distroImageTag := fmt.Sprintf("oxidizr-%s:latest", d)
-				prefix := col.Sprintf("[%s]", d)
-
-				log.Printf("%s Processing...", prefix)
-
 				// Resolve docker context dir relative to current working dir/repo
 				ctxDir := *dockerCtx
 				if !filepath.IsAbs(ctxDir) {
@@ -182,6 +177,16 @@ func main() {
 						}
 					}
 				}
+
+				// Compute a content hash of the build inputs to create a unique tag per source revision
+				hash := "latest"
+				if h, err := computeBuildHash(ctxDir); err == nil && h != "" {
+					hash = h
+				}
+				distroImageTag := fmt.Sprintf("oxidizr-%s:%s", d, hash)
+				prefix := col.Sprintf("[%s]", d)
+
+				log.Printf("%s Processing...", prefix)
 
 				// If one-shot, we implicitly build
 				doBuild := *archBuild

@@ -65,18 +65,16 @@ This program is designed to be executed inside Docker containers by the host orc
 
 ## Locale and parallel-run handling
 
-The runner does not modify locales; it only probes/logs their presence during preflight for visibility. Most suites are independent of locale status and run across all distros.
+Locales are baked into the Docker image at build time (see `test-orch/docker/Dockerfile`), including `de_DE.UTF-8`. The runner may probe/log locale status for visibility, but tests must not SKIP due to locale availability.
 
-- `disable-in-german` has a known flakiness when the matrix runs distros in parallel. This suite may SKIP in parallel runs across the Arch-family (including Arch) but passes when run in isolation/serialized.
+- `disable-in-german` must run across the Arch-family and must not SKIP. Any failure is treated as a hard error to be fixed (infra or product), not skipped.
 - All other suites run across all distros.
 
-Rationale: keep images minimal and avoid mutating system locales during tests; address nondeterminism by deflaking or serializing the affected suite rather than masking with harness logic.
-
-Reference policy: see `TESTING_POLICY.md` (Allowed SKIPs Table). The `disable-in-german` suite is the only permitted SKIP and only due to parallel-run flakiness. This exception is temporary and tracked for removal once deflaked or serialized reliably.
+Rationale: bake deterministic prerequisites into images for reproducible CI. Address any parallel-run nondeterminism by deflaking tests or serializing in CI configuration, not by skipping.
 
 ## Interaction with Dockerfile
 
-The Dockerfile provides only the minimal base packages. User management, Rust toolchain configuration, AUR helper installation, and locale generation are intentionally handled by the runner. This keeps images simple and reproducible, and centralizes logic in code instead of image layers.
+The Dockerfile pre-provisions prerequisites for deterministic execution, including baking `de_DE.UTF-8` into the image. User management, Rust toolchain configuration, and AUR helper installation remain the runner's responsibility.
 
 ## Interactive shell helper
 

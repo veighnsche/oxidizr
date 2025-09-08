@@ -27,10 +27,7 @@ func preflight() error {
 		log.Println("Preflight: curl not present yet; skipping network check until after dependencies")
 	}
 
-	// Surface FULL_MATRIX mode for logs
-	if os.Getenv("FULL_MATRIX") == "1" {
-		log.Println("Preflight: FULL_MATRIX=1 (skipped suites and infra failures are fatal)")
-	}
+	// Strict matrix semantics are the default; no special-casing needed.
 
 	// Probe and summarize environment differences for logs
 	if distroID, err := util.CurrentDistroID(); err == nil {
@@ -39,12 +36,20 @@ func preflight() error {
 		filePresent := fileErr == nil
 		cmdPresent := util.RunCmdQuiet("sh", "-lc", "locale -a | grep -qi '^de_DE\\.'") == nil
 
+		// Enforce baked-in German locale (policy): both the definition file and a listed locale must exist
+		if !(filePresent && cmdPresent) {
+			return fmt.Errorf(
+				"preflight: missing German locale (de_DE). filePresent=%t, listedInLocaleA=%t. Expected de_DE.UTF-8 to be baked into the image. Rebuild the image from test-orch/docker/Dockerfile and ensure locale-gen runs at build time.",
+				filePresent, cmdPresent,
+			)
+		}
+
 		// Detect AUR helpers commonly found on derivatives
 		hasParu := util.Has("paru")
 		hasYay := util.Has("yay")
 
 		log.Printf("Preflight summary: distro=%s, de_DE_present=%t (file=%t,locale=%t), aur_paru=%t, aur_yay=%t",
-			distroID, (filePresent || cmdPresent), filePresent, cmdPresent, hasParu, hasYay)
+			distroID, (filePresent && cmdPresent), filePresent, cmdPresent, hasParu, hasYay)
 	} else {
 		log.Println("Preflight summary: distro could not be determined from /etc/os-release")
 	}
