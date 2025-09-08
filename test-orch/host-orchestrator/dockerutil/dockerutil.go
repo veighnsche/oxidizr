@@ -110,7 +110,32 @@ func RunArchInteractiveShell(tag, rootDir string, verbose bool) error {
 		Tty:        true,
 		OpenStdin:  true,
 	}
-	hostCfg := &container.HostConfig{Binds: []string{fmt.Sprintf("%s:/workspace", rootDir)}, AutoRemove: true}
+	// Add persistent cache mounts similar to non-interactive runs to avoid repeated downloads.
+	// Derive a distro key from the tag, e.g., oxidizr-cachyos:latest -> cachyos
+	distroKey := strings.TrimPrefix(tag, "oxidizr-")
+	if i := strings.Index(distroKey, ":"); i >= 0 {
+		distroKey = distroKey[:i]
+	}
+	cacheRoot := filepath.Join(rootDir, ".cache", "test-orch")
+	cargoReg := filepath.Join(cacheRoot, "cargo", "registry")
+	cargoGit := filepath.Join(cacheRoot, "cargo", "git")
+	cargoTarget := filepath.Join(cacheRoot, "cargo-target", distroKey)
+	pacmanCache := filepath.Join(cacheRoot, "pacman")
+	aurBuild := filepath.Join(cacheRoot, "aur-build", distroKey)
+	rustupRoot := filepath.Join(cacheRoot, "rustup")
+	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild, rustupRoot} {
+		_ = os.MkdirAll(d, 0o755)
+	}
+	binds := []string{
+		fmt.Sprintf("%s:/workspace", rootDir),
+		fmt.Sprintf("%s:%s", cargoReg, "/root/.cargo/registry"),
+		fmt.Sprintf("%s:%s", cargoGit, "/root/.cargo/git"),
+		fmt.Sprintf("%s:%s", cargoTarget, "/workspace/target"),
+		fmt.Sprintf("%s:%s", pacmanCache, "/var/cache/pacman"),
+		fmt.Sprintf("%s:%s", aurBuild, "/home/builder/build"),
+		fmt.Sprintf("%s:%s", rustupRoot, "/root/.rustup"),
+	}
+	hostCfg := &container.HostConfig{Binds: binds, AutoRemove: true}
 	_ = cli.ContainerRemove(context.Background(), "oxidizr-arch-shell", types.ContainerRemoveOptions{Force: true})
 	created, err := cli.ContainerCreate(ctx, cfg, hostCfg, nil, nil, "oxidizr-arch-shell")
 	if err != nil {
@@ -160,12 +185,16 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	for _, env := range envVars {
 		args = append(args, "-e", env)
 	}
+	// Provide distro identifier to in-container runner for analytics/report naming
+	distroKey := strings.TrimPrefix(tag, "oxidizr-")
+	if i := strings.Index(distroKey, ":"); i >= 0 {
+		distroKey = distroKey[:i]
+	}
+	args = append(args, "-e", fmt.Sprintf("ANALYTICS_DISTRO=%s", distroKey))
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", rootDir))
 
 	// Add persistent cache mounts to speed up repeated runs
 	cacheRoot := filepath.Join(rootDir, ".cache", "test-orch")
-	// Derive a distro key from the tag, e.g., oxidizr-cachyos:latest -> cachyos
-	distroKey := strings.TrimPrefix(tag, "oxidizr-")
 	if i := strings.Index(distroKey, ":"); i >= 0 {
 		distroKey = distroKey[:i]
 	}
@@ -175,8 +204,9 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	pacmanCache := filepath.Join(cacheRoot, "pacman")
 	// Make AUR build cache per-distro to avoid concurrent access and cross-distro conflicts
 	aurBuild := filepath.Join(cacheRoot, "aur-build", distroKey)
+	rustupRoot := filepath.Join(cacheRoot, "rustup")
 	// Ensure directories exist
-	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild} {
+	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild, rustupRoot} {
 		_ = os.MkdirAll(d, 0o755)
 	}
 	// Bind mounts
@@ -185,6 +215,7 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoTarget, "/workspace/target"))
 	args = append(args, "-v", fmt.Sprintf("%s:%s", pacmanCache, "/var/cache/pacman"))
 	args = append(args, "-v", fmt.Sprintf("%s:%s", aurBuild, "/home/builder/build"))
+	args = append(args, "-v", fmt.Sprintf("%s:%s", rustupRoot, "/root/.rustup"))
 	args = append(args, "--workdir", "/workspace")
 	args = append(args, "--name", containerName)
 	args = append(args, tag)

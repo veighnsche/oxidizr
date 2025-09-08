@@ -12,10 +12,10 @@ echo "==> Building oxidizr-arch for interactive shell..."
 # Navigate to the project directory inside the container
 cd /workspace
 
-# Ensure Rust toolchain is configured (rustup default stable) for root and builder
-rustup default stable
-if id -u builder >/dev/null 2>&1; then
-  su - builder -c 'rustup default stable' || true
+# Ensure Rust toolchain is configured once (root only) with a minimal profile
+rustup set profile minimal
+if ! rustup toolchain list | grep -q '^stable'; then
+  rustup default stable
 fi
 
 # Build the release binary

@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"container-runner/assertions"
+	"container-runner/analytics"
 	"container-runner/setup"
 	"container-runner/util"
 	"container-runner/yamlrunner"
@@ -34,5 +36,16 @@ func runInContainer() error {
 	}
 
 	log.Println("Go orchestrator finished successfully.")
+	// Write analytics report to the mounted workspace so it persists on host
+	// Include distro suffix when provided (ANALYTICS_DISTRO is set by host orchestrator)
+	reportPath := "/workspace/TEST_DOWNLOADS_ANALYTICS.md"
+	if d := os.Getenv("ANALYTICS_DISTRO"); d != "" {
+		reportPath = fmt.Sprintf("/workspace/TEST_DOWNLOADS_ANALYTICS-%s.md", d)
+	}
+	if err := analytics.WriteReportMarkdown(reportPath); err != nil {
+		log.Printf("warning: failed to write download analytics: %v", err)
+	} else {
+		log.Printf("Download analytics written to %s", reportPath)
+	}
 	return nil
 }

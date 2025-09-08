@@ -24,7 +24,7 @@ RUN sed -i 's/^[[:space:]]*NoExtract/# NoExtract (disabled for locales)/' /etc/p
 # Refresh system and install essentials used by our scripts
 RUN pacman -Syyu --noconfirm && \
     pacman -S --noconfirm reflector && \
-    reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist && \
+    reflector --protocol https --latest 10 --sort rate --save /etc/pacman.d/mirrorlist && \
     pacman -S --noconfirm --needed sudo git curl rustup which findutils glibc sed && \
     # Reduce image size a bit
     pacman -Scc --noconfirm || true
@@ -32,16 +32,19 @@ RUN pacman -Syyu --noconfirm && \
 # Force reinstall glibc to restore any locale files that may have been stripped previously
 RUN pacman -S --noconfirm --overwrite='*' glibc
 
-# Enable and generate de_DE.UTF-8
-RUN sed -i 's/^[#[:space:]]*de_DE.UTF-8 UTF-8/de_DE.UTF-8 UTF-8/' /etc/locale.gen && \
+# Enable and generate en_US.UTF-8 (default) and de_DE.UTF-8 (for tests)
+RUN sed -i \
+        -e 's/^[#[:space:]]*en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' \
+        -e 's/^[#[:space:]]*de_DE.UTF-8 UTF-8/de_DE.UTF-8 UTF-8/' \
+        /etc/locale.gen && \
     locale-gen
 
-# Persist default locale for non-login shells and child processes
-RUN printf 'LANG=de_DE.UTF-8\nLC_ALL=de_DE.UTF-8\n' > /etc/locale.conf
+# Persist default locale (English) for non-login shells and child processes
+RUN printf 'LANG=en_US.UTF-8\nLC_ALL=en_US.UTF-8\n' > /etc/locale.conf
 
-# Now set environment defaults (after generation)
-ENV LANG=de_DE.UTF-8 \
-    LC_ALL=de_DE.UTF-8
+# Now set environment defaults (after generation) to English
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
 
 # Set DNS servers to fix network issues
 RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \

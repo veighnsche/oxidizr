@@ -144,5 +144,28 @@ func executeScriptBlock(script, workDir string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	// Run each test script under English locale by default; inline VAR=... command
+	// settings inside the script still take precedence for that subcommand only.
+	baseEnv := os.Environ()
+	baseEnv = setOrReplaceEnv(baseEnv, "LANG", "en_US.UTF-8")
+	baseEnv = setOrReplaceEnv(baseEnv, "LC_ALL", "en_US.UTF-8")
+	baseEnv = setOrReplaceEnv(baseEnv, "LANGUAGE", "en_US.UTF-8")
+	cmd.Env = baseEnv
+
 	return cmd.Run()
+}
+
+// setOrReplaceEnv sets key=value in the env slice, replacing an existing entry
+// if present, or appending if not present. Returns a new slice.
+func setOrReplaceEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	for i, e := range env {
+		if len(e) >= len(prefix) && e[:len(prefix)] == prefix {
+			// Replace in place
+			env[i] = prefix + value
+			return env
+		}
+	}
+	// Not found; append
+	return append(env, prefix+value)
 }

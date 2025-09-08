@@ -1,0 +1,241 @@
+package analytics
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+    "regexp"
+    "strconv"
+    "strings"
+    "sync"
+)
+
+// Analyzer collects lightweight download analytics by parsing stdout/stderr lines
+// from common tools (pacman, rustup, cargo, git, makepkg).
+// It is intentionally approximate: good enough to flag excessive downloads.
+var (
+    mu       sync.Mutex
+    counters = &Stats{}
+)
+
+// Stats holds counters and some detail samples.
+type Stats struct {
+    // pacman
+    PacmanPackages int
+    PacmanNames    map[string]int
+
+    // rustup
+    RustupComponents int
+    RustupBytes      int64
+
+    // cargo
+    CargoCrates int
+    CargoBytes  int64
+
+    // git / makepkg
+    GitClones int
+    GitBytes  int64
+
+    MakepkgDownloads int
+}
+
+func ensureMaps() {
+    if counters.PacmanNames == nil {
+        counters.PacmanNames = make(map[string]int)
+    }
+}
+
+// ProcessLine ingests one line of output.
+func ProcessLine(line string) {
+    mu.Lock()
+    defer mu.Unlock()
+    ensureMaps()
+
+    l := strings.TrimSpace(line)
+    if l == "" {
+        return
+    }
+
+    // pacman package downloads like: "sudo-rs-0.2.8-2-x86_64 downloading..."
+    if strings.HasSuffix(l, "downloading...") {
+        // Ignore repo DB lines like "core downloading..."
+        if strings.HasPrefix(l, "core ") || strings.HasPrefix(l, "extra ") || strings.HasPrefix(l, "community ") {
+            // ignore repo DB
+        } else if strings.Contains(l, "-") { // naive package name check
+            name := strings.TrimSuffix(l, "downloading...")
+            name = strings.TrimSpace(name)
+            counters.PacmanPackages++
+            counters.PacmanNames[name]++
+            return
+        }
+    }
+
+    // rustup
+    if strings.HasPrefix(l, "info: downloading component '") {
+        counters.RustupComponents++
+        return
+    }
+    // rustup progress lines e.g.: " 78.1 MiB /  78.1 MiB (100 %)  ..."
+    if strings.Contains(l, "MiB") || strings.Contains(l, "KiB") || strings.Contains(l, "GiB") {
+        if strings.Contains(l, "(100 %)") {
+            // parse first size token "<num> <unit>"
+            fields := strings.Fields(l)
+            if len(fields) >= 2 {
+                if sz := parseSize(fields[0] + " " + fields[1]); sz > 0 {
+                    counters.RustupBytes += sz
+                    return
+                }
+            }
+        }
+    }
+
+    // cargo: "Downloaded foo v1.2.3 (123.4 KB)"
+    if strings.HasPrefix(l, "Downloaded ") {
+        // attempt to extract size in parentheses
+        start := strings.LastIndex(l, "(")
+        end := strings.LastIndex(l, ")")
+        if start > 0 && end > start+1 {
+            size := strings.TrimSpace(l[start+1 : end]) // e.g. "123.4 KB"
+            if sz := parseSize(size); sz > 0 {
+                counters.CargoBytes += sz
+            }
+        }
+        counters.CargoCrates++
+        return
+    }
+
+    // git clone
+    if strings.HasPrefix(l, "Cloning into ") {
+        counters.GitClones++
+        return
+    }
+    // git progress: "Receiving objects: 100% (...), 12.34 MiB | ..."
+    if strings.HasPrefix(l, "Receiving objects:") {
+        // try to find a size token with unit
+        sz := extractFirstSize(l)
+        if sz > 0 {
+            counters.GitBytes += sz
+            return
+        }
+    }
+
+    // makepkg: lines often start with "Downloading <file>..."
+    if strings.HasPrefix(l, "Downloading ") && strings.HasSuffix(l, "...") {
+        counters.MakepkgDownloads++
+        return
+    }
+}
+
+var sizeRe = regexp.MustCompile(`(?i)^(?:~?)([0-9]+(?:\.[0-9]+)?)\s*([KMG]i?B?)$`)
+
+func parseSize(s string) int64 {
+    s = strings.TrimSpace(s)
+    if s == "" {
+        return 0
+    }
+    m := sizeRe.FindStringSubmatch(s)
+    if len(m) != 3 {
+        return 0
+    }
+    val, _ := strconv.ParseFloat(m[1], 64)
+    unit := strings.ToUpper(m[2])
+    mul := float64(1)
+    switch unit {
+    case "KB":
+        mul = 1000
+    case "KIB":
+        mul = 1024
+    case "MB":
+        mul = 1000 * 1000
+    case "MIB":
+        mul = 1024 * 1024
+    case "GB":
+        mul = 1000 * 1000 * 1000
+    case "GIB":
+        mul = 1024 * 1024 * 1024
+    default:
+        mul = 1
+    }
+    return int64(val * mul)
+}
+
+func extractFirstSize(s string) int64 {
+    // find first token like "12.34 MiB"
+    f := strings.Fields(s)
+    for i := 0; i+1 < len(f); i++ {
+        if sz := parseSize(f[i] + " " + f[i+1]); sz > 0 {
+            return sz
+        }
+    }
+    return 0
+}
+
+// ReportMarkdown returns a markdown summary and heuristic recommendations.
+func ReportMarkdown() string {
+    mu.Lock()
+    defer mu.Unlock()
+    ensureMaps()
+
+    var b strings.Builder
+    b.WriteString("# Download Analytics Summary\n\n")
+    if d := os.Getenv("ANALYTICS_DISTRO"); d != "" {
+        fmt.Fprintf(&b, "_Distro: %s_\n\n", d)
+    }
+    b.WriteString("This summary was generated by the in-container runner by parsing tool output.\n")
+    b.WriteString("Numbers are approximate but useful to flag excessive downloads.\n\n")
+
+    b.WriteString("## Totals\n")
+    fmt.Fprintf(&b, "- Pacman packages downloaded: %d\n", counters.PacmanPackages)
+    if len(counters.PacmanNames) > 0 {
+        b.WriteString("  - Examples:\n")
+        count := 0
+        for name, n := range counters.PacmanNames {
+            fmt.Fprintf(&b, "    - %s (x%d)\n", name, n)
+            count++
+            if count >= 5 {
+                break
+            }
+        }
+    }
+    fmt.Fprintf(&b, "- Rustup components downloaded: %d (approx bytes: %d)\n", counters.RustupComponents, counters.RustupBytes)
+    fmt.Fprintf(&b, "- Cargo crates downloaded: %d (approx bytes: %d)\n", counters.CargoCrates, counters.CargoBytes)
+    fmt.Fprintf(&b, "- Git clones: %d (approx bytes: %d)\n", counters.GitClones, counters.GitBytes)
+    fmt.Fprintf(&b, "- makepkg downloads: %d\n\n", counters.MakepkgDownloads)
+
+    b.WriteString("## Heuristic Minimum (ideal warm run)\n")
+    b.WriteString("On a warm run with persistent caches and prebuilt image:\n")
+    b.WriteString("- Pacman: 0 new package downloads (if base deps baked or pacman cache mounted).\n")
+    b.WriteString("- Rustup: 0 components (toolchain cached under /root/.rustup).\n")
+    b.WriteString("- Cargo: 0 crates (registry/git cached; incremental build).\n")
+    b.WriteString("- Git/makepkg: 0 (AUR helper cached under /home/builder/build).\n\n")
+
+    b.WriteString("## Suggestions\n")
+    b.WriteString("- Ensure persistent mounts are active: /root/.rustup, /root/.cargo/(registry|git), /workspace/target, /var/cache/pacman, /home/builder/build.\n")
+    b.WriteString("- Pre-bake more base dependencies if first-run downloads are too heavy.\n")
+    b.WriteString("- Consider cargo sparse registry and lockfile pinning to reduce updates.\n")
+    b.WriteString("- If pacman updates occur frequently, pin mirror and reduce Syyu frequency.\n")
+
+    return b.String()
+}
+
+// WriteReportMarkdown writes the report to the given path.
+func WriteReportMarkdown(path string) error {
+    md := ReportMarkdown()
+    if err := os.WriteFile(path, []byte(md), 0644); err != nil {
+        return err
+    }
+    return nil
+}
+
+// Wrap a reader with a scanner that processes lines.
+func ProcessStream(r *bufio.Reader) {
+    for {
+        line, err := r.ReadString('\n')
+        if line != "" {
+            ProcessLine(line)
+        }
+        if err != nil {
+            return
+        }
+    }
+}
