@@ -248,6 +248,7 @@ impl Worker {
         // If already installed, do nothing
         if self.check_installed(package)? {
             log::info!("Package '{}' already installed (skipping)", package);
+            log::info!("✅ Expected: '{}' installed, Received: present", package);
             return Ok(());
         }
         
@@ -275,6 +276,7 @@ impl Worker {
         );
         
         if pacman_status.success() && self.check_installed(package)? {
+            log::info!("✅ Expected: '{}' installed, Received: present", package);
             return Ok(());
         }
         
@@ -315,19 +317,20 @@ impl Worker {
             
             if !tried_any {
                 return Err(Error::ExecutionFailed(format!(
-                    "No AUR helper found. Install an AUR helper (e.g., paru or yay) or pass --package-manager to specify one."
+                    "❌ Expected: '{}' installed, Received: absent. Reason: no AUR helper found. Install an AUR helper (e.g., paru or yay) or pass --package-manager to specify one.",
+                    package
                 )));
             }
             
             return Err(Error::ExecutionFailed(format!(
-                "Failed to install '{}' via pacman or any available AUR helper. Ensure networking and helper are functional.",
+                "❌ Expected: '{}' installed, Received: absent. Failed to install via pacman or any available AUR helper. Ensure networking and helper are functional.",
                 package
             )));
         }
         
         // Official-only policy for all other packages
         Err(Error::ExecutionFailed(format!(
-            "Failed to install '{}' from official repositories (pacman -S). Package may be unavailable in configured repos or mirrors.",
+            "❌ Expected: '{}' installed, Received: absent. Failed to install from official repositories (pacman -S). Package may be unavailable in configured repos or mirrors.",
             package
         )))
     }
@@ -349,6 +352,7 @@ impl Worker {
         // If not installed, do nothing
         if !self.check_installed(package)? {
             log::info!("Package '{}' not installed, skipping removal", package);
+            log::info!("✅ Expected: '{}' absent, Received: absent", package);
             return Ok(());
         }
         
@@ -375,10 +379,19 @@ impl Worker {
         );
         
         if status.success() {
+            // Verify absence after removal for clarity
+            if self.check_installed(package)? {
+                log::error!("❌ Expected: '{}' absent after removal, Received: present", package);
+                return Err(Error::ExecutionFailed(format!(
+                    "❌ Expected: '{}' absent after removal, Received: present",
+                    package
+                )));
+            }
+            log::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
             Ok(())
         } else {
             Err(Error::ExecutionFailed(format!(
-                "Failed to remove '{}' (pacman -R failed)",
+                "❌ Expected: '{}' absent after removal, Received: present (pacman -R failed)",
                 package
             )))
         }

@@ -37,6 +37,21 @@ impl SudoRsExperiment {
         // Install package
         log::info!("Installing package: {}", self.package_name);
         worker.install_package(&self.package_name, assume_yes)?;
+        if worker.check_installed(&self.package_name)? {
+            log::info!(
+                "✅ Expected: '{}' installed, Received: present",
+                self.package_name
+            );
+        } else {
+            log::error!(
+                "❌ Expected: '{}' installed, Received: absent",
+                self.package_name
+            );
+            return Err(Error::ExecutionFailed(format!(
+                "❌ Expected: '{}' installed, Received: absent",
+                self.package_name
+            )));
+        }
         
         // Replace sudo, su, visudo with binaries provided by sudo-rs
         for (name, target) in [
@@ -65,6 +80,27 @@ impl SudoRsExperiment {
                 source.display()
             );
             worker.replace_file_with_symlink(&source, &alias)?;
+            // Verify alias symlink presence for visibility
+            match std::fs::symlink_metadata(&alias) {
+                Ok(m) if m.file_type().is_symlink() => {
+                    log::info!(
+                        "✅ Expected: '{}' alias symlink present, Received: symlink",
+                        name
+                    );
+                }
+                Ok(_) => {
+                    log::error!(
+                        "❌ Expected: '{}' alias symlink present, Received: not a symlink",
+                        name
+                    );
+                }
+                Err(_) => {
+                    log::error!(
+                        "❌ Expected: '{}' alias symlink present, Received: missing",
+                        name
+                    );
+                }
+            }
             
             log::info!(
                 "Linking sudo-rs '{}' via alias: {} -> {}",
@@ -73,6 +109,27 @@ impl SudoRsExperiment {
                 alias.display()
             );
             worker.replace_file_with_symlink(&alias, &target)?;
+            // Verify target symlink presence for visibility
+            match std::fs::symlink_metadata(&target) {
+                Ok(m) if m.file_type().is_symlink() => {
+                    log::info!(
+                        "✅ Expected: '{}' linked via alias, Received: symlink",
+                        name
+                    );
+                }
+                Ok(_) => {
+                    log::error!(
+                        "❌ Expected: '{}' linked via alias, Received: not a symlink",
+                        name
+                    );
+                }
+                Err(_) => {
+                    log::error!(
+                        "❌ Expected: '{}' linked via alias, Received: missing",
+                        name
+                    );
+                }
+            }
         }
         
         Ok(())
@@ -92,6 +149,27 @@ impl SudoRsExperiment {
                 self.resolve_target(name)
             };
             worker.restore_file(&target)?;
+            // Verify restored (not a symlink)
+            match std::fs::symlink_metadata(&target) {
+                Ok(m) if m.file_type().is_symlink() => {
+                    log::error!(
+                        "❌ Expected: '{}' restored to non-symlink, Received: still a symlink",
+                        name
+                    );
+                }
+                Ok(_) => {
+                    log::info!(
+                        "✅ Expected: '{}' restored to non-symlink, Received: non-symlink",
+                        name
+                    );
+                }
+                Err(_) => {
+                    log::error!(
+                        "❌ Expected: '{}' restored to system binary, Received: missing",
+                        name
+                    );
+                }
+            }
         }
         
         Ok(())
@@ -107,10 +185,18 @@ impl SudoRsExperiment {
         
         // Verify absence
         if worker.check_installed(&self.package_name)? {
+            log::error!(
+                "❌ Expected: '{}' absent after removal, Received: present",
+                self.package_name
+            );
             return Err(Error::ExecutionFailed(
                 "sudo-rs still appears installed after removal".into(),
             ));
         }
+        log::info!(
+            "✅ Expected: '{}' absent after removal, Received: absent",
+            self.package_name
+        );
         
         Ok(())
     }

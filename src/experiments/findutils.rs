@@ -43,11 +43,18 @@ impl FindutilsExperiment {
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
         if applets.is_empty() {
+            log::error!(
+                "❌ Expected: at least 1 findutils applet discovered after install; Received: 0"
+            );
             return Err(Error::ExecutionFailed(format!(
-                "No applets found for findutils. Ensure {} is installed correctly.",
+                "❌ Expected: findutils applets discovered; Received: 0. Ensure {} is installed correctly.",
                 self.package_name
             )));
         }
+        log::info!(
+            "✅ Expected: findutils applets discovered; Received: {}",
+            applets.len()
+        );
         
         self.log_applets_summary(&applets);
         self.create_symlinks(worker, &applets)?;
@@ -78,6 +85,22 @@ impl FindutilsExperiment {
         // Then remove the package
         log::info!("Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
+        
+        // Verify absence explicitly
+        if worker.check_installed(&self.package_name)? {
+            log::error!(
+                "❌ Expected: '{}' absent after removal, Received: present",
+                self.package_name
+            );
+            return Err(Error::ExecutionFailed(format!(
+                "❌ Expected: '{}' absent after removal, Received: present",
+                self.package_name
+            )));
+        }
+        log::info!(
+            "✅ Expected: '{}' absent after removal, Received: absent",
+            self.package_name
+        );
         
         Ok(())
     }

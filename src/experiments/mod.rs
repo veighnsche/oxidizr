@@ -141,8 +141,17 @@ pub fn check_download_prerequisites(
 
     // Gate on repo availability
     if !extra_available && !aur_available {
+        log::error!(
+            "❌ Expected: access to 'extra' repo or an AUR helper; Received: extra_available={}, aur_available={}",
+            extra_available,
+            aur_available
+        );
         return Err(Error::ExecutionFailed(
-            "You do not have access to extra or AUR repositories.".into(),
+            format!(
+                "❌ Expected: access to 'extra' repo or AUR helper; Received: extra_available={}, aur_available={}",
+                extra_available, aur_available
+            )
+            .into(),
         ));
     }
 
@@ -150,20 +159,41 @@ pub fn check_download_prerequisites(
     match package {
         UUTILS_COREUTILS | SUDO_RS => {
             if !extra_available {
+                log::error!(
+                    "❌ Expected: extra repo available for '{}'; Received: extra_available=false",
+                    package
+                );
                 return Err(Error::ExecutionFailed(
-                    "Cannot download because the extra repository is not available.".into(),
+                    format!(
+                        "❌ Expected: extra repo available for '{}'; Received: extra_available=false",
+                        package
+                    )
+                    .into(),
                 ));
             }
         }
         UUTILS_FINDUTILS => {
             if !aur_available {
+                log::error!(
+                    "❌ Expected: an AUR helper present for '{}'; Received: none",
+                    package
+                );
                 return Err(Error::ExecutionFailed(
-                    "Cannot download uutils-findutils because no AUR helper is installed.".into(),
+                    format!(
+                        "❌ Expected: an AUR helper present for '{}'; Received: none",
+                        package
+                    )
+                    .into(),
                 ));
             }
         }
         _ => {}
     }
+
+    log::info!(
+        "✅ Repository gating satisfied for '{}': extra_available={}, aur_available={}",
+        package, extra_available, aur_available
+    );
 
     // Check if already installed and prompt for reuse
     if worker.check_installed(package)? {
