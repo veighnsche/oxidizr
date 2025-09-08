@@ -8,6 +8,17 @@ use std::path::PathBuf;
 // Coreutils bins list (same as original)
 const COREUTILS_BINS_LIST: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
 
+// Binaries we must not replace to keep packaging tools functional (e.g., makepkg)
+const PRESERVE_BINS: &[&str] = &[
+    "b2sum",
+    "md5sum",
+    "sha1sum",
+    "sha224sum",
+    "sha256sum",
+    "sha384sum",
+    "sha512sum",
+];
+
 pub struct CoreutilsExperiment {
     name: String,
     package_name: String,
@@ -62,8 +73,23 @@ impl CoreutilsExperiment {
             applets.len()
         );
         
-        log_applets_summary("coreutils", &applets, 8);
-        create_symlinks(worker, &applets, |name| self.resolve_target(name))?;
+        // Filter out preserved binaries (do not replace these targets)
+        let original_len = applets.len();
+        let filtered: Vec<(String, PathBuf)> = applets
+            .into_iter()
+            .filter(|(name, _)| !PRESERVE_BINS.contains(&name.as_str()))
+            .collect();
+        let preserved_count = original_len.saturating_sub(filtered.len());
+        if preserved_count > 0 {
+            log::info!(
+                "Preserving {} checksum tool(s) unmodified: {:?}",
+                preserved_count,
+                PRESERVE_BINS
+            );
+        }
+        
+        log_applets_summary("coreutils", &filtered, 8);
+        create_symlinks(worker, &filtered, |name| self.resolve_target(name))?;
         
         Ok(())
     }

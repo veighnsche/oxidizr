@@ -258,26 +258,42 @@ impl Worker {
             ));
         }
         
-        // Try pacman first
-        let mut args = vec!["-S"];
-        if assume_yes {
-            args.push("--noconfirm");
-        }
-        args.push(package);
+        // Try pacman first, unless we know this is an AUR-only package not present in official repos
+        let mut attempted_pacman = false;
+        let mut pacman_status_ok = false;
+        if package != "uutils-findutils-bin" || self.repo_has_package(package).unwrap_or(false) {
+            let mut args = vec!["-S"]; 
+            if assume_yes {
+                args.push("--noconfirm");
+            }
+            args.push(package);
 
-        let pacman_status = std::process::Command::new("pacman").args(&args).status()?;
-        let _ = PROVENANCE.log(
-            "worker",
-            "install_package.pacman",
-            if pacman_status.success() { "ok" } else { "failed_or_unavailable" },
-            &format!("pacman {}", args.join(" ")),
-            "",
-            pacman_status.code(),
-        );
-        
-        if pacman_status.success() && self.check_installed(package)? {
-            log::info!("✅ Expected: '{}' installed, Received: present", package);
-            return Ok(());
+            let pacman_status = std::process::Command::new("pacman").args(&args).status()?;
+            attempted_pacman = true;
+            pacman_status_ok = pacman_status.success();
+            let _ = PROVENANCE.log(
+                "worker",
+                "install_package.pacman",
+                if pacman_status.success() { "ok" } else { "failed_or_unavailable" },
+                &format!("pacman {}", args.join(" ")),
+                "",
+                pacman_status.code(),
+            );
+            
+            if pacman_status_ok && self.check_installed(package)? {
+                log::info!("✅ Expected: '{}' installed, Received: present", package);
+                return Ok(());
+            }
+        } else {
+            // Explicitly record that we skipped pacman because the package is not in official repos
+            let _ = PROVENANCE.log(
+                "worker",
+                "install_package.pacman",
+                "skipped_official_absent",
+                package,
+                "uutils-findutils-bin is AUR-only; pacman -Si indicates absent",
+                None,
+            );
         }
         
         // Selective policy: allow AUR fallback only for uutils-findutils-bin
@@ -323,8 +339,10 @@ impl Worker {
             }
             
             return Err(Error::ExecutionFailed(format!(
-                "❌ Expected: '{}' installed, Received: absent. Failed to install via pacman or any available AUR helper. Ensure networking and helper are functional.",
-                package
+                "❌ Expected: '{}' installed, Received: absent. {} Failed to install via pacman{} or any available AUR helper. Ensure networking and helper are functional.",
+                package,
+                if attempted_pacman { "" } else { "(official repos do not carry this package)." },
+                if attempted_pacman && !pacman_status_ok { " (pacman reported target not found)" } else { "" }
             )));
         }
         

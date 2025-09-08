@@ -110,9 +110,11 @@ impl Experiment {
 
 /// Get all available experiments
 pub fn all_experiments() -> Vec<Experiment> {
+    // Order matters for --all: install AUR packages (findutils) before flipping coreutils,
+    // so that makepkg still has access to GNU checksum tools during builds.
     vec![
-        Experiment::Coreutils(coreutils::CoreutilsExperiment::new()),
         Experiment::Findutils(findutils::FindutilsExperiment::new()),
+        Experiment::Coreutils(coreutils::CoreutilsExperiment::new()),
         Experiment::SudoRs(sudors::SudoRsExperiment::new()),
     ]
 }
@@ -127,14 +129,16 @@ pub fn check_download_prerequisites(
     let extra_available = worker.extra_repo_available()?;
     let aur_helper = worker.aur_helper_name()?;
     let aur_available = aur_helper.is_some();
+    // Probe whether the package exists in official repos (helps clarify AUR-only cases)
+    let official_has = worker.repo_has_package(package).unwrap_or(false);
     
     let _ = PROVENANCE.log(
         "experiments",
         "repo_capabilities",
         "observed",
         &format!(
-            "extra_available={}, aur_available={}, helper={:?}",
-            extra_available, aur_available, aur_helper
+            "extra_available={}, aur_available={}, official_has={}, helper={:?}",
+            extra_available, aur_available, official_has, aur_helper
         ),
         "",
         None,
