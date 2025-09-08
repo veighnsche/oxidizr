@@ -36,6 +36,21 @@ impl FindutilsExperiment {
         
         // Check prerequisites and handle prompts
         check_download_prerequisites(worker, &self.package_name, assume_yes)?;
+        // Visibility: AUR build for findutils will require checksums. These are expected to be provided
+        // by the currently active coreutils (with checksum applets possibly flipped via --flip-checksums).
+        match worker.which("sha256sum") {
+            Ok(Some(p)) => {
+                log::info!(
+                    "AUR checksum preflight: using sha256sum at {} (provided by active coreutils)",
+                    p.display()
+                );
+            }
+            _ => {
+                log::warn!(
+                    "AUR checksum preflight: could not resolve 'sha256sum' in PATH; makepkg may fail"
+                );
+            }
+        }
         
         // Install package
         log::info!("Installing package: {}", self.package_name);

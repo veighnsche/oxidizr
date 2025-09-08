@@ -45,6 +45,7 @@ func RunCmd(name string, args ...string) error {
 		for scanner.Scan() {
 			line := scanner.Text()
 			analytics.ProcessLine(line)
+			// Host prefixes container stream with [DISTRO]; print plain lines here
 			fmt.Fprintln(os.Stdout, line)
 		}
 		doneCh <- struct{}{}
@@ -54,6 +55,7 @@ func RunCmd(name string, args ...string) error {
 		for scanner.Scan() {
 			line := scanner.Text()
 			analytics.ProcessLine(line)
+			// Host prefixes container stream with [DISTRO]; print plain lines here
 			fmt.Fprintln(os.Stderr, line)
 		}
 		doneCh <- struct{}{}

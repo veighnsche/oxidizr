@@ -198,8 +198,9 @@ func main() {
 
 			// Ensure image exists; auto-build if missing
 			if err := runSilent("docker", "image", "inspect", tag); err != nil {
-				log.Printf("[shell/%s] Docker image not found; building...", d)
-				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, "[shell]", color.New(color.FgCyan)); err2 != nil {
+				shellPrefix := color.New(color.FgCyan).Sprintf("[%s]", d)
+				log.Printf("%s[HOST] Docker image not found; building...", shellPrefix)
+				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, shellPrefix+"[HOST]", color.New(color.FgCyan)); err2 != nil {
 					log.Fatalf("docker build failed for --shell: %v", err2)
 				}
 			}
@@ -252,13 +253,11 @@ func main() {
 				distroImageTag := fmt.Sprintf("oxidizr-%s:%s", d, hash)
 				prefix := col.Sprintf("[%s]", d)
 
-				log.Printf("%s Processing...", prefix)
-
 				// If one-shot, we implicitly build
 				doBuild := *archBuild
 				if doBuild {
-					log.Printf("%s Building test environment (%s)...", prefix, distroImageTag)
-					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix, col); err != nil {
+					log.Printf("%s[HOST] Building test environment (%s)...", prefix, distroImageTag)
+					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix+"[HOST]", col); err != nil {
 						errs <- fmt.Errorf("%s docker build failed: %w", prefix, err)
 						return
 					}
@@ -280,8 +279,8 @@ func main() {
 
 					// Auto-build if the image tag is missing
 					if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
-						log.Printf("%s Docker image not found; building...", prefix)
-						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix, col); err2 != nil {
+						log.Printf("%s[HOST] Docker image not found; building...", prefix)
+						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, prefix+"[HOST]", col); err2 != nil {
 							errs <- fmt.Errorf("%s docker build failed: %w", prefix, err2)
 							return
 						}
@@ -306,25 +305,26 @@ func main() {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}
 
-					log.Printf("%s Starting tests...", prefix)
+					log.Printf("%s[HOST] Starting tests...", prefix)
+					// Streamed container output will be tagged with distro only (container is default)
 					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1, prefix, col); err != nil {
 						errs <- fmt.Errorf("%s docker run failed: %w", prefix, err)
 						cancel() // Cancel all other running tests
 						return
 					}
-					log.Printf("%s Tests finished successfully.", prefix)
+					log.Printf("%s[HOST] Tests finished successfully.", prefix)
 				}
 
 				// If interactive shell is requested
 				if *archShell {
 					// Shell mode is not parallelized as it's interactive
-					log.Printf("Skipping interactive shell for %s in parallel mode.", distro)
+					log.Printf("%s[HOST] Skipping interactive shell for %s in parallel mode.", prefix, distro)
 				}
 			}(distroName, colorPalette[i%len(colorPalette)])
 		}
 
 		wg.Wait()
-		close(errs)
+// ... (rest of the code remains the same)
 
 		for err := range errs {
 			if err != nil {

@@ -13,6 +13,10 @@ func main() {
 		os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
 	}
 
+	// Make runner-originated logs clearly identifiable
+	log.SetFlags(0)
+    // Runner logs should not include distro; host will prefix container stream with [DISTRO]
+    log.SetPrefix("[RUNNER] ")
 	testFilter := flag.String("test-filter", "", "Run only the named YAML suite directory (e.g., disable-all)")
 	flag.Parse()
 

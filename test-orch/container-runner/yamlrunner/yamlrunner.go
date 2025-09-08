@@ -1,6 +1,7 @@
 package yamlrunner
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -174,8 +175,9 @@ trap on_exit EXIT
 
 	cmd := exec.Command(tmpFile.Name())
 	cmd.Dir = workDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Stream with explicit prefixes to distinguish from runner logs
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
 
 	// Run each test script under English locale by default; inline VAR=... command
 	// settings inside the script still take precedence for that subcommand only.
@@ -185,7 +187,40 @@ trap on_exit EXIT
 	baseEnv = setOrReplaceEnv(baseEnv, "LANGUAGE", "en_US.UTF-8")
 	cmd.Env = baseEnv
 
-	return cmd.Run()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	doneCh := make(chan struct{}, 2)
+	distro := os.Getenv("ANALYTICS_DISTRO")
+	outPrefix := ""
+	if distro != "" {
+		outPrefix = "[" + distro + "]"
+	}
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			if outPrefix != "" {
+				fmt.Fprintln(os.Stdout, outPrefix, scanner.Text())
+			} else {
+				fmt.Fprintln(os.Stdout, scanner.Text())
+			}
+		}
+		doneCh <- struct{}{}
+	}()
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			if outPrefix != "" {
+				fmt.Fprintln(os.Stderr, outPrefix, scanner.Text())
+			} else {
+				fmt.Fprintln(os.Stderr, scanner.Text())
+			}
+		}
+		doneCh <- struct{}{}
+	}()
+	<-doneCh
+	<-doneCh
+	return cmd.Wait()
 }
 
 // setOrReplaceEnv sets key=value in the env slice, replacing an existing entry

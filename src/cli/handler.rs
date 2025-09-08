@@ -44,6 +44,19 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             .collect()
     };
 
+    // Orchestration visibility: when both coreutils and findutils are selected, we
+    // will enable coreutils first so that checksum applets (optionally flipped via --flip-checksums)
+    // are available before starting any AUR downloads (findutils).
+    let names: Vec<String> = exps.iter().map(|e| e.name().to_string()).collect();
+    let has_core = names.iter().any(|n| n == "coreutils");
+    let has_find = names.iter().any(|n| n == "findutils");
+    if has_core && has_find {
+        log::info!(
+            "Orchestration: enabling 'coreutils' before 'findutils'. flip-checksums={}",
+            worker.flip_checksums
+        );
+    }
+
     if exps.is_empty() {
         eprintln!("No experiments selected. Use --all or --experiments=<names>");
         return Ok(());
@@ -57,7 +70,13 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             if !cli.assume_yes && !confirm("Enable and switch to Rust replacements?")? {
                 return Ok(());
             }
-            for e in &exps {
+            for (idx, e) in exps.iter().enumerate() {
+                log::info!(
+                    "Enable sequence {}/{}: {}",
+                    idx + 1,
+                    exps.len(),
+                    e.name()
+                );
                 e.enable(
                     &worker,
                     cli.assume_yes,
