@@ -1,7 +1,7 @@
 use crate::cli::parser::{Cli, Commands};
 use crate::error::Result;
 use crate::experiments::{all_experiments, Experiment};
-use crate::logging::PROVENANCE;
+use crate::logging::audit_event;
 use crate::system::Worker;
 use std::io::{self, Write};
 
@@ -112,7 +112,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                 ans == "remove" || ans == "r"
             };
             
-            let _ = PROVENANCE.log(
+            let _ = audit_event(
                 "cli",
                 "disable_choice",
                 if do_remove { "remove" } else { "disable" },

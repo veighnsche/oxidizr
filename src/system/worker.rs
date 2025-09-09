@@ -1,6 +1,6 @@
 use crate::checks::Distribution;
 use crate::error::{Error, Result};
-use crate::logging::PROVENANCE;
+use crate::logging::audit_event;
 use crate::symlink;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -71,7 +71,7 @@ impl Worker {
                     .lines()
                     .map(|s| s.trim().to_ascii_lowercase())
                     .any(|l| l == "extra");
-                let _ = PROVENANCE.log(
+                let _ = audit_event(
                     "worker",
                     "extra_repo_available.repo_list",
                     if found { "detected" } else { "not_detected" },
@@ -97,7 +97,7 @@ impl Worker {
             }
             s
         } {
-            let _ = PROVENANCE.log(
+            let _ = audit_event(
                 "worker",
                 "extra_repo_available.pacman_sl",
                 if status.success() { "detected" } else { "not_detected" },
@@ -124,7 +124,7 @@ impl Worker {
             let stdout = String::from_utf8_lossy(&out.stdout);
             if out.status.success() {
                 let found = stdout.to_ascii_lowercase().contains("[extra]");
-                let _ = PROVENANCE.log(
+                let _ = audit_event(
                     "worker",
                     "extra_repo_available.conf_dump",
                     if found { "detected" } else { "not_detected" },
@@ -141,7 +141,7 @@ impl Worker {
         // 4) Last resort: parse /etc/pacman.conf for a [extra] section
         let conf = fs::read_to_string("/etc/pacman.conf").unwrap_or_default();
         let found = conf.to_ascii_lowercase().contains("[extra]");
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "worker",
             "extra_repo_available.file_fallback",
             if found { "detected" } else { "not_detected" },
@@ -157,7 +157,7 @@ impl Worker {
         let candidates = self.aur_helper_candidates();
         for h in &candidates {
             if which(h).is_ok() {
-                let _ = PROVENANCE.log(
+                let _ = audit_event(
                     "worker",
                     "aur_helper_name",
                     "found",
@@ -168,7 +168,7 @@ impl Worker {
                 return Ok(Some(h.to_string()));
             }
         }
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "worker",
             "aur_helper_name",
             "not_found",
@@ -189,7 +189,7 @@ impl Worker {
             .args(["-Si", package])
             .status()?;
         tracing::debug!(status = ?status.code(), "exit");
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "worker",
             "repo_has_package",
             if status.success() { "yes" } else { "no" },
@@ -221,7 +221,7 @@ impl Worker {
         tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
         let status = std::process::Command::new("pacman").args(&args).status()?;
         tracing::debug!(status = ?status.code(), "exit");
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "worker",
             "update_packages",
             if status.success() { "ok" } else { "error" },
@@ -244,7 +244,7 @@ impl Worker {
         let status = std::process::Command::new("pacman")
             .args(["-Qi", package])
             .status()?;
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "worker",
             "check_installed",
             if status.success() { "present" } else { "absent" },
@@ -297,7 +297,7 @@ impl Worker {
             tracing::debug!(status = ?pacman_status.code(), "exit");
             attempted_pacman = true;
             pacman_status_ok = pacman_status.success();
-            let _ = PROVENANCE.log(
+            let _ = audit_event(
                 "worker",
                 "install_package.pacman",
                 if pacman_status.success() { "ok" } else { "failed_or_unavailable" },
@@ -312,7 +312,7 @@ impl Worker {
             }
         } else {
             // Explicitly record that we skipped pacman because the package is not in official repos
-            let _ = PROVENANCE.log(
+            let _ = audit_event(
                 "worker",
                 "install_package.pacman",
                 "skipped_official_absent",
@@ -343,7 +343,7 @@ impl Worker {
                     .status()?;
                 tracing::debug!(status = ?aur_status.code(), "exit");
                     
-                let _ = PROVENANCE.log(
+                let _ = audit_event(
                     "worker",
                     "install_package.aur",
                     if aur_status.success() { "ok" } else { "error" },
@@ -416,7 +416,7 @@ impl Worker {
         tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
         let status = std::process::Command::new("pacman").args(&args).status()?;
         tracing::debug!(status = ?status.code(), "exit");
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "worker",
             "remove_package",
             if status.success() { "ok" } else { "error" },

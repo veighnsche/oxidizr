@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::logging::PROVENANCE;
+use crate::logging::audit_op;
 use crate::ui::progress::symlink_info_enabled;
 use std::fs;
 use std::os::unix::fs as unix_fs;
@@ -194,7 +194,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     }
     
     // Log the symlink creation
-    let _ = PROVENANCE.log_operation(
+    let _ = audit_op(
         "CREATE_SYMLINK",
         &format!("{} -> {}", target.display(), source.display()),
         true,
@@ -224,7 +224,7 @@ pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
         let _ = fs::remove_file(target);
         fs::rename(backup, target)?;
         // Log the restoration
-        let _ = PROVENANCE.log_operation("RESTORE_FILE", &format!("{}", target.display()), true);
+        let _ = audit_op("RESTORE_FILE", &format!("{}", target.display()), true);
     } else {
         tracing::warn!("No backup for {}, leaving as-is", target.display());
     }

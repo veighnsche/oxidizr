@@ -5,7 +5,7 @@ pub mod util;
 
 use crate::checks::Distribution;
 use crate::error::{Error, Result};
-use crate::logging::PROVENANCE;
+use crate::logging::audit_event;
 use crate::system::Worker;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -138,7 +138,7 @@ pub fn check_download_prerequisites(
     // Probe whether the package exists in official repos (helps clarify AUR-only cases)
     let official_has = worker.repo_has_package(package).unwrap_or(false);
     
-    let _ = PROVENANCE.log(
+    let _ = audit_event(
         "experiments",
         "repo_capabilities",
         "observed",
@@ -241,7 +241,7 @@ pub fn check_download_prerequisites(
             }
         }
         
-        let _ = PROVENANCE.log(
+        let _ = audit_event(
             "experiments",
             "already_installed",
             if reuse { "reuse" } else { "reinstall_requested" },
