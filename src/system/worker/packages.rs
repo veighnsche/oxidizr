@@ -7,6 +7,47 @@ use crate::logging::{audit_event_fields, AuditFields};
 use which::which;
 
 impl super::Worker {
+    /// Ensure AUR build prerequisites are present or install them under --assume-yes.
+    pub fn ensure_aur_preflight(&self, assume_yes: bool) -> Result<()> {
+        if self.dry_run {
+            tracing::info!("[dry-run] ensure AUR preflight: base-devel git fakeroot makepkg");
+            return Ok(());
+        }
+        let mut missing: Vec<&str> = Vec::new();
+        for pkg in ["base-devel", "git", "fakeroot", "pacman"] {
+            let ok = std::process::Command::new("pacman")
+                .args(["-Qi", pkg])
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if !ok {
+                missing.push(pkg);
+            }
+        }
+        if missing.is_empty() {
+            return Ok(());
+        }
+        if !assume_yes {
+            let cmd = format!("pacman -S --needed {}", missing.join(" "));
+            return Err(Error::ExecutionFailed(format!(
+                "AUR preflight missing: {}. Run as root: {}",
+                missing.join(", "),
+                cmd
+            )));
+        }
+        let mut args = vec!["-S", "--needed", "--noconfirm"];
+        for m in &missing { args.push(m); }
+        tracing::info!(cmd = %format!("pacman {}", args.join(" ")), "exec");
+        let status = std::process::Command::new("pacman").args(&args).status()?;
+        let _ = audit_event_fields(
+            "worker",
+            "ensure_aur_preflight",
+            if status.success() { "ok" } else { "error" },
+            &AuditFields { cmd: Some(format!("pacman {}", args.join(" "))), rc: status.code(), ..Default::default() },
+        );
+        if status.success() { Ok(()) } else { Err(Error::ExecutionFailed("failed to install AUR prerequisites".into())) }
+    }
+
     /// Check if a package exists in official repos (pacman -Si)
     pub fn repo_has_package(&self, package: &str) -> Result<bool> {
         if !Self::is_valid_package_name(package) {
@@ -322,5 +363,55 @@ impl super::Worker {
         }
         name.chars()
             .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '+' || c == '.')
+    }
+
+    /// Query owner of a file via pacman -Qo. Returns Some(pkg) if owned.
+    pub fn query_file_owner(&self, path: &Path) -> Result<Option<String>> {
+        let spath = path.display().to_string();
+        let out = std::process::Command::new("pacman")
+            .args(["-Qo", &spath])
+            .output();
+        match out {
+            Ok(o) => {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                let _ = audit_event_fields(
+                    "worker",
+                    "query_file_owner",
+                    if o.status.success() { "owned" } else { "unowned" },
+                    &AuditFields { cmd: Some(format!("pacman -Qo {}", spath)), rc: o.status.code(), ..Default::default() },
+                );
+                if o.status.success() {
+                    // Example: /usr/bin/ls is owned by coreutils 9.4-2
+                    if let Some((_, rest)) = stdout.split_once(" is owned by ") {
+                        if let Some((pkg, _ver)) = rest.split_once(' ') {
+                            return Ok(Some(pkg.trim().to_string()));
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Err(e) => Err(Error::Io(e)),
+        }
+    }
+
+    /// Verify ownership policy for target path. Warn by default; abort under --strict-ownership.
+    pub fn verify_owner_for_target(&self, target: &Path) -> Result<()> {
+        match self.query_file_owner(target)? {
+            Some(pkg) => {
+                tracing::debug!(target = %target.display(), owner = %pkg, "owner_ok");
+                Ok(())
+            }
+            None => {
+                if self.strict_ownership {
+                    Err(Error::ExecutionFailed(format!(
+                        "no package owner found for {}; run without --strict-ownership to proceed",
+                        target.display()
+                    )))
+                } else {
+                    tracing::warn!(target = %target.display(), "owner_unknown");
+                    Ok(())
+                }
+            }
+        }
     }
 }

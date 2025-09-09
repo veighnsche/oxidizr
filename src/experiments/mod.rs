@@ -276,3 +276,23 @@ pub fn check_download_prerequisites(
 
     Ok(())
 }
+
+/// Relink previously managed experiments based on persisted state.
+pub fn relink_managed(worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+    let st = crate::state::load_state(worker.state_dir_override.as_deref());
+    if st.enabled_experiments.is_empty() {
+        tracing::info!("No persisted experiments to relink");
+        return Ok(());
+    }
+    let registry = all_experiments();
+    for name in st.enabled_experiments {
+        if let Some(exp) = registry.iter().find(|e| e.name() == name) {
+            tracing::info!(event = "relink_managed", experiment = %name);
+            // Skip compatibility in relink mode (assume prior success)
+            exp.enable(worker, assume_yes, update_lists, true)?;
+        } else {
+            tracing::warn!("Persisted experiment '{}' not in registry; skipping", name);
+        }
+    }
+    Ok(())
+}

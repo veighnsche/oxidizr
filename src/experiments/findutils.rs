@@ -5,6 +5,7 @@ use crate::experiments::util::{
 };
 use crate::experiments::{check_download_prerequisites, UUTILS_FINDUTILS};
 use crate::system::Worker;
+use crate::state;
 use crate::logging::{audit_event_fields, AuditFields};
 use std::path::PathBuf;
 
@@ -42,6 +43,8 @@ impl FindutilsExperiment {
 
         // Check prerequisites and handle prompts
         check_download_prerequisites(worker, &self.package_name, assume_yes)?;
+        // AUR preflight for build requirements
+        worker.ensure_aur_preflight(assume_yes)?;
         // Visibility: AUR build for findutils will require checksums. These are expected to be provided
         // by the currently active coreutils (and optionally flipped via the dedicated 'checksums' experiment).
         match worker.which("sha256sum") {
@@ -85,6 +88,17 @@ impl FindutilsExperiment {
 
         log_applets_summary("findutils", &applets, 8);
         create_symlinks(worker, &applets, |name| self.resolve_target(name))?;
+        // Persist state: mark enabled and record managed targets
+        let managed: Vec<PathBuf> = applets
+            .iter()
+            .map(|(n, _)| self.resolve_target(n))
+            .collect();
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            true,
+            &managed,
+        );
 
         Ok(())
     }
@@ -101,6 +115,13 @@ impl FindutilsExperiment {
         // Restore findutils applets
         let targets = vec![self.resolve_target("find"), self.resolve_target("xargs")];
         restore_targets(worker, &targets)?;
+        // Persist state: mark disabled and remove managed targets
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            false,
+            &targets,
+        );
 
         Ok(())
     }

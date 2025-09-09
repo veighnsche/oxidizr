@@ -3,6 +3,9 @@ use crate::error::{Error, Result};
 use crate::experiments::util::{resolve_usrbin, restore_targets, verify_removed};
 use crate::experiments::{check_download_prerequisites, SUDO_RS};
 use crate::system::Worker;
+use crate::state;
+use std::fs;
+use std::os::unix::fs::MetadataExt;
 use crate::ui::progress;
 use std::path::PathBuf;
 
@@ -161,6 +164,35 @@ impl SudoRsExperiment {
             progress::set_msg_and_inc(&pb, format!("Linking {}", name));
         }
         progress::finish(pb);
+        // Post-enable verifier: setuid, ownership, PAM, smoke test
+        if let Err(e) = self.verify_post_enable(worker) {
+            // Revert on failure
+            let targets = vec![
+                self.resolve_target("sudo"),
+                self.resolve_target("su"),
+                PathBuf::from("/usr/sbin/visudo"),
+            ];
+            let _ = crate::experiments::util::restore_targets(worker, &targets);
+            // Remove alias symlinks
+            for n in ["sudo", "su", "visudo"] {
+                let alias = PathBuf::from(format!("/usr/bin/{}.sudo-rs", n));
+                let _ = fs::remove_file(&alias);
+            }
+            return Err(e);
+        }
+
+        // Persist state: mark enabled and record managed targets
+        let managed = vec![
+            self.resolve_target("sudo"),
+            self.resolve_target("su"),
+            PathBuf::from("/usr/sbin/visudo"),
+        ];
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            true,
+            &managed,
+        );
 
         Ok(())
     }
@@ -181,6 +213,13 @@ impl SudoRsExperiment {
             PathBuf::from("/usr/sbin/visudo"),
         ];
         restore_targets(worker, &targets)?;
+        // Persist state: mark disabled and remove managed targets
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            false,
+            &targets,
+        );
         // Verify restored (not a symlink)
         for (name, target) in [
             ("sudo", &targets[0]),
@@ -266,5 +305,52 @@ impl SudoRsExperiment {
 
     fn resolve_target(&self, filename: &str) -> PathBuf {
         resolve_usrbin(filename)
+    }
+
+    fn verify_post_enable(&self, worker: &Worker) -> Result<()> {
+        // 1) Check real binary ownership and setuid bits for sudo, su, visudo
+        for (name, _target) in [
+            ("sudo", self.resolve_target("sudo")),
+            ("su", self.resolve_target("su")),
+            ("visudo", PathBuf::from("/usr/sbin/visudo")),
+        ] {
+            // Follow alias to real binary
+            let alias = PathBuf::from(format!("/usr/bin/{}.sudo-rs", name));
+            let real = fs::canonicalize(&alias).map_err(|e| Error::ExecutionFailed(format!(
+                "failed to resolve real binary for {} via {}: {}",
+                name,
+                alias.display(),
+                e
+            )))?;
+            let meta = fs::metadata(&real)?;
+            if meta.uid() != 0 || meta.gid() != 0 || (meta.mode() & 0o4000) == 0 {
+                return Err(Error::ExecutionFailed(format!(
+                    "post-enable verifier failed for {} (real: {}): require uid=0,gid=0,setuid bit",
+                    name,
+                    real.display()
+                )));
+            }
+        }
+        // 2) PAM file exists
+        if fs::metadata("/etc/pam.d/sudo").is_err() {
+            return Err(Error::ExecutionFailed(
+                "PAM file /etc/pam.d/sudo not found after sudo-rs enable".into(),
+            ));
+        }
+        // 3) Smoke test
+        if let Some(user) = &worker.sudo_smoke_user {
+            let status = std::process::Command::new("sudo")
+                .args(["-n", "-u", user, "true"])
+                .status()
+                .map_err(|e| Error::ExecutionFailed(format!("failed to run sudo smoke test: {}", e)))?;
+            if !status.success() {
+                return Err(Error::ExecutionFailed(
+                    "sudo -n true smoke test failed for configured user".into(),
+                ));
+            }
+        } else {
+            tracing::warn!("sudo-rs: skipping sudo smoke test; provide --sudo-smoke-user to enable");
+        }
+        Ok(())
     }
 }

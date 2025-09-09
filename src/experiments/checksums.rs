@@ -6,6 +6,7 @@ use crate::experiments::util::{
 };
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
 use crate::system::Worker;
+use crate::state;
 use crate::logging::{audit_event_fields, AuditFields};
 use std::path::PathBuf;
 
@@ -88,6 +89,17 @@ impl ChecksumsExperiment {
 
         log_applets_summary("checksums", &links, 8);
         create_symlinks(worker, &links, |name| self.resolve_target(name))?;
+        // Persist state: mark enabled and record managed checksum targets
+        let managed: Vec<PathBuf> = links
+            .iter()
+            .map(|(n, _)| self.resolve_target(n))
+            .collect();
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            true,
+            &managed,
+        );
         Ok(())
     }
 
@@ -98,6 +110,13 @@ impl ChecksumsExperiment {
             .map(|n| self.resolve_target(n))
             .collect();
         restore_targets(worker, &targets)?;
+        // Persist state: mark disabled and remove managed targets
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            false,
+            &targets,
+        );
         Ok(())
     }
 

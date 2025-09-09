@@ -6,6 +6,7 @@ use crate::experiments::util::{
 };
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
 use crate::system::Worker;
+use crate::state;
 use std::path::PathBuf;
 
 // Coreutils bins list (moved under assets per DELTA)
@@ -98,6 +99,17 @@ impl CoreutilsExperiment {
 
         log_applets_summary("coreutils", &to_link, 8);
         create_symlinks(worker, &to_link, |name| self.resolve_target(name))?;
+        // Persist state: mark enabled and record managed (non-checksum) targets
+        let managed: Vec<PathBuf> = to_link
+            .iter()
+            .map(|(n, _)| self.resolve_target(n))
+            .collect();
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            true,
+            &managed,
+        );
 
         Ok(())
     }
@@ -125,6 +137,13 @@ impl CoreutilsExperiment {
             targets.push(target);
         }
         restore_targets(worker, &targets)?;
+        // Persist state: mark disabled and remove managed targets
+        let _ = state::set_enabled(
+            worker.state_dir_override.as_deref(),
+            self.name(),
+            false,
+            &targets,
+        );
 
         Ok(())
     }

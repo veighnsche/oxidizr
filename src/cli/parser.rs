@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 /// AUR helper selection
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -99,6 +100,26 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub force_restore_best_effort: bool,
 
+    /// Strict owner verification: abort when target not owned by expected packages
+    #[arg(long, global = true)]
+    pub strict_ownership: bool,
+
+    /// Force override trust checks for custom --bin_dir/--unified_binary sources
+    #[arg(long = "force", global = true)]
+    pub force_override_untrusted: bool,
+
+    /// Override state directory for persistence (useful in tests)
+    #[arg(long, global = true)]
+    pub state_dir: Option<PathBuf>,
+
+    /// Override log directory for state report emission (useful in tests)
+    #[arg(long, global = true)]
+    pub log_dir: Option<PathBuf>,
+
+    /// Optional user to try sudo -n true smoke test with sudo-rs
+    #[arg(long, global = true)]
+    pub sudo_smoke_user: Option<String>,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -115,4 +136,8 @@ pub enum Commands {
     Check,
     /// List computed target paths that would be affected
     ListTargets,
+    /// Re-apply links for previously managed experiments (used by pacman hook)
+    RelinkManaged,
+    /// Install pacman post-transaction hook to relink managed targets
+    InstallHook,
 }

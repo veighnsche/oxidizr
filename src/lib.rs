@@ -6,6 +6,7 @@ pub mod logging;
 pub mod symlink;
 pub mod system;
 pub mod ui;
+pub mod state;
 
 pub use error::{Error, Result};
 

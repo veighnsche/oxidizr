@@ -2,7 +2,8 @@ use crate::cli::parser::{Cli, Commands};
 use crate::error::Result;
 use crate::experiments::{all_experiments, Experiment};
 use crate::logging::{audit_event_fields, AuditFields};
-use crate::system::Worker;
+use crate::system::{lock, hook, Worker};
+use crate::state;
 use std::io::{self, Write};
 
 /// Main CLI handler - preserves backward compatibility with original
@@ -29,6 +30,11 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
         cli.bin_dir.clone(),
         cli.unified_binary.clone(),
         cli.force_restore_best_effort,
+        cli.strict_ownership,
+        cli.force_override_untrusted,
+        cli.state_dir.clone(),
+        cli.log_dir.clone(),
+        cli.sudo_smoke_user.clone(),
     );
 
     let update_lists = !cli.no_update;
@@ -78,6 +84,8 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
 
     match cli.command {
         Commands::Enable => {
+            // Enforce single-instance lock for mutating command
+            let _lock_guard = lock::acquire()?;
             if !cli.dry_run {
                 enforce_root()?;
             }
@@ -100,8 +108,11 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
                 );
             }
+            // Emit final state report
+            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
         }
         Commands::Disable => {
+            let _lock_guard = lock::acquire()?;
             if !cli.dry_run {
                 enforce_root()?;
             }
@@ -116,8 +127,10 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
                 );
             }
+            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
         }
         Commands::Remove => {
+            let _lock_guard = lock::acquire()?;
             if !cli.dry_run {
                 enforce_root()?;
             }
@@ -131,6 +144,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
                 );
             }
+            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
         }
         Commands::Check => {
             let distro = worker.distribution()?;
@@ -147,6 +161,19 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     tracing::info!(event = "list_target", experiment = %e.name(), target = %t.display().to_string());
                 }
             }
+        }
+        Commands::RelinkManaged => {
+            let _lock_guard = lock::acquire()?;
+            if !cli.dry_run { enforce_root()?; }
+            // Relink previously managed experiments from persisted state
+            crate::experiments::relink_managed(&worker, /*assume_yes=*/ true, /*update_lists=*/ false)?;
+            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
+        }
+        Commands::InstallHook => {
+            let _lock_guard = lock::acquire()?;
+            if !cli.dry_run { enforce_root()?; }
+            let path = hook::install_pacman_hook()?;
+            println!("Installed pacman hook at {}", path.display());
         }
     }
 

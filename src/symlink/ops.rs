@@ -5,6 +5,8 @@ use std::fs;
 use std::time::Instant;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
+use std::os::unix::io::RawFd;
+use nix::libc;
 
 const BACKUP_SUFFIX: &str = ".oxidizr.bak";
 
@@ -54,7 +56,20 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         ));
     }
 
-    // Use symlink_metadata to avoid TOCTOU race conditions
+    // Enforce no-follow on the parent directory using open(O_DIRECTORY|O_NOFOLLOW)
+    if let Some(parent) = target.parent() {
+        let _dirfd = open_dir_nofollow(parent).map_err(|e| {
+            crate::Error::ExecutionFailed(format!(
+                "failed parent no-follow open on {}: {}",
+                parent.display(),
+                e
+            ))
+        })?;
+        // Close immediately; existence and no-follow guarantees are enough here.
+        unsafe { libc::close(_dirfd) };
+    }
+
+    // Use symlink_metadata to avoid simple TOCTOU races on the leaf
     let metadata = fs::symlink_metadata(target);
     let existed = metadata.is_ok();
     let is_symlink = metadata
@@ -273,14 +288,37 @@ fn atomic_symlink_swap(source: &Path, target: &Path) -> std::io::Result<()> {
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("target");
-    let tmp = parent.join(format!(".{}.oxidizr.tmp", fname));
+    let tmp_name = format!(".{}.oxidizr.tmp", fname);
+    let tmp = parent.join(&tmp_name);
     // Best-effort cleanup
     let _ = fs::remove_file(&tmp);
     unix_fs::symlink(source, &tmp)?;
-    fs::rename(&tmp, target)?;
+
+    // Perform renameat anchored at the parent directory to avoid path races
+    let dirfd = open_dir_nofollow(parent)?;
+    let old_c = std::ffi::CString::new(tmp_name.as_str()).unwrap();
+    let new_c = std::ffi::CString::new(fname).unwrap();
+    let rc = unsafe { libc::renameat(dirfd, old_c.as_ptr(), dirfd, new_c.as_ptr()) };
+    let last = std::io::Error::last_os_error();
+    unsafe { libc::close(dirfd) };
+    if rc != 0 { return Err(last); }
+
     // fsync parent directory
     let _ = fsync_parent_dir(target);
     Ok(())
+}
+
+fn open_dir_nofollow(dir: &Path) -> std::io::Result<RawFd> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(dir.as_os_str().as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))?;
+    // O_NOFOLLOW will fail with ELOOP if dir is a symlink
+    let flags = libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW;
+    let fd = unsafe { libc::open(c.as_ptr(), flags, 0) };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(fd)
 }
 
 fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {

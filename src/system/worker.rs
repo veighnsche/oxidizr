@@ -14,6 +14,11 @@ pub struct Worker {
     pub bin_dir_override: Option<PathBuf>,
     pub unified_binary_override: Option<PathBuf>,
     pub force_restore_best_effort: bool,
+    pub strict_ownership: bool,
+    pub force_override_untrusted: bool,
+    pub state_dir_override: Option<PathBuf>,
+    pub log_dir_override: Option<PathBuf>,
+    pub sudo_smoke_user: Option<String>,
 }
 
 impl Worker {
@@ -27,6 +32,11 @@ impl Worker {
         bin_dir_override: Option<PathBuf>,
         unified_binary_override: Option<PathBuf>,
         force_restore_best_effort: bool,
+        strict_ownership: bool,
+        force_override_untrusted: bool,
+        state_dir_override: Option<PathBuf>,
+        log_dir_override: Option<PathBuf>,
+        sudo_smoke_user: Option<String>,
     ) -> Self {
         Self {
             aur_helper,
@@ -37,6 +47,11 @@ impl Worker {
             bin_dir_override,
             unified_binary_override,
             force_restore_best_effort,
+            strict_ownership,
+            force_override_untrusted,
+            state_dir_override,
+            log_dir_override,
+            sudo_smoke_user,
         }
     }
 }
