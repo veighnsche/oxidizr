@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::logging::audit_event;
+use crate::logging::{audit_event_fields, AuditFields};
 use which::which;
 
 impl super::Worker {
@@ -8,17 +8,31 @@ impl super::Worker {
         let candidates = self.aur_helper_candidates();
         for h in &candidates {
             if which(h).is_ok() {
-                let _ = audit_event("worker", "aur_helper_name", "found", h, "", None);
+                let _ = audit_event_fields(
+                    "worker",
+                    "aur_helper_name",
+                    "found",
+                    &AuditFields {
+                        target: Some(h.to_string()),
+                        ..Default::default()
+                    },
+                );
                 return Ok(Some(h.to_string()));
             }
         }
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "worker",
             "aur_helper_name",
             "not_found",
-            &self.aur_helper,
-            "",
-            None,
+            &AuditFields {
+                target: if self.aur_helper.is_empty() {
+                    None
+                } else {
+                    Some(self.aur_helper.clone())
+                },
+                artifacts: Some(candidates.iter().map(|s| s.to_string()).collect()),
+                ..Default::default()
+            },
         );
         Ok(None)
     }

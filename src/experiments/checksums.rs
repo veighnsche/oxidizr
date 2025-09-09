@@ -6,6 +6,7 @@ use crate::experiments::util::{
 };
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
 use crate::system::Worker;
+use crate::logging::{audit_event_fields, AuditFields};
 use std::path::PathBuf;
 
 pub struct ChecksumsExperiment {
@@ -71,13 +72,14 @@ impl ChecksumsExperiment {
             );
         }
         if links.is_empty() {
-            let _ = crate::logging::audit_event(
+            let _ = audit_event_fields(
                 "experiments",
                 "nothing_to_link",
                 "checksums",
-                "",
-                "",
-                None,
+                &AuditFields {
+                    suite: Some("checksums".to_string()),
+                    ..Default::default()
+                },
             );
             return Err(Error::NothingToLink(
                 "no checksum applets discovered after ensuring provider".into(),

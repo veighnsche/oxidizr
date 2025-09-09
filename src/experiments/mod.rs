@@ -7,7 +7,7 @@ pub mod util;
 
 use crate::checks::Distribution;
 use crate::error::{Error, Result};
-use crate::logging::audit_event;
+use crate::logging::{audit_event_fields, AuditFields};
 use crate::system::Worker;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -151,16 +151,11 @@ pub fn check_download_prerequisites(
     // Probe whether the package exists in official repos (helps clarify AUR-only cases)
     let official_has = worker.repo_has_package(package).unwrap_or(false);
 
-    let _ = audit_event(
+    let _ = audit_event_fields(
         "experiments",
         "repo_capabilities",
         "observed",
-        &format!(
-            "extra_available={}, aur_available={}, official_has={}, helper={:?}",
-            extra_available, aur_available, official_has, aur_helper
-        ),
-        "",
-        None,
+        &AuditFields::default(),
     );
 
     // Gate on repo availability
@@ -169,13 +164,11 @@ pub fn check_download_prerequisites(
             "no 'extra' repo and no AUR helper available (extra_available={}, aur_available={})",
             extra_available, aur_available
         );
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "experiments",
             "repo_gate_failed",
             "missing_repo_and_helper",
-            &details,
-            "",
-            None,
+            &AuditFields::default(),
         );
         return Err(Error::RepoGateFailed {
             package: package.into(),
@@ -188,13 +181,11 @@ pub fn check_download_prerequisites(
         UUTILS_COREUTILS | SUDO_RS => {
             if !extra_available {
                 let details = "extra repo unavailable".to_string();
-                let _ = audit_event(
+                let _ = audit_event_fields(
                     "experiments",
                     "repo_gate_failed",
                     "extra_missing",
-                    &details,
-                    package,
-                    None,
+                    &AuditFields { target: Some(package.to_string()), ..Default::default() },
                 );
                 return Err(Error::RepoGateFailed {
                     package: package.into(),
@@ -211,13 +202,11 @@ pub fn check_download_prerequisites(
                 }
                 Ok(false) => {
                     let details = "package not present in repos (pacman -Si)".to_string();
-                    let _ = audit_event(
+                    let _ = audit_event_fields(
                         "experiments",
                         "repo_gate_failed",
                         "package_absent",
-                        &details,
-                        package,
-                        None,
+                        &AuditFields { target: Some(package.to_string()), ..Default::default() },
                     );
                     return Err(Error::RepoGateFailed {
                         package: package.into(),
@@ -232,13 +221,11 @@ pub fn check_download_prerequisites(
         UUTILS_FINDUTILS => {
             if !aur_available {
                 let details = "no AUR helper available".to_string();
-                let _ = audit_event(
+                let _ = audit_event_fields(
                     "experiments",
                     "repo_gate_failed",
                     "aur_helper_missing",
-                    &details,
-                    package,
-                    None,
+                    &AuditFields { target: Some(package.to_string()), ..Default::default() },
                 );
                 return Err(Error::RepoGateFailed {
                     package: package.into(),
@@ -272,17 +259,11 @@ pub fn check_download_prerequisites(
             }
         }
 
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "experiments",
             "already_installed",
-            if reuse {
-                "reuse"
-            } else {
-                "reinstall_requested"
-            },
-            package,
-            "",
-            None,
+            if reuse { "reuse" } else { "reinstall_requested" },
+            &AuditFields { target: Some(package.to_string()), ..Default::default() },
         );
 
         if reuse {

@@ -5,6 +5,7 @@ use crate::experiments::util::{
 };
 use crate::experiments::{check_download_prerequisites, UUTILS_FINDUTILS};
 use crate::system::Worker;
+use crate::logging::{audit_event_fields, AuditFields};
 use std::path::PathBuf;
 
 pub struct FindutilsExperiment {
@@ -64,13 +65,14 @@ impl FindutilsExperiment {
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
         if applets.is_empty() {
-            let _ = crate::logging::audit_event(
+            let _ = audit_event_fields(
                 "experiments",
                 "nothing_to_link",
                 "findutils",
-                "",
-                "",
-                None,
+                &AuditFields {
+                    suite: Some("findutils".to_string()),
+                    ..Default::default()
+                },
             );
             return Err(Error::NothingToLink(
                 "no findutils applets discovered after install".into(),

@@ -1,7 +1,7 @@
 use crate::cli::parser::{Cli, Commands};
 use crate::error::Result;
 use crate::experiments::{all_experiments, Experiment};
-use crate::logging::audit_event;
+use crate::logging::{audit_event_fields, AuditFields};
 use crate::system::Worker;
 use std::io::{self, Write};
 
@@ -93,7 +93,12 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     cli.no_compatibility_check,
                 )?;
                 tracing::info!(event = "enabled", experiment = %e.name());
-                let _ = audit_event("cli", "enabled", "success", e.name(), "", None);
+                let _ = audit_event_fields(
+                    "cli",
+                    "enabled",
+                    "success",
+                    &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
+                );
             }
         }
         Commands::Disable => {
@@ -104,7 +109,12 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             for e in &exps {
                 e.disable(&worker, cli.assume_yes, update_lists)?;
                 tracing::info!(event = "disabled", experiment = %e.name());
-                let _ = audit_event("cli", "disabled", "success", e.name(), "", None);
+                let _ = audit_event_fields(
+                    "cli",
+                    "disabled",
+                    "success",
+                    &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
+                );
             }
         }
         Commands::Remove => {
@@ -114,7 +124,12 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             for e in &exps {
                 e.remove(&worker, cli.assume_yes, update_lists)?;
                 tracing::info!(event = "removed_and_restored", experiment = %e.name());
-                let _ = audit_event("cli", "removed_and_restored", "success", e.name(), "", None);
+                let _ = audit_event_fields(
+                    "cli",
+                    "removed_and_restored",
+                    "success",
+                    &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
+                );
             }
         }
         Commands::Check => {

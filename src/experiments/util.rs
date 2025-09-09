@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::logging::{audit_event_fields, AuditFields};
 use crate::system::Worker;
 use crate::ui::progress;
 use std::path::{Path, PathBuf};
@@ -30,13 +31,15 @@ where
             tracing::info!("Symlinking {} -> {}", src.display(), target.display());
         }
         // Structured audit: link_started
-        let _ = crate::logging::audit_event(
+        let _ = audit_event_fields(
             "symlink",
             "link_started",
             "begin",
-            &format!("{} -> {}", src.display(), target.display()),
-            "",
-            None,
+            &AuditFields {
+                source: Some(src.display().to_string()),
+                target: Some(target.display().to_string()),
+                ..Default::default()
+            },
         );
         // Emit host progress protocol line for v1 host bar
         progress::emit_host_pb(idx + 1, total, &format!("Linking {}", filename));
@@ -65,13 +68,16 @@ where
             elapsed_ms
         );
         // Structured audit: link_done
-        let _ = crate::logging::audit_event(
+        let _ = audit_event_fields(
             "symlink",
             "link_done",
             "success",
-            &format!("{} -> {}", src.display(), target.display()),
-            &format!("duration_ms={}", elapsed_ms),
-            None,
+            &AuditFields {
+                source: Some(src.display().to_string()),
+                target: Some(target.display().to_string()),
+                duration_ms: Some(elapsed_ms),
+                ..Default::default()
+            },
         );
         // Update progress after a successful link
         progress::set_msg_and_inc(&pb, format!("Linking {}", filename));
@@ -99,13 +105,11 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
             );
         }
         // Structured audit: restore_started
-        let _ = crate::logging::audit_event(
+        let _ = audit_event_fields(
             "symlink",
             "restore_started",
             "begin",
-            &format!("{}", target.display()),
-            "",
-            None,
+            &AuditFields { target: Some(target.display().to_string()), ..Default::default() },
         );
         // Emit host progress protocol line for v1 host bar
         if let Some(name) = target.file_name().and_then(|s| s.to_str()) {
@@ -126,13 +130,11 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
         let elapsed_ms = t0.elapsed().as_millis() as u64;
         tracing::debug!("restore_done: {} ({} ms)", target.display(), elapsed_ms);
         // Structured audit: restore_done
-        let _ = crate::logging::audit_event(
+        let _ = audit_event_fields(
             "symlink",
             "restore_done",
             "success",
-            &format!("{}", target.display()),
-            &format!("duration_ms={}", elapsed_ms),
-            None,
+            &AuditFields { target: Some(target.display().to_string()), duration_ms: Some(elapsed_ms), ..Default::default() },
         );
         // Update progress after a successful restore
         if let Some(name) = target.file_name().and_then(|s| s.to_str()) {

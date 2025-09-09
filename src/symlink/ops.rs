@@ -1,4 +1,4 @@
-use crate::logging::audit_op;
+use crate::logging::{audit_op, audit_event_fields, AuditFields};
 use crate::ui::progress::symlink_info_enabled;
 use crate::Result;
 use std::fs;
@@ -142,13 +142,17 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
                     // Create a symlink backup pointing to the same destination
                     let _ = unix_fs::symlink(curr, &backup);
                     let elapsed_ms = t0.elapsed().as_millis() as u64;
-                    let _ = crate::logging::audit_event(
+                    let _ = audit_event_fields(
                         "symlink",
                         "backup_created",
-                        "symlink",
-                        &backup.display().to_string(),
-                        &format!("dest={} duration_ms={}", curr.display(), elapsed_ms),
-                        None,
+                        "success",
+                        &AuditFields {
+                            backup_path: Some(backup.display().to_string()),
+                            source: Some(curr.display().to_string()),
+                            target: Some(target.display().to_string()),
+                            duration_ms: Some(elapsed_ms),
+                            ..Default::default()
+                        },
                     );
                 }
             }
@@ -180,13 +184,16 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             fs::set_permissions(&backup, perm)?;
             fs::remove_file(target)?;
             let elapsed_ms = t0.elapsed().as_millis() as u64;
-            let _ = crate::logging::audit_event(
+            let _ = audit_event_fields(
                 "symlink",
                 "backup_created",
-                "file",
-                &backup.display().to_string(),
-                &format!("from={} duration_ms={}", target.display(), elapsed_ms),
-                None,
+                "success",
+                &AuditFields {
+                    backup_path: Some(backup.display().to_string()),
+                    target: Some(target.display().to_string()),
+                    duration_ms: Some(elapsed_ms),
+                    ..Default::default()
+                },
             );
         } else {
             // If metadata failed, the file might have been removed - handle gracefully

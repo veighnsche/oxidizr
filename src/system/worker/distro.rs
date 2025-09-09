@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::checks::Distribution;
 use crate::error::Result;
-use crate::logging::audit_event;
+use crate::logging::{audit_event_fields, AuditFields};
 
 impl super::Worker {
     /// Get current distribution information
@@ -46,13 +46,11 @@ impl super::Worker {
                     .lines()
                     .map(|s| s.trim().to_ascii_lowercase())
                     .any(|l| l == "extra");
-                let _ = audit_event(
+                let _ = audit_event_fields(
                     "worker",
                     "extra_repo_available.repo_list",
                     if found { "detected" } else { "not_detected" },
-                    "pacman-conf --repo-list",
-                    &stdout,
-                    out.status.code(),
+                    &AuditFields { cmd: Some("pacman-conf --repo-list".to_string()), rc: out.status.code(), ..Default::default() },
                 );
                 if found {
                     return Ok(true);
@@ -72,17 +70,11 @@ impl super::Worker {
             }
             s
         } {
-            let _ = audit_event(
+            let _ = audit_event_fields(
                 "worker",
                 "extra_repo_available.pacman_sl",
-                if status.success() {
-                    "detected"
-                } else {
-                    "not_detected"
-                },
-                "pacman -Sl extra",
-                "",
-                status.code(),
+                if status.success() { "detected" } else { "not_detected" },
+                &AuditFields { cmd: Some("pacman -Sl extra".to_string()), rc: status.code(), ..Default::default() },
             );
             if status.success() {
                 return Ok(true);
@@ -103,13 +95,11 @@ impl super::Worker {
             let stdout = String::from_utf8_lossy(&out.stdout);
             if out.status.success() {
                 let found = stdout.to_ascii_lowercase().contains("[extra]");
-                let _ = audit_event(
+                let _ = audit_event_fields(
                     "worker",
                     "extra_repo_available.conf_dump",
                     if found { "detected" } else { "not_detected" },
-                    "pacman-conf -l",
-                    &stdout,
-                    out.status.code(),
+                    &AuditFields { cmd: Some("pacman-conf -l".to_string()), rc: out.status.code(), ..Default::default() },
                 );
                 if found {
                     return Ok(true);
@@ -120,13 +110,11 @@ impl super::Worker {
         // 4) Last resort: parse /etc/pacman.conf for a [extra] section
         let conf = fs::read_to_string("/etc/pacman.conf").unwrap_or_default();
         let found = conf.to_ascii_lowercase().contains("[extra]");
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "worker",
             "extra_repo_available.file_fallback",
             if found { "detected" } else { "not_detected" },
-            "/etc/pacman.conf",
-            "",
-            None,
+            &AuditFields { cmd: Some("/etc/pacman.conf".to_string()), ..Default::default() },
         );
         Ok(found)
     }

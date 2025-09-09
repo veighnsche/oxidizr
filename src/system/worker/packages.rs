@@ -3,7 +3,7 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use crate::error::{Error, Result};
-use crate::logging::audit_event;
+use crate::logging::{audit_event_fields, AuditFields};
 use which::which;
 
 impl super::Worker {
@@ -17,13 +17,15 @@ impl super::Worker {
             .args(["-Si", package])
             .status()?;
         tracing::debug!(status = ?status.code(), "exit");
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "worker",
             "repo_has_package",
             if status.success() { "yes" } else { "no" },
-            &format!("pacman -Si {}", package),
-            "",
-            status.code(),
+            &AuditFields {
+                cmd: Some(format!("pacman -Si {}", package)),
+                rc: status.code(),
+                ..Default::default()
+            },
         );
         Ok(status.success())
     }
@@ -49,13 +51,11 @@ impl super::Worker {
         tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
         let status = std::process::Command::new("pacman").args(&args).status()?;
         tracing::debug!(status = ?status.code(), "exit");
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "worker",
             "update_packages",
             if status.success() { "ok" } else { "error" },
-            &format!("pacman {}", args.join(" ")),
-            "",
-            status.code(),
+            &AuditFields { cmd: Some(format!("pacman {}", args.join(" "))), rc: status.code(), ..Default::default() },
         );
 
         if status.success() {
@@ -72,17 +72,11 @@ impl super::Worker {
         let status = std::process::Command::new("pacman")
             .args(["-Qi", package])
             .status()?;
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "worker",
             "check_installed",
-            if status.success() {
-                "present"
-            } else {
-                "absent"
-            },
-            &format!("pacman -Qi {}", package),
-            "",
-            status.code(),
+            if status.success() { "present" } else { "absent" },
+            &AuditFields { cmd: Some(format!("pacman -Qi {}", package)), rc: status.code(), ..Default::default() },
         );
         Ok(status.success())
     }
@@ -129,17 +123,11 @@ impl super::Worker {
             tracing::debug!(status = ?pacman_status.code(), "exit");
             attempted_pacman = true;
             pacman_status_ok = pacman_status.success();
-            let _ = audit_event(
+            let _ = audit_event_fields(
                 "worker",
                 "install_package.pacman",
-                if pacman_status.success() {
-                    "ok"
-                } else {
-                    "failed_or_unavailable"
-                },
-                &format!("pacman {}", args.join(" ")),
-                "",
-                pacman_status.code(),
+                if pacman_status.success() { "ok" } else { "failed_or_unavailable" },
+                &AuditFields { cmd: Some(format!("pacman {}", args.join(" "))), rc: pacman_status.code(), ..Default::default() },
             );
 
             if pacman_status_ok && self.check_installed(package)? {
@@ -148,13 +136,11 @@ impl super::Worker {
             }
         } else {
             // Explicitly record that we skipped pacman because the package is not in official repos
-            let _ = audit_event(
+            let _ = audit_event_fields(
                 "worker",
                 "install_package.pacman",
                 "skipped_official_absent",
-                package,
-                "uutils-findutils-bin is AUR-only; pacman -Si indicates absent",
-                None,
+                &AuditFields { cmd: Some(format!("pacman -Si {}", package)), ..Default::default() },
             );
         }
 
@@ -203,13 +189,11 @@ impl super::Worker {
 
                 tracing::debug!(status = ?aur_status.code(), "exit");
 
-                let _ = audit_event(
+                let _ = audit_event_fields(
                     "worker",
                     "install_package.aur",
                     if aur_status.success() { "ok" } else { "error" },
-                    &format!("helper={} args=-S --needed {}", h, package),
-                    &format!("aur_user={}", self.aur_user.as_deref().unwrap_or("<self>")),
-                    aur_status.code(),
+                    &AuditFields { cmd: Some(format!("{} -S --needed {}", h, package)), rc: aur_status.code(), ..Default::default() },
                 );
 
                 if aur_status.success() && self.check_installed(package)? {
@@ -276,13 +260,11 @@ impl super::Worker {
         tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
         let status = std::process::Command::new("pacman").args(&args).status()?;
         tracing::debug!(status = ?status.code(), "exit");
-        let _ = audit_event(
+        let _ = audit_event_fields(
             "worker",
             "remove_package",
             if status.success() { "ok" } else { "error" },
-            &format!("pacman {}", args.join(" ")),
-            "",
-            status.code(),
+            &AuditFields { cmd: Some(format!("pacman {}", args.join(" "))), rc: status.code(), ..Default::default() },
         );
 
         if status.success() {
