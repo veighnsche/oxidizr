@@ -18,6 +18,19 @@ pub enum Error {
     #[error("Unsupported distribution or release: {0}")]
     Incompatible(String),
 
+    // New typed errors for enumerated exit codes / behavior
+    /// No applets discovered to link after ensuring provider installation
+    #[error("nothing to link: {0}")]
+    NothingToLink(String),
+
+    /// Restore failed because a backup file is missing (unless forced best-effort)
+    #[error("restore backup missing for: {0}")]
+    RestoreBackupMissing(String),
+
+    /// Repository gating failed for a package with details
+    #[error("repo gate failed for '{package}': {details}")]
+    RepoGateFailed { package: String, details: String },
+
     #[error("Other error: {0}")]
     Other(String),
 }

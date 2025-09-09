@@ -16,6 +16,6 @@ impl super::Worker {
 
     /// Restore file from backup (delegated to symlink module)
     pub fn restore_file(&self, target: &Path) -> Result<()> {
-        crate::symlink::restore_file(target, self.dry_run)
+        crate::symlink::restore_file(target, self.dry_run, self.force_restore_best_effort)
     }
 }

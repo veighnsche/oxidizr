@@ -164,35 +164,35 @@ pub fn check_download_prerequisites(
 
     // Gate on repo availability
     if !extra_available && !aur_available {
-        tracing::error!(
-            "❌ Expected: access to 'extra' repo or an AUR helper; Received: extra_available={}, aur_available={}",
-            extra_available,
-            aur_available
+        let details = format!(
+            "no 'extra' repo and no AUR helper available (extra_available={}, aur_available={})",
+            extra_available, aur_available
         );
-        return Err(Error::ExecutionFailed(
-            format!(
-                "❌ Expected: access to 'extra' repo or AUR helper; Received: extra_available={}, aur_available={}",
-                extra_available, aur_available
-            )
-            .into(),
-        ));
+        let _ = audit_event(
+            "experiments",
+            "repo_gate_failed",
+            "missing_repo_and_helper",
+            &details,
+            "",
+            None,
+        );
+        return Err(Error::RepoGateFailed { package: package.into(), details });
     }
 
     // Per-package repo requirements
     match package {
         UUTILS_COREUTILS | SUDO_RS => {
             if !extra_available {
-                tracing::error!(
-                    "❌ Expected: extra repo available for '{}'; Received: extra_available=false",
-                    package
+                let details = "extra repo unavailable".to_string();
+                let _ = audit_event(
+                    "experiments",
+                    "repo_gate_failed",
+                    "extra_missing",
+                    &details,
+                    package,
+                    None,
                 );
-                return Err(Error::ExecutionFailed(
-                    format!(
-                        "❌ Expected: extra repo available for '{}'; Received: extra_available=false",
-                        package
-                    )
-                    .into(),
-                ));
+                return Err(Error::RepoGateFailed { package: package.into(), details });
             }
             // Gate on actual package presence in the repo to avoid ambiguous 'not found' failures
             match worker.repo_has_package(package) {
@@ -200,14 +200,16 @@ pub fn check_download_prerequisites(
                     tracing::info!("✅ Package '{}' present in repositories (pacman -Si)", package);
                 }
                 Ok(false) => {
-                    tracing::error!(
-                        "❌ Package '{}' not found in repositories (pacman -Si). Mirrors may be out of sync or the repo set is incomplete.",
-                        package
+                    let details = "package not present in repos (pacman -Si)".to_string();
+                    let _ = audit_event(
+                        "experiments",
+                        "repo_gate_failed",
+                        "package_absent",
+                        &details,
+                        package,
+                        None,
                     );
-                    return Err(Error::ExecutionFailed(format!(
-                        "package '{}' not found in repositories (pacman -Si). Try 'pacman -Syy' to refresh, switch mirrors, or rerun later.",
-                        package
-                    )));
+                    return Err(Error::RepoGateFailed { package: package.into(), details });
                 }
                 Err(e) => {
                     tracing::warn!("Warning: failed to probe repo for '{}': {}", package, e);
@@ -216,17 +218,16 @@ pub fn check_download_prerequisites(
         }
         UUTILS_FINDUTILS => {
             if !aur_available {
-                tracing::error!(
-                    "❌ Expected: an AUR helper present for '{}'; Received: none",
-                    package
+                let details = "no AUR helper available".to_string();
+                let _ = audit_event(
+                    "experiments",
+                    "repo_gate_failed",
+                    "aur_helper_missing",
+                    &details,
+                    package,
+                    None,
                 );
-                return Err(Error::ExecutionFailed(
-                    format!(
-                        "❌ Expected: an AUR helper present for '{}'; Received: none",
-                        package
-                    )
-                    .into(),
-                ));
+                return Err(Error::RepoGateFailed { package: package.into(), details });
             }
         }
         _ => {}

@@ -57,11 +57,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         .as_ref()
         .map(|m| m.file_type().is_symlink())
         .unwrap_or(false);
-    let current_dest = if is_symlink {
-        fs::read_link(target).ok()
-    } else {
-        None
-    };
+    let current_dest = if is_symlink { fs::read_link(target).ok() } else { None };
 
     if symlink_info_enabled() {
         tracing::info!(
@@ -121,30 +117,34 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
                 );
             }
             
-            // Create a backup of the current resolved target if it exists
+            // Link-aware backup: back up the symlink itself (if present) by creating a backup symlink
             let backup = backup_path(target);
-            if resolved_current.exists() {
-                if symlink_info_enabled() {
-                    tracing::info!(
-                        "Backing up (from symlink) {} -> {}",
-                        target.display(),
-                        backup.display()
+            if is_symlink {
+                if let Some(curr) = current_dest.as_ref() {
+                    let _ = fs::remove_file(&backup);
+                    if symlink_info_enabled() {
+                        tracing::info!(
+                            "Backing up symlink {} (-> {}) as {}",
+                            target.display(),
+                            curr.display(),
+                            backup.display()
+                        );
+                    }
+                    // Create a symlink backup pointing to the same destination
+                    let _ = unix_fs::symlink(curr, &backup);
+                    let _ = crate::logging::audit_event(
+                        "symlink",
+                        "backup_created",
+                        "symlink",
+                        &backup.display().to_string(),
+                        &format!("dest={}", curr.display()),
+                        None,
                     );
                 }
-                let _ = fs::copy(&resolved_current, &backup);
-                if let Ok(meta) = fs::metadata(&resolved_current) {
-                    let perm = meta.permissions();
-                    let _ = fs::set_permissions(&backup, perm);
-                }
-            } else {
-                tracing::warn!(
-                    "Resolved current target for {} does not exist ({}); creating no-op backup",
-                    target.display(),
-                    resolved_current.display()
-                );
             }
+            // Atomically swap using a temp symlink + rename
             fs::remove_file(target)?;
-            unix_fs::symlink(source, target)?;
+            atomic_symlink_swap(source, target)?;
             if symlink_info_enabled() {
                 tracing::info!(
                     "Symlink updated: {} -> {}",
@@ -168,6 +168,14 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             let perm = meta.permissions();
             fs::set_permissions(&backup, perm)?;
             fs::remove_file(target)?;
+            let _ = crate::logging::audit_event(
+                "symlink",
+                "backup_created",
+                "file",
+                &backup.display().to_string(),
+                &format!("from={}", target.display()),
+                None,
+            );
         } else {
             // If metadata failed, the file might have been removed - handle gracefully
             tracing::warn!(
@@ -178,13 +186,11 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     }
     
     // Ensure parent exists
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    
-    // Remove leftover target then symlink
+    if let Some(parent) = target.parent() { fs::create_dir_all(parent)?; }
+
+    // Remove leftover target then perform atomic symlink swap
     let _ = fs::remove_file(target);
-    unix_fs::symlink(source, target)?;
+    atomic_symlink_swap(source, target)?;
     if symlink_info_enabled() {
         tracing::info!(
             "Symlink created: {} -> {}",
@@ -203,8 +209,8 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     Ok(())
 }
 
-/// Restore a file from its backup
-pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
+/// Restore a file from its backup. When no backup exists, return an error unless force_best_effort is true.
+pub fn restore_file(target: &Path, dry_run: bool, force_best_effort: bool) -> Result<()> {
     let backup = backup_path(target);
     if backup.exists() {
         if dry_run {
@@ -220,13 +226,45 @@ pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
         if symlink_info_enabled() {
             tracing::info!("Restoring {} <- {}", target.display(), backup.display());
         }
-        // Remove symlink or leftover
+        // Remove current target then atomically rename backup into place
         let _ = fs::remove_file(target);
-        fs::rename(backup, target)?;
+        fs::rename(&backup, target)?;
+        // fsync parent directory to solidify rename
+        let _ = fsync_parent_dir(target);
         // Log the restoration
         let _ = audit_op("RESTORE_FILE", &format!("{}", target.display()), true);
     } else {
-        tracing::warn!("No backup for {}, leaving as-is", target.display());
+        if force_best_effort {
+            tracing::warn!("No backup for {}, leaving as-is", target.display());
+        } else {
+            return Err(crate::Error::RestoreBackupMissing(target.display().to_string()));
+        }
+    }
+    Ok(())
+}
+
+/// Create a symlink at a temporary path in the same directory as target and atomically rename it into place.
+fn atomic_symlink_swap(source: &Path, target: &Path) -> std::io::Result<()> {
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let fname = target
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("target");
+    let tmp = parent.join(format!(".{}.oxidizr.tmp", fname));
+    // Best-effort cleanup
+    let _ = fs::remove_file(&tmp);
+    unix_fs::symlink(source, &tmp)?;
+    fs::rename(&tmp, target)?;
+    // fsync parent directory
+    let _ = fsync_parent_dir(target);
+    Ok(())
+}
+
+fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        // Open the directory and fsync it
+        let dir = std::fs::File::open(parent)?;
+        dir.sync_all()?;
     }
     Ok(())
 }

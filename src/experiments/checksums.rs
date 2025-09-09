@@ -1,5 +1,5 @@
 use crate::checks::{Distribution, is_supported_distro};
-use crate::error::Result;
+use crate::error::{Result, Error};
 use crate::experiments::util::{create_symlinks, log_applets_summary, resolve_usrbin, restore_targets};
 use crate::experiments::constants::CHECKSUM_BINS;
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
@@ -67,8 +67,17 @@ impl ChecksumsExperiment {
             );
         }
         if links.is_empty() {
-            tracing::info!("No checksum applets discovered to flip; leaving system as-is");
-            return Ok(());
+            let _ = crate::logging::audit_event(
+                "experiments",
+                "nothing_to_link",
+                "checksums",
+                "",
+                "",
+                None,
+            );
+            return Err(Error::NothingToLink(
+                "no checksum applets discovered after ensuring provider".into(),
+            ));
         }
 
         log_applets_summary("checksums", &links, 8);

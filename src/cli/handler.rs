@@ -17,22 +17,24 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
         assume_yes = cli.assume_yes
     )
     .entered();
-    // Prefer --package-manager when provided; else fallback to --aur-helper
-    let effective_helper = cli
-        .package_manager
-        .clone()
-        .unwrap_or_else(|| cli.aur_helper.as_helper_str().to_string());
+    // Use configured AUR helper (string value from enum)
+    let effective_helper = cli.aur_helper.as_helper_str().to_string();
         
     let worker = Worker::new(
         effective_helper,
+        cli.aur_user.clone(),
         cli.dry_run,
         cli.wait_lock,
         cli.package.clone(),
         cli.bin_dir.clone(),
         cli.unified_binary.clone(),
+        cli.force_restore_best_effort,
     );
     
     let update_lists = !cli.no_update;
+
+    // Configure progress behavior from CLI
+    crate::ui::progress::set_disabled(cli.no_progress);
 
     // Build experiment selection
     let selection: Vec<String> = if cli.all {
@@ -43,7 +45,9 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
     } else if let Some(single) = &cli.experiment {
         vec![single.clone()]
     } else {
-        default_experiments()
+        // No implicit defaults: require explicit selection
+        tracing::error!("No experiments selected. Use --all or --experiments=<names>");
+        return Err(crate::Error::Other("no experiments selected".into()));
     };
 
     let all_exps = all_experiments();
@@ -66,8 +70,8 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
     }
 
     if exps.is_empty() {
-        tracing::warn!("No experiments selected. Use --all or --experiments=<names>");
-        return Ok(());
+        tracing::error!("No experiments matched the selection");
+        return Err(crate::Error::Other("no experiments matched selection".into()));
     }
 
     match cli.command {
@@ -87,47 +91,26 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     cli.no_compatibility_check,
                 )?;
                 tracing::info!(event = "enabled", experiment = %e.name());
+                let _ = audit_event("cli", "enabled", "success", e.name(), "", None);
             }
         }
         Commands::Disable => {
             if !cli.dry_run {
                 enforce_root()?;
             }
-            
-            // Ask whether to Disable (restore only) or Remove (uninstall package + restore)
-            // In non-interactive/assume-yes mode, default to Remove to ensure clean state for tests.
-            let do_remove = if cli.assume_yes {
-                true
-            } else {
-                print!(
-                    "Disable (swap back to GNU, keep package installed) or Remove (uninstall package and restore GNU)? [disable/Remove]: "
-                );
-                io::stdout().flush().ok();
-                let mut s = String::new();
-                let _ = io::stdin().read_line(&mut s);
-                let ans = s.trim().to_ascii_lowercase();
-                ans == "remove" || ans == "r"
-            };
-            
-            let _ = audit_event(
-                "cli",
-                "disable_choice",
-                if do_remove { "remove" } else { "disable" },
-                "",
-                "",
-                None,
-            );
-            
-            if do_remove {
-                for e in &exps {
-                    e.remove(&worker, cli.assume_yes, update_lists)?;
-                    tracing::info!(event = "removed_and_restored", experiment = %e.name());
-                }
-            } else {
-                for e in &exps {
-                    e.disable(&worker, cli.assume_yes, update_lists)?;
-                    tracing::info!(event = "disabled", experiment = %e.name());
-                }
+            // Restore only; never uninstall in Disable
+            for e in &exps {
+                e.disable(&worker, cli.assume_yes, update_lists)?;
+                tracing::info!(event = "disabled", experiment = %e.name());
+                let _ = audit_event("cli", "disabled", "success", e.name(), "", None);
+            }
+        }
+        Commands::Remove => {
+            if !cli.dry_run { enforce_root()?; }
+            for e in &exps {
+                e.remove(&worker, cli.assume_yes, update_lists)?;
+                tracing::info!(event = "removed_and_restored", experiment = %e.name());
+                let _ = audit_event("cli", "removed_and_restored", "success", e.name(), "", None);
             }
         }
         Commands::Check => {
@@ -171,10 +154,4 @@ fn confirm(prompt: &str) -> Result<bool> {
     }
     let ans = s.trim().to_ascii_lowercase();
     Ok(ans == "y" || ans == "yes")
-}
-
-fn default_experiments() -> Vec<String> {
-    let mut v = vec!["coreutils".to_string(), "sudo-rs".to_string()];
-    v.sort();
-    v
 }

@@ -24,6 +24,15 @@ where
         if pb.is_none() {
             tracing::info!("Symlinking {} -> {}", src.display(), target.display());
         }
+        // Structured audit: link_started
+        let _ = crate::logging::audit_event(
+            "symlink",
+            "link_started",
+            "begin",
+            &format!("{} -> {}", src.display(), target.display()),
+            "",
+            None,
+        );
         // Emit host progress protocol line for v1 host bar
         progress::emit_host_pb(idx + 1, total, &format!("Linking {}", filename));
         if let Err(e) = worker.replace_file_with_symlink(src, &target) {
@@ -42,6 +51,15 @@ where
                 e
             )));
         }
+        // Structured audit: link_done
+        let _ = crate::logging::audit_event(
+            "symlink",
+            "link_done",
+            "success",
+            &format!("{} -> {}", src.display(), target.display()),
+            "",
+            None,
+        );
         // Update progress after a successful link
         progress::set_msg_and_inc(&pb, format!("Linking {}", filename));
     }
@@ -60,6 +78,15 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
         if pb.is_none() {
             tracing::info!("[disable] Restoring {} (if backup exists)", target.display());
         }
+        // Structured audit: restore_started
+        let _ = crate::logging::audit_event(
+            "symlink",
+            "restore_started",
+            "begin",
+            &format!("{}", target.display()),
+            "",
+            None,
+        );
         // Emit host progress protocol line for v1 host bar
         if let Some(name) = target.file_name().and_then(|s| s.to_str()) {
             progress::emit_host_pb(idx + 1, total, &format!("Restoring {}", name));
@@ -79,6 +106,15 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
                 e
             )));
         }
+        // Structured audit: restore_done
+        let _ = crate::logging::audit_event(
+            "symlink",
+            "restore_done",
+            "success",
+            &format!("{}", target.display()),
+            "",
+            None,
+        );
         // Update progress after a successful restore
         if let Some(name) = target.file_name().and_then(|s| s.to_str()) {
             progress::set_msg_and_inc(&pb, format!("Restoring {}", name));

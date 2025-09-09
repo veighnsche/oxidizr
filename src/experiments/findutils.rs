@@ -60,13 +60,17 @@ impl FindutilsExperiment {
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
         if applets.is_empty() {
-            tracing::error!(
-                "❌ Expected: at least 1 findutils applet discovered after install; Received: 0"
+            let _ = crate::logging::audit_event(
+                "experiments",
+                "nothing_to_link",
+                "findutils",
+                "",
+                "",
+                None,
             );
-            return Err(Error::ExecutionFailed(format!(
-                "❌ Expected: findutils applets discovered; Received: 0. Ensure {} is installed correctly.",
-                self.package_name
-            )));
+            return Err(Error::NothingToLink(
+                "no findutils applets discovered after install".into(),
+            ));
         }
         tracing::info!(
             "✅ Expected: findutils applets discovered; Received: {}",
@@ -134,48 +138,6 @@ impl FindutilsExperiment {
                 applets.push((name.to_string(), path));
             } else {
                 tracing::warn!("No binary found for '{}' in known locations", name);
-            }
-        }
-        
-        // If nothing found, try to synthesize from known locations
-        if applets.is_empty() {
-            tracing::info!("Attempting to synthesize findutils applet locations...");
-            std::fs::create_dir_all(&self.bin_directory).ok();
-            
-            for name in &known {
-                let candidates = [
-                    PathBuf::from(format!("/usr/bin/uu-{}", name)),
-                    PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
-                ];
-                
-                if let Some(real) = candidates.iter().find(|p| p.exists()) {
-                    let canonical_src = self.bin_directory.join(name);
-                    if canonical_src.exists() {
-                        std::fs::remove_file(&canonical_src).ok();
-                    }
-                    
-                    match std::fs::copy(real, &canonical_src) {
-                        Ok(_) => {
-                            if let Ok(meta) = std::fs::metadata(real) {
-                                let perm = meta.permissions();
-                                std::fs::set_permissions(&canonical_src, perm).ok();
-                            }
-                            tracing::info!(
-                                "Synthesized canonical source (copied) {} <- {}",
-                                canonical_src.display(),
-                                real.display()
-                            );
-                            applets.push((name.to_string(), canonical_src));
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to copy {} to canonical source: {}",
-                                real.display(),
-                                e
-                            );
-                        }
-                    }
-                }
             }
         }
         

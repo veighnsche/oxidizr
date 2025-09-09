@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 // Global toggle to quiet noisy per-item symlink INFO logs while a progress bar
 // is active. Warnings and errors are never suppressed.
 static QUIET_SYMLINK_INFO: AtomicBool = AtomicBool::new(false);
+static DISABLE_PROGRESS: AtomicBool = AtomicBool::new(false);
 
 pub fn symlink_info_enabled() -> bool {
     !QUIET_SYMLINK_INFO.load(Ordering::Relaxed)
@@ -26,11 +27,16 @@ pub fn enable_symlink_quiet() -> SymlinkQuietGuard {
     SymlinkQuietGuard(true)
 }
 
+/// Allow CLI to disable progress rendering globally (e.g., --no-progress)
+pub fn set_disabled(disabled: bool) {
+    DISABLE_PROGRESS.store(disabled, Ordering::Relaxed);
+}
+
 /// Create a configured progress bar if running in a TTY and len > 0.
 /// Returns None when not interactive or when len == 0, so callers can
 /// gracefully fall back to plain logging.
 pub fn new_bar(len: u64) -> Option<ProgressBar> {
-    if len == 0 {
+    if len == 0 || DISABLE_PROGRESS.load(Ordering::Relaxed) {
         return None;
     }
 

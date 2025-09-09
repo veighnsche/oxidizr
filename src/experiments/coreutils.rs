@@ -6,8 +6,8 @@ use crate::experiments::constants::CHECKSUM_BINS;
 use crate::system::Worker;
 use std::path::PathBuf;
 
-// Coreutils bins list (same as original)
-const COREUTILS_BINS_LIST: &str = include_str!("../../tests/lib/rust-coreutils-bins.txt");
+// Coreutils bins list (moved under assets per DELTA)
+const COREUTILS_BINS_LIST: &str = include_str!("../assets/coreutils-bins.txt");
 
 // Binaries we must not replace to keep packaging tools functional (e.g., makepkg)
 const PRESERVE_BINS: &[&str] = &[

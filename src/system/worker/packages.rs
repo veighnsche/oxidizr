@@ -157,26 +157,42 @@ impl super::Worker {
             let mut tried_any = false;
 
             for h in available_iter {
-                let mut aur_cmd_str = h.to_string();
-                if assume_yes {
-                    // Batch install must come before the operation for paru
-                    aur_cmd_str.push_str(" --batchinstall --noconfirm");
+                // Build argument vector for direct exec
+                let mut args: Vec<String> = Vec::new();
+                if h == "paru" && assume_yes {
+                    args.push("--batchinstall".into());
+                    args.push("--noconfirm".into());
+                } else if assume_yes {
+                    // For other helpers, --noconfirm is usually sufficient
+                    args.push("--noconfirm".into());
                 }
-                aur_cmd_str.push_str(" -S --needed");
-                aur_cmd_str.push_str(&format!(" {}", package));
+                args.push("-S".into());
+                args.push("--needed".into());
+                args.push(package.to_string());
 
-                tracing::info!("Running AUR helper: su - builder -c '{}'", aur_cmd_str);
-                let aur_status = std::process::Command::new("su")
-                    .args(["-", "builder", "-c", &aur_cmd_str])
-                    .status()?;
+                let aur_status = if let Some(user) = &self.aur_user {
+                    // Run via su as configured user using a shell-escaped command string
+                    let mut aur_cmd_str = String::from(h);
+                    for a in &args { aur_cmd_str.push(' '); aur_cmd_str.push_str(a); }
+                    tracing::info!("Running AUR helper as user '{}': su - {} -c '{}'", user, user, aur_cmd_str);
+                    std::process::Command::new("su")
+                        .args(["-", user, "-c", &aur_cmd_str])
+                        .status()?
+                } else {
+                    tracing::info!("Running AUR helper: {} {}", h, args.join(" "));
+                    std::process::Command::new(h)
+                        .args(args.iter().map(|s| s.as_str()))
+                        .status()?
+                };
+
                 tracing::debug!(status = ?aur_status.code(), "exit");
 
                 let _ = audit_event(
                     "worker",
                     "install_package.aur",
                     if aur_status.success() { "ok" } else { "error" },
-                    &format!("su - builder -c '{}'", aur_cmd_str),
-                    &format!("helper={}", h),
+                    &format!("helper={} args=-S --needed {}", h, package),
+                    &format!("aur_user={}", self.aur_user.as_deref().unwrap_or("<self>")),
                     aur_status.code(),
                 );
 
@@ -188,7 +204,7 @@ impl super::Worker {
 
             if !tried_any {
                 return Err(Error::ExecutionFailed(format!(
-                    "❌ Expected: '{}' installed, Received: absent. Reason: no AUR helper found. Install an AUR helper (e.g., paru or yay) or pass --package-manager to specify one.",
+                    "❌ Expected: '{}' installed, Received: absent. Reason: no AUR helper found. Install an AUR helper (e.g., paru or yay) or pass --aur-helper to select one.",
                     package
                 )));
             }

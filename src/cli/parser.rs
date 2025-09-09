@@ -56,16 +56,13 @@ pub struct Cli {
     pub experiment: Option<String>,
 
     /// Skip compatibility checks (dangerous)
-    #[arg(long = "skip-compatibility-check", alias = "no-compatibility-check", global = true)]
+    #[arg(long = "skip-compat-check", alias = "skip-compatibility-check", global = true)]
     pub no_compatibility_check: bool,
 
     /// AUR helper to use for package operations (auto-detect by default)
     #[arg(long, value_enum, default_value_t = AurHelperArg::Auto, global = true)]
     pub aur_helper: AurHelperArg,
 
-    /// Force a specific package manager (AUR helper) instead of auto-detect
-    #[arg(long, global = true)]
-    pub package_manager: Option<String>,
 
     /// Override package name (Arch/AUR). Defaults depend on experiment.
     #[arg(long, global = true)]
@@ -84,8 +81,20 @@ pub struct Cli {
     pub dry_run: bool,
 
     /// Wait for pacman database lock to clear, in seconds (polling)
-    #[arg(long, global = true)]
+    #[arg(long, alias = "wait_lock", global = true)]
     pub wait_lock: Option<u64>,
+
+    /// Disable progress bars even on TTY (CI-friendly)
+    #[arg(long, global = true)]
+    pub no_progress: bool,
+
+    /// Run AUR helper as this user (if set). If unset, run as invoking user.
+    #[arg(long, global = true)]
+    pub aur_user: Option<String>,
+
+    /// Force restore to be best-effort (warn on missing backup instead of error)
+    #[arg(long, global = true)]
+    pub force_restore_best_effort: bool,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -97,6 +106,8 @@ pub enum Commands {
     Enable,
     /// Disable the Rust replacement utilities (restore + remove)
     Disable,
+    /// Remove provider packages after restoring originals
+    Remove,
     /// Check distro compatibility for this experiment
     Check,
     /// List computed target paths that would be affected

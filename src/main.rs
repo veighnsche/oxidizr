@@ -9,7 +9,15 @@ fn main() {
     
     // Handle command and execute
     if let Err(e) = oxidizr_arch::cli::handle_cli(cli) {
-        tracing::error!(error=%e, "fatal_error");
-        std::process::exit(1);
+        use oxidizr_arch::Error;
+        let code = match &e {
+            Error::Incompatible(_) => 10,
+            Error::NothingToLink(_) => 20,
+            Error::RestoreBackupMissing(_) => 30,
+            Error::RepoGateFailed { .. } => 40,
+            _ => 1,
+        };
+        tracing::error!(error=%e, exit_code=code, "fatal_error");
+        std::process::exit(code);
     }
 }
