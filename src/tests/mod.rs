@@ -95,6 +95,41 @@ mod tests {
     }
 
     #[test]
+    fn test_coreutils_list_targets_excludes_checksums() {
+        use oxidizr_arch::experiments::coreutils::CoreutilsExperiment;
+        let coreutils = CoreutilsExperiment::new();
+        let targets = coreutils.list_targets();
+        // Check that common checksum applets are not among coreutils targets anymore
+        for name in [
+            "b2sum", "md5sum", "sha1sum", "sha224sum", "sha256sum", "sha384sum", "sha512sum",
+        ] {
+            assert!(
+                !targets.contains(&Path::new(&format!("/usr/bin/{}", name)).to_path_buf()),
+                "coreutils list_targets should exclude checksum applet {}",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_checksums_list_targets_includes_only_checksums() {
+        use oxidizr_arch::experiments::checksums::ChecksumsExperiment;
+        let checksums = ChecksumsExperiment::new();
+        let targets = checksums.list_targets();
+        // Expect exactly 7 checksum applets
+        assert_eq!(targets.len(), 7);
+        for name in [
+            "b2sum", "md5sum", "sha1sum", "sha224sum", "sha256sum", "sha384sum", "sha512sum",
+        ] {
+            assert!(
+                targets.contains(&Path::new(&format!("/usr/bin/{}", name)).to_path_buf()),
+                "checksums list_targets should include {}",
+                name
+            );
+        }
+    }
+
+    #[test]
     fn test_cli_default_experiments() {
         // Test that we have the expected default experiments
         // The default should be coreutils and sudo-rs

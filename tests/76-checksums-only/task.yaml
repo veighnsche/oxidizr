@@ -1,0 +1,56 @@
+summary: Enable only checksums; auto-install provider and flip present checksum applets (presence-aware)
+distro-check:
+  - arch
+  - manjaro
+  - cachyos
+  - endeavouros
+execute: |
+  set -euo pipefail
+
+  # Ensure provider is absent to exercise auto-install path
+  pacman -R --noconfirm uutils-coreutils >/dev/null 2>&1 || true
+
+  LOG=/tmp/oxi-enable-checksums-only.log
+  : >"${LOG}"
+
+  # Enable only the checksums experiment
+  oxidizr-arch enable --yes --experiments checksums 2>"${LOG}"
+
+  # Verify provider package was installed
+  pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed by checksums-only enable"; exit 1; }
+
+  # Presence-aware detection: unified dispatcher means all checksums are present; otherwise probe per-applet
+  CHECKSUMS=(b2sum md5sum sha1sum sha224sum sha256sum sha384sum sha512sum)
+  PRESENT=()
+  ABSENT=()
+  if [ -x /usr/bin/coreutils ]; then
+    PRESENT=("${CHECKSUMS[@]}")
+  else
+    for t in "${CHECKSUMS[@]}"; do
+      if [ -x "/usr/lib/uutils/coreutils/${t}" ] || \
+         [ -x "/usr/bin/uu-${t}" ] || \
+         [ -x "/usr/lib/cargo/bin/coreutils/${t}" ] || \
+         [ -x "/usr/lib/cargo/bin/${t}" ]; then
+        PRESENT+=("${t}")
+      else
+        ABSENT+=("${t}")
+      fi
+    done
+  fi
+
+  # Assert: for each present checksum, target is a symlink and not GNU
+  for t in "${PRESENT[@]}"; do
+    [ -L "/usr/bin/${t}" ] || { echo "/usr/bin/${t} should be a symlink (present in uutils build)"; exit 1; }
+    "/usr/bin/${t}" --version 2>&1 | grep -v "GNU coreutils" >/dev/null || { echo "${t} should not be GNU version"; exit 1; }
+  done
+
+  # Assert: for each absent checksum, a WARN line was emitted
+  for t in "${ABSENT[@]}"; do
+    grep -F "flip-checksums: checksum tool '${t}' not provided by uutils-coreutils on this distro/build; skipping" "${LOG}" >/dev/null || {
+      echo "Missing expected WARN for absent checksum tool: ${t}"; echo "--- LOG ---"; cat "${LOG}"; exit 1; }
+  done
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr-arch disable --yes --experiments checksums || true
+    oxidizr-arch disable --yes --experiments coreutils || true
+  fi

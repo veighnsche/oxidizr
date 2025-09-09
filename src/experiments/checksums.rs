@@ -38,12 +38,17 @@ impl ChecksumsExperiment {
         // First attempt discovery using existing installation/state
         let (mut links, mut skipped) = self.discover_present(worker)?;
 
-        // If nothing is available, proactively install uutils-coreutils (provider of checksum applets)
+        // If nothing is available, proactively install provider package (default: uutils-coreutils)
         if links.is_empty() {
-            tracing::info!("No checksum applets found in current system state; ensuring '{}' is installed", UUTILS_COREUTILS);
-            check_download_prerequisites(worker, UUTILS_COREUTILS, assume_yes)?;
-            tracing::info!("Installing package: {}", UUTILS_COREUTILS);
-            worker.install_package(UUTILS_COREUTILS, assume_yes)?;
+            let provider = worker
+                .package_override
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| UUTILS_COREUTILS.to_string());
+            tracing::info!("No checksum applets found in current system state; ensuring '{}' is installed", provider);
+            check_download_prerequisites(worker, &provider, assume_yes)?;
+            tracing::info!("Installing package: {}", provider);
+            worker.install_package(&provider, assume_yes)?;
             // Re-discover after install
             let rediscovered = self.discover_present(worker)?;
             links = rediscovered.0;
@@ -79,7 +84,8 @@ impl ChecksumsExperiment {
     }
 
     pub fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
-        // Nothing to uninstall; simply restore
+        // Nothing to uninstall; simply restore, and clarify intent in logs
+        tracing::info!("checksums: remove -> disable only (no package removal performed)");
         self.disable(worker, assume_yes, update_lists)
     }
 
@@ -91,8 +97,20 @@ impl ChecksumsExperiment {
         let mut applets: Vec<(String, PathBuf)> = Vec::new();
         let mut skipped: Vec<String> = Vec::new();
 
+        // Apply overrides
+        let effective_unified = worker
+            .unified_binary_override
+            .as_ref()
+            .cloned()
+            .or_else(|| self.unified_binary.clone());
+        let effective_bin_dir = worker
+            .bin_dir_override
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| self.bin_directory.clone());
+
         // Prefer unified dispatcher if present
-        let unified_path = if let Some(ref path) = self.unified_binary {
+        let unified_path = if let Some(ref path) = effective_unified {
             if path.exists() { Some(path.clone()) } else if let Ok(Some(found)) = worker.which("coreutils") { Some(found) } else { None }
         } else { None };
 
@@ -103,7 +121,7 @@ impl ChecksumsExperiment {
             }
             // Try per-applet
             let candidates = [
-                self.bin_directory.join(name),
+                effective_bin_dir.join(name),
                 PathBuf::from(format!("/usr/bin/uu-{}", name)),
                 PathBuf::from(format!("/usr/lib/cargo/bin/coreutils/{}", name)),
                 PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),

@@ -2,6 +2,7 @@ use crate::checks::{Distribution, is_supported_distro};
 use crate::error::{Error, Result};
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
 use crate::experiments::util::{create_symlinks, log_applets_summary, resolve_usrbin, restore_targets, verify_removed};
+use crate::experiments::constants::CHECKSUM_BINS;
 use crate::system::Worker;
 use std::path::PathBuf;
 
@@ -55,12 +56,19 @@ impl CoreutilsExperiment {
             worker.update_packages(assume_yes)?;
         }
         
+        // Effective package with optional override
+        let effective_package = worker
+            .package_override
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| self.package_name.clone());
+
         // Check prerequisites and handle prompts
-        check_download_prerequisites(worker, &self.package_name, assume_yes)?;
+        check_download_prerequisites(worker, &effective_package, assume_yes)?;
         
         // Install package
-        tracing::info!("Installing package: {}", self.package_name);
-        worker.install_package(&self.package_name, assume_yes)?;
+        tracing::info!("Installing package: {}", effective_package);
+        worker.install_package(&effective_package, assume_yes)?;
         
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
@@ -98,13 +106,12 @@ impl CoreutilsExperiment {
             worker.update_packages(assume_yes)?;
         }
         
-        // Restore all coreutils applets
+        // Restore only non-checksum coreutils applets (checksums are handled by the dedicated experiment)
         let mut targets: Vec<PathBuf> = Vec::new();
         for line in COREUTILS_BINS_LIST.lines() {
             let filename = line.trim();
-            if filename.is_empty() {
-                continue;
-            }
+            if filename.is_empty() { continue; }
+            if PRESERVE_BINS.contains(&filename) { continue; }
             let target = self.resolve_target(filename);
             targets.push(target);
         }
@@ -118,6 +125,27 @@ impl CoreutilsExperiment {
         // First restore GNU tools
         self.disable(worker, assume_yes, update_lists)?;
         
+        // Preflight: refuse to remove if checksum applets appear to be linked (to avoid breaking active checksum links)
+        // Ask the user to disable the 'checksums' experiment first.
+        let mut active_checksum_links = Vec::new();
+        for name in CHECKSUM_BINS {
+            let target = self.resolve_target(name);
+            if let Ok(meta) = std::fs::symlink_metadata(&target) {
+                if meta.file_type().is_symlink() {
+                    active_checksum_links.push(target);
+                }
+            }
+        }
+        if !active_checksum_links.is_empty() {
+            tracing::error!(
+                "❌ Refusing to remove '{}' while checksum applets are still linked. Disable 'checksums' experiment first.",
+                self.package_name
+            );
+            return Err(Error::ExecutionFailed(
+                "checksums experiment appears active; run 'oxidizr-arch disable --experiments checksums' first".into()
+            ));
+        }
+
         // Then remove the package
         tracing::info!("Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
@@ -132,9 +160,9 @@ impl CoreutilsExperiment {
         let mut targets = Vec::new();
         for line in COREUTILS_BINS_LIST.lines() {
             let filename = line.trim();
-            if !filename.is_empty() {
-                targets.push(self.resolve_target(filename));
-            }
+            if filename.is_empty() { continue; }
+            if PRESERVE_BINS.contains(&filename) { continue; }
+            targets.push(self.resolve_target(filename));
         }
         targets
     }
@@ -142,8 +170,20 @@ impl CoreutilsExperiment {
     fn discover_applets(&self, worker: &Worker) -> Result<Vec<(String, PathBuf)>> {
         let mut applets = Vec::new();
         
-        // Check for unified binary first
-        let unified_path = if let Some(ref path) = self.unified_binary {
+        // Determine effective unified binary and bin directory from overrides
+        let effective_unified = worker
+            .unified_binary_override
+            .as_ref()
+            .cloned()
+            .or_else(|| self.unified_binary.clone());
+        let effective_bin_dir = worker
+            .bin_dir_override
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| self.bin_directory.clone());
+
+        // Check for unified binary first (effective)
+        let unified_path = if let Some(ref path) = effective_unified {
             if path.exists() {
                 Some(path.clone())
             } else if let Ok(Some(found)) = worker.which("coreutils") {
@@ -175,7 +215,7 @@ impl CoreutilsExperiment {
                 
                 // Try various locations
                 let candidates = [
-                    self.bin_directory.join(name),
+                    effective_bin_dir.join(name),
                     PathBuf::from(format!("/usr/bin/uu-{}", name)),
                     PathBuf::from(format!("/usr/lib/cargo/bin/coreutils/{}", name)),
                     PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),

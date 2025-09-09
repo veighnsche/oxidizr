@@ -27,6 +27,9 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
         effective_helper,
         cli.dry_run,
         cli.wait_lock,
+        cli.package.clone(),
+        cli.bin_dir.clone(),
+        cli.unified_binary.clone(),
     );
     
     let update_lists = !cli.no_update;

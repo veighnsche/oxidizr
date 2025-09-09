@@ -1,0 +1,37 @@
+summary: Guard coreutils removal when checksums are active; require disabling checksums first
+distro-check:
+  - arch
+  - manjaro
+  - cachyos
+  - endeavouros
+execute: |
+  set -euo pipefail
+
+  # Enable coreutils (non-checksum applets only)
+  oxidizr-arch enable --yes --experiments coreutils
+  # Flip checksums via dedicated experiment
+  oxidizr-arch enable --yes --experiments checksums
+
+  # Attempt removal of coreutils via disable --yes (which removes on assume-yes)
+  # Expect: failure with a helpful message instructing to disable checksums first
+  if oxidizr-arch disable --yes --experiments coreutils; then
+    echo "Expected coreutils removal to fail while checksums are active, but it succeeded" >&2
+    exit 1
+  else
+    echo "Observed expected failure removing coreutils while checksums active (OK)"
+  fi
+
+  # Now disable checksums and try removal again
+  oxidizr-arch disable --yes --experiments checksums
+  oxidizr-arch disable --yes --experiments coreutils
+
+  # Verify provider removal succeeded
+  if pacman -Qi uutils-coreutils >/dev/null 2>&1; then
+    echo "uutils-coreutils should be removed after disable --yes when checksums are disabled" >&2
+    exit 1
+  fi
+restore: |
+  if [ -z "${CI:-}" ]; then
+    oxidizr-arch disable --yes --experiments checksums || true
+    oxidizr-arch disable --yes --experiments coreutils || true
+  fi
