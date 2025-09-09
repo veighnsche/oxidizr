@@ -45,24 +45,17 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	stdoutPipe, _ := cmd.StdoutPipe()
 	stderrPipe, _ := cmd.StderrPipe()
 
-	// Prepare timestamped log files; stderr is not printed to console, stdout is printed per verbosity.
-	ts := time.Now().UTC().Format("20060102-150405Z")
-	stderrLogPath := filepath.Join(logsDir, fmt.Sprintf("%s-stderr-%s.log", containerName, ts))
-	stderrLogFile, err := os.Create(stderrLogPath)
+	// Prepare temp log files; we'll delete them on success or rename to timestamped paths on error.
+	stdoutTmpFile, err := os.CreateTemp(logsDir, fmt.Sprintf("%s-stdout-*.log", containerName))
 	if err != nil {
-		return fmt.Errorf("failed to create stderr log file: %w", err)
+		return fmt.Errorf("failed to create temp stdout log file: %w", err)
 	}
-	defer stderrLogFile.Close()
-	stdoutLogPath := filepath.Join(logsDir, fmt.Sprintf("%s-stdout-%s.log", containerName, ts))
-	stdoutLogFile, err := os.Create(stdoutLogPath)
+	defer stdoutTmpFile.Close()
+	stderrTmpFile, err := os.CreateTemp(logsDir, fmt.Sprintf("%s-stderr-*.log", containerName))
 	if err != nil {
-		return fmt.Errorf("failed to create stdout log file: %w", err)
+		return fmt.Errorf("failed to create temp stderr log file: %w", err)
 	}
-	defer stdoutLogFile.Close()
-	if Allowed(selected, V2) {
-		log.Printf("%s CTX> container stdout -> %s", col.Sprint(Prefix(distro, V2, "HOST")), stdoutLogPath)
-		log.Printf("%s CTX> container stderr -> %s", col.Sprint(Prefix(distro, V2, "HOST")), stderrLogPath)
-	}
+	defer stderrTmpFile.Close()
 
 	const maxLines = 200
 	lastStdout := make([]string, 0, maxLines)
@@ -127,8 +120,8 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 					if y > 0 && x >= y { // when complete, finish the line so next logs start on a fresh line
 						finishPB()
 					}
-					// Still persist the frame to stdout log for postmortem
-					fmt.Fprintln(stdoutLogFile, content)
+					// Still persist the frame to stdout temp log for postmortem
+					fmt.Fprintln(stdoutTmpFile, content)
 					continue
 				}
 			}
@@ -138,8 +131,8 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 			} else {
 				push(&lastStdout, line)
 			}
-			// Always write container stdout to file
-			fmt.Fprintln(stdoutLogFile, content)
+			// Always write container stdout to temp file
+			fmt.Fprintln(stdoutTmpFile, content)
 		}
 		doneCh <- struct{}{}
 	}()
@@ -148,9 +141,9 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		for scanner.Scan() {
 			line := scanner.Text()
 			_, _, content := classifyLine(line)
-			// Always capture tail and write to file, do not print to console
+			// Always capture tail and write to temp file, do not print to console
 			push(&lastStderr, content)
-			fmt.Fprintln(stderrLogFile, content)
+			fmt.Fprintln(stderrTmpFile, content)
 		}
 		doneCh <- struct{}{}
 	}()
@@ -170,9 +163,20 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 			exitCode = ee.ExitCode()
 		}
 		cmdLine := "docker " + strings.Join(args, " ")
-		stdoutTail := strings.Join(lastStdout, "\n")
-		stderrTail := strings.Join(lastStderr, "\n")
-		return fmt.Errorf("docker run failed (exit code %d). Command: %s\n--- stdout (last %d lines) [full at %s] ---\n%s\n--- stderr (last %d lines) [full at %s] ---\n%s", exitCode, cmdLine, len(lastStdout), stdoutLogPath, stdoutTail, len(lastStderr), stderrLogPath, stderrTail)
+		// Persist logs with a shared timestamp
+		ts := time.Now().UTC().Format("20060102-150405Z")
+		finalStdout := filepath.Join(logsDir, fmt.Sprintf("%s-stdout-%s.log", containerName, ts))
+		finalStderr := filepath.Join(logsDir, fmt.Sprintf("%s-stderr-%s.log", containerName, ts))
+		stdoutTmpFile.Close()
+		stderrTmpFile.Close()
+		_ = os.Rename(stdoutTmpFile.Name(), finalStdout)
+		_ = os.Rename(stderrTmpFile.Name(), finalStderr)
+		return fmt.Errorf("docker run failed (exit code %d). Command: %s\nLogs saved to:\n  stdout: %s\n  stderr: %s", exitCode, cmdLine, finalStdout, finalStderr)
 	}
+	// Success path: remove temp logs
+	stdoutTmpFile.Close()
+	stderrTmpFile.Close()
+	_ = os.Remove(stdoutTmpFile.Name())
+	_ = os.Remove(stderrTmpFile.Name())
 	return nil
 }

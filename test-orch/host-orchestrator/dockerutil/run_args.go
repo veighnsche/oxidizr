@@ -71,8 +71,8 @@ func BuildDockerRunArgs(opts RunOptions) (args []string, containerName string, l
 	// Make AUR build cache per-distro to avoid concurrent access and cross-distro conflicts
 	aurBuild := filepath.Join(cacheRoot, "aur-build", distroKey)
 	rustupRoot := filepath.Join(cacheRoot, "rustup", distroKey)
-	// Ensure directories exist (including logs dir for stderr capture)
-	logsDir = filepath.Join(cacheRoot, "logs", distroKey)
+	// Ensure directories exist (including top-level logs dir for container logs)
+	logsDir = filepath.Join(opts.RootDir, "logs", distroKey)
 	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild, rustupRoot, logsDir} {
 		_ = os.MkdirAll(d, 0o755)
 	}

@@ -1,4 +1,4 @@
-summary: Flip checksum tools when --flip-checksums is set (override preserve allowlist)
+summary: Flip checksum tools via the dedicated 'checksums' experiment (presence-aware)
 distro-check:
   - arch
   - manjaro
@@ -7,18 +7,47 @@ distro-check:
 execute: |
   set -euo pipefail
 
-  # Enable only coreutils and explicitly flip checksum tools as well
-  oxidizr-arch enable --yes --experiments coreutils --flip-checksums
+  # Enable coreutils (without checksums by default) and then flip checksums via dedicated experiment
+  LOG=/tmp/oxi-enable-checksums.log
+  : >"${LOG}"
+  oxidizr-arch enable --yes --experiments coreutils 2>>"${LOG}"
+  oxidizr-arch enable --yes --experiments checksums 2>>"${LOG}"
 
   # Verify package is installed
   pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }
 
-  # Verify checksum tools are symlinks and not GNU versions
-  for t in b2sum md5sum sha1sum sha224sum sha256sum sha384sum sha512sum; do
-    [ -L "/usr/bin/${t}" ] || { echo "/usr/bin/${t} should be a symlink"; exit 1; }
-    ${t} --version 2>&1 | grep -v "GNU coreutils" >/dev/null || { echo "${t} should not be GNU version"; exit 1; }
+  # Determine presence of checksum applets from installed uutils build
+  # Rule: if unified dispatcher exists, all are considered present; otherwise check per-applet paths
+  CHECKSUMS=(b2sum md5sum sha1sum sha224sum sha256sum sha384sum sha512sum)
+  PRESENT=()
+  ABSENT=()
+  if [ -x /usr/bin/coreutils ]; then
+    PRESENT=("${CHECKSUMS[@]}")
+  else
+    for t in "${CHECKSUMS[@]}"; do
+      if [ -x "/usr/lib/uutils/coreutils/${t}" ] || \
+         [ -x "/usr/bin/uu-${t}" ] || \
+         [ -x "/usr/lib/cargo/bin/coreutils/${t}" ] || \
+         [ -x "/usr/lib/cargo/bin/${t}" ]; then
+        PRESENT+=("${t}")
+      else
+        ABSENT+=("${t}")
+      fi
+    done
+  fi
+
+  # Assert: each present checksum becomes a symlink and is not GNU
+  for t in "${PRESENT[@]}"; do
+    [ -L "/usr/bin/${t}" ] || { echo "/usr/bin/${t} should be a symlink (present in uutils build)"; exit 1; }
+    "/usr/bin/${t}" --version 2>&1 | grep -v "GNU coreutils" >/dev/null || { echo "${t} should not be GNU version"; exit 1; }
+  done
+
+  # Assert: for each absent checksum, a WARN line was emitted by checksums experiment
+  for t in "${ABSENT[@]}"; do
+    grep -F "flip-checksums: checksum tool '${t}' not provided by uutils-coreutils on this distro/build; skipping" "${LOG}" >/dev/null || {
+      echo "Missing expected WARN for absent checksum tool: ${t}"; echo "--- LOG ---"; cat "${LOG}"; exit 1; }
   done
 restore: |
   if [ -z "${CI:-}" ]; then
-    oxidizr-arch disable --yes --experiments coreutils || true
+    oxidizr-arch disable --yes --experiments coreutils,checksums || true
   fi

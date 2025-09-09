@@ -23,6 +23,9 @@ tmp/
 .cache/test-orch/aur-build/
 .cache/test-orch/logs/
 
+# Host orchestrator container logs
+logs/
+
 # Local builds of the Go runners (if built outside Docker)
 test-orch/container-runner/isolated-runner
 test-orch/container-runner/isolated-runner.exe

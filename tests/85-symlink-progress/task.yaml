@@ -8,7 +8,7 @@ execute: |
   set -euo pipefail
 
   echo "--- Enabling with many symlinks to show progress ---"
-  oxidizr-arch enable --yes --flip-checksums
+  oxidizr-arch enable --yes --experiments coreutils,checksums
 
   # Spot-check a few expected symlinks (date is representative)
   [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink after enable"; exit 1; }

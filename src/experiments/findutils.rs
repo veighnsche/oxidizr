@@ -38,7 +38,7 @@ impl FindutilsExperiment {
         // Check prerequisites and handle prompts
         check_download_prerequisites(worker, &self.package_name, assume_yes)?;
         // Visibility: AUR build for findutils will require checksums. These are expected to be provided
-        // by the currently active coreutils (with checksum applets possibly flipped via --flip-checksums).
+        // by the currently active coreutils (and optionally flipped via the dedicated 'checksums' experiment).
         match worker.which("sha256sum") {
             Ok(Some(p)) => {
                 tracing::info!(

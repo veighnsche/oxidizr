@@ -10,6 +10,7 @@ The CLI manages “experiments” that switch selected tool families to Rust imp
 - coreutils → uutils-coreutils
 - findutils → uutils-findutils-bin
 - sudo → sudo-rs
+- checksums → presence-aware flipping of checksum tools (b2sum, md5sum, sha1..sha512sum)
 
 Experiments are selected from a registry in `src/experiments/mod.rs`. We do not gate by distro ID within the supported set; the practical guardrail is whether providers can be installed and their binaries discovered. Distros outside the supported set may be incompatible unless you use `--no-compatibility-check`.
 
@@ -49,7 +50,7 @@ oxidizr-arch check
 # List target paths that would be affected
 oxidizr-arch list-targets
 
-# Enable the default experiment set (coreutils + sudo-rs)
+# Enable the default experiment set (coreutils + sudo-rs). Checksums are excluded by default for safety.
 sudo oxidizr-arch enable
 
 # Disable and restore from backups
@@ -87,6 +88,9 @@ oxidizr-arch --all --dry-run --wait_lock 30 enable
 
 # Enable only coreutils, skip pacman -Sy, and force paru AUR helper
 sudo oxidizr-arch --experiments coreutils --no-update --package-manager paru enable
+
+# Flip checksum tools explicitly (presence-aware)
+sudo oxidizr-arch --experiments checksums enable
 
 # Disable only coreutils (sudo remains in its current state)
 sudo oxidizr-arch --experiments coreutils disable

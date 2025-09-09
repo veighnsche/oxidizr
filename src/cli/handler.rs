@@ -27,7 +27,6 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
         effective_helper,
         cli.dry_run,
         cli.wait_lock,
-        cli.flip_checksums,
     );
     
     let update_lists = !cli.no_update;
@@ -54,18 +53,13 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             .collect()
     };
 
-    // Orchestration visibility: when both coreutils and findutils are selected, we
-    // will enable coreutils first so that checksum applets (optionally flipped via --flip-checksums)
-    // are available before starting any AUR downloads (findutils).
+    // Orchestration visibility: when both findutils and coreutils are selected, we enable
+    // findutils first so GNU checksum tools remain available for AUR builds before any flipping.
     let names: Vec<String> = exps.iter().map(|e| e.name().to_string()).collect();
     let has_core = names.iter().any(|n| n == "coreutils");
     let has_find = names.iter().any(|n| n == "findutils");
     if has_core && has_find {
-        tracing::info!(
-            step = "orchestration",
-            flip_checksums = worker.flip_checksums,
-            "enable coreutils before findutils"
-        );
+        tracing::info!(step = "orchestration", "enable findutils before coreutils");
     }
 
     if exps.is_empty() {

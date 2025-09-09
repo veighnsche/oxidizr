@@ -2,6 +2,8 @@ pub mod coreutils;
 pub mod findutils;
 pub mod sudors;
 pub mod util;
+pub mod checksums;
+pub mod constants;
 
 use crate::checks::Distribution;
 use crate::error::{Error, Result};
@@ -31,6 +33,7 @@ pub enum Experiment {
     Coreutils(coreutils::CoreutilsExperiment),
     Findutils(findutils::FindutilsExperiment),
     SudoRs(sudors::SudoRsExperiment),
+    Checksums(checksums::ChecksumsExperiment),
 }
 
 impl Experiment {
@@ -39,6 +42,7 @@ impl Experiment {
             Experiment::Coreutils(e) => e.name(),
             Experiment::Findutils(e) => e.name(),
             Experiment::SudoRs(e) => e.name(),
+            Experiment::Checksums(e) => e.name(),
         }
     }
 
@@ -63,6 +67,7 @@ impl Experiment {
                 Experiment::Coreutils(e) => e.check_compatible(&distro)?,
                 Experiment::Findutils(e) => e.check_compatible(&distro)?,
                 Experiment::SudoRs(e) => e.check_compatible(&distro)?,
+                Experiment::Checksums(e) => e.check_compatible(&distro)?,
             };
             
             if !compatible {
@@ -78,6 +83,7 @@ impl Experiment {
             Experiment::Coreutils(e) => e.enable(worker, assume_yes, update_lists),
             Experiment::Findutils(e) => e.enable(worker, assume_yes, update_lists),
             Experiment::SudoRs(e) => e.enable(worker, assume_yes, update_lists),
+            Experiment::Checksums(e) => e.enable(worker, assume_yes, update_lists),
         }
     }
 
@@ -86,6 +92,7 @@ impl Experiment {
             Experiment::Coreutils(e) => e.disable(worker, assume_yes, update_lists),
             Experiment::Findutils(e) => e.disable(worker, assume_yes, update_lists),
             Experiment::SudoRs(e) => e.disable(worker, assume_yes, update_lists),
+            Experiment::Checksums(e) => e.disable(worker, assume_yes, update_lists),
         }
     }
 
@@ -94,6 +101,7 @@ impl Experiment {
             Experiment::Coreutils(e) => e.remove(worker, assume_yes, update_lists),
             Experiment::Findutils(e) => e.remove(worker, assume_yes, update_lists),
             Experiment::SudoRs(e) => e.remove(worker, assume_yes, update_lists),
+            Experiment::Checksums(e) => e.remove(worker, assume_yes, update_lists),
         }
     }
 
@@ -102,6 +110,7 @@ impl Experiment {
             Experiment::Coreutils(e) => e.check_compatible(distro),
             Experiment::Findutils(e) => e.check_compatible(distro),
             Experiment::SudoRs(e) => e.check_compatible(distro),
+            Experiment::Checksums(e) => e.check_compatible(distro),
         }
     }
 
@@ -110,18 +119,21 @@ impl Experiment {
             Experiment::Coreutils(e) => e.list_targets(),
             Experiment::Findutils(e) => e.list_targets(),
             Experiment::SudoRs(e) => e.list_targets(),
+            Experiment::Checksums(e) => e.list_targets(),
         }
     }
 }
 
 /// Get all available experiments
 pub fn all_experiments() -> Vec<Experiment> {
-    // Order matters for --all: install AUR packages (findutils) before flipping coreutils,
-    // so that makepkg still has access to GNU checksum tools during builds.
+    // Order matters for --all: install AUR packages (findutils) before flipping checksums,
+    // so that makepkg still has access to GNU checksum tools during builds. Flip checksums
+    // last for safety after core utils are active.
     vec![
         Experiment::Findutils(findutils::FindutilsExperiment::new()),
         Experiment::Coreutils(coreutils::CoreutilsExperiment::new()),
         Experiment::SudoRs(sudors::SudoRsExperiment::new()),
+        Experiment::Checksums(checksums::ChecksumsExperiment::new()),
     ]
 }
 
