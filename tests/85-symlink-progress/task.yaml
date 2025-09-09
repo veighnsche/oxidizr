@@ -1,0 +1,20 @@
+summary: Exercise symlink operations to drive host-side progress bar
+distro-check:
+  - arch
+  - manjaro
+  - cachyos
+  - endeavouros
+execute: |
+  set -euo pipefail
+
+  echo "--- Enabling with many symlinks to show progress ---"
+  oxidizr-arch enable --yes --flip-checksums
+
+  # Spot-check a few expected symlinks (date is representative)
+  [ -L /usr/bin/date ] || { echo "/usr/bin/date should be a symlink after enable"; exit 1; }
+
+  echo "--- Disabling and restoring symlinks ---"
+  oxidizr-arch disable --yes
+restore: |
+  # Ensure we leave the system in a clean state for subsequent tests
+  oxidizr-arch disable --yes || true

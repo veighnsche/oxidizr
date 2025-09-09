@@ -16,13 +16,16 @@ where
 {
     let mut pb = progress::new_bar(applets.len() as u64);
     let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
-    for (filename, src) in applets {
+    let total = applets.len().max(1);
+    for (idx, (filename, src)) in applets.iter().enumerate() {
         let target = resolve(filename);
         tracing::trace!(step = "symlink_item", filename = %filename, src = %src.display(), target = %target.display());
         // When progress bar is active, avoid noisy per-item info logs
         if pb.is_none() {
             tracing::info!("Symlinking {} -> {}", src.display(), target.display());
         }
+        // Emit host progress protocol line for v1 host bar
+        progress::emit_host_pb(idx + 1, total, &format!("Linking {}", filename));
         if let Err(e) = worker.replace_file_with_symlink(src, &target) {
             tracing::error!(
                 "❌ Failed to create symlink: src={} -> target={}: {}",
@@ -51,10 +54,17 @@ where
 pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
     let mut pb = progress::new_bar(targets.len() as u64);
     let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
-    for target in targets {
+    let total = targets.len().max(1);
+    for (idx, target) in targets.iter().enumerate() {
         tracing::trace!(step = "restore_item", target = %target.display());
         if pb.is_none() {
             tracing::info!("[disable] Restoring {} (if backup exists)", target.display());
+        }
+        // Emit host progress protocol line for v1 host bar
+        if let Some(name) = target.file_name().and_then(|s| s.to_str()) {
+            progress::emit_host_pb(idx + 1, total, &format!("Restoring {}", name));
+        } else {
+            progress::emit_host_pb(idx + 1, total, "Restoring");
         }
         if let Err(e) = worker.restore_file(target) {
             tracing::error!(

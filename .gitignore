@@ -21,6 +21,7 @@ tmp/
 .cache/test-orch/cargo-target/
 .cache/test-orch/pacman/
 .cache/test-orch/aur-build/
+.cache/test-orch/logs/
 
 # Local builds of the Go runners (if built outside Docker)
 test-orch/container-runner/isolated-runner

@@ -11,120 +11,32 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/fatih/color"
 )
 
-// classifyLine infers an intrinsic verbosity class and scope from a line.
-// Returns (vLevel 0..3, scope "[RUNNER]" or "", content without leading tags).
-func classifyLine(line string) (int, string, string) {
-	// Detect explicit runner-tagged lines like "[v2][RUNNER] message"
-	if strings.HasPrefix(line, "[v") {
-		reRunner := regexp.MustCompile(`^\[v([0-3])\]\[RUNNER\]\s+`)
-		if m := reRunner.FindStringSubmatch(line); m != nil {
-			lvl := int(m[1][0] - '0')
-			content := reRunner.ReplaceAllString(line, "")
-			return lvl, "[RUNNER]", content
-		}
-		// Generic [vN] tag (no scope); treat as product/raw intrinsic level
-		reGeneric := regexp.MustCompile(`^\[v([0-3])\]\s+`)
-		if m := reGeneric.FindStringSubmatch(line); m != nil {
-			lvl := int(m[1][0] - '0')
-			content := reGeneric.ReplaceAllString(line, "")
-			return lvl, "", content
-		}
-	}
-	if strings.HasPrefix(line, "[RUNNER] ") {
-		content := strings.TrimPrefix(line, "[RUNNER] ")
-		if strings.HasPrefix(content, "RUN> ") {
-			return 2, "[RUNNER]", content
-		}
-		if strings.HasPrefix(content, "CTX> ") {
-			return 2, "[RUNNER]", content
-		}
-		if strings.HasPrefix(content, "TRC> ") {
-			return 3, "[RUNNER]", content
-		}
-		if strings.Contains(content, "❌") {
-			return 0, "[RUNNER]", content
-		}
-		return 1, "[RUNNER]", content
-	}
-	// Detect Rust env_logger style levels inside product output
-	// Map: ERROR->v0, WARN->v1, INFO->v1, DEBUG->v2, TRACE->v3
-	switch {
-	case strings.Contains(line, " ERROR "):
-		return 0, "", line
-	case strings.Contains(line, " WARN "):
-		return 1, "", line
-	case strings.Contains(line, " INFO "):
-		return 1, "", line
-	case strings.Contains(line, " DEBUG "):
-		return 2, "", line
-	case strings.Contains(line, " TRACE "):
-		return 3, "", line
-	}
-	// Default for container script/stdout lines
-	return 1, "", line
-}
-
 func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, selected Verb, distro string, col *color.Color) error {
-	containerName := fmt.Sprintf("oxidizr-arch-test-%s", strings.ReplaceAll(tag, ":", "-"))
+	// Build docker run args and compute derived paths
+	opts := RunOptions{
+		Tag:           tag,
+		RootDir:       rootDir,
+		Command:       command,
+		EnvVars:       envVars,
+		KeepContainer: keepContainer,
+		Selected:      selected,
+		Distro:        distro,
+		Col:           col,
+	}
+	args, containerName, logsDir := BuildDockerRunArgs(opts)
 	if Allowed(selected, V2) {
-		log.Printf("%s RUN> docker run -v %s:/workspace --name %s %s %s", col.Sprint(Prefix(distro, V2, "HOST")), rootDir, containerName, tag, command)
+		log.Printf("%s RUN> docker %s", col.Sprint(Prefix(distro, V2, "HOST")), strings.Join(args, " "))
 	}
 	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
 	_ = exec.Command("docker", "rm", "-f", containerName).Run()
-
-	args := []string{"run"}
-	if !keepContainer {
-		args = append(args, "--rm")
-	}
-	for _, env := range envVars {
-		args = append(args, "-e", env)
-	}
-	// Provide distro identifier to in-container runner for analytics/report naming
-	distroKey := strings.TrimPrefix(tag, "oxidizr-")
-	if i := strings.Index(distroKey, ":"); i >= 0 {
-		distroKey = distroKey[:i]
-	}
-	args = append(args, "-e", fmt.Sprintf("ANALYTICS_DISTRO=%s", distroKey))
-	args = append(args, "-v", fmt.Sprintf("%s:/workspace", rootDir))
-
-	// Add persistent cache mounts to speed up repeated runs
-	cacheRoot := filepath.Join(rootDir, ".cache", "test-orch")
-	if i := strings.Index(distroKey, ":"); i >= 0 {
-		distroKey = distroKey[:i]
-	}
-	// Namespace caches per-distro to avoid cross-container contention
-	cargoReg := filepath.Join(cacheRoot, "cargo", "registry", distroKey)
-	cargoGit := filepath.Join(cacheRoot, "cargo", "git", distroKey)
-	cargoTarget := filepath.Join(cacheRoot, "cargo-target", distroKey)
-	pacmanCache := filepath.Join(cacheRoot, "pacman", distroKey)
-	// Make AUR build cache per-distro to avoid concurrent access and cross-distro conflicts
-	aurBuild := filepath.Join(cacheRoot, "aur-build", distroKey)
-	rustupRoot := filepath.Join(cacheRoot, "rustup", distroKey)
-	// Ensure directories exist
-	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild, rustupRoot} {
-		_ = os.MkdirAll(d, 0o755)
-	}
-	// Bind mounts
-	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoReg, "/root/.cargo/registry"))
-	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoGit, "/root/.cargo/git"))
-	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoTarget, "/workspace/target"))
-	args = append(args, "-v", fmt.Sprintf("%s:%s", pacmanCache, "/var/cache/pacman"))
-	args = append(args, "-v", fmt.Sprintf("%s:%s", aurBuild, "/home/builder/build"))
-	args = append(args, "-v", fmt.Sprintf("%s:%s", rustupRoot, "/root/.rustup"))
-	args = append(args, "--workdir", "/workspace")
-	args = append(args, "--name", containerName)
-	args = append(args, tag)
-	if command != "" {
-		args = append(args, command)
-	}
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
 
@@ -132,6 +44,25 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	// keep a bounded ring buffer so failures in quiet mode still surface useful context.
 	stdoutPipe, _ := cmd.StdoutPipe()
 	stderrPipe, _ := cmd.StderrPipe()
+
+	// Prepare timestamped log files; stderr is not printed to console, stdout is printed per verbosity.
+	ts := time.Now().UTC().Format("20060102-150405Z")
+	stderrLogPath := filepath.Join(logsDir, fmt.Sprintf("%s-stderr-%s.log", containerName, ts))
+	stderrLogFile, err := os.Create(stderrLogPath)
+	if err != nil {
+		return fmt.Errorf("failed to create stderr log file: %w", err)
+	}
+	defer stderrLogFile.Close()
+	stdoutLogPath := filepath.Join(logsDir, fmt.Sprintf("%s-stdout-%s.log", containerName, ts))
+	stdoutLogFile, err := os.Create(stdoutLogPath)
+	if err != nil {
+		return fmt.Errorf("failed to create stdout log file: %w", err)
+	}
+	defer stdoutLogFile.Close()
+	if Allowed(selected, V2) {
+		log.Printf("%s CTX> container stdout -> %s", col.Sprint(Prefix(distro, V2, "HOST")), stdoutLogPath)
+		log.Printf("%s CTX> container stderr -> %s", col.Sprint(Prefix(distro, V2, "HOST")), stderrLogPath)
+	}
 
 	const maxLines = 200
 	lastStdout := make([]string, 0, maxLines)
@@ -155,7 +86,8 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	finishPB := func() {
 		pbMu.Lock()
 		if progressShown {
-			fmt.Println()
+			// Print newline on stderr to align stream with log.Printf output
+			fmt.Fprintln(os.Stderr)
 			progressShown = false
 		}
 		pbMu.Unlock()
@@ -172,9 +104,9 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		bar := strings.Repeat("=", filled) + strings.Repeat(" ", width-filled)
 		prefix := col.Sprint(Prefix(distro, V1, ""))
 		if label != "" {
-			fmt.Printf("\r%s [%s] (%d/%d) %s", prefix, bar, x, y, label)
+			fmt.Fprintf(os.Stderr, "\r%s [%s] (%d/%d) %s\x1b[K", prefix, bar, x, y, label)
 		} else {
-			fmt.Printf("\r%s [%s] (%d/%d)", prefix, bar, x, y)
+			fmt.Fprintf(os.Stderr, "\r%s [%s] (%d/%d)\x1b[K", prefix, bar, x, y)
 		}
 		progressShown = true
 		pbMu.Unlock()
@@ -192,6 +124,11 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 					y, _ := strconv.Atoi(m[2])
 					label := m[3]
 					updatePB(x, y, label)
+					if y > 0 && x >= y { // when complete, finish the line so next logs start on a fresh line
+						finishPB()
+					}
+					// Still persist the frame to stdout log for postmortem
+					fmt.Fprintln(stdoutLogFile, content)
 					continue
 				}
 			}
@@ -201,6 +138,8 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 			} else {
 				push(&lastStdout, line)
 			}
+			// Always write container stdout to file
+			fmt.Fprintln(stdoutLogFile, content)
 		}
 		doneCh <- struct{}{}
 	}()
@@ -208,13 +147,10 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		scanner := bufio.NewScanner(stderrPipe)
 		for scanner.Scan() {
 			line := scanner.Text()
-			lvl, _, content := classifyLine(line)
-			v := Verb(lvl)
-			if Allowed(selected, v) {
-				log.Printf("%s %s", col.Sprint(Prefix(distro, v, "")), content)
-			} else {
-				push(&lastStderr, line)
-			}
+			_, _, content := classifyLine(line)
+			// Always capture tail and write to file, do not print to console
+			push(&lastStderr, content)
+			fmt.Fprintln(stderrLogFile, content)
 		}
 		doneCh <- struct{}{}
 	}()
@@ -236,7 +172,7 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		cmdLine := "docker " + strings.Join(args, " ")
 		stdoutTail := strings.Join(lastStdout, "\n")
 		stderrTail := strings.Join(lastStderr, "\n")
-		return fmt.Errorf("docker run failed (exit code %d). Command: %s\n--- stdout (last %d lines) ---\n%s\n--- stderr (last %d lines) ---\n%s", exitCode, cmdLine, len(lastStdout), stdoutTail, len(lastStderr), stderrTail)
+		return fmt.Errorf("docker run failed (exit code %d). Command: %s\n--- stdout (last %d lines) [full at %s] ---\n%s\n--- stderr (last %d lines) [full at %s] ---\n%s", exitCode, cmdLine, len(lastStdout), stdoutLogPath, stdoutTail, len(lastStderr), stderrLogPath, stderrTail)
 	}
 	return nil
 }

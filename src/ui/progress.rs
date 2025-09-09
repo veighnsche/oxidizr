@@ -1,5 +1,6 @@
 use atty::Stream;
 use indicatif::{ProgressBar, ProgressStyle, ProgressDrawTarget};
+use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // Global toggle to quiet noisy per-item symlink INFO logs while a progress bar
@@ -82,5 +83,44 @@ pub fn finish(pb: Option<ProgressBar>) {
             // Leave a final line so logs show completion in non-TTY capture
             bar.finish_with_message("Done");
         }
+    }
+}
+
+/// Format a host progress protocol line. Example: "PB> 3/10 Linking rm"
+pub fn fmt_host_pb_line(current: usize, total: usize, label: &str) -> String {
+    if label.is_empty() {
+        format!("PB> {}/{}", current, total)
+    } else {
+        format!("PB> {}/{} {}", current, total, label)
+    }
+}
+
+/// Write a host progress protocol line to a writer, followed by a newline.
+pub fn write_host_pb_line<W: Write>(mut w: W, current: usize, total: usize, label: &str) -> io::Result<()> {
+    let line = fmt_host_pb_line(current, total, label);
+    writeln!(w, "{}", line)
+}
+
+/// Emit a host progress protocol line to stdout. The host orchestrator will render
+/// these as a single in-place progress bar at verbosity v1.
+pub fn emit_host_pb(current: usize, total: usize, label: &str) {
+    let _ = write_host_pb_line(io::stdout(), current, total, label);
+    let _ = io::stdout().flush();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fmt_host_pb_with_label() {
+        let s = fmt_host_pb_line(3, 10, "Linking rm");
+        assert_eq!(s, "PB> 3/10 Linking rm");
+    }
+
+    #[test]
+    fn test_fmt_host_pb_without_label() {
+        let s = fmt_host_pb_line(1, 2, "");
+        assert_eq!(s, "PB> 1/2");
     }
 }
