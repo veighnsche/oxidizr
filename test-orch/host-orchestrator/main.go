@@ -77,18 +77,20 @@ func main() {
 	default:
 		selected = dockerutil.V3
 	}
+	// Apply selection to helpers so hostLog() uses the same filter
+	setSelectedVerb(selected)
 
 	// Require root privileges (sudo) for consistent Docker access on systems without docker group configuration.
 	if !isRoot() {
-		warn("requires root privileges to interact with Docker reliably. Re-run with: sudo go run . [flags]")
+		hostLog(dockerutil.V1, "requires root privileges to interact with Docker reliably. Re-run with: sudo go run . [flags]")
 		os.Exit(1)
 	}
 
 	// Developer-friendly default: with no action flags, perform build+run using the Go runner
 	if *testCI {
 		if !have("act") {
-			log.Println("'act' is not installed or not in your PATH.")
-			log.Println("Please install it to run local CI tests: https://github.com/nektos/act#installation")
+			hostLog(dockerutil.V1, "'act' is not installed or not in your PATH.")
+			hostLog(dockerutil.V1, "Please install it to run local CI tests: https://github.com/nektos/act#installation")
 			os.Exit(1)
 		}
 
@@ -97,7 +99,7 @@ func main() {
 			log.Fatalf("Failed to detect repository root: %v", err)
 		}
 
-		log.Println("Running CI 'test-orch' job locally with act...")
+		hostLog(dockerutil.V1, "Running CI 'test-orch' job locally with act...")
 		// Specify the runner image to make act non-interactive
 		cmd := exec.Command("act", "-j", "test-orch", "-P", "ubuntu-latest=catthehacker/ubuntu:act-latest")
 		cmd.Dir = repoRoot
@@ -115,7 +117,7 @@ func main() {
 		*archBuild = true
 		*archRun = true
 		if !quietMode {
-			log.Println("==> No action specified, running default: build + test")
+			hostLog(dockerutil.V1, "==> No action specified, running default: build + test")
 		}
 	}
 
@@ -211,7 +213,9 @@ func main() {
 			// Ensure image exists; auto-build if missing
 			if err := runSilent("docker", "image", "inspect", tag); err != nil {
 				shellCol := color.New(color.FgCyan)
-				log.Printf("%s Docker image not found; building...", shellCol.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+				if dockerutil.Allowed(selected, dockerutil.V1) {
+					log.Printf("%s Docker image not found; building...", shellCol.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+				}
 				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, selected, d, shellCol); err2 != nil {
 					log.Fatalf("docker build failed for --shell: %v", err2)
 				}
@@ -268,7 +272,9 @@ func main() {
 				// If one-shot, we implicitly build
 				doBuild := *archBuild
 				if doBuild {
-					log.Printf("%s Building test environment (%s)...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")), distroImageTag)
+					if dockerutil.Allowed(selected, dockerutil.V1) {
+						log.Printf("%s Building test environment (%s)...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")), distroImageTag)
+					}
 					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, selected, d, col); err != nil {
 						errs <- fmt.Errorf("%s docker build failed: %w", distroTag, err)
 						return
@@ -291,7 +297,9 @@ func main() {
 
 					// Auto-build if the image tag is missing
 					if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
-						log.Printf("%s Docker image not found; building...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+						if dockerutil.Allowed(selected, dockerutil.V1) {
+							log.Printf("%s Docker image not found; building...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+						}
 						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, selected, d, col); err2 != nil {
 							errs <- fmt.Errorf("%s docker build failed: %w", distroTag, err2)
 							return
@@ -316,14 +324,18 @@ func main() {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}
 
-					log.Printf("%s Starting tests...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+					if dockerutil.Allowed(selected, dockerutil.V1) {
+						log.Printf("%s Starting tests...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+					}
 					// Stream and tag per-line with intrinsic levels
 					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, selected, d, col); err != nil {
 						errs <- fmt.Errorf("%s docker run failed: %w", distroTag, err)
 						cancel() // Cancel all other running tests
 						return
 					}
-					log.Printf("%s Tests finished successfully.", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+					if dockerutil.Allowed(selected, dockerutil.V1) {
+						log.Printf("%s Tests finished successfully.", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+					}
 				}
 			}(distroName, colorPalette[i%len(colorPalette)])
 		}
@@ -342,12 +354,12 @@ func main() {
 
 	if ok {
 		if !quietMode {
-			log.Println("==> All tests passed successfully.")
+			hostLog(dockerutil.V0, "==> All tests passed successfully.")
 		}
 		os.Exit(0)
 	} else {
 		if !quietMode {
-			log.Println("==> Some tests failed.")
+			hostLog(dockerutil.V0, "==> Some tests failed.")
 		}
 	}
 	os.Exit(1)

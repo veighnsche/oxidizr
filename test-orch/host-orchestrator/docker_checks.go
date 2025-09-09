@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"host-orchestrator/dockerutil"
 )
 
 // checkDocker validates Docker presence and daemon responsiveness.
@@ -9,26 +9,26 @@ func checkDocker(verbose bool) bool {
 	section("Docker checks")
 	ok := true
 	if !have("docker") {
-		warn("docker not found on PATH.")
+		hostLog(dockerutil.V0, "docker not found on PATH.")
 		if verbose {
-			log.Println(dockerInstallHelp())
+			hostLog(dockerutil.V2, "%s", dockerInstallHelp())
 		} else {
-			log.Println("Docker is not installed. Run with -v for full install instructions.")
+			hostLog(dockerutil.V1, "Docker is not installed. Run with -v for full install instructions.")
 		}
 		return false
 	}
 	if verbose {
-		log.Println(prefixRun(), "docker version --format '{{.Client.Version}}' (client)")
+		hostLog(dockerutil.V2, "%s docker version --format '{{.Client.Version}}' (client)", prefixRun())
 	}
 	if err := runSilent("docker", "version"); err != nil {
-		warn("docker is installed but not responding. Make sure the Docker daemon is running and your user is in the docker group.")
+		hostLog(dockerutil.V0, "docker is installed but not responding. Make sure the Docker daemon is running and your user is in the docker group.")
 		if verbose {
-			log.Println("Quick fix:")
-			log.Println("  sudo systemctl enable --now docker")
-			log.Println("  sudo usermod -aG docker \"$USER\"  # then re-login or run: newgrp docker")
-			log.Println(dockerTroubleshootTips("daemon"))
+			hostLog(dockerutil.V2, "Quick fix:")
+			hostLog(dockerutil.V2, "  sudo systemctl enable --now docker")
+			hostLog(dockerutil.V2, "  sudo usermod -aG docker \"$USER\"  # then re-login or run: newgrp docker")
+			hostLog(dockerutil.V2, "%s", dockerTroubleshootTips("daemon"))
 		} else {
-			log.Println("Hint: sudo systemctl enable --now docker; add your user to the 'docker' group. Run with -v for detailed tips.")
+			hostLog(dockerutil.V1, "Hint: sudo systemctl enable --now docker; add your user to the 'docker' group. Run with -v for detailed tips.")
 		}
 		ok = false
 	}
@@ -71,7 +71,7 @@ Once Docker is installed, you can retry:
 // dockerTroubleshootTips provides additional, context-aware guidance for common Docker issues.
 // The ctx parameter can be one of: "daemon", "pull", "smoke", "build", "run".
 func dockerTroubleshootTips(ctx string) string {
-    header := "\nAdditional troubleshooting tips:\n\n"
+	header := "\nAdditional troubleshooting tips:\n\n"
 	common := `
 General
   - Check the Docker service: sudo systemctl status docker
@@ -138,19 +138,19 @@ Run issues
 func smokeTestDockerArch(verbose bool) bool {
 	section("Docker Arch smoke test")
 	if verbose {
-		log.Println(prefixRun(), "docker run --rm archlinux:base-devel pacman --version")
+		hostLog(dockerutil.V2, "%s docker run --rm archlinux:base-devel pacman --version", prefixRun())
 	}
 	if err := runMaybeSilent(verbose, "docker", "run", "--rm", "archlinux:base-devel", "pacman", "--version"); err != nil {
-		warn("Docker Arch smoke test failed: ", err)
+		hostLog(dockerutil.V0, "Docker Arch smoke test failed: %v", err)
 		if verbose {
-			log.Println(dockerTroubleshootTips("smoke"))
+			hostLog(dockerutil.V2, "%s", dockerTroubleshootTips("smoke"))
 		} else {
-			log.Println("Run with -v for detailed troubleshooting tips.")
+			hostLog(dockerutil.V1, "Run with -v for detailed troubleshooting tips.")
 		}
 		return false
 	}
 	if !quietMode {
-		log.Println("Docker Arch smoke test passed.")
+		hostLog(dockerutil.V1, "Docker Arch smoke test passed.")
 	}
 	return true
 }

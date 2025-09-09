@@ -12,16 +12,15 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"host-orchestrator/dockerutil"
 )
 
-// Verbosity controls
-// 0 = quiet (only final summary and critical errors)
-// 1 = normal (default)
-// 2 = verbose (-v)
-// 3 = trace (-vv)
+// Verbosity controls (selection comes from CLI and is centralized)
 var (
 	quietMode      bool
-	verbosityLevel = 1
+	verbosityLevel = 1 // kept for legacy checks; prefer selectedVerb for filtering
+	selectedVerb   = dockerutil.V1
 )
 
 func setQuiet(q bool) { quietMode = q }
@@ -30,64 +29,67 @@ func setQuiet(q bool) { quietMode = q }
 // sha256 hex digest. Any change to inputs yields a new tag, so existing images are reused only
 // when inputs are unchanged.
 func computeBuildHash(ctxDir string) (string, error) {
-    // Inputs that affect the in-container runner image
-    inputs := []string{
-        filepath.Join(ctxDir, "docker/Dockerfile"),
-        filepath.Join(ctxDir, "docker/setup_shell.sh"),
-        filepath.Join(ctxDir, "container-runner"), // binary name if present (ignored if not)
-        filepath.Join(ctxDir, "container-runner/"), // source tree
-        filepath.Join(ctxDir, "container-runner/demos/"), // demo scripts copied into image
-    }
-    h := sha256.New()
-    seen := make(map[string]bool)
-    for _, p := range inputs {
-        // Expand directories
-        fi, err := os.Stat(p)
-        if err != nil {
-            continue
-        }
-        if fi.IsDir() {
-            filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
-                if err != nil { return nil }
-                if info.IsDir() { return nil }
-                rel, _ := filepath.Rel(ctxDir, path)
-                if seen[rel] { return nil }
-                seen[rel] = true
-                io.WriteString(h, rel)
-                f, err := os.Open(path)
-                if err == nil {
-                    _, _ = io.Copy(h, f)
-                    f.Close()
-                }
-                return nil
-            })
-        } else {
-            rel, _ := filepath.Rel(ctxDir, p)
-            if !seen[rel] {
-                seen[rel] = true
-                io.WriteString(h, rel)
-                f, err := os.Open(p)
-                if err == nil {
-                    _, _ = io.Copy(h, f)
-                    f.Close()
-                }
-            }
-        }
-    }
-    // Stabilize by hashing the filenames set order too
-    var files []string
-    for k := range seen { files = append(files, k) }
-    sort.Strings(files)
-    for _, k := range files { io.WriteString(h, "|"+k) }
-    sum := fmt.Sprintf("%x", h.Sum(nil))
-    if len(sum) > 12 { sum = sum[:12] }
-    return sum, nil
+	// Inputs that affect the in-container runner image
+	inputs := []string{
+		filepath.Join(ctxDir, "docker/Dockerfile"),
+		filepath.Join(ctxDir, "docker/setup_shell.sh"),
+		filepath.Join(ctxDir, "container-runner"), // binary name if present (ignored if not)
+		filepath.Join(ctxDir, "container-runner/"), // source tree
+		filepath.Join(ctxDir, "container-runner/demos/"), // demo scripts copied into image
+	}
+	h := sha256.New()
+	seen := make(map[string]bool)
+	for _, p := range inputs {
+		// Expand directories
+		fi, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		if fi.IsDir() {
+			filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
+				if err != nil { return nil }
+				if info.IsDir() { return nil }
+				rel, _ := filepath.Rel(ctxDir, path)
+				if seen[rel] { return nil }
+				seen[rel] = true
+				io.WriteString(h, rel)
+				f, err := os.Open(path)
+				if err == nil {
+					_, _ = io.Copy(h, f)
+					f.Close()
+				}
+				return nil
+			})
+		} else {
+			rel, _ := filepath.Rel(ctxDir, p)
+			if !seen[rel] {
+				seen[rel] = true
+				io.WriteString(h, rel)
+				f, err := os.Open(p)
+				if err == nil {
+					_, _ = io.Copy(h, f)
+					f.Close()
+				}
+			}
+		}
+	}
+	// Stabilize by hashing the filenames set order too
+	var files []string
+	for k := range seen { files = append(files, k) }
+	sort.Strings(files)
+	for _, k := range files { io.WriteString(h, "|"+k) }
+	sum := fmt.Sprintf("%x", h.Sum(nil))
+	if len(sum) > 12 { sum = sum[:12] }
+	return sum, nil
 }
 func setVerbosity(lvl int) {
 	if lvl < 0 { lvl = 0 }
 	if lvl > 3 { lvl = 3 }
 	verbosityLevel = lvl
 }
+
+// setSelectedVerb configures the dockerutil.Verb used for filtering host logs.
+func setSelectedVerb(v dockerutil.Verb) { selectedVerb = v }
 
 func have(name string) bool {
 	_, err := exec.LookPath(name)
@@ -130,28 +132,56 @@ func isRoot() bool {
 	return os.Geteuid() == 0
 }
 
-func warn(v ...interface{}) {
-	if quietMode {
+// hostLog emits a host-originated log line with intrinsic level and [HOST] scope.
+func hostLog(level dockerutil.Verb, format string, args ...interface{}) {
+	if !dockerutil.Allowed(selectedVerb, level) {
 		return
 	}
-	log.Println("WARN:", fmt.Sprint(v...))
+	// Global (non-distro) host logs omit the distro tag per rules; still include [vN][HOST]
+	p := dockerutil.Prefix("", level, "HOST")
+	if format == "" {
+		log.Println(p)
+		return
+	}
+	log.Printf("%s %s", p, fmt.Sprintf(format, args...))
+}
+
+func warn(v ...interface{}) {
+	if quietMode { // preserve quiet suppression for warnings
+		return
+	}
+	hostLog(dockerutil.V1, "%s", fmt.Sprint(v...))
 }
 
 func section(title string) {
-	if quietMode || verbosityLevel < 2 {
+	if quietMode {
 		return
 	}
-	log.Println()
-	log.Println("==>", title)
-	time.Sleep(10 * time.Millisecond) // keep logs readable
+	if dockerutil.Allowed(selectedVerb, dockerutil.V2) {
+		log.Println()
+		hostLog(dockerutil.V2, "==> %s", title)
+		time.Sleep(10 * time.Millisecond) // keep logs readable
+	}
 }
 
 func prefixRun() string { return "RUN>" }
 
 // vlog prints when the current verbosity is >= level (0..3)
 func vlog(level int, v ...interface{}) {
-	if verbosityLevel >= level {
-		log.Println(v...)
+	// Map int->Verb and apply central filter
+	lv := dockerutil.V1
+	switch {
+	case level <= 0:
+		lv = dockerutil.V0
+	case level == 1:
+		lv = dockerutil.V1
+	case level == 2:
+		lv = dockerutil.V2
+	default:
+		lv = dockerutil.V3
+	}
+	if dockerutil.Allowed(selectedVerb, lv) {
+		hostLog(lv, "%s", fmt.Sprint(v...))
 	}
 }
 
