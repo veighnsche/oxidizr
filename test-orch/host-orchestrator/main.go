@@ -445,8 +445,6 @@ func main() {
 						envVars = append(envVars, "VERBOSE=2")
 					default:
 						envVars = append(envVars, "VERBOSE=3")
-						// Propagate verbosity to the Rust binary's logger
-						envVars = append(envVars, "RUST_LOG=info")
 					}
 					// Correlatable run identifier across host/runner/product
 					envVars = append(envVars, fmt.Sprintf("RUN_ID=%s", runID))

@@ -164,6 +164,57 @@ Notes:
 - Common utilities
   - Audit logging: `src/logging/*`
 
+## Logging and Artifacts
+
+Human-readable logs follow a strict verbosity model (see `VERBOSITY.md`).
+
+- Prefix format for human logs: `[<distro>][v<level>][<scope>] message`.
+  - `<scope>` is `HOST` or `RUNNER` for harness-side logs; blank for product/raw.
+  - Product (Rust) logs are emitted with `[<distro>][vN] message`.
+
+Structured logs (JSONL) use a canonical envelope:
+
+```json
+{
+  "ts": "2025-09-09T10:30:45.949Z",
+  "component": "product|runner|host",
+  "level": "trace|debug|info|warn|error",
+  "run_id": "r-20250909-1030-abc123",
+  "container_id": "ctr_96be2899",
+  "distro": "arch|manjaro|...",
+  "suite": "<suite-name>",
+  "stage": "preflight|deps|build|run_suites|restore|collect",
+  "event": "...",
+  "cmd": "...",
+  "rc": 0,
+  "duration_ms": 123,
+  "target": "/usr/bin/sha256sum",
+  "source": "/usr/bin/uu-sha256sum",
+  "backup_path": "/.oxidizr/backups/sha256sum.XXXX",
+  "artifacts": ["..."],
+  "message": "short text"
+}
+```
+
+Artifact locations:
+
+- In container (written by runner):
+  - `/workspace/.proof/logs/runner.jsonl`
+  - `/workspace/.proof/logs/product.stdout.log`
+  - `/workspace/.proof/logs/product.stderr.log`
+  - `/workspace/.proof/results/summary.json`
+- On host (mirrored 1:1):
+  - `.artifacts/<run_id>/<distro>_<container_id>/host.jsonl`
+  - `.artifacts/<run_id>/<distro>_<container_id>/logs/runner.jsonl`
+  - `.artifacts/<run_id>/<distro>_<container_id>/logs/product.stdout.log`
+  - `.artifacts/<run_id>/<distro>_<container_id>/logs/product.stderr.log`
+  - `.artifacts/<run_id>/<distro>_<container_id>/results/summary.json`
+
+The runner enforces guardrails during `collect`:
+
+- `runner.jsonl` lines must include `ts`, `component`, and `run_id`.
+- If the product was invoked but top‑level `product.stdout.log`/`product.stderr.log` are missing, the run is marked INCONCLUSIVE (fail).
+
 ## Testing
 
 1) Rust unit tests

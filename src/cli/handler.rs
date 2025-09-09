@@ -122,12 +122,14 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             for e in &exps {
                 let ok = e.check_compatible(&distro)?;
                 println!("{}\tCompatible: {}", e.name(), ok);
+                tracing::info!(event = "compatibility_check", experiment = %e.name(), distro = %distro.id, compatible = ok, "compatibility: {} -> {}", e.name(), ok);
             }
         }
         Commands::ListTargets => {
             for e in &exps {
                 for t in e.list_targets() {
                     println!("{}\t{}", e.name(), t.display());
+                    tracing::info!(event = "list_target", experiment = %e.name(), target = %t.display().to_string());
                 }
             }
         }

@@ -26,7 +26,7 @@ Gaps remain versus the plan (prefix format for human logs, canonical JSONL envel
 
 - [ ] Adopt the canonical JSONL envelope fields consistently: `ts`, `component`, `level`, `run_id`, `container_id`, `distro`, `suite`, `stage`, `event`, `cmd`, `rc`, `duration_ms`, `target`, `source`, `backup_path`, `artifacts`, `message`.
   - Runner already writes most of these; add missing ones where noted below.
-  - Product audit should emit these field names (see Rust section).
+  - Product audit: currently emits `ts`, `component`, `level`, `run_id`, `container_id`, `distro`, `event`, `decision`, `inputs`, `outputs`, `exit_code`. Future enhancement: add optional structured fields (`target`, `source`, `backup_path`, `stage`, `suite`, `cmd`, `rc`, `duration_ms`, `artifacts`) directly as fields rather than embedding in `outputs`.
   - Host must add a `host.jsonl` writer (see Go section).
 - [x] Propagate IDs and context via environment:
   - Host passes `RUN_ID` into `docker run` env; runner and product read it.
@@ -52,14 +52,14 @@ Files to touch: `src/logging/init.rs`, `src/logging/audit.rs`, call sites in `sr
     - Accept optional structured fields: `stage`, `suite`, `cmd`, `rc`, `duration_ms`, `target`, `source`, `backup_path`, `artifacts`.
     - Keep `component` and `event` as top-level fields.
   - Update all call sites to pass structured fields instead of packing into the `inputs/outputs` strings (e.g., in `symlink/ops.rs` for `backup_created`, `link_started/done`, `restore_started/done`).
-- [ ] Event taxonomy and levels
+- [x] Event taxonomy and levels
   - Ensure the following are emitted at the specified levels:
     - `enabled`, `removed_and_restored` ➜ info (v1) plus run/suite end summary at v0 handled by runner/host.
     - `link_started`, `restore_started` ➜ debug (v2).
     - `link_done`, `restore_done`, `backup_created` ➜ debug (v2) with `duration_ms` where measurable.
-    - `skip_applet` ➜ warn (v1) with `target` and reason (presence-aware); add where missing.
+    - `skip_applet` ➜ warn (v1) with `target`, reason.
     - `package_install`, `package_remove` ➜ info (v1); failures ➜ error (v0) with explicit exit codes.
-- [ ] Replace ad-hoc stdout prints with structured logs where appropriate
+- [x] Replace ad-hoc stdout prints with structured logs where appropriate
   - In `src/cli/handler.rs`, for `Check` and `ListTargets` commands, mirror the `println!` output with `tracing::info!(...)` so human logs remain consistent with the prefix policy (keep `println!` for tool-like output).
 - [ ] Documentation
   - Add the event names and meanings to CLI help/README (short section enumerating product-side events).
@@ -78,7 +78,7 @@ Files to touch: `test-orch/container-runner/runner.py`, `test-orch/container-run
     - `assert_pass` (v1 info) with `suite` and relevant `artifacts`.
     - `assert_fail` (v0 error) with `suite`, `artifacts`, and short `message`.
   - Extend `lib/fs.py::assert_presence()` to send `event="assert_fail"` or `assert_pass` via the injected `logger`.
-- [ ] Raw product stdout/stderr capture
+- [x] Raw product stdout/stderr capture
   - Introduce a minimal wrapper to run the product and tee raw output to:
     - `.proof/logs/product.stdout.log`
     - `.proof/logs/product.stderr.log`
@@ -86,9 +86,9 @@ Files to touch: `test-orch/container-runner/runner.py`, `test-orch/container-run
     1) Add a small shell helper (`oxidizr` function) that wraps `oxidizr-arch` calls; update YAMLs to use it.
     2) Provide a `proc.run_product(argv)` path and document its usage for YAMLs that call directly.
   - Until wrappers are in place, keep per-suite `execute.*.log`/`restore.*.log` (already captured). Mark the TODO to migrate YAMLs.
-- [ ] Guardrails (collect stage)
+- [x] Guardrails (collect stage)
   - [x] Validate `runner.jsonl` lines: fail the run if any line is missing `ts`, `component`, or `run_id` (per plan).
-  - [ ] If the product was invoked during any suite but `.proof/logs/product.stdout.log`/`.stderr.log` are missing, mark the run INCONCLUSIVE and fail it.
+  - [x] If the product was invoked during any suite but `.proof/logs/product.stdout.log`/`.stderr.log` are missing, mark the run INCONCLUSIVE and fail it.
 - [x] Envelope completeness
   - Ensure `JSONLLogger.event()` also includes optional fields when provided (`artifacts`, `target`, `source`, etc.).
   - Add `stage="suite_start"/"suite_end"` events with `suite` and summary outcome.
@@ -119,7 +119,7 @@ Files to touch: `test-orch/host-orchestrator/{main.go, dockerutil/*.go}` (likely
     2) Or perform `docker cp <cid>:/workspace/.proof <dest>` before container removal.
 - [x] Verbosity behavior (live tail)
   - Continue to print container stdout filtered by `classifyLine()`; at `-vv` print container stderr lines live as-is (already in place) and also write them to `host.jsonl` as `stderr_tail` events.
-- [ ] Non-blocking lifecycle
+- [x] Non-blocking lifecycle
   - Keep the current channel handling; ensure `host.jsonl` always receives a final `container_exit` event even on early failures.
 
 ---

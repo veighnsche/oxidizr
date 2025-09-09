@@ -40,7 +40,7 @@ impl SudoRsExperiment {
         check_download_prerequisites(worker, &self.package_name, assume_yes)?;
 
         // Install package
-        tracing::info!("Installing package: {}", self.package_name);
+        tracing::info!(event = "package_install", package = %self.package_name, "Installing package: {}", self.package_name);
         worker.install_package(&self.package_name, assume_yes)?;
         if worker.check_installed(&self.package_name)? {
             tracing::info!(
@@ -223,7 +223,7 @@ impl SudoRsExperiment {
         self.disable(worker, assume_yes, update_lists)?;
 
         // Then remove the package
-        tracing::info!("Removing package: {}", self.package_name);
+        tracing::info!(event = "package_remove", package = %self.package_name, "Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
 
         // Verify absence

@@ -86,12 +86,12 @@ def stage_preflight(logger: logmod.JSONLLogger) -> None:
     # Tool versions
     for cmd in (["rustup", "--version"], ["cargo", "--version"], ["pacman", "-V"]):
         res = procmod.run(cmd, timeout=30)
-        logger.event(stage="preflight", suite=None, event="cmd_exec", cmd=res.command_str, rc=res.rc,
+        logger.event(stage="preflight", suite=None, event="cmd_exec", level="debug", cmd=res.command_str, rc=res.rc,
                      elapsed_ms=res.elapsed_ms, msg=res.stdout.strip()[:200])
 
     # Verify product can be built (no repairs). Use cargo check as a quick build test.
     res = procmod.run(["cargo", "check"], cwd=str(PROJECT_DIR), timeout=1200)
-    logger.event(stage="preflight", suite=None, event="cmd_exec", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms)
+    logger.event(stage="preflight", suite=None, event="cmd_exec", level="debug", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms)
     if res.rc != 0:
         print("[preflight] ❌ cargo check failed; aborting")
         sys.exit(res.rc)
@@ -111,7 +111,7 @@ def stage_deps(logger: logmod.JSONLLogger) -> None:
     missing = []
     for pkg in packages:
         res = procmod.run(["pacman", "-Qi", pkg], timeout=60)
-        logger.event(stage="deps", suite=None, event="verify_pkg", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms, msg=pkg)
+        logger.event(stage="deps", suite=None, event="cmd_exec", level="debug", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms, msg=pkg)
         if res.rc != 0:
             missing.append(pkg)
     if missing:
@@ -130,7 +130,7 @@ def stage_build(logger: logmod.JSONLLogger) -> None:
 
     # Select default toolchain (toolchain should be pre-installed in image)
     res = procmod.run(["rustup", "default", toolchain], timeout=120)
-    logger.event(stage="build", suite=None, event="cmd_exec", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms)
+    logger.event(stage="build", suite=None, event="cmd_exec", level="debug", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms)
     if res.rc != 0:
         print("[build] ❌ rustup default failed")
         sys.exit(res.rc)
@@ -138,7 +138,7 @@ def stage_build(logger: logmod.JSONLLogger) -> None:
     # Log tool versions for provenance
     for cmd in (["rustup", "show"], ["cargo", "--version"], ["rustc", "--version"]):
         info = procmod.run(cmd, timeout=60)
-        logger.event(stage="build", suite=None, event="cmd_exec", cmd=info.command_str, rc=info.rc, elapsed_ms=info.elapsed_ms)
+        logger.event(stage="build", suite=None, event="cmd_exec", level="debug", cmd=info.command_str, rc=info.rc, elapsed_ms=info.elapsed_ms)
 
     # Build the product
     env = os.environ.copy()
@@ -146,7 +146,7 @@ def stage_build(logger: logmod.JSONLLogger) -> None:
     build_cmd = ["cargo", "build", "--profile", profile]
     t0 = time.time()
     res = procmod.run(build_cmd, cwd=str(PROJECT_DIR), env=env, timeout=7200)
-    logger.event(stage="build", suite=None, event="cmd_exec", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms)
+    logger.event(stage="build", suite=None, event="cmd_exec", level="debug", cmd=res.command_str, rc=res.rc, elapsed_ms=res.elapsed_ms)
     if res.rc != 0:
         print("[build] ❌ cargo build failed")
         sys.exit(res.rc)
@@ -204,8 +204,8 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
                 suite, PROJECT_DIR, logger,
                 stdout_path=logs_root / "execute.stdout.log",
                 stderr_path=logs_root / "execute.stderr.log",
-                product_stdout_path=logs_root / "product.stdout.log",
-                product_stderr_path=logs_root / "product.stderr.log",
+                product_stdout_path=LOGS_DIR / "product.stdout.log",
+                product_stderr_path=LOGS_DIR / "product.stderr.log",
             )
             duration_ms = int((time.time() - started) * 1000)
             status = "pass"
@@ -244,8 +244,8 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
                 suite, PROJECT_DIR, logger,
                 stdout_path=logs_root / "restore.stdout.log",
                 stderr_path=logs_root / "restore.stderr.log",
-                product_stdout_path=logs_root / "product.stdout.log",
-                product_stderr_path=logs_root / "product.stderr.log",
+                product_stdout_path=LOGS_DIR / "product.stdout.log",
+                product_stderr_path=LOGS_DIR / "product.stderr.log",
             )
             restore_rc = rest_res.rc
             if restore_rc != 0:
@@ -265,8 +265,12 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
             "presence_ok": presence_ok,
         }
         results.append(result)
-        logger.event(stage="run_suites", suite=name, event="suite_end", level="info", elapsed_ms=int((time.time() - started) * 1000),
+        elapsed_suite = int((time.time() - started) * 1000)
+        logger.event(stage="run_suites", suite=name, event="suite_end", level="info", elapsed_ms=elapsed_suite,
                      msg=status, artifacts=result.get("artifacts"))
+        # Also emit a v0-style summary event (error on FAIL, info on PASS)
+        lvl = "error" if status == "fail" else "info"
+        logger.event(stage="run_suites", suite=name, event="suite_summary", level=lvl, elapsed_ms=elapsed_suite, msg=status)
         print(f"[run_suites] {'✅ PASS' if status=='pass' else '❌ FAIL'} suite: {name}")
 
     # Persist results for later collect stage (if run separately)
@@ -348,18 +352,12 @@ def stage_collect(logger: logmod.JSONLLogger, suites_results: list) -> None:
     except Exception:
         pass
 
-    # Guardrails: if any suite invoked the product, require product logs exist
+    # Guardrails: if any suite invoked the product, require product logs exist (top-level)
     try:
         suites = suitesmod.discover_suites(str(TESTS_DIR))
         invoked = any(("oxidizr-arch" in (s.execute or "")) or ("oxidizr-arch" in (s.restore or "" if s.restore else "")) for s in suites)
         if invoked:
-            # Search for any per-suite product logs
-            any_prod_logs = False
-            for p in LOGS_DIR.glob("*/product.stdout.log"):
-                if p.exists():
-                    any_prod_logs = True
-                    break
-            if not any_prod_logs:
+            if not ( (LOGS_DIR / "product.stdout.log").exists() and (LOGS_DIR / "product.stderr.log").exists() ):
                 print("[collect] ❌ product stdout/stderr logs missing despite product invocation; marking run INCONCLUSIVE")
                 sys.exit(1)
     except Exception:
