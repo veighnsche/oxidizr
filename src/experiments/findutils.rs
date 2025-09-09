@@ -29,8 +29,9 @@ impl FindutilsExperiment {
     }
     
     pub fn enable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("findutils_enable", package = %self.package_name, update_lists).entered();
         if update_lists {
-            log::info!("Updating package lists...");
+            tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
         
@@ -40,26 +41,26 @@ impl FindutilsExperiment {
         // by the currently active coreutils (with checksum applets possibly flipped via --flip-checksums).
         match worker.which("sha256sum") {
             Ok(Some(p)) => {
-                log::info!(
+                tracing::info!(
                     "AUR checksum preflight: using sha256sum at {} (provided by active coreutils)",
                     p.display()
                 );
             }
             _ => {
-                log::warn!(
+                tracing::warn!(
                     "AUR checksum preflight: could not resolve 'sha256sum' in PATH; makepkg may fail"
                 );
             }
         }
         
         // Install package
-        log::info!("Installing package: {}", self.package_name);
+        tracing::info!("Installing package: {}", self.package_name);
         worker.install_package(&self.package_name, assume_yes)?;
         
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
         if applets.is_empty() {
-            log::error!(
+            tracing::error!(
                 "❌ Expected: at least 1 findutils applet discovered after install; Received: 0"
             );
             return Err(Error::ExecutionFailed(format!(
@@ -67,7 +68,7 @@ impl FindutilsExperiment {
                 self.package_name
             )));
         }
-        log::info!(
+        tracing::info!(
             "✅ Expected: findutils applets discovered; Received: {}",
             applets.len()
         );
@@ -79,8 +80,9 @@ impl FindutilsExperiment {
     }
     
     pub fn disable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("findutils_disable", package = %self.package_name, update_lists).entered();
         if update_lists {
-            log::info!("Updating package lists...");
+            tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
         
@@ -92,11 +94,12 @@ impl FindutilsExperiment {
     }
     
     pub fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("findutils_remove", package = %self.package_name, update_lists).entered();
         // First restore GNU tools
         self.disable(worker, assume_yes, update_lists)?;
         
         // Then remove the package
-        log::info!("Removing package: {}", self.package_name);
+        tracing::info!("Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
         
         // Verify absence explicitly
@@ -130,13 +133,13 @@ impl FindutilsExperiment {
             } else if let Ok(Some(path)) = worker.which(name) {
                 applets.push((name.to_string(), path));
             } else {
-                log::warn!("No binary found for '{}' in known locations", name);
+                tracing::warn!("No binary found for '{}' in known locations", name);
             }
         }
         
         // If nothing found, try to synthesize from known locations
         if applets.is_empty() {
-            log::info!("Attempting to synthesize findutils applet locations...");
+            tracing::info!("Attempting to synthesize findutils applet locations...");
             std::fs::create_dir_all(&self.bin_directory).ok();
             
             for name in &known {
@@ -157,7 +160,7 @@ impl FindutilsExperiment {
                                 let perm = meta.permissions();
                                 std::fs::set_permissions(&canonical_src, perm).ok();
                             }
-                            log::info!(
+                            tracing::info!(
                                 "Synthesized canonical source (copied) {} <- {}",
                                 canonical_src.display(),
                                 real.display()
@@ -165,7 +168,7 @@ impl FindutilsExperiment {
                             applets.push((name.to_string(), canonical_src));
                         }
                         Err(e) => {
-                            log::warn!(
+                            tracing::warn!(
                                 "Failed to copy {} to canonical source: {}",
                                 real.display(),
                                 e

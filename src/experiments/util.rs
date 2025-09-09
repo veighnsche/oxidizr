@@ -18,12 +18,13 @@ where
     let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
     for (filename, src) in applets {
         let target = resolve(filename);
+        tracing::trace!(step = "symlink_item", filename = %filename, src = %src.display(), target = %target.display());
         // When progress bar is active, avoid noisy per-item info logs
         if pb.is_none() {
-            log::info!("Symlinking {} -> {}", src.display(), target.display());
+            tracing::info!("Symlinking {} -> {}", src.display(), target.display());
         }
         if let Err(e) = worker.replace_file_with_symlink(src, &target) {
-            log::error!(
+            tracing::error!(
                 "❌ Failed to create symlink: src={} -> target={}: {}",
                 src.display(),
                 target.display(),
@@ -51,11 +52,12 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
     let mut pb = progress::new_bar(targets.len() as u64);
     let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
     for target in targets {
+        tracing::trace!(step = "restore_item", target = %target.display());
         if pb.is_none() {
-            log::info!("[disable] Restoring {} (if backup exists)", target.display());
+            tracing::info!("[disable] Restoring {} (if backup exists)", target.display());
         }
         if let Err(e) = worker.restore_file(target) {
-            log::error!(
+            tracing::error!(
                 "❌ Failed to restore {}: {}",
                 target.display(),
                 e
@@ -80,28 +82,28 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
 
 /// Log a short summary of the first `max_items` applets to be linked.
 pub fn log_applets_summary(prefix: &str, applets: &[(String, PathBuf)], max_items: usize) {
-    log::info!(
+    tracing::info!(
         "Preparing to link {} applet(s) for {}",
         applets.len(),
         prefix
     );
     for (i, (filename, src)) in applets.iter().enumerate() {
         if i >= max_items {
-            log::info!("  (…truncated)");
+            tracing::info!("  (…truncated)");
             break;
         }
         let target = resolve_usrbin(filename);
-        log::info!("  [{}] {} -> {}", i + 1, src.display(), target.display());
+        tracing::info!("  [{}] {} -> {}", i + 1, src.display(), target.display());
     }
 }
 
 /// Verify a package is installed, emitting explicit logs.
 pub fn verify_installed(worker: &Worker, package: &str) -> Result<()> {
     if worker.check_installed(package)? {
-        log::info!("✅ Expected: '{}' installed, Received: present", package);
+        tracing::info!("✅ Expected: '{}' installed, Received: present", package);
         Ok(())
     } else {
-        log::error!("❌ Expected: '{}' installed, Received: absent", package);
+        tracing::error!("❌ Expected: '{}' installed, Received: absent", package);
         Err(Error::ExecutionFailed(format!(
             "package '{}' not installed after operation",
             package
@@ -112,13 +114,13 @@ pub fn verify_installed(worker: &Worker, package: &str) -> Result<()> {
 /// Verify a package is removed, emitting explicit logs.
 pub fn verify_removed(worker: &Worker, package: &str) -> Result<()> {
     if worker.check_installed(package)? {
-        log::error!("❌ Expected: '{}' absent after removal, Received: present", package);
+        tracing::error!("❌ Expected: '{}' absent after removal, Received: present", package);
         Err(Error::ExecutionFailed(format!(
             "package '{}' still installed after removal",
             package
         )))
     } else {
-        log::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
+        tracing::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
         Ok(())
     }
 }

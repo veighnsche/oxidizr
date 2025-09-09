@@ -55,10 +55,16 @@ impl Worker {
     /// Check if official repositories (e.g., [extra]) are available
     pub fn extra_repo_available(&self) -> Result<bool> {
         // 1) Prefer a concise repo list to avoid false positives (e.g., NoExtract)
-        if let Ok(out) = std::process::Command::new("pacman-conf")
-            .args(["--repo-list"]) // lists repo names, one per line
-            .output()
-        {
+        if let Ok(out) = {
+            tracing::debug!(cmd = %"pacman-conf --repo-list", "exec");
+            let o = std::process::Command::new("pacman-conf")
+                .args(["--repo-list"]) // lists repo names, one per line
+                .output();
+            if let Ok(ref o2) = o {
+                tracing::debug!(status = ?o2.status.code(), "exit");
+            }
+            o
+        } {
             let stdout = String::from_utf8_lossy(&out.stdout);
             if out.status.success() {
                 let found = stdout
@@ -81,10 +87,16 @@ impl Worker {
         }
 
         // 2) Probe pacman sync DB for the 'extra' repo directly. Requires that callers refreshed (-Sy).
-        if let Ok(status) = std::process::Command::new("pacman")
-            .args(["-Sl", "extra"]) // list packages in 'extra'
-            .status()
-        {
+        if let Ok(status) = {
+            tracing::debug!(cmd = %"pacman -Sl extra", "exec");
+            let s = std::process::Command::new("pacman")
+                .args(["-Sl", "extra"]) // list packages in 'extra'
+                .status();
+            if let Ok(ref st) = s {
+                tracing::debug!(status = ?st.code(), "exit");
+            }
+            s
+        } {
             let _ = PROVENANCE.log(
                 "worker",
                 "extra_repo_available.pacman_sl",
@@ -99,10 +111,16 @@ impl Worker {
         }
 
         // 3) Fallback to full config dump; look for an explicit [extra] section
-        if let Ok(out) = std::process::Command::new("pacman-conf")
-            .args(["-l"]) // list configuration
-            .output()
-        {
+        if let Ok(out) = {
+            tracing::debug!(cmd = %"pacman-conf -l", "exec");
+            let o = std::process::Command::new("pacman-conf")
+                .args(["-l"]) // list configuration
+                .output();
+            if let Ok(ref o2) = o {
+                tracing::debug!(status = ?o2.status.code(), "exit");
+            }
+            o
+        } {
             let stdout = String::from_utf8_lossy(&out.stdout);
             if out.status.success() {
                 let found = stdout.to_ascii_lowercase().contains("[extra]");
@@ -166,9 +184,11 @@ impl Worker {
         if !Self::is_valid_package_name(package) {
             return Ok(false);
         }
+        tracing::debug!(cmd = %format!("pacman -Si {}", package), "exec");
         let status = std::process::Command::new("pacman")
             .args(["-Si", package])
             .status()?;
+        tracing::debug!(status = ?status.code(), "exit");
         let _ = PROVENANCE.log(
             "worker",
             "repo_has_package",
@@ -183,7 +203,7 @@ impl Worker {
     /// Update package databases (pacman -Sy)
     pub fn update_packages(&self, assume_yes: bool) -> Result<()> {
         if self.dry_run {
-            log::info!("[dry-run] pacman -Sy");
+            tracing::info!("[dry-run] pacman -Sy");
             return Ok(());
         }
         
@@ -198,7 +218,9 @@ impl Worker {
             args.push("--noconfirm");
         }
         
+        tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
         let status = std::process::Command::new("pacman").args(&args).status()?;
+        tracing::debug!(status = ?status.code(), "exit");
         let _ = PROVENANCE.log(
             "worker",
             "update_packages",
@@ -243,14 +265,14 @@ impl Worker {
         }
         
         if self.dry_run {
-            log::info!("[dry-run] pacman -S --noconfirm {}", package);
+            tracing::info!("[dry-run] pacman -S --noconfirm {}", package);
             return Ok(());
         }
         
         // If already installed, do nothing
         if self.check_installed(package)? {
-            log::info!("Package '{}' already installed (skipping)", package);
-            log::info!("✅ Expected: '{}' installed, Received: present", package);
+            tracing::info!("Package '{}' already installed (skipping)", package);
+            tracing::info!("✅ Expected: '{}' installed, Received: present", package);
             return Ok(());
         }
         
@@ -270,7 +292,9 @@ impl Worker {
             }
             args.push(package);
 
+            tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
             let pacman_status = std::process::Command::new("pacman").args(&args).status()?;
+            tracing::debug!(status = ?pacman_status.code(), "exit");
             attempted_pacman = true;
             pacman_status_ok = pacman_status.success();
             let _ = PROVENANCE.log(
@@ -283,7 +307,7 @@ impl Worker {
             );
             
             if pacman_status_ok && self.check_installed(package)? {
-                log::info!("✅ Expected: '{}' installed, Received: present", package);
+                tracing::info!("✅ Expected: '{}' installed, Received: present", package);
                 return Ok(());
             }
         } else {
@@ -313,10 +337,11 @@ impl Worker {
                 aur_cmd_str.push_str(" -S --needed");
                 aur_cmd_str.push_str(&format!(" {}", package));
 
-                log::info!("Running AUR helper: su - builder -c '{}'", aur_cmd_str);
+                tracing::info!("Running AUR helper: su - builder -c '{}'", aur_cmd_str);
                 let aur_status = std::process::Command::new("su")
                     .args(["-", "builder", "-c", &aur_cmd_str])
                     .status()?;
+                tracing::debug!(status = ?aur_status.code(), "exit");
                     
                 let _ = PROVENANCE.log(
                     "worker",
@@ -365,14 +390,14 @@ impl Worker {
         }
         
         if self.dry_run {
-            log::info!("[dry-run] pacman -R --noconfirm {}", package);
+            tracing::info!("[dry-run] pacman -R --noconfirm {}", package);
             return Ok(());
         }
 
         // If not installed, do nothing
         if !self.check_installed(package)? {
-            log::info!("Package '{}' not installed, skipping removal", package);
-            log::info!("✅ Expected: '{}' absent, Received: absent", package);
+            tracing::info!("Package '{}' not installed, skipping removal", package);
+            tracing::info!("✅ Expected: '{}' absent, Received: absent", package);
             return Ok(());
         }
         
@@ -388,7 +413,9 @@ impl Worker {
         }
         args.push(package);
         
+        tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
         let status = std::process::Command::new("pacman").args(&args).status()?;
+        tracing::debug!(status = ?status.code(), "exit");
         let _ = PROVENANCE.log(
             "worker",
             "remove_package",
@@ -401,13 +428,13 @@ impl Worker {
         if status.success() {
             // Verify absence after removal for clarity
             if self.check_installed(package)? {
-                log::error!("❌ Expected: '{}' absent after removal, Received: present", package);
+                tracing::error!("❌ Expected: '{}' absent after removal, Received: present", package);
                 return Err(Error::ExecutionFailed(format!(
                     "❌ Expected: '{}' absent after removal, Received: present",
                     package
                 )));
             }
-            log::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
+            tracing::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
             Ok(())
         } else {
             Err(Error::ExecutionFailed(format!(

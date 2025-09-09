@@ -45,8 +45,14 @@ impl CoreutilsExperiment {
     }
     
     pub fn enable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!(
+            "coreutils_enable",
+            package = %self.package_name,
+            update_lists,
+            flip_checksums = worker.flip_checksums
+        ).entered();
         if update_lists {
-            log::info!("Updating package lists...");
+            tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
         
@@ -54,13 +60,13 @@ impl CoreutilsExperiment {
         check_download_prerequisites(worker, &self.package_name, assume_yes)?;
         
         // Install package
-        log::info!("Installing package: {}", self.package_name);
+        tracing::info!("Installing package: {}", self.package_name);
         worker.install_package(&self.package_name, assume_yes)?;
         
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
         if applets.is_empty() {
-            log::error!(
+            tracing::error!(
                 "❌ Expected: at least 1 coreutils applet discovered after install; Received: 0"
             );
             return Err(Error::ExecutionFailed(format!(
@@ -68,7 +74,7 @@ impl CoreutilsExperiment {
                 self.package_name
             )));
         }
-        log::info!(
+        tracing::info!(
             "✅ Expected: coreutils applets discovered; Received: {}",
             applets.len()
         );
@@ -85,7 +91,7 @@ impl CoreutilsExperiment {
                 .collect();
             let preserved_count = original_len.saturating_sub(filtered.len());
             if preserved_count > 0 {
-                log::info!(
+                tracing::info!(
                     "Preserving {} checksum tool(s) unmodified: {:?}",
                     preserved_count,
                     PRESERVE_BINS
@@ -94,7 +100,7 @@ impl CoreutilsExperiment {
             (filtered, "flip-checksums: disabled (preserving checksum tools)")
         };
 
-        log::info!("{}", mode_msg);
+        tracing::info!("{}", mode_msg);
         log_applets_summary("coreutils", &to_link, 8);
         create_symlinks(worker, &to_link, |name| self.resolve_target(name))?;
         
@@ -102,8 +108,9 @@ impl CoreutilsExperiment {
     }
     
     pub fn disable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("coreutils_disable", package = %self.package_name, update_lists).entered();
         if update_lists {
-            log::info!("Updating package lists...");
+            tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
         
@@ -123,11 +130,12 @@ impl CoreutilsExperiment {
     }
     
     pub fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("coreutils_remove", package = %self.package_name, update_lists).entered();
         // First restore GNU tools
         self.disable(worker, assume_yes, update_lists)?;
         
         // Then remove the package
-        log::info!("Removing package: {}", self.package_name);
+        tracing::info!("Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
         
         // Verify absence explicitly
@@ -164,7 +172,7 @@ impl CoreutilsExperiment {
         };
         
         if let Some(unified) = unified_path {
-            log::info!("Using unified coreutils binary at: {}", unified.display());
+            tracing::info!("Using unified coreutils binary at: {}", unified.display());
             // Use unified binary for all applets
             for line in COREUTILS_BINS_LIST.lines() {
                 let name = line.trim();
@@ -173,7 +181,7 @@ impl CoreutilsExperiment {
                 }
             }
         } else {
-            log::warn!("Unified dispatcher not available; falling back to per-applet binaries");
+            tracing::warn!("Unified dispatcher not available; falling back to per-applet binaries");
             // Try to find individual binaries
             for line in COREUTILS_BINS_LIST.lines() {
                 let name = line.trim();

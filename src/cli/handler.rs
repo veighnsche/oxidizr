@@ -7,6 +7,16 @@ use std::io::{self, Write};
 
 /// Main CLI handler - preserves backward compatibility with original
 pub fn handle_cli(cli: Cli) -> Result<()> {
+    // Top-level CLI span for context
+    let _cli_span = tracing::info_span!(
+        "cli",
+        command = ?cli.command,
+        all = cli.all,
+        exp_count = cli.experiments.len(),
+        dry_run = cli.dry_run,
+        assume_yes = cli.assume_yes
+    )
+    .entered();
     // Prefer --package-manager when provided; else fallback to --aur-helper
     let effective_helper = cli
         .package_manager
@@ -51,14 +61,15 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
     let has_core = names.iter().any(|n| n == "coreutils");
     let has_find = names.iter().any(|n| n == "findutils");
     if has_core && has_find {
-        log::info!(
-            "Orchestration: enabling 'coreutils' before 'findutils'. flip-checksums={}",
-            worker.flip_checksums
+        tracing::info!(
+            step = "orchestration",
+            flip_checksums = worker.flip_checksums,
+            "enable coreutils before findutils"
         );
     }
 
     if exps.is_empty() {
-        eprintln!("No experiments selected. Use --all or --experiments=<names>");
+        tracing::warn!("No experiments selected. Use --all or --experiments=<names>");
         return Ok(());
     }
 
@@ -71,19 +82,14 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                 return Ok(());
             }
             for (idx, e) in exps.iter().enumerate() {
-                log::info!(
-                    "Enable sequence {}/{}: {}",
-                    idx + 1,
-                    exps.len(),
-                    e.name()
-                );
+                tracing::info!(step = "enable_sequence", idx = idx + 1, total = exps.len(), experiment = %e.name());
                 e.enable(
                     &worker,
                     cli.assume_yes,
                     update_lists,
                     cli.no_compatibility_check,
                 )?;
-                println!("Enabled experiment: {}", e.name());
+                tracing::info!(event = "enabled", experiment = %e.name());
             }
         }
         Commands::Disable => {
@@ -118,12 +124,12 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             if do_remove {
                 for e in &exps {
                     e.remove(&worker, cli.assume_yes, update_lists)?;
-                    println!("Removed experiment package and restored: {}", e.name());
+                    tracing::info!(event = "removed_and_restored", experiment = %e.name());
                 }
             } else {
                 for e in &exps {
                     e.disable(&worker, cli.assume_yes, update_lists)?;
-                    println!("Disabled experiment: {}", e.name());
+                    tracing::info!(event = "disabled", experiment = %e.name());
                 }
             }
         }

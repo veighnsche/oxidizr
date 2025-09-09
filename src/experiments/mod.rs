@@ -50,6 +50,12 @@ impl Experiment {
         skip_compat_check: bool,
     ) -> Result<()> {
         let distro = worker.distribution()?;
+        let _span = tracing::info_span!(
+            "experiment_enable",
+            experiment = %self.name(),
+            distro = %distro.id,
+            skip_compat_check
+        ).entered();
         
         // Check compatibility unless overridden
         if !skip_compat_check {
@@ -146,7 +152,7 @@ pub fn check_download_prerequisites(
 
     // Gate on repo availability
     if !extra_available && !aur_available {
-        log::error!(
+        tracing::error!(
             "❌ Expected: access to 'extra' repo or an AUR helper; Received: extra_available={}, aur_available={}",
             extra_available,
             aur_available
@@ -164,7 +170,7 @@ pub fn check_download_prerequisites(
     match package {
         UUTILS_COREUTILS | SUDO_RS => {
             if !extra_available {
-                log::error!(
+                tracing::error!(
                     "❌ Expected: extra repo available for '{}'; Received: extra_available=false",
                     package
                 );
@@ -179,10 +185,10 @@ pub fn check_download_prerequisites(
             // Gate on actual package presence in the repo to avoid ambiguous 'not found' failures
             match worker.repo_has_package(package) {
                 Ok(true) => {
-                    log::info!("✅ Package '{}' present in repositories (pacman -Si)", package);
+                    tracing::info!("✅ Package '{}' present in repositories (pacman -Si)", package);
                 }
                 Ok(false) => {
-                    log::error!(
+                    tracing::error!(
                         "❌ Package '{}' not found in repositories (pacman -Si). Mirrors may be out of sync or the repo set is incomplete.",
                         package
                     );
@@ -192,13 +198,13 @@ pub fn check_download_prerequisites(
                     )));
                 }
                 Err(e) => {
-                    log::warn!("Warning: failed to probe repo for '{}': {}", package, e);
+                    tracing::warn!("Warning: failed to probe repo for '{}': {}", package, e);
                 }
             }
         }
         UUTILS_FINDUTILS => {
             if !aur_available {
-                log::error!(
+                tracing::error!(
                     "❌ Expected: an AUR helper present for '{}'; Received: none",
                     package
                 );
@@ -214,7 +220,7 @@ pub fn check_download_prerequisites(
         _ => {}
     }
 
-    log::info!(
+    tracing::info!(
         "✅ Repository gating satisfied for '{}': extra_available={}, aur_available={}",
         package, extra_available, aur_available
     );
@@ -245,12 +251,12 @@ pub fn check_download_prerequisites(
         );
         
         if reuse {
-            log::info!(
+            tracing::info!(
                 "Using existing installation of '{}' (no download)",
                 package
             );
         } else {
-            log::info!(
+            tracing::info!(
                 "Reinstall requested for '{}' (will attempt package install)",
                 package
             );

@@ -28,8 +28,9 @@ impl SudoRsExperiment {
     }
     
     pub fn enable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("sudors_enable", package = %self.package_name, update_lists).entered();
         if update_lists {
-            log::info!("Updating package lists...");
+            tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
         
@@ -37,15 +38,15 @@ impl SudoRsExperiment {
         check_download_prerequisites(worker, &self.package_name, assume_yes)?;
         
         // Install package
-        log::info!("Installing package: {}", self.package_name);
+        tracing::info!("Installing package: {}", self.package_name);
         worker.install_package(&self.package_name, assume_yes)?;
         if worker.check_installed(&self.package_name)? {
-            log::info!(
+            tracing::info!(
                 "✅ Expected: '{}' installed, Received: present",
                 self.package_name
             );
         } else {
-            log::error!(
+            tracing::error!(
                 "❌ Expected: '{}' installed, Received: absent",
                 self.package_name
             );
@@ -64,7 +65,7 @@ impl SudoRsExperiment {
         let pb = progress::new_bar(items.len() as u64);
         let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
         for (name, target) in items {
-            log::info!("Preparing sudo-rs applet '{}'", name);
+            tracing::info!("Preparing sudo-rs applet '{}'", name);
             
             let source = self.find_sudors_source(worker, name);
             let source = source.ok_or_else(|| {
@@ -79,7 +80,7 @@ impl SudoRsExperiment {
             // Create a stable alias in /usr/bin so that readlink(1) shows '/usr/bin/<name>.sudo-rs'
             let alias = PathBuf::from(format!("/usr/bin/{}.sudo-rs", name));
             if pb.is_none() {
-                log::info!(
+                tracing::info!(
                     "Creating alias for sudo-rs '{}': {} -> {}",
                     name,
                     alias.display(),
@@ -91,7 +92,7 @@ impl SudoRsExperiment {
             match std::fs::symlink_metadata(&alias) {
                 Ok(m) if m.file_type().is_symlink() => {
                     if pb.is_none() {
-                        log::info!(
+                        tracing::info!(
                             "✅ Expected: '{}' alias symlink present, Received: symlink",
                             name
                         );
@@ -115,7 +116,7 @@ impl SudoRsExperiment {
             }
             
             if pb.is_none() {
-                log::info!(
+                tracing::info!(
                     "Linking sudo-rs '{}' via alias: {} -> {}",
                     name,
                     target.display(),
@@ -127,7 +128,7 @@ impl SudoRsExperiment {
             match std::fs::symlink_metadata(&target) {
                 Ok(m) if m.file_type().is_symlink() => {
                     if pb.is_none() {
-                        log::info!(
+                        tracing::info!(
                             "✅ Expected: '{}' linked via alias, Received: symlink",
                             name
                         );
@@ -159,8 +160,9 @@ impl SudoRsExperiment {
     }
     
     pub fn disable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("sudors_disable", package = %self.package_name, update_lists).entered();
         if update_lists {
-            log::info!("Updating package lists...");
+            tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
         
@@ -182,7 +184,7 @@ impl SudoRsExperiment {
                     )));
                 }
                 Ok(_) => {
-                    log::info!(
+                    tracing::info!(
                         "✅ Expected: '{}' restored to non-symlink, Received: non-symlink",
                         name
                     );
@@ -202,11 +204,12 @@ impl SudoRsExperiment {
     }
     
     pub fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
+        let _span = tracing::info_span!("sudors_remove", package = %self.package_name, update_lists).entered();
         // First restore GNU tools
         self.disable(worker, assume_yes, update_lists)?;
         
         // Then remove the package
-        log::info!("Removing package: {}", self.package_name);
+        tracing::info!("Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
         
         // Verify absence
@@ -233,14 +236,14 @@ impl SudoRsExperiment {
         ];
         
         for c in candidates {
-            log::debug!("checking sudo-rs candidate for '{}': {}", name, c.display());
+            tracing::debug!("checking sudo-rs candidate for '{}': {}", name, c.display());
             if c.exists() {
                 return Some(c);
             }
         }
         
         if let Ok(Some(path)) = worker.which(&rs_name) {
-            log::debug!("found sudo-rs on PATH for '{}': {}", name, path.display());
+            tracing::debug!("found sudo-rs on PATH for '{}': {}", name, path.display());
             return Some(path);
         }
         

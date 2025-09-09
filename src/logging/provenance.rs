@@ -1,28 +1,23 @@
 use crate::Result;
-use chrono::Local;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::Path;
+use super::audit::{audit_event, audit_op};
 
-/// Structured provenance logger for command execution and decisions
-pub struct ProvenanceLogger {
-    log_path: String,
-}
+/// Structured provenance logger shim that emits tracing-backed audit events.
+///
+/// Kept for backward compatibility; routes all calls to the tracing audit sink.
+pub struct ProvenanceLogger;
 
 impl Default for ProvenanceLogger {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl ProvenanceLogger {
     pub fn new() -> Self {
-        Self {
-            log_path: "/var/log/oxidizr-arch-audit.log".to_string(),
-        }
+        Self
     }
 
-    /// Log a structured provenance entry (JSONL format)
+    /// Log a structured provenance entry (JSONL via tracing layer)
     /// Fields: timestamp, component, event, decision, inputs, outputs, exit_code
     pub fn log(
         &self,
@@ -33,57 +28,12 @@ impl ProvenanceLogger {
         outputs: &str,
         exit_code: Option<i32>,
     ) -> Result<()> {
-        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string();
-        
-        // Escape special characters for JSON
-        fn esc(s: &str) -> String {
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\n")
-                .replace('\r', "\\r")
-        }
-        
-        let json = format!(
-            "{{\"timestamp\":\"{}\",\"component\":\"{}\",\"event\":\"{}\",\"decision\":\"{}\",\"inputs\":\"{}\",\"outputs\":\"{}\",\"exit_code\":{}}}\n",
-            esc(&timestamp),
-            esc(component),
-            esc(event),
-            esc(decision),
-            esc(inputs),
-            esc(outputs),
-            exit_code.map(|c| c.to_string()).unwrap_or_else(|| "null".into())
-        );
-
-        // Try system path first, fallback to user log on error
-        if self.write_to_file(&self.log_path, &json).is_err() {
-            let user_log = format!(
-                "{}/.oxidizr-arch-audit.log",
-                std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())
-            );
-            self.write_to_file(&user_log, &json)?;
-        }
-        Ok(())
+        audit_event(component, event, decision, inputs, outputs, exit_code)
     }
 
     /// Log a simple operation with success/failure status
     pub fn log_operation(&self, operation: &str, target: &str, success: bool) -> Result<()> {
-        self.log(
-            "operation",
-            operation,
-            if success { "success" } else { "failure" },
-            target,
-            "",
-            None,
-        )
-    }
-
-    fn write_to_file(&self, path: &str, content: &str) -> Result<()> {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(Path::new(path))?;
-        file.write_all(content.as_bytes())?;
-        Ok(())
+        audit_op(operation, target, success)
     }
 }
 

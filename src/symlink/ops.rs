@@ -38,7 +38,7 @@ pub fn is_safe_path(path: &Path) -> bool {
 pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) -> Result<()> {
     if source == target {
         if symlink_info_enabled() {
-            log::info!("Source and target are the same ({}), skipping symlink.", source.display());
+            tracing::info!("Source and target are the same ({}), skipping symlink.", source.display());
         }
         return Ok(());
     }
@@ -64,7 +64,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     };
 
     if symlink_info_enabled() {
-        log::info!(
+        tracing::info!(
             "replace_file_with_symlink pre-state: target={}, existed={}, is_symlink={}, current_dest={}",
             target.display(),
             existed,
@@ -78,7 +78,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
 
     if dry_run {
         if symlink_info_enabled() {
-            log::info!(
+            tracing::info!(
                 "[dry-run] would ensure symlink {} -> {} (updating/replacing as needed)",
                 source.display(),
                 target.display()
@@ -101,7 +101,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         
         if resolved_current == desired {
             if symlink_info_enabled() {
-                log::info!(
+                tracing::info!(
                     "Existing symlink already correct: {} -> {} (no action)",
                     target.display(),
                     resolved_current.display()
@@ -110,7 +110,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             return Ok(());
         } else {
             if symlink_info_enabled() {
-                log::info!(
+                tracing::info!(
                     "Replacing existing symlink: {} currently -> {}, desired -> {}",
                     target.display(),
                     current_dest
@@ -125,7 +125,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             let backup = backup_path(target);
             if resolved_current.exists() {
                 if symlink_info_enabled() {
-                    log::info!(
+                    tracing::info!(
                         "Backing up (from symlink) {} -> {}",
                         target.display(),
                         backup.display()
@@ -137,7 +137,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
                     let _ = fs::set_permissions(&backup, perm);
                 }
             } else {
-                log::warn!(
+                tracing::warn!(
                     "Resolved current target for {} does not exist ({}); creating no-op backup",
                     target.display(),
                     resolved_current.display()
@@ -146,7 +146,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             fs::remove_file(target)?;
             unix_fs::symlink(source, target)?;
             if symlink_info_enabled() {
-                log::info!(
+                tracing::info!(
                     "Symlink updated: {} -> {}",
                     target.display(),
                     source.display()
@@ -160,7 +160,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     if existed {
         let backup = backup_path(target);
         if symlink_info_enabled() {
-            log::info!("Backing up {} -> {}", target.display(), backup.display());
+            tracing::info!("Backing up {} -> {}", target.display(), backup.display());
         }
         // Use metadata we already have to avoid additional TOCTOU
         if let Ok(ref meta) = metadata {
@@ -170,7 +170,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             fs::remove_file(target)?;
         } else {
             // If metadata failed, the file might have been removed - handle gracefully
-            log::warn!(
+            tracing::warn!(
                 "Target file {} disappeared during operation",
                 target.display()
             );
@@ -186,7 +186,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     let _ = fs::remove_file(target);
     unix_fs::symlink(source, target)?;
     if symlink_info_enabled() {
-        log::info!(
+        tracing::info!(
             "Symlink created: {} -> {}",
             target.display(),
             source.display()
@@ -209,7 +209,7 @@ pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
     if backup.exists() {
         if dry_run {
             if symlink_info_enabled() {
-                log::info!(
+                tracing::info!(
                     "[dry-run] would restore {} from {}",
                     target.display(),
                     backup.display()
@@ -218,7 +218,7 @@ pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
             return Ok(());
         }
         if symlink_info_enabled() {
-            log::info!("Restoring {} <- {}", target.display(), backup.display());
+            tracing::info!("Restoring {} <- {}", target.display(), backup.display());
         }
         // Remove symlink or leftover
         let _ = fs::remove_file(target);
@@ -226,7 +226,7 @@ pub fn restore_file(target: &Path, dry_run: bool) -> Result<()> {
         // Log the restoration
         let _ = PROVENANCE.log_operation("RESTORE_FILE", &format!("{}", target.display()), true);
     } else {
-        log::warn!("No backup for {}, leaving as-is", target.display());
+        tracing::warn!("No backup for {}, leaving as-is", target.display());
     }
     Ok(())
 }
