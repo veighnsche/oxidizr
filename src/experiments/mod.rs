@@ -148,8 +148,6 @@ pub fn check_download_prerequisites(
     let extra_available = worker.extra_repo_available()?;
     let aur_helper = worker.aur_helper_name()?;
     let aur_available = aur_helper.is_some();
-    // Probe whether the package exists in official repos (helps clarify AUR-only cases)
-    let official_has = worker.repo_has_package(package).unwrap_or(false);
 
     let _ = audit_event_fields(
         "experiments",
