@@ -85,8 +85,11 @@ func Run() error {
 
 	for i, taskPath := range tasks {
 		suiteName := filepath.Base(filepath.Dir(taskPath))
-		log.Printf("[%d/%d] START suite: %s", i+1, len(tasks), suiteName)
+		// v1 progress protocol for host: emit PB> to update the loading bar
+		log.Printf("PB> %d/%d Running suite: %s", i+1, len(tasks), suiteName)
 
+		// v2 context
+		log.Printf("CTX> START suite: %s", suiteName)
 		log.Printf("CTX> running suite path: %s", taskPath)
 		err := runSingleSuite(taskPath, projectDir)
 		if err != nil {

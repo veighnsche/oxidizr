@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/fatih/color"
 )
@@ -144,12 +146,55 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	}
 
 	doneCh := make(chan struct{}, 2)
+	// Progress-bar protocol (Option A): lines like "PB> x/y [label]" from the runner.
+	// We only render the bar in v1 to avoid interference with -v/-vv.
+	showPB := selected == V1
+	pbRe := regexp.MustCompile(`^PB>\s*(\d+)\s*/\s*(\d+)(?:\s+(.*))?$`)
+	var pbMu sync.Mutex
+	progressShown := false
+	finishPB := func() {
+		pbMu.Lock()
+		if progressShown {
+			fmt.Println()
+			progressShown = false
+		}
+		pbMu.Unlock()
+	}
+	updatePB := func(x, y int, label string) {
+		pbMu.Lock()
+		// Build a compact bar
+		width := 28
+		if y <= 0 { y = 1 }
+		if x < 0 { x = 0 }
+		if x > y { x = y }
+		filled := int(float64(width) * float64(x) / float64(y))
+		if filled > width { filled = width }
+		bar := strings.Repeat("=", filled) + strings.Repeat(" ", width-filled)
+		prefix := col.Sprint(Prefix(distro, V1, ""))
+		if label != "" {
+			fmt.Printf("\r%s [%s] (%d/%d) %s", prefix, bar, x, y, label)
+		} else {
+			fmt.Printf("\r%s [%s] (%d/%d)", prefix, bar, x, y)
+		}
+		progressShown = true
+		pbMu.Unlock()
+	}
 	go func() {
 		scanner := bufio.NewScanner(stdoutPipe)
 		for scanner.Scan() {
 			line := scanner.Text()
 			lvl, _, content := classifyLine(line)
 			v := Verb(lvl)
+			if showPB && strings.HasPrefix(content, "PB> ") {
+				m := pbRe.FindStringSubmatch(content)
+				if m != nil {
+					x, _ := strconv.Atoi(m[1])
+					y, _ := strconv.Atoi(m[2])
+					label := m[3]
+					updatePB(x, y, label)
+					continue
+				}
+			}
 			if Allowed(selected, v) {
 				// Host prefixes streamed lines with [distro][vN]; scope omitted to avoid duplication
 				log.Printf("%s %s", col.Sprint(Prefix(distro, v, "")), content)
@@ -181,6 +226,8 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	<-doneCh
 	<-doneCh
 
+	// Ensure any in-progress bar is finalized
+	finishPB()
 	if runErr != nil {
 		exitCode := -1
 		if ee, ok := runErr.(*exec.ExitError); ok {
