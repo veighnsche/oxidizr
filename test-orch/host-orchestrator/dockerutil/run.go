@@ -39,6 +39,12 @@ func classifyLine(line string) (int, string, string) {
 		if strings.HasPrefix(content, "RUN> ") {
 			return 2, "[RUNNER]", content
 		}
+		if strings.HasPrefix(content, "CTX> ") {
+			return 2, "[RUNNER]", content
+		}
+		if strings.HasPrefix(content, "TRC> ") {
+			return 3, "[RUNNER]", content
+		}
 		if strings.Contains(content, "❌") {
 			return 0, "[RUNNER]", content
 		}

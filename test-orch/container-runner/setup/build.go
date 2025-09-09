@@ -2,6 +2,7 @@ package setup
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +30,9 @@ func buildProject() error {
 	// Build stamp: skip if current git commit hash matches stamp and binary exists,
     // unless forced via FORCE_RUST_REBUILD=1
     force := os.Getenv("FORCE_RUST_REBUILD") == "1"
+    if force {
+        log.Println("CTX> FORCE_RUST_REBUILD=1: forcing full rebuild")
+    }
     var currentHash string
     if err := util.RunCmdQuiet("git", "rev-parse", "HEAD"); err == nil {
         // Capture via shell to get output
@@ -44,6 +48,7 @@ func buildProject() error {
         if b, err := os.ReadFile(stampPath); err == nil && strings.TrimSpace(string(b)) == currentHash {
             if _, err2 := os.Stat(destPath); err2 == nil {
                 // Up-to-date; skip rebuild
+                log.Printf("CTX> build stamp matches (%s); skipping cargo build", currentHash)
                 return util.RunCmdQuiet(binaryName, "--help")
             }
         }
@@ -53,11 +58,13 @@ func buildProject() error {
 	if buildJobs == "" {
 		buildJobs = "2"
 	}
+	log.Printf("CTX> running cargo build -j %s (release)", buildJobs)
 	if err := util.RunCmd("cargo", "build", "--release", "-j", buildJobs); err != nil {
 		return fmt.Errorf("cargo build failed: %w", err)
 	}
 
 	sourcePath := fmt.Sprintf("target/release/%s", binaryName)
+	log.Printf("CTX> installing binary to %s", destPath)
 	if err := util.RunCmd("install", "-m", "0755", sourcePath, destPath); err != nil {
 		return fmt.Errorf("failed to install binary: %w", err)
 	}

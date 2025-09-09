@@ -53,12 +53,25 @@ func Run() error {
 
 	sort.Strings(tasks)
 
+	// v2 context: list a few discovered suites for debugging
+	if len(tasks) > 0 {
+		maxList := 5
+		if len(tasks) < maxList { maxList = len(tasks) }
+		for i := 0; i < maxList; i++ {
+			log.Printf("CTX> discovered suite: %s", filepath.Dir(tasks[i]))
+		}
+		if len(tasks) > maxList {
+			log.Printf("CTX> ... and %d more", len(tasks)-maxList)
+		}
+	}
+
 	testFilter := os.Getenv("TEST_FILTER")
 	if testFilter != "" {
 		var filteredTasks []string
 		for _, taskPath := range tasks {
 			if filepath.Base(filepath.Dir(taskPath)) == testFilter {
 				filteredTasks = append(filteredTasks, taskPath)
+				log.Printf("CTX> filter matched: %s", taskPath)
 			}
 		}
 		if len(filteredTasks) == 0 {
@@ -74,6 +87,7 @@ func Run() error {
 		suiteName := filepath.Base(filepath.Dir(taskPath))
 		log.Printf("[%d/%d] START suite: %s", i+1, len(tasks), suiteName)
 
+		log.Printf("CTX> running suite path: %s", taskPath)
 		err := runSingleSuite(taskPath, projectDir)
 		if err != nil {
 			log.Printf("[%d/%d] ❌ FAIL suite: %s", i+1, len(tasks), suiteName)

@@ -110,6 +110,7 @@ func ensureCoreutilsInstalled() error {
 		projectDir = "/workspace"
 	}
 	binsFile := filepath.Join(projectDir, "tests/lib/rust-coreutils-bins.txt")
+	log.Printf("CTX> coreutils bins file: %s", binsFile)
 	bins, err := readLines(binsFile)
 	if err != nil {
 		return fmt.Errorf("could not read coreutils bin list: %w", err)
@@ -117,6 +118,7 @@ func ensureCoreutilsInstalled() error {
 	// Minimum symlink coverage threshold (default 10). Can override via COREUTILS_MIN_SYMLINKS env.
 	minSymlinks := 10
 	if v := os.Getenv("COREUTILS_MIN_SYMLINKS"); v != "" {
+		log.Printf("CTX> COREUTILS_MIN_SYMLINKS env=%q", v)
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			minSymlinks = n
 		}
@@ -164,6 +166,7 @@ func ensureCoreutilsInstalled() error {
 	if symlinkCount < minSymlinks {
 		return fmt.Errorf("insufficient coreutils coverage: have %d symlinks, require at least %d", symlinkCount, minSymlinks)
 	}
+	log.Printf("CTX> coreutils coverage detail: checked=%d symlinks=%d min=%d", checkedCount, symlinkCount, minSymlinks)
 	log.Printf("Coreutils coverage: %d/%d symlinks (min %d)", symlinkCount, checkedCount, minSymlinks)
 	return nil
 }

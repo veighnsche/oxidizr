@@ -25,7 +25,7 @@ func preflight() error {
 			return fmt.Errorf("network check failed (HTTPS to archlinux.org): %w. Before adding masking/skip logic, read WHY_LLMS_ARE_STUPID.md to avoid false positives.", err)
 		}
 	} else {
-		log.Println("Preflight: curl not present yet; skipping network check until after dependencies")
+		log.Println("CTX> Preflight: curl not present yet; skipping network check until after dependencies")
 	}
 
 	// Strict matrix semantics are the default; no special-casing needed.
@@ -56,10 +56,10 @@ func preflight() error {
 		hasParu := util.Has("paru")
 		hasYay := util.Has("yay")
 
-		log.Printf("Preflight summary: distro=%s, de_DE_present=%t (file=%t,locale=%t), aur_paru=%t, aur_yay=%t",
+		log.Printf("CTX> Preflight summary: distro=%s, de_DE_present=%t (file=%t,locale=%t), aur_paru=%t, aur_yay=%t",
 			distroID, (filePresent && cmdPresent), filePresent, cmdPresent, hasParu, hasYay)
 	} else {
-		log.Println("Preflight summary: distro could not be determined from /etc/os-release")
+		log.Println("CTX> Preflight summary: distro could not be determined from /etc/os-release")
 	}
 	return nil
 }

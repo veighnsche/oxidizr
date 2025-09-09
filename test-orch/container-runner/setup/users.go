@@ -50,11 +50,11 @@ func installAurHelper() error {
 	}
 	
 	if paruFound {
-		log.Println("paru is already installed.")
+		log.Println("CTX> Detected pre-installed paru; skipping AUR build.")
 		return nil
 	}
 
-	log.Println("paru not found, installing from AUR...")
+	log.Println("CTX> paru not found; installing from AUR...")
 	// Install dependencies for building packages
 	if err := util.RunCmd("pacman", "-S", "--noconfirm", "--needed", "base-devel", "git"); err != nil {
 		return fmt.Errorf("failed to install base-devel/git: %w", err)
@@ -73,12 +73,14 @@ func installAurHelper() error {
 	// As the non-root 'builder' user, clone and build paru
 	// Use || true to handle the case where paru-bin already exists (persistent cache)
 	buildCmd := "cd /home/builder/build && (git clone https://aur.archlinux.org/paru-bin.git || true) && cd paru-bin && git pull --rebase && makepkg -s --noconfirm -f"
+	log.Println("CTX> Building paru-bin as user 'builder' (idempotent)")
 	if err := util.RunCmd("su", "-", "builder", "-c", buildCmd); err != nil {
 		return fmt.Errorf("failed to build paru: %w", err)
 	}
 
 	// As root, install the built package (wildcard for version)
 	installCmd := "pacman -U --noconfirm /home/builder/build/paru-bin/paru-bin-*.pkg.tar.zst"
+	log.Println("CTX> Installing paru-bin package")
 	if err := util.RunCmd("sh", "-c", installCmd); err != nil {
 		return fmt.Errorf("failed to install paru package: %w", err)
 	}

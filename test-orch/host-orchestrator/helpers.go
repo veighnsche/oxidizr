@@ -158,7 +158,6 @@ func section(title string) {
 		return
 	}
 	if dockerutil.Allowed(selectedVerb, dockerutil.V2) {
-		log.Println()
 		hostLog(dockerutil.V2, "==> %s", title)
 		time.Sleep(10 * time.Millisecond) // keep logs readable
 	}
