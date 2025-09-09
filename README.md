@@ -172,7 +172,7 @@ Notes:
 cargo test
 ```
 
-2) Orchestrated, isolated tests (Docker)
+1) Orchestrated, isolated tests (Docker)
 
 The `test-orch/` directory contains two Go programs:
 
@@ -206,10 +206,92 @@ See `test-orch/host-orchestrator/README.md` and `test-orch/container-runner/READ
 - Root is required for non-dry-run `enable`/`disable` since targets live under `/usr/bin` and `/usr/sbin`.
 - No exceptions: all test suites run across all supported Arch-family distributions (Arch, Manjaro, CachyOS, EndeavourOS). Any SKIP indicates an issue to fix in infra or product.
 
+## Security modules: SELinux and AppArmor
+
+Even when Unix permissions and ownership are correct, Mandatory Access Control (MAC) systems like SELinux and AppArmor can block execution of provider binaries or swapped targets. If a command “looks fine” but won’t execute (permission denied, EPERM, or silent failure), check your MAC layer first.
+
+Symptoms:
+
+- `Permission denied` when executing a file that has `+x` and readable perms
+- `operation not permitted` on `execve` or while creating/renaming symlinks
+- AVC/AppArmor denials in logs
+
+How to diagnose:
+
+- SELinux (if enabled):
+
+  ```bash
+  journalctl -t setroubleshoot -t audit --since -2h | grep -i avc || true
+  ausearch -m avc -m user_avc -ts recent || true
+  dmesg | grep -i avc || true
+  ```
+
+  - Inspect file context:
+
+  ```bash
+  ls -Z /usr/bin/ls /usr/lib/uutils/coreutils 2>/dev/null || true
+  ```
+
+- AppArmor (if enabled):
+
+  - Check profile status and denials:
+
+  ```bash
+  aa-status
+  journalctl -k --since -2h | grep -i apparmor || true
+  ```
+
+SELinux remediation (recommended, persistent):
+
+If your provider binaries live under non-standard paths (e.g., `/usr/lib/uutils/...` or a custom `--bin-dir`), ensure they are labeled with the executable type (typically `bin_t`).
+
+```bash
+# Label the directory tree as executable binaries
+sudo semanage fcontext -a -t bin_t "/usr/lib/uutils(/.*)?"
+sudo restorecon -Rv /usr/lib/uutils
+
+# If you use a unified dispatcher override
+sudo semanage fcontext -a -t bin_t "/usr/bin/coreutils"
+sudo restorecon -v /usr/bin/coreutils
+```
+
+If SELinux is enforcing and you are validating a one-off issue, you can temporarily switch to permissive to confirm the diagnosis (not a fix):
+
+```bash
+# Temporarily (until reboot) — for debugging only
+sudo setenforce 0
+# Re-enable enforcing immediately after validation
+sudo setenforce 1
+```
+
+AppArmor remediation:
+
+Some distros ship strict profiles for package managers or system utilities that might deny `execve` on unfamiliar paths.
+
+- Put the affected profile into complain mode during validation (logs denials but allows actions):
+
+  ```bash
+  sudo aa-status | sed -n 's/^\s\+profiles are in enforce mode:\s*//p'
+  # Example: relax a specific profile while testing
+  sudo aa-complain /usr/bin/pacman || true
+  ```
+
+- For a permanent fix, extend the relevant profile to allow execution of the chosen `--bin-dir` or unified binary path, or disable that profile if appropriate for your environment:
+
+  ```bash
+  # Disable a profile (use sparingly)
+  sudo aa-disable /path/to/profile
+  ```
+
+Notes for Docker-based tests (`test-orch/`):
+
+- Host AppArmor/SELinux may confine the container. If you see denials originating from the host, adjust the Docker run profile or set `--security-opt` appropriately from the host orchestrator.
+- The Arch-derived images in `test-orch/` are minimal; ensure any required MAC tooling (`audit`, `setools`, `appArmor` utilities) is present if you need to debug inside the container.
+
 ## License
 
 This project is licensed under the GNU General Public License, version 3 or (at your option) any later version.
- 
+
 Copyright (C) 2025 veighnsche
- 
+
 See the `LICENSE` file for the full text of the GPL-3.0-or-later license.

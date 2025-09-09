@@ -1,9 +1,9 @@
+pub mod checksums;
+pub mod constants;
 pub mod coreutils;
 pub mod findutils;
 pub mod sudors;
 pub mod util;
-pub mod checksums;
-pub mod constants;
 
 use crate::checks::Distribution;
 use crate::error::{Error, Result};
@@ -59,8 +59,9 @@ impl Experiment {
             experiment = %self.name(),
             distro = %distro.id,
             skip_compat_check
-        ).entered();
-        
+        )
+        .entered();
+
         // Check compatibility unless overridden
         if !skip_compat_check {
             let compatible = match self {
@@ -69,7 +70,7 @@ impl Experiment {
                 Experiment::SudoRs(e) => e.check_compatible(&distro)?,
                 Experiment::Checksums(e) => e.check_compatible(&distro)?,
             };
-            
+
             if !compatible {
                 return Err(Error::Incompatible(format!(
                     "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
@@ -78,7 +79,7 @@ impl Experiment {
                 )));
             }
         }
-        
+
         match self {
             Experiment::Coreutils(e) => e.enable(worker, assume_yes, update_lists),
             Experiment::Findutils(e) => e.enable(worker, assume_yes, update_lists),
@@ -149,7 +150,7 @@ pub fn check_download_prerequisites(
     let aur_available = aur_helper.is_some();
     // Probe whether the package exists in official repos (helps clarify AUR-only cases)
     let official_has = worker.repo_has_package(package).unwrap_or(false);
-    
+
     let _ = audit_event(
         "experiments",
         "repo_capabilities",
@@ -176,7 +177,10 @@ pub fn check_download_prerequisites(
             "",
             None,
         );
-        return Err(Error::RepoGateFailed { package: package.into(), details });
+        return Err(Error::RepoGateFailed {
+            package: package.into(),
+            details,
+        });
     }
 
     // Per-package repo requirements
@@ -192,12 +196,18 @@ pub fn check_download_prerequisites(
                     package,
                     None,
                 );
-                return Err(Error::RepoGateFailed { package: package.into(), details });
+                return Err(Error::RepoGateFailed {
+                    package: package.into(),
+                    details,
+                });
             }
             // Gate on actual package presence in the repo to avoid ambiguous 'not found' failures
             match worker.repo_has_package(package) {
                 Ok(true) => {
-                    tracing::info!("✅ Package '{}' present in repositories (pacman -Si)", package);
+                    tracing::info!(
+                        "✅ Package '{}' present in repositories (pacman -Si)",
+                        package
+                    );
                 }
                 Ok(false) => {
                     let details = "package not present in repos (pacman -Si)".to_string();
@@ -209,7 +219,10 @@ pub fn check_download_prerequisites(
                         package,
                         None,
                     );
-                    return Err(Error::RepoGateFailed { package: package.into(), details });
+                    return Err(Error::RepoGateFailed {
+                        package: package.into(),
+                        details,
+                    });
                 }
                 Err(e) => {
                     tracing::warn!("Warning: failed to probe repo for '{}': {}", package, e);
@@ -227,7 +240,10 @@ pub fn check_download_prerequisites(
                     package,
                     None,
                 );
-                return Err(Error::RepoGateFailed { package: package.into(), details });
+                return Err(Error::RepoGateFailed {
+                    package: package.into(),
+                    details,
+                });
             }
         }
         _ => {}
@@ -235,7 +251,9 @@ pub fn check_download_prerequisites(
 
     tracing::info!(
         "✅ Repository gating satisfied for '{}': extra_available={}, aur_available={}",
-        package, extra_available, aur_available
+        package,
+        extra_available,
+        aur_available
     );
 
     // Check if already installed and prompt for reuse
@@ -253,21 +271,22 @@ pub fn check_download_prerequisites(
                 reuse = ans.is_empty() || ans == "y" || ans == "yes";
             }
         }
-        
+
         let _ = audit_event(
             "experiments",
             "already_installed",
-            if reuse { "reuse" } else { "reinstall_requested" },
+            if reuse {
+                "reuse"
+            } else {
+                "reinstall_requested"
+            },
             package,
             "",
             None,
         );
-        
+
         if reuse {
-            tracing::info!(
-                "Using existing installation of '{}' (no download)",
-                package
-            );
+            tracing::info!("Using existing installation of '{}' (no download)", package);
         } else {
             tracing::info!(
                 "Reinstall requested for '{}' (will attempt package install)",
@@ -275,6 +294,6 @@ pub fn check_download_prerequisites(
             );
         }
     }
-    
+
     Ok(())
 }

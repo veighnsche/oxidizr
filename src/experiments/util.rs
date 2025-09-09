@@ -2,6 +2,7 @@ use crate::error::{Error, Result};
 use crate::system::Worker;
 use crate::ui::progress;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 /// Resolve a target path under /usr/bin
 pub fn resolve_usrbin(filename: &str) -> PathBuf {
@@ -15,7 +16,11 @@ where
     F: Fn(&str) -> PathBuf,
 {
     let mut pb = progress::new_bar(applets.len() as u64);
-    let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
+    let _quiet_guard = if pb.is_some() {
+        Some(progress::enable_symlink_quiet())
+    } else {
+        None
+    };
     let total = applets.len().max(1);
     for (idx, (filename, src)) in applets.iter().enumerate() {
         let target = resolve(filename);
@@ -35,6 +40,7 @@ where
         );
         // Emit host progress protocol line for v1 host bar
         progress::emit_host_pb(idx + 1, total, &format!("Linking {}", filename));
+        let t0 = Instant::now();
         if let Err(e) = worker.replace_file_with_symlink(src, &target) {
             tracing::error!(
                 "❌ Failed to create symlink: src={} -> target={}: {}",
@@ -51,13 +57,20 @@ where
                 e
             )));
         }
+        let elapsed_ms = t0.elapsed().as_millis() as u64;
+        tracing::debug!(
+            "link_done: {} -> {} ({} ms)",
+            src.display(),
+            target.display(),
+            elapsed_ms
+        );
         // Structured audit: link_done
         let _ = crate::logging::audit_event(
             "symlink",
             "link_done",
             "success",
             &format!("{} -> {}", src.display(), target.display()),
-            "",
+            &format!("duration_ms={}", elapsed_ms),
             None,
         );
         // Update progress after a successful link
@@ -71,12 +84,19 @@ where
 /// Restore a list of targets, logging each and surfacing errors with context.
 pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
     let mut pb = progress::new_bar(targets.len() as u64);
-    let _quiet_guard = if pb.is_some() { Some(progress::enable_symlink_quiet()) } else { None };
+    let _quiet_guard = if pb.is_some() {
+        Some(progress::enable_symlink_quiet())
+    } else {
+        None
+    };
     let total = targets.len().max(1);
     for (idx, target) in targets.iter().enumerate() {
         tracing::trace!(step = "restore_item", target = %target.display());
         if pb.is_none() {
-            tracing::info!("[disable] Restoring {} (if backup exists)", target.display());
+            tracing::info!(
+                "[disable] Restoring {} (if backup exists)",
+                target.display()
+            );
         }
         // Structured audit: restore_started
         let _ = crate::logging::audit_event(
@@ -93,12 +113,9 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
         } else {
             progress::emit_host_pb(idx + 1, total, "Restoring");
         }
+        let t0 = Instant::now();
         if let Err(e) = worker.restore_file(target) {
-            tracing::error!(
-                "❌ Failed to restore {}: {}",
-                target.display(),
-                e
-            );
+            tracing::error!("❌ Failed to restore {}: {}", target.display(), e);
             progress::finish(pb.take());
             return Err(Error::ExecutionFailed(format!(
                 "failed to restore {}: {}",
@@ -106,13 +123,15 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
                 e
             )));
         }
+        let elapsed_ms = t0.elapsed().as_millis() as u64;
+        tracing::debug!("restore_done: {} ({} ms)", target.display(), elapsed_ms);
         // Structured audit: restore_done
         let _ = crate::logging::audit_event(
             "symlink",
             "restore_done",
             "success",
             &format!("{}", target.display()),
-            "",
+            &format!("duration_ms={}", elapsed_ms),
             None,
         );
         // Update progress after a successful restore
@@ -160,13 +179,19 @@ pub fn verify_installed(worker: &Worker, package: &str) -> Result<()> {
 /// Verify a package is removed, emitting explicit logs.
 pub fn verify_removed(worker: &Worker, package: &str) -> Result<()> {
     if worker.check_installed(package)? {
-        tracing::error!("❌ Expected: '{}' absent after removal, Received: present", package);
+        tracing::error!(
+            "❌ Expected: '{}' absent after removal, Received: present",
+            package
+        );
         Err(Error::ExecutionFailed(format!(
             "package '{}' still installed after removal",
             package
         )))
     } else {
-        tracing::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
+        tracing::info!(
+            "✅ Expected: '{}' absent after removal, Received: absent",
+            package
+        );
         Ok(())
     }
 }

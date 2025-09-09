@@ -1,5 +1,5 @@
-pub mod parser;
 pub mod handler;
+pub mod parser;
 
-pub use parser::{AurHelperArg, Cli, Commands};
 pub use handler::handle_cli;
+pub use parser::{AurHelperArg, Cli, Commands};

@@ -1,5 +1,5 @@
 use atty::Stream;
-use indicatif::{ProgressBar, ProgressStyle, ProgressDrawTarget};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -63,11 +63,10 @@ pub fn new_bar(len: u64) -> Option<ProgressBar> {
     };
 
     let pb = ProgressBar::with_draw_target(Some(len), draw);
-    let style = ProgressStyle::with_template(
-        "{spinner:.green} [{wide_bar:.cyan/blue}] {pos}/{len} {msg}"
-    )
-    .unwrap()
-    .progress_chars("#>-");
+    let style =
+        ProgressStyle::with_template("{spinner:.green} [{wide_bar:.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("#>-");
     pb.set_style(style);
     Some(pb)
 }
@@ -102,7 +101,12 @@ pub fn fmt_host_pb_line(current: usize, total: usize, label: &str) -> String {
 }
 
 /// Write a host progress protocol line to a writer, followed by a newline.
-pub fn write_host_pb_line<W: Write>(mut w: W, current: usize, total: usize, label: &str) -> io::Result<()> {
+pub fn write_host_pb_line<W: Write>(
+    mut w: W,
+    current: usize,
+    total: usize,
+    label: &str,
+) -> io::Result<()> {
     let line = fmt_host_pb_line(current, total, label);
     writeln!(w, "{}", line)
 }

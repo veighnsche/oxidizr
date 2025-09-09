@@ -1,8 +1,10 @@
-use crate::checks::{Distribution, is_supported_distro};
+use crate::checks::{is_supported_distro, Distribution};
 use crate::error::{Error, Result};
-use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
-use crate::experiments::util::{create_symlinks, log_applets_summary, resolve_usrbin, restore_targets, verify_removed};
 use crate::experiments::constants::CHECKSUM_BINS;
+use crate::experiments::util::{
+    create_symlinks, log_applets_summary, resolve_usrbin, restore_targets, verify_removed,
+};
+use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
 use crate::system::Worker;
 use std::path::PathBuf;
 
@@ -36,26 +38,27 @@ impl CoreutilsExperiment {
             bin_directory: PathBuf::from("/usr/lib/uutils/coreutils"),
         }
     }
-    
+
     pub fn name(&self) -> &str {
         &self.name
     }
-    
+
     pub fn check_compatible(&self, distro: &Distribution) -> Result<bool> {
         Ok(is_supported_distro(&distro.id))
     }
-    
+
     pub fn enable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
         let _span = tracing::info_span!(
             "coreutils_enable",
             package = %self.package_name,
             update_lists,
-        ).entered();
+        )
+        .entered();
         if update_lists {
             tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
-        
+
         // Effective package with optional override
         let effective_package = worker
             .package_override
@@ -65,11 +68,11 @@ impl CoreutilsExperiment {
 
         // Check prerequisites and handle prompts
         check_download_prerequisites(worker, &effective_package, assume_yes)?;
-        
+
         // Install package
-        tracing::info!("Installing package: {}", effective_package);
+        tracing::info!(event = "package_install", package = %effective_package, "Installing package: {}", effective_package);
         worker.install_package(&effective_package, assume_yes)?;
-        
+
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
         if applets.is_empty() {
@@ -85,7 +88,7 @@ impl CoreutilsExperiment {
             "✅ Expected: coreutils applets discovered; Received: {}",
             applets.len()
         );
-        
+
         // Build link plan: always exclude checksum applets for safety; those are handled by the
         // dedicated 'checksums' experiment.
         let to_link: Vec<(String, PathBuf)> = applets
@@ -95,36 +98,44 @@ impl CoreutilsExperiment {
 
         log_applets_summary("coreutils", &to_link, 8);
         create_symlinks(worker, &to_link, |name| self.resolve_target(name))?;
-        
+
         Ok(())
     }
 
     pub fn disable(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
-        let _span = tracing::info_span!("coreutils_disable", package = %self.package_name, update_lists).entered();
+        let _span =
+            tracing::info_span!("coreutils_disable", package = %self.package_name, update_lists)
+                .entered();
         if update_lists {
             tracing::info!("Updating package lists...");
             worker.update_packages(assume_yes)?;
         }
-        
+
         // Restore only non-checksum coreutils applets (checksums are handled by the dedicated experiment)
         let mut targets: Vec<PathBuf> = Vec::new();
         for line in COREUTILS_BINS_LIST.lines() {
             let filename = line.trim();
-            if filename.is_empty() { continue; }
-            if PRESERVE_BINS.contains(&filename) { continue; }
+            if filename.is_empty() {
+                continue;
+            }
+            if PRESERVE_BINS.contains(&filename) {
+                continue;
+            }
             let target = self.resolve_target(filename);
             targets.push(target);
         }
         restore_targets(worker, &targets)?;
-        
+
         Ok(())
     }
-    
+
     pub fn remove(&self, worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
-        let _span = tracing::info_span!("coreutils_remove", package = %self.package_name, update_lists).entered();
+        let _span =
+            tracing::info_span!("coreutils_remove", package = %self.package_name, update_lists)
+                .entered();
         // First restore GNU tools
         self.disable(worker, assume_yes, update_lists)?;
-        
+
         // Preflight: refuse to remove if checksum applets appear to be linked (to avoid breaking active checksum links)
         // Ask the user to disable the 'checksums' experiment first.
         let mut active_checksum_links = Vec::new();
@@ -147,29 +158,33 @@ impl CoreutilsExperiment {
         }
 
         // Then remove the package
-        tracing::info!("Removing package: {}", self.package_name);
+        tracing::info!(event = "package_remove", package = %self.package_name, "Removing package: {}", self.package_name);
         worker.remove_package(&self.package_name, assume_yes)?;
-        
+
         // Verify absence explicitly
         verify_removed(worker, &self.package_name)?;
-        
+
         Ok(())
     }
-    
+
     pub fn list_targets(&self) -> Vec<PathBuf> {
         let mut targets = Vec::new();
         for line in COREUTILS_BINS_LIST.lines() {
             let filename = line.trim();
-            if filename.is_empty() { continue; }
-            if PRESERVE_BINS.contains(&filename) { continue; }
+            if filename.is_empty() {
+                continue;
+            }
+            if PRESERVE_BINS.contains(&filename) {
+                continue;
+            }
             targets.push(self.resolve_target(filename));
         }
         targets
     }
-    
+
     fn discover_applets(&self, worker: &Worker) -> Result<Vec<(String, PathBuf)>> {
         let mut applets = Vec::new();
-        
+
         // Determine effective unified binary and bin directory from overrides
         let effective_unified = worker
             .unified_binary_override
@@ -194,7 +209,7 @@ impl CoreutilsExperiment {
         } else {
             None
         };
-        
+
         if let Some(unified) = unified_path {
             tracing::info!("Using unified coreutils binary at: {}", unified.display());
             // Use unified binary for all applets
@@ -207,12 +222,13 @@ impl CoreutilsExperiment {
         } else {
             tracing::warn!("Unified dispatcher not available; falling back to per-applet binaries");
             // Try to find individual binaries
+            let mut skipped: Vec<String> = Vec::new();
             for line in COREUTILS_BINS_LIST.lines() {
                 let name = line.trim();
                 if name.is_empty() {
                     continue;
                 }
-                
+
                 // Try various locations
                 let candidates = [
                     effective_bin_dir.join(name),
@@ -220,18 +236,23 @@ impl CoreutilsExperiment {
                     PathBuf::from(format!("/usr/lib/cargo/bin/coreutils/{}", name)),
                     PathBuf::from(format!("/usr/lib/cargo/bin/{}", name)),
                 ];
-                
+
                 if let Some(found) = candidates.iter().find(|p| p.exists()) {
                     applets.push((name.to_string(), found.clone()));
                 } else if let Ok(Some(path)) = worker.which(name) {
                     applets.push((name.to_string(), path));
+                } else {
+                    skipped.push(name.to_string());
                 }
             }
+            for s in &skipped {
+                tracing::warn!(event = "skip_applet", target = %format!("/usr/bin/{}", s), reason = "not provided by provider or not found in known locations", "Skipping applet '{}' (not found)", s);
+            }
         }
-        
+
         Ok(applets)
     }
-    
+
     fn resolve_target(&self, filename: &str) -> PathBuf {
         resolve_usrbin(filename)
     }

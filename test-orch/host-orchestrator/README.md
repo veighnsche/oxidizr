@@ -83,6 +83,7 @@ sudo go run . --fail-fast=true --retries=2 --backoff=8s
 - `-q` (bool): Quiet output (level 0)
 
 Notes:
+
 - When no action flags are provided, the default behavior is to perform `--arch-build` and `--run`.
 - Root privileges are required on hosts not configured with a `docker` group for reliable Docker access.
 

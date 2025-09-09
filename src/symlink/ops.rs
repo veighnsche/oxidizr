@@ -1,7 +1,8 @@
-use crate::Result;
 use crate::logging::audit_op;
 use crate::ui::progress::symlink_info_enabled;
+use crate::Result;
 use std::fs;
+use std::time::Instant;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 
@@ -38,7 +39,10 @@ pub fn is_safe_path(path: &Path) -> bool {
 pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) -> Result<()> {
     if source == target {
         if symlink_info_enabled() {
-            tracing::info!("Source and target are the same ({}), skipping symlink.", source.display());
+            tracing::info!(
+                "Source and target are the same ({}), skipping symlink.",
+                source.display()
+            );
         }
         return Ok(());
     }
@@ -57,7 +61,11 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         .as_ref()
         .map(|m| m.file_type().is_symlink())
         .unwrap_or(false);
-    let current_dest = if is_symlink { fs::read_link(target).ok() } else { None };
+    let current_dest = if is_symlink {
+        fs::read_link(target).ok()
+    } else {
+        None
+    };
 
     if symlink_info_enabled() {
         tracing::info!(
@@ -94,7 +102,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             }
         }
         let resolved_current = fs::canonicalize(&resolved_current).unwrap_or(resolved_current);
-        
+
         if resolved_current == desired {
             if symlink_info_enabled() {
                 tracing::info!(
@@ -116,7 +124,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
                     source.display()
                 );
             }
-            
+
             // Link-aware backup: back up the symlink itself (if present) by creating a backup symlink
             let backup = backup_path(target);
             if is_symlink {
@@ -130,14 +138,16 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
                             backup.display()
                         );
                     }
+                    let t0 = Instant::now();
                     // Create a symlink backup pointing to the same destination
                     let _ = unix_fs::symlink(curr, &backup);
+                    let elapsed_ms = t0.elapsed().as_millis() as u64;
                     let _ = crate::logging::audit_event(
                         "symlink",
                         "backup_created",
                         "symlink",
                         &backup.display().to_string(),
-                        &format!("dest={}", curr.display()),
+                        &format!("dest={} duration_ms={}", curr.display(), elapsed_ms),
                         None,
                     );
                 }
@@ -164,16 +174,18 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         }
         // Use metadata we already have to avoid additional TOCTOU
         if let Ok(ref meta) = metadata {
+            let t0 = Instant::now();
             fs::copy(target, &backup)?;
             let perm = meta.permissions();
             fs::set_permissions(&backup, perm)?;
             fs::remove_file(target)?;
+            let elapsed_ms = t0.elapsed().as_millis() as u64;
             let _ = crate::logging::audit_event(
                 "symlink",
                 "backup_created",
                 "file",
                 &backup.display().to_string(),
-                &format!("from={}", target.display()),
+                &format!("from={} duration_ms={}", target.display(), elapsed_ms),
                 None,
             );
         } else {
@@ -184,9 +196,11 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             );
         }
     }
-    
+
     // Ensure parent exists
-    if let Some(parent) = target.parent() { fs::create_dir_all(parent)?; }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
 
     // Remove leftover target then perform atomic symlink swap
     let _ = fs::remove_file(target);
@@ -198,14 +212,14 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             source.display()
         );
     }
-    
+
     // Log the symlink creation
     let _ = audit_op(
         "CREATE_SYMLINK",
         &format!("{} -> {}", target.display(), source.display()),
         true,
     );
-    
+
     Ok(())
 }
 
@@ -237,7 +251,9 @@ pub fn restore_file(target: &Path, dry_run: bool, force_best_effort: bool) -> Re
         if force_best_effort {
             tracing::warn!("No backup for {}, leaving as-is", target.display());
         } else {
-            return Err(crate::Error::RestoreBackupMissing(target.display().to_string()));
+            return Err(crate::Error::RestoreBackupMissing(
+                target.display().to_string(),
+            ));
         }
     }
     Ok(())

@@ -67,6 +67,8 @@ def get_container_id():
 
 
 def stage_preflight(logger: logmod.JSONLLogger) -> None:
+    logger.event(stage="preflight", suite=None, event="stage_start", level="info", msg="start")
+    t0 = time.time()
     print("[preflight] starting…")
     osr = read_os_release()
     print(f"[preflight] os-release ID={osr.get('ID','?')} VERSION_ID={osr.get('VERSION_ID','?')}")
@@ -94,9 +96,12 @@ def stage_preflight(logger: logmod.JSONLLogger) -> None:
         print("[preflight] ❌ cargo check failed; aborting")
         sys.exit(res.rc)
     print("[preflight] ✅ cargo check succeeded")
+    logger.event(stage="preflight", suite=None, event="stage_end", level="info", elapsed_ms=int((time.time() - t0) * 1000))
 
 
 def stage_deps(logger: logmod.JSONLLogger) -> None:
+    logger.event(stage="deps", suite=None, event="stage_start", level="info", msg="start")
+    t0 = time.time()
     print("[deps] starting…")
     # Verify-only: ensure required packages are present; do not install or normalize mirrors.
     packages = [
@@ -113,9 +118,12 @@ def stage_deps(logger: logmod.JSONLLogger) -> None:
         print("[deps] ❌ missing packages (bake into image): " + ", ".join(missing))
         sys.exit(1)
     print("[deps] ✅ dependencies present")
+    logger.event(stage="deps", suite=None, event="stage_end", level="info", elapsed_ms=int((time.time() - t0) * 1000))
 
 
 def stage_build(logger: logmod.JSONLLogger) -> None:
+    logger.event(stage="build", suite=None, event="stage_start", level="info", msg="start")
+    t0_total = time.time()
     print("[build] starting…")
     profile = os.environ.get("CARGO_PROFILE", "release")
     toolchain = os.environ.get("RUSTUP_TOOLCHAIN", "stable")
@@ -151,9 +159,12 @@ def stage_build(logger: logmod.JSONLLogger) -> None:
     }
     (RESULTS_DIR / "build_meta.json").write_text(json.dumps(meta, indent=2))
     print("[build] ✅ cargo build succeeded")
+    logger.event(stage="build", suite=None, event="stage_end", level="info", elapsed_ms=int((time.time() - t0_total) * 1000))
 
 
 def stage_run_suites(logger: logmod.JSONLLogger) -> list:
+    logger.event(stage="run_suites", suite=None, event="stage_start", level="info", msg="start")
+    t_stage = time.time()
     print("[run_suites] starting…")
     test_filter = os.environ.get("TEST_FILTER", "")
     suites = suitesmod.discover_suites(str(TESTS_DIR), test_filter=test_filter)
@@ -182,15 +193,20 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
         fsmod.snapshot(selected_paths, before_path)
 
         started = time.time()
+        logger.event(stage="run_suites", suite=name, event="suite_start", level="info")
         # Enforce fail-on-skip: incompatible suite is treated as failure
         if not suite.compatible:
             status = "fail"
             exec_res = suitesmod.ExecResult(rc=125, stdout="", stderr=f"suite {name} incompatible with this distro")
             duration_ms = 0
         else:
-            exec_res = suitesmod.run_execute_block(suite, PROJECT_DIR, logger,
-                                               stdout_path=logs_root / "execute.stdout.log",
-                                               stderr_path=logs_root / "execute.stderr.log")
+            exec_res = suitesmod.run_execute_block(
+                suite, PROJECT_DIR, logger,
+                stdout_path=logs_root / "execute.stdout.log",
+                stderr_path=logs_root / "execute.stderr.log",
+                product_stdout_path=logs_root / "product.stdout.log",
+                product_stderr_path=logs_root / "product.stderr.log",
+            )
             duration_ms = int((time.time() - started) * 1000)
             status = "pass"
 
@@ -224,9 +240,13 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
         # Always attempt restore; any failure makes suite FAIL
         restore_rc = 0
         if suite.restore:
-            rest_res = suitesmod.run_restore_block(suite, PROJECT_DIR, logger,
-                                                   stdout_path=logs_root / "restore.stdout.log",
-                                                   stderr_path=logs_root / "restore.stderr.log")
+            rest_res = suitesmod.run_restore_block(
+                suite, PROJECT_DIR, logger,
+                stdout_path=logs_root / "restore.stdout.log",
+                stderr_path=logs_root / "restore.stderr.log",
+                product_stdout_path=logs_root / "product.stdout.log",
+                product_stderr_path=logs_root / "product.stderr.log",
+            )
             restore_rc = rest_res.rc
             if restore_rc != 0:
                 status = "fail"
@@ -245,7 +265,8 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
             "presence_ok": presence_ok,
         }
         results.append(result)
-
+        logger.event(stage="run_suites", suite=name, event="suite_end", level="info", elapsed_ms=int((time.time() - started) * 1000),
+                     msg=status, artifacts=result.get("artifacts"))
         print(f"[run_suites] {'✅ PASS' if status=='pass' else '❌ FAIL'} suite: {name}")
 
     # Persist results for later collect stage (if run separately)
@@ -253,10 +274,13 @@ def stage_run_suites(logger: logmod.JSONLLogger) -> list:
         (TMP_DIR / "suites_results.json").write_text(json.dumps(results, indent=2))
     except Exception:
         pass
+    logger.event(stage="run_suites", suite=None, event="stage_end", level="info", elapsed_ms=int((time.time() - t_stage) * 1000))
     return results
 
 
 def stage_collect(logger: logmod.JSONLLogger, suites_results: list) -> None:
+    logger.event(stage="collect", suite=None, event="stage_start", level="info", msg="start")
+    t0 = time.time()
     print("[collect] starting…")
     # Copy audit log and runner JSONL under proofs
     try:
@@ -301,6 +325,47 @@ def stage_collect(logger: logmod.JSONLLogger, suites_results: list) -> None:
         print(f"[collect] 📦 packaged artifacts at {tar_path}")
     except Exception as e:
         print(f"[collect] warning: failed to create tar: {e}")
+
+    # Guardrails: validate runner.jsonl required fields
+    try:
+        ok = True
+        required = {"ts", "component", "run_id"}
+        if JSONL_PATH.exists():
+            for line in JSONL_PATH.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                    if not required.issubset(set(rec.keys())):
+                        ok = False
+                        break
+                except Exception:
+                    ok = False
+                    break
+        if not ok:
+            print("[collect] ❌ invalid runner.jsonl envelope (missing required fields)")
+            sys.exit(1)
+    except Exception:
+        pass
+
+    # Guardrails: if any suite invoked the product, require product logs exist
+    try:
+        suites = suitesmod.discover_suites(str(TESTS_DIR))
+        invoked = any(("oxidizr-arch" in (s.execute or "")) or ("oxidizr-arch" in (s.restore or "" if s.restore else "")) for s in suites)
+        if invoked:
+            # Search for any per-suite product logs
+            any_prod_logs = False
+            for p in LOGS_DIR.glob("*/product.stdout.log"):
+                if p.exists():
+                    any_prod_logs = True
+                    break
+            if not any_prod_logs:
+                print("[collect] ❌ product stdout/stderr logs missing despite product invocation; marking run INCONCLUSIVE")
+                sys.exit(1)
+    except Exception:
+        pass
+
+    logger.event(stage="collect", suite=None, event="stage_end", level="info", elapsed_ms=int((time.time() - t0) * 1000))
 
 
 def main():

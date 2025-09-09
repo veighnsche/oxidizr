@@ -1,7 +1,9 @@
-use crate::checks::{Distribution, is_supported_distro};
-use crate::error::{Result, Error};
-use crate::experiments::util::{create_symlinks, log_applets_summary, resolve_usrbin, restore_targets};
+use crate::checks::{is_supported_distro, Distribution};
+use crate::error::{Error, Result};
 use crate::experiments::constants::CHECKSUM_BINS;
+use crate::experiments::util::{
+    create_symlinks, log_applets_summary, resolve_usrbin, restore_targets,
+};
 use crate::experiments::{check_download_prerequisites, UUTILS_COREUTILS};
 use crate::system::Worker;
 use std::path::PathBuf;
@@ -21,7 +23,9 @@ impl ChecksumsExperiment {
         }
     }
 
-    pub fn name(&self) -> &str { &self.name }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 
     pub fn check_compatible(&self, distro: &Distribution) -> Result<bool> {
         Ok(is_supported_distro(&distro.id))
@@ -45,7 +49,10 @@ impl ChecksumsExperiment {
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| UUTILS_COREUTILS.to_string());
-            tracing::info!("No checksum applets found in current system state; ensuring '{}' is installed", provider);
+            tracing::info!(
+                "No checksum applets found in current system state; ensuring '{}' is installed",
+                provider
+            );
             check_download_prerequisites(worker, &provider, assume_yes)?;
             tracing::info!("Installing package: {}", provider);
             worker.install_package(&provider, assume_yes)?;
@@ -55,10 +62,7 @@ impl ChecksumsExperiment {
             skipped = rediscovered.1;
         }
         if !links.is_empty() {
-            tracing::info!(
-                "flip-checksums: linking {} checksum applet(s)",
-                links.len()
-            );
+            tracing::info!("flip-checksums: linking {} checksum applet(s)", links.len());
         }
         for s in &skipped {
             tracing::warn!(
@@ -87,7 +91,10 @@ impl ChecksumsExperiment {
 
     pub fn disable(&self, worker: &Worker, _assume_yes: bool, _update_lists: bool) -> Result<()> {
         let _span = tracing::info_span!("checksums_disable").entered();
-        let targets: Vec<PathBuf> = CHECKSUM_BINS.iter().map(|n| self.resolve_target(n)).collect();
+        let targets: Vec<PathBuf> = CHECKSUM_BINS
+            .iter()
+            .map(|n| self.resolve_target(n))
+            .collect();
         restore_targets(worker, &targets)?;
         Ok(())
     }
@@ -99,7 +106,10 @@ impl ChecksumsExperiment {
     }
 
     pub fn list_targets(&self) -> Vec<PathBuf> {
-        CHECKSUM_BINS.iter().map(|n| self.resolve_target(n)).collect()
+        CHECKSUM_BINS
+            .iter()
+            .map(|n| self.resolve_target(n))
+            .collect()
     }
 
     fn discover_present(&self, worker: &Worker) -> Result<(Vec<(String, PathBuf)>, Vec<String>)> {
@@ -120,8 +130,16 @@ impl ChecksumsExperiment {
 
         // Prefer unified dispatcher if present
         let unified_path = if let Some(ref path) = effective_unified {
-            if path.exists() { Some(path.clone()) } else if let Ok(Some(found)) = worker.which("coreutils") { Some(found) } else { None }
-        } else { None };
+            if path.exists() {
+                Some(path.clone())
+            } else if let Ok(Some(found)) = worker.which("coreutils") {
+                Some(found)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         for name in CHECKSUM_BINS {
             if let Some(ref unified) = unified_path {

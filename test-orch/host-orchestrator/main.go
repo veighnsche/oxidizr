@@ -448,6 +448,8 @@ func main() {
 						// Propagate verbosity to the Rust binary's logger
 						envVars = append(envVars, "RUST_LOG=info")
 					}
+					// Correlatable run identifier across host/runner/product
+					envVars = append(envVars, fmt.Sprintf("RUN_ID=%s", runID))
 					if *testFilter != "" {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}

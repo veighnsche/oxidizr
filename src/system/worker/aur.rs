@@ -8,14 +8,7 @@ impl super::Worker {
         let candidates = self.aur_helper_candidates();
         for h in &candidates {
             if which(h).is_ok() {
-                let _ = audit_event(
-                    "worker",
-                    "aur_helper_name",
-                    "found",
-                    h,
-                    "",
-                    None,
-                );
+                let _ = audit_event("worker", "aur_helper_name", "found", h, "", None);
                 return Ok(Some(h.to_string()));
             }
         }

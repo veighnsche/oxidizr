@@ -75,7 +75,11 @@ impl super::Worker {
             let _ = audit_event(
                 "worker",
                 "extra_repo_available.pacman_sl",
-                if status.success() { "detected" } else { "not_detected" },
+                if status.success() {
+                    "detected"
+                } else {
+                    "not_detected"
+                },
                 "pacman -Sl extra",
                 "",
                 status.code(),

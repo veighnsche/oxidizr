@@ -16,7 +16,9 @@ class JSONLLogger:
 
     def event(self, *, stage: str, suite: Optional[str], cmd: Optional[str] = None,
               rc: Optional[int] = None, elapsed_ms: Optional[int] = None,
-              level: str = "info", msg: Optional[str] = None, event: Optional[str] = None):
+              level: str = "info", msg: Optional[str] = None, event: Optional[str] = None,
+              target: Optional[str] = None, source: Optional[str] = None,
+              backup_path: Optional[str] = None, artifacts: Optional[list] = None):
         rec = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "component": self.component,
@@ -33,6 +35,14 @@ class JSONLLogger:
         }
         if msg is not None:
             rec["message"] = msg
+        if target is not None:
+            rec["target"] = target
+        if source is not None:
+            rec["source"] = source
+        if backup_path is not None:
+            rec["backup_path"] = backup_path
+        if artifacts is not None:
+            rec["artifacts"] = artifacts
         line = json.dumps(rec, ensure_ascii=False)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")

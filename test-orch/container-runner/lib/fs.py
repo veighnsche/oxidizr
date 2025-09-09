@@ -120,13 +120,13 @@ def assert_presence(coreutils_applets: Iterable[str], preserve: Set[str], logger
                     msg = f"expected symlink for {name} at {target}, but not a symlink"
                     report["failures"].append(msg)
                     ok = False
-                    logger.event(stage="run_suites", suite=suite_name, level="error", msg=msg)
+                    logger.event(stage="run_suites", suite=suite_name, level="error", event="assert_fail", msg=msg)
             else:
                 if target.is_symlink():
                     msg = f"expected no symlink for {name} at {target} after disable, but found symlink"
                     report["failures"].append(msg)
                     ok = False
-                    logger.event(stage="run_suites", suite=suite_name, level="error", msg=msg)
+                    logger.event(stage="run_suites", suite=suite_name, level="error", event="assert_fail", msg=msg)
         else:
             if expect_symlink:
                 # Look for WARN in exec output mentioning this applet
@@ -135,6 +135,8 @@ def assert_presence(coreutils_applets: Iterable[str], preserve: Set[str], logger
                     msg = f"missing applet {name} without corresponding product WARN in logs"
                     report["failures"].append(msg)
                     ok = False
-                    logger.event(stage="run_suites", suite=suite_name, level="error", msg=msg)
+                    logger.event(stage="run_suites", suite=suite_name, level="error", event="assert_fail", msg=msg)
 
+    if ok:
+        logger.event(stage="run_suites", suite=suite_name, level="info", event="assert_pass", msg="presence assertions passed")
     return report, ok

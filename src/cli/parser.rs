@@ -56,13 +56,16 @@ pub struct Cli {
     pub experiment: Option<String>,
 
     /// Skip compatibility checks (dangerous)
-    #[arg(long = "skip-compat-check", alias = "skip-compatibility-check", global = true)]
+    #[arg(
+        long = "skip-compat-check",
+        alias = "skip-compatibility-check",
+        global = true
+    )]
     pub no_compatibility_check: bool,
 
     /// AUR helper to use for package operations (auto-detect by default)
     #[arg(long, value_enum, default_value_t = AurHelperArg::Auto, global = true)]
     pub aur_helper: AurHelperArg,
-
 
     /// Override package name (Arch/AUR). Defaults depend on experiment.
     #[arg(long, global = true)]

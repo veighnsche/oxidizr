@@ -75,7 +75,11 @@ impl super::Worker {
         let _ = audit_event(
             "worker",
             "check_installed",
-            if status.success() { "present" } else { "absent" },
+            if status.success() {
+                "present"
+            } else {
+                "absent"
+            },
             &format!("pacman -Qi {}", package),
             "",
             status.code(),
@@ -114,7 +118,7 @@ impl super::Worker {
         let mut attempted_pacman = false;
         let mut pacman_status_ok = false;
         if package != "uutils-findutils-bin" || self.repo_has_package(package).unwrap_or(false) {
-            let mut args = vec!["-S"]; 
+            let mut args = vec!["-S"];
             if assume_yes {
                 args.push("--noconfirm");
             }
@@ -128,7 +132,11 @@ impl super::Worker {
             let _ = audit_event(
                 "worker",
                 "install_package.pacman",
-                if pacman_status.success() { "ok" } else { "failed_or_unavailable" },
+                if pacman_status.success() {
+                    "ok"
+                } else {
+                    "failed_or_unavailable"
+                },
                 &format!("pacman {}", args.join(" ")),
                 "",
                 pacman_status.code(),
@@ -173,8 +181,16 @@ impl super::Worker {
                 let aur_status = if let Some(user) = &self.aur_user {
                     // Run via su as configured user using a shell-escaped command string
                     let mut aur_cmd_str = String::from(h);
-                    for a in &args { aur_cmd_str.push(' '); aur_cmd_str.push_str(a); }
-                    tracing::info!("Running AUR helper as user '{}': su - {} -c '{}'", user, user, aur_cmd_str);
+                    for a in &args {
+                        aur_cmd_str.push(' ');
+                        aur_cmd_str.push_str(a);
+                    }
+                    tracing::info!(
+                        "Running AUR helper as user '{}': su - {} -c '{}'",
+                        user,
+                        user,
+                        aur_cmd_str
+                    );
                     std::process::Command::new("su")
                         .args(["-", user, "-c", &aur_cmd_str])
                         .status()?
@@ -272,13 +288,19 @@ impl super::Worker {
         if status.success() {
             // Verify absence after removal for clarity
             if self.check_installed(package)? {
-                tracing::error!("❌ Expected: '{}' absent after removal, Received: present", package);
+                tracing::error!(
+                    "❌ Expected: '{}' absent after removal, Received: present",
+                    package
+                );
                 return Err(Error::ExecutionFailed(format!(
                     "❌ Expected: '{}' absent after removal, Received: present",
                     package
                 )));
             }
-            tracing::info!("✅ Expected: '{}' absent after removal, Received: absent", package);
+            tracing::info!(
+                "✅ Expected: '{}' absent after removal, Received: absent",
+                package
+            );
             Ok(())
         } else {
             Err(Error::ExecutionFailed(format!(

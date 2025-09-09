@@ -45,6 +45,11 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	}
 	args, containerName, logsDir, cidFile := BuildDockerRunArgs(opts)
 	meta := RunMeta{Distro: distro, Tag: tag, ContainerName: containerName}
+	// Host JSONL logger for lifecycle events
+	hostLogger := NewHostJSONLLogger(logsDir, opts.RunID, opts.Distro)
+	if Allowed(selected, V1) {
+		hostLogger.Event("info", "run", "container_start", "starting docker run", nil, nil)
+	}
 	if Allowed(selected, V2) {
 		log.Printf("%s RUN> docker %s", col.Sprint(Prefix(distro, V2, "HOST")), strings.Join(args, " "))
 	}
@@ -183,6 +188,12 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		meta.StdoutLogPath = finalStdout
 		meta.StderrLogPath = finalStderr
 		meta.ExitCode = -1
+		// Emit exit event to host JSONL
+		if Allowed(selected, V1) {
+			dur := meta.FinishedAt.Sub(meta.StartedAt).Milliseconds()
+			rc := meta.ExitCode
+			hostLogger.Event("error", "run", "container_exit", "docker run failed to start", &rc, &dur)
+		}
 		return meta, fmt.Errorf("docker run start failed: %w", err)
 	}
 	runErr := cmd.Wait()
@@ -220,21 +231,61 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	if b, err := os.ReadFile(cidFile); err == nil {
 		meta.ContainerID = strings.TrimSpace(string(b))
 	}
+	if meta.ContainerID != "" {
+		hostLogger.SetContainerID(meta.ContainerID)
+		if Allowed(selected, V1) {
+			hostLogger.Event("info", "run", "container_ready", "cid acquired", nil, nil)
+		}
+	}
 
-    // Best-effort cleanup if container should not be kept
-    if !opts.KeepContainer {
-        id := meta.ContainerID
-        if id == "" {
-            id = containerName
-        }
-        // Try a graceful stop first, then force remove
-        _ = exec.Command("docker", "stop", "--time", "10", id).Run()
-        _ = exec.Command("docker", "rm", "-f", id).Run()
-    }
+	// Mirror artifacts from container to host before any potential removal
+	// Destination: <rootDir>/.artifacts/<runID>/<distro>_<containerID>/
+	if meta.ContainerID != "" {
+		artDir := filepath.Join(rootDir, ".artifacts", runID, fmt.Sprintf("%s_%s", distro, meta.ContainerID))
+		_ = os.MkdirAll(artDir, 0o755)
+		// docker cp <cid>:/workspace/.proof/. <dest>
+		_ = exec.Command("docker", "cp", fmt.Sprintf("%s:%s", meta.ContainerID, "/workspace/.proof/."), artDir).Run()
+		// Also copy host.jsonl into the artifact directory
+		hostJSON := filepath.Join(logsDir, "host.jsonl")
+		if b, err := os.ReadFile(hostJSON); err == nil {
+			_ = os.WriteFile(filepath.Join(artDir, "host.jsonl"), b, 0o644)
+		}
+		hostLogger.Event("info", "artifact", "artifact_mirror", artDir, nil, nil)
+	}
+
+	// Best-effort cleanup if container should not be kept
+	if !opts.KeepContainer {
+		id := meta.ContainerID
+		if id == "" {
+			id = containerName
+		}
+		// Try a graceful stop first, then force remove
+		_ = exec.Command("docker", "stop", "--time", "10", id).Run()
+		_ = exec.Command("docker", "rm", "-f", id).Run()
+	}
+	// Emit stderr tail at very-verbose for easier triage
+	if Allowed(selected, V3) {
+		for _, line := range lastStderr {
+			// Emit as debug-level tail entries
+			hostLogger.Event("debug", "run", "stderr_tail", line, nil, nil)
+		}
+	}
 
 	if runErr != nil {
 		cmdLine := "docker " + strings.Join(args, " ")
+		// Emit exit event to host JSONL
+		if Allowed(selected, V1) {
+			dur := meta.FinishedAt.Sub(meta.StartedAt).Milliseconds()
+			rc := meta.ExitCode
+			hostLogger.Event("error", "run", "container_exit", cmdLine, &rc, &dur)
+		}
 		return meta, fmt.Errorf("docker run failed (exit code %d). Command: %s\nLogs saved to:\n  stdout: %s\n  stderr: %s", exitCode, cmdLine, finalStdout, finalStderr)
+	}
+	// Emit successful exit
+	if Allowed(selected, V1) {
+		dur := meta.FinishedAt.Sub(meta.StartedAt).Milliseconds()
+		rc := meta.ExitCode
+		hostLogger.Event("info", "run", "container_exit", "success", &rc, &dur)
 	}
 	return meta, nil
 }

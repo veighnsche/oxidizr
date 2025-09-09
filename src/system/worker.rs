@@ -1,5 +1,5 @@
-use std::time::Duration;
 use std::path::PathBuf;
+use std::time::Duration;
 
 const PACMAN_LOCK: &str = "/var/lib/pacman/db.lck";
 const PACMAN_LOCK_CHECK_INTERVAL: Duration = Duration::from_millis(500);
@@ -42,7 +42,7 @@ impl Worker {
 }
 
 // Submodules providing the rest of the Worker methods
-mod distro;
 mod aur;
-mod packages;
+mod distro;
 mod fs_ops;
+mod packages;

@@ -76,10 +76,16 @@ def discover_suites(tests_root: str, *, test_filter: str = "") -> List[Suite]:
     return suites
 
 
-def _run_script(script: str, workdir: Path, *, stdout_path: Path, stderr_path: Path) -> ExecResult:
+def _run_script(script: str, workdir: Path, *, stdout_path: Path, stderr_path: Path,
+                product_stdout_path: Path, product_stderr_path: Path) -> ExecResult:
     # Write temp script with minimal prelude, no functions/traps
     with tempfile.NamedTemporaryFile("w", delete=False, prefix="suite-", suffix=".sh") as tf:
         tf.write("#!/usr/bin/env bash\nset -euo pipefail\n\n")
+        # Provide a wrapper for oxidizr-arch that tees raw stdout/stderr to top-level product logs
+        tf.write(f'PRODUCT_STDOUT="{product_stdout_path}"\n')
+        tf.write(f'PRODUCT_STDERR="{product_stderr_path}"\n')
+        tf.write('touch "${PRODUCT_STDOUT}" "${PRODUCT_STDERR}"\n')
+        tf.write('oxidizr-arch() { command oxidizr-arch "$@" 1>>"${PRODUCT_STDOUT}" 2>>"${PRODUCT_STDERR}"; }\n\n')
         tf.write(script)
         tmp_path = Path(tf.name)
     try:
@@ -101,16 +107,20 @@ def _run_script(script: str, workdir: Path, *, stdout_path: Path, stderr_path: P
     return ExecResult(rc=res.rc, stdout=res.stdout, stderr=res.stderr)
 
 
-def run_execute_block(suite: Suite, project_dir: Path, logger, *, stdout_path: Path, stderr_path: Path) -> ExecResult:
+def run_execute_block(suite: Suite, project_dir: Path, logger, *, stdout_path: Path, stderr_path: Path,
+                      product_stdout_path: Path, product_stderr_path: Path) -> ExecResult:
     logger.event(stage="run_suites", suite=suite.name, event="exec_start", msg=f"suite={suite.name}")
-    res = _run_script(suite.execute, project_dir, stdout_path=stdout_path, stderr_path=stderr_path)
+    res = _run_script(suite.execute, project_dir, stdout_path=stdout_path, stderr_path=stderr_path,
+                      product_stdout_path=product_stdout_path, product_stderr_path=product_stderr_path)
     logger.event(stage="run_suites", suite=suite.name, event="exec_done", rc=res.rc)
     return res
 
 
-def run_restore_block(suite: Suite, project_dir: Path, logger, *, stdout_path: Path, stderr_path: Path) -> ExecResult:
+def run_restore_block(suite: Suite, project_dir: Path, logger, *, stdout_path: Path, stderr_path: Path,
+                      product_stdout_path: Path, product_stderr_path: Path) -> ExecResult:
     logger.event(stage="restore", suite=suite.name, event="restore_start")
-    res = _run_script(suite.restore or "true", project_dir, stdout_path=stdout_path, stderr_path=stderr_path)
+    res = _run_script(suite.restore or "true", project_dir, stdout_path=stdout_path, stderr_path=stderr_path,
+                      product_stdout_path=product_stdout_path, product_stderr_path=product_stderr_path)
     logger.event(stage="restore", suite=suite.name, event="restore_done", rc=res.rc)
     return res
 

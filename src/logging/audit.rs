@@ -1,6 +1,8 @@
 use crate::Result;
-use tracing::{event, Level};
 use chrono::{Local, SecondsFormat};
+use std::env;
+use std::fs;
+use tracing::{event, Level};
 
 pub const AUDIT_LOG_PATH: &str = "/var/log/oxidizr-arch-audit.log";
 
@@ -11,9 +13,19 @@ fn mask_secrets(s: &str) -> String {
         // key=value style
         if let Some((k, v)) = token.split_once('=') {
             let kl = k.to_ascii_lowercase();
-            if matches!(kl.as_str(),
-                "token" | "secret" | "password" | "passwd" | "auth" | "authorization" | "bearer" |
-                "access_key" | "secret_key" | "api_key" | "apikey"
+            if matches!(
+                kl.as_str(),
+                "token"
+                    | "secret"
+                    | "password"
+                    | "passwd"
+                    | "auth"
+                    | "authorization"
+                    | "bearer"
+                    | "access_key"
+                    | "secret_key"
+                    | "api_key"
+                    | "apikey"
             ) {
                 out.push(format!("{}=***", k));
                 continue;
@@ -48,12 +60,25 @@ pub fn audit_event(
     let inputs = mask_secrets(inputs);
     let outputs = mask_secrets(outputs);
     let timestamp = Local::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+    // Correlatable fields
+    let run_id = env::var("RUN_ID").unwrap_or_default();
+    let container_id = read_container_id();
+    let distro = read_distro_id();
+    // Canonical level string for JSONL envelope; keep tracing level INFO for routing
+    let level_str = match decision.to_ascii_lowercase().as_str() {
+        "failure" | "error" => "error",
+        _ => "info",
+    };
     // Note: exit_code will be rendered as a string by the formatter; presence is what matters.
     event!(
         target: "audit",
         Level::INFO,
-        timestamp = %timestamp,
+        ts = %timestamp,
         component = %component,
+        level = %level_str,
+        run_id = %run_id,
+        container_id = %container_id,
+        distro = %distro,
         event = %event_name,
         decision = %decision,
         inputs = %inputs,
@@ -74,4 +99,26 @@ pub fn audit_op(operation: &str, target: &str, success: bool) -> Result<()> {
         "",
         None,
     )
+}
+
+fn read_container_id() -> String {
+    // Docker typically sets /etc/hostname to the short container ID
+    if let Ok(s) = fs::read_to_string("/etc/hostname") {
+        let id = s.trim();
+        if !id.is_empty() {
+            return id.to_string();
+        }
+    }
+    "".to_string()
+}
+
+fn read_distro_id() -> String {
+    if let Ok(txt) = fs::read_to_string("/etc/os-release") {
+        for line in txt.lines() {
+            if let Some(rest) = line.strip_prefix("ID=") {
+                return rest.trim_matches('"').to_ascii_lowercase();
+            }
+        }
+    }
+    "".to_string()
 }

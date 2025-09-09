@@ -19,7 +19,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
     .entered();
     // Use configured AUR helper (string value from enum)
     let effective_helper = cli.aur_helper.as_helper_str().to_string();
-        
+
     let worker = Worker::new(
         effective_helper,
         cli.aur_user.clone(),
@@ -30,7 +30,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
         cli.unified_binary.clone(),
         cli.force_restore_best_effort,
     );
-    
+
     let update_lists = !cli.no_update;
 
     // Configure progress behavior from CLI
@@ -71,7 +71,9 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
 
     if exps.is_empty() {
         tracing::error!("No experiments matched the selection");
-        return Err(crate::Error::Other("no experiments matched selection".into()));
+        return Err(crate::Error::Other(
+            "no experiments matched selection".into(),
+        ));
     }
 
     match cli.command {
@@ -106,7 +108,9 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             }
         }
         Commands::Remove => {
-            if !cli.dry_run { enforce_root()?; }
+            if !cli.dry_run {
+                enforce_root()?;
+            }
             for e in &exps {
                 e.remove(&worker, cli.assume_yes, update_lists)?;
                 tracing::info!(event = "removed_and_restored", experiment = %e.name());
@@ -128,7 +132,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }
 

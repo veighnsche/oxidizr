@@ -22,7 +22,7 @@ pub fn check_compatibility(distro: &Distribution, skip_check: bool) -> Result<()
     if skip_check {
         return Ok(());
     }
-    
+
     if !is_supported_distro(&distro.id) {
         return Err(Error::Incompatible(format!(
             "Unsupported distro '{}'. Supported: {:?}. Pass --skip-compatibility-check to override.",
@@ -30,6 +30,6 @@ pub fn check_compatibility(distro: &Distribution, skip_check: bool) -> Result<()
             SUPPORTED_DISTROS
         )));
     }
-    
+
     Ok(())
 }
