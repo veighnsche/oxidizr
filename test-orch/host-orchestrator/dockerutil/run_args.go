@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -20,12 +21,28 @@ type RunOptions struct {
 	Selected     Verb
 	Distro       string
 	Col          *color.Color
+	// RunID is an optional, stable identifier for this orchestrator run. When set,
+	// it is appended to the computed container name to avoid cross-run collisions
+	// while keeping names deterministic per-run.
+	RunID        string
 }
 
 // BuildDockerRunArgs assembles the argument list for `docker run`, ensures
-// cache directories exist, and returns the computed container name and logs dir.
-func BuildDockerRunArgs(opts RunOptions) (args []string, containerName string, logsDir string) {
-	containerName = fmt.Sprintf("oxidizr-arch-test-%s", strings.ReplaceAll(opts.Tag, ":", "-"))
+// cache directories exist, and returns the computed container name, logs dir,
+// and path to a cidfile used to capture the container ID.
+func BuildDockerRunArgs(opts RunOptions) (args []string, containerName string, logsDir string, cidFile string) {
+	// Derive a distro key from the tag (oxidizr-<distro>:<hash>)
+	distroKey := strings.TrimPrefix(opts.Tag, "oxidizr-")
+	if i := strings.Index(distroKey, ":"); i >= 0 {
+		distroKey = distroKey[:i]
+	}
+	// Normalize a deterministic, per-run container name
+	tagNorm := strings.ReplaceAll(opts.Tag, ":", "-")
+	if opts.RunID != "" {
+		containerName = fmt.Sprintf("oxidizr-arch-%s-%s-%s", distroKey, tagNorm, opts.RunID)
+	} else {
+		containerName = fmt.Sprintf("oxidizr-arch-%s-%s", distroKey, tagNorm)
+	}
 
 	args = []string{"run"}
 	if !opts.KeepContainer {
@@ -36,10 +53,6 @@ func BuildDockerRunArgs(opts RunOptions) (args []string, containerName string, l
 	}
 
 	// Provide distro identifier to in-container runner for analytics/report naming
-	distroKey := strings.TrimPrefix(opts.Tag, "oxidizr-")
-	if i := strings.Index(distroKey, ":"); i >= 0 {
-		distroKey = distroKey[:i]
-	}
 	args = append(args, "-e", fmt.Sprintf("ANALYTICS_DISTRO=%s", distroKey))
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", opts.RootDir))
 
@@ -73,8 +86,26 @@ func BuildDockerRunArgs(opts RunOptions) (args []string, containerName string, l
 	rustupRoot := filepath.Join(cacheRoot, "rustup", distroKey)
 	// Ensure directories exist (including top-level logs dir for container logs)
 	logsDir = filepath.Join(opts.RootDir, "logs", distroKey)
+
+	ensureDir := func(path string) {
+		_ = os.MkdirAll(path, 0o755)
+		// When executed via sudo, make directories owned by the invoking user so they are removable
+		if os.Geteuid() == 0 { // running as root
+			if uidStr, ok := os.LookupEnv("SUDO_UID"); ok {
+				if gidStr, ok2 := os.LookupEnv("SUDO_GID"); ok2 {
+					if uid, err1 := strconv.Atoi(uidStr); err1 == nil {
+						if gid, err2 := strconv.Atoi(gidStr); err2 == nil {
+							_ = os.Chown(path, uid, gid)
+							_ = os.Chmod(path, 0o755)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	for _, d := range []string{cargoReg, cargoGit, cargoTarget, pacmanCache, aurBuild, rustupRoot, logsDir} {
-		_ = os.MkdirAll(d, 0o755)
+		ensureDir(d)
 	}
 	// Bind mounts
 	args = append(args, "-v", fmt.Sprintf("%s:%s", cargoReg, "/root/.cargo/registry"))
@@ -85,9 +116,12 @@ func BuildDockerRunArgs(opts RunOptions) (args []string, containerName string, l
 	args = append(args, "-v", fmt.Sprintf("%s:%s", rustupRoot, "/root/.rustup"))
 	args = append(args, "--workdir", "/workspace")
 	args = append(args, "--name", containerName)
+	// Record container ID to a cidfile for robust post-run inspection
+	cidFile = filepath.Join(logsDir, fmt.Sprintf("%s.cid", containerName))
+	args = append(args, "--cidfile", cidFile)
 	args = append(args, opts.Tag)
 	if opts.Command != "" {
 		args = append(args, opts.Command)
 	}
-	return args, containerName, logsDir
+	return args, containerName, logsDir, cidFile
 }

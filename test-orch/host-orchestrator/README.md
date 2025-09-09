@@ -50,6 +50,9 @@ sudo go run . --test-filter="disable-all"
 
 # Increase parallelism of distro runs
 sudo go run . --concurrency=6
+
+# Fail-fast cancel and retries with backoff
+sudo go run . --fail-fast=true --retries=2 --backoff=8s
 ```
 
 ## Command Line Options
@@ -72,6 +75,9 @@ sudo go run . --concurrency=6
 - `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-all`). Default: empty (run all)
 - `--test-ci` (bool): Run the CI `test-orch` job locally using `act`. Default: `false`
 - `--concurrency` (int): Number of distributions to test in parallel. Default: `4`
+- `--fail-fast` (bool): Cancel remaining runs on first failure. Default: `true`
+- `--retries` (int): Retry attempts for docker run failures. Default: `2`
+- `--backoff` (duration): Initial backoff between retries (exponential). Default: `8s`
 - `-v` (bool): Verbose output (level 2)
 - `-vv` (bool): Very verbose/trace output (level 3)
 - `-q` (bool): Quiet output (level 0)
@@ -89,3 +95,5 @@ Notes:
 ## Architecture
 
 The host orchestrator communicates with a separate container-runner program that executes inside the Docker container. The container-runner handles the actual test execution, environment setup, and assertions.
+
+For detailed design, logging, artifact layout, and JSON summary schema, see `HOST_ORCH.md` in this directory.

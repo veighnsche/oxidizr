@@ -19,3 +19,17 @@ func ImageExists(ctx context.Context, cli *client.Client, tag string) (bool, err
 	}
 	return len(imgs) > 0, nil
 }
+
+// ImageDigest returns the image ID/digest for the given tag, e.g. "sha256:...".
+// If the image is not found locally, an error is returned.
+func ImageDigest(ctx context.Context, cli *client.Client, tag string) (string, error) {
+	inspect, _, err := cli.ImageInspectWithRaw(ctx, tag)
+	if err != nil {
+		return "", fmt.Errorf("image inspect: %w", err)
+	}
+	// Prefer RepoDigests when present; fall back to ID
+	if len(inspect.RepoDigests) > 0 {
+		return inspect.RepoDigests[0], nil
+	}
+	return inspect.ID, nil
+}
