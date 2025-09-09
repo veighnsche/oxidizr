@@ -8,10 +8,10 @@ execute: |
   set -euo pipefail
 
   # Enable coreutils (without checksums by default) and then flip checksums via dedicated experiment
-  LOG=/tmp/oxi-enable-checksums.log
+  LOG=/tmp/oxi-flip-checksums.log
   : >"${LOG}"
-  oxidizr-arch enable --yes --experiments coreutils 2>>"${LOG}"
-  oxidizr-arch enable --yes --experiments checksums 2>>"${LOG}"
+  oxidizr-arch enable --yes --experiments coreutils >>"${LOG}" 2>&1
+  oxidizr-arch enable --yes --experiments checksums >>"${LOG}" 2>&1
 
   # Verify package is installed
   pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed"; exit 1; }

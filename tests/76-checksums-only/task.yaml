@@ -14,7 +14,7 @@ execute: |
   : >"${LOG}"
 
   # Enable only the checksums experiment
-  oxidizr-arch enable --yes --experiments checksums 2>"${LOG}"
+  oxidizr-arch enable --yes --experiments checksums >>"${LOG}" 2>&1
 
   # Verify provider package was installed
   pacman -Qi uutils-coreutils >/dev/null 2>&1 || { echo "uutils-coreutils should be installed by checksums-only enable"; exit 1; }
