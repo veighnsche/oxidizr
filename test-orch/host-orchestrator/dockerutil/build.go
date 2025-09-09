@@ -16,12 +16,15 @@ import (
 	"github.com/moby/term"
 )
 
-func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, verbose bool, prefix string, col *color.Color) error {
+// BuildArchImage builds the Docker image for the in-container runner.
+// selected controls visibility; stream lines are intrinsically v3 (trace).
+// distro is the raw distro name (e.g., "arch").
+func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, selected Verb, distro string, col *color.Color) error {
 	if baseImage == "" {
 		baseImage = "archlinux:base-devel"
 	}
-	if verbose {
-		log.Println("RUN>", "docker build -t", tag, contextDir)
+	if Allowed(selected, V2) { // command echo at v2
+		log.Printf("%s RUN> docker build -t %s %s", col.Sprint(Prefix(distro, V2, "HOST")), tag, contextDir)
 	}
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -51,9 +54,9 @@ func BuildArchImage(tag, contextDir, baseImage string, noCache, pull bool, verbo
 	// Always parse the JSON message stream so we can detect build errors even when not verbose.
 	fd, isTerm := term.GetFdInfo(os.Stdout)
 	var out io.Writer = io.Discard
-	if verbose {
-		// Use a custom writer to prefix output lines when verbose
-		out = &prefixWriter{prefix: prefix, w: os.Stdout, col: col}
+	if Allowed(selected, V3) {
+		// Prefix each build stream line as [distro][v3][HOST] <line>
+		out = &prefixWriter{distro: distro, lvl: V3, scope: "HOST", w: os.Stdout, col: col}
 	}
 	if err := jsonmessage.DisplayJSONMessagesStream(resp.Body, out, fd, isTerm, nil); err != nil {
 		return fmt.Errorf("render build output: %w", err)

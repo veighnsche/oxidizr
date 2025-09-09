@@ -16,11 +16,14 @@ import (
 	"github.com/moby/term"
 )
 
+// Verb, Allowed and Prefix are defined in util.go and shared across dockerutil.
+
 // RunArchInteractiveShell starts an interactive shell inside the given image,
 // wiring TTY/stdin/out and mounting the workspace and caches similarly to RunArchContainer.
-func RunArchInteractiveShell(tag, rootDir string, verbose bool) error {
-	if verbose {
-		log.Println("RUN>", "docker run -it -v", rootDir+":/workspace", tag, "bash -l")
+// selected controls visibility of host-originated lines; distro is the raw name for prefixing.
+func RunArchInteractiveShell(tag, rootDir string, selected Verb, distro string) error {
+	if Allowed(selected, V2) {
+		log.Printf("%s RUN> docker run -it -v %s:/workspace %s bash -l", Prefix(distro, V2, "HOST"), rootDir, tag)
 	}
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -117,8 +120,8 @@ func RunArchInteractiveShell(tag, rootDir string, verbose bool) error {
 	wg.Wait()
 
 	// Do not treat non-zero exit as an error in interactive mode; user may exit with custom code.
-	if verbose {
-		log.Printf("interactive shell exited with code %d", exitCode)
+	if Allowed(selected, V2) {
+		log.Printf("%s interactive shell exited with code %d", Prefix(distro, V2, "HOST"), exitCode)
 	}
 	return nil
 }

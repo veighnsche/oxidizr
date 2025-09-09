@@ -65,6 +65,18 @@ func main() {
 	}
 	setQuiet(*quiet)
 	setVerbosity(verbosityLevel)
+	// Map to dockerutil.Verb for host-side filtering
+	var selected dockerutil.Verb
+	switch verbosityLevel {
+	case 0:
+		selected = dockerutil.V0
+	case 1:
+		selected = dockerutil.V1
+	case 2:
+		selected = dockerutil.V2
+	default:
+		selected = dockerutil.V3
+	}
 
 	// Require root privileges (sudo) for consistent Docker access on systems without docker group configuration.
 	if !isRoot() {
@@ -198,15 +210,15 @@ func main() {
 
 			// Ensure image exists; auto-build if missing
 			if err := runSilent("docker", "image", "inspect", tag); err != nil {
-				shellPrefix := color.New(color.FgCyan).Sprintf("[%s]", d)
-				log.Printf("%s[v1][HOST] Docker image not found; building...", shellPrefix)
-				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, shellPrefix+"[v3][HOST]", color.New(color.FgCyan)); err2 != nil {
+				shellCol := color.New(color.FgCyan)
+				log.Printf("%s Docker image not found; building...", shellCol.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+				if err2 := dockerutil.BuildArchImage(tag, ctxDir, baseImage, *noCache, *pullBase, selected, d, shellCol); err2 != nil {
 					log.Fatalf("docker build failed for --shell: %v", err2)
 				}
 			}
 
 			// Launch interactive shell (this pre-runs setup_shell.sh then drops into bash -l)
-			if err := dockerutil.RunArchInteractiveShell(tag, rootDir, verbosityLevel >= 2); err != nil {
+			if err := dockerutil.RunArchInteractiveShell(tag, rootDir, selected, d); err != nil {
 				log.Fatalf("interactive shell failed: %v", err)
 			}
 			// After shell exits, return without running any parallel tasks
@@ -256,8 +268,8 @@ func main() {
 				// If one-shot, we implicitly build
 				doBuild := *archBuild
 				if doBuild {
-					log.Printf("%s[v1][HOST] Building test environment (%s)...", distroTag, distroImageTag)
-					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, distroTag+"[v3][HOST]", col); err != nil {
+					log.Printf("%s Building test environment (%s)...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")), distroImageTag)
+					if err := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, selected, d, col); err != nil {
 						errs <- fmt.Errorf("%s docker build failed: %w", distroTag, err)
 						return
 					}
@@ -279,8 +291,8 @@ func main() {
 
 					// Auto-build if the image tag is missing
 					if err := runSilent("docker", "image", "inspect", distroImageTag); err != nil {
-						log.Printf("%s[v1][HOST] Docker image not found; building...", distroTag)
-						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, verbosityLevel >= 2, distroTag+"[v3][HOST]", col); err2 != nil {
+						log.Printf("%s Docker image not found; building...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
+						if err2 := dockerutil.BuildArchImage(distroImageTag, ctxDir, baseImage, *noCache, *pullBase, selected, d, col); err2 != nil {
 							errs <- fmt.Errorf("%s docker build failed: %w", distroTag, err2)
 							return
 						}
@@ -304,14 +316,14 @@ func main() {
 						envVars = append(envVars, fmt.Sprintf("TEST_FILTER=%s", *testFilter))
 					}
 
-					log.Printf("%s[v1][HOST] Starting tests...", distroTag)
+					log.Printf("%s Starting tests...", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
 					// Stream and tag per-line with intrinsic levels
-					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, verbosityLevel >= 1, verbosityLevel, distroTag, col); err != nil {
+					if err := dockerutil.RunArchContainer(ctx, distroImageTag, rootDir, "internal-runner", envVars, *keepCtr, *timeout, selected, d, col); err != nil {
 						errs <- fmt.Errorf("%s docker run failed: %w", distroTag, err)
 						cancel() // Cancel all other running tests
 						return
 					}
-					log.Printf("%s[v1][HOST] Tests finished successfully.", distroTag)
+					log.Printf("%s Tests finished successfully.", col.Sprint(dockerutil.Prefix(d, dockerutil.V1, "HOST")))
 				}
 			}(distroName, colorPalette[i%len(colorPalette)])
 		}

@@ -13,7 +13,8 @@ import (
 
 // RunCmd executes a command and streams its output to stdout/stderr.
 func RunCmd(name string, args ...string) error {
-	log.Printf("Running command: %s %v", name, args)
+    // Echo command for visibility; host will classify '[RUNNER] RUN>' as v2.
+    log.Printf("RUN> %s %s", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...)
 
 	// Environment defaults for better diagnostics
