@@ -37,7 +37,7 @@ Defined in `src/cli/parser.rs`, handled in `src/cli/handler.rs`.
   - `--bin-dir <path>`: override replacement bin directory for uutils experiments.
   - `--unified-binary <path>`: specify unified dispatcher path (e.g., `/usr/bin/coreutils`).
   - `--dry-run`: print intended actions; make no changes.
-  - `--wait_lock <secs>`: wait up to N seconds for pacman DB lock to clear.
+  - `--wait-lock <secs>`: wait up to N seconds for pacman DB lock to clear.
 
 - Subcommands:
   - `enable`: install provider(s) if needed and swap targets to provider binaries (symlink with backup).
@@ -88,7 +88,7 @@ Note on implementation detail: although a trait `ExperimentOps` is defined in `s
 - Inputs:
   - Optionally overridden `package` (default `uutils-coreutils`).
   - Optional `--unified-binary` and `--bin-dir` overrides.
-  - `--dry-run`, `--no-update`, `--assume-yes`, `--wait_lock`.
+  - `--dry-run`, `--no-update`, `--assume-yes`, `--wait-lock`.
 
 - Enable behavior:
   - If `update_lists`: runs `pacman -Sy`.
