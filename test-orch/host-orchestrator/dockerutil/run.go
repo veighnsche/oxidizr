@@ -17,7 +17,20 @@ import (
 	"github.com/fatih/color"
 )
 
-func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, selected Verb, distro string, col *color.Color) error {
+// RunMeta captures metadata about a docker run invocation for summary reporting.
+type RunMeta struct {
+	Distro         string
+	Tag            string
+	ContainerName  string
+	ContainerID    string
+	StartedAt      time.Time
+	FinishedAt     time.Time
+	ExitCode       int
+	StdoutLogPath  string
+	StderrLogPath  string
+}
+
+func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, envVars []string, keepContainer bool, timeout time.Duration, selected Verb, distro string, col *color.Color, runID string) (RunMeta, error) {
 	// Build docker run args and compute derived paths
 	opts := RunOptions{
 		Tag:           tag,
@@ -28,8 +41,10 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		Selected:      selected,
 		Distro:        distro,
 		Col:           col,
+		RunID:         runID,
 	}
-	args, containerName, logsDir := BuildDockerRunArgs(opts)
+	args, containerName, logsDir, cidFile := BuildDockerRunArgs(opts)
+	meta := RunMeta{Distro: distro, Tag: tag, ContainerName: containerName}
 	if Allowed(selected, V2) {
 		log.Printf("%s RUN> docker %s", col.Sprint(Prefix(distro, V2, "HOST")), strings.Join(args, " "))
 	}
@@ -48,12 +63,12 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 	// Prepare temp log files; we'll delete them on success or rename to timestamped paths on error.
 	stdoutTmpFile, err := os.CreateTemp(logsDir, fmt.Sprintf("%s-stdout-*.log", containerName))
 	if err != nil {
-		return fmt.Errorf("failed to create temp stdout log file: %w", err)
+		return meta, fmt.Errorf("failed to create temp stdout log file: %w", err)
 	}
 	defer stdoutTmpFile.Close()
 	stderrTmpFile, err := os.CreateTemp(logsDir, fmt.Sprintf("%s-stderr-*.log", containerName))
 	if err != nil {
-		return fmt.Errorf("failed to create temp stderr log file: %w", err)
+		return meta, fmt.Errorf("failed to create temp stderr log file: %w", err)
 	}
 	defer stderrTmpFile.Close()
 
@@ -144,26 +159,17 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 			// Always capture tail and write to temp file, do not print to console
 			push(&lastStderr, content)
 			fmt.Fprintln(stderrTmpFile, content)
+			// At very-verbose, live-stream stderr as well (do not attempt to reclassify severity)
+			if Allowed(selected, V3) {
+				log.Printf("%s %s", col.Sprint(Prefix(distro, V3, "")), content)
+			}
 		}
 		doneCh <- struct{}{}
 	}()
 
+	meta.StartedAt = time.Now().UTC()
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("docker run start failed: %w", err)
-	}
-	runErr := cmd.Wait()
-	<-doneCh
-	<-doneCh
-
-	// Ensure any in-progress bar is finalized
-	finishPB()
-	if runErr != nil {
-		exitCode := -1
-		if ee, ok := runErr.(*exec.ExitError); ok {
-			exitCode = ee.ExitCode()
-		}
-		cmdLine := "docker " + strings.Join(args, " ")
-		// Persist logs with a shared timestamp
+		// Finalize temp logs into stable paths so callers can inspect
 		ts := time.Now().UTC().Format("20060102-150405Z")
 		finalStdout := filepath.Join(logsDir, fmt.Sprintf("%s-stdout-%s.log", containerName, ts))
 		finalStderr := filepath.Join(logsDir, fmt.Sprintf("%s-stderr-%s.log", containerName, ts))
@@ -171,12 +177,64 @@ func RunArchContainer(parentCtx context.Context, tag, rootDir, command string, e
 		stderrTmpFile.Close()
 		_ = os.Rename(stdoutTmpFile.Name(), finalStdout)
 		_ = os.Rename(stderrTmpFile.Name(), finalStderr)
-		return fmt.Errorf("docker run failed (exit code %d). Command: %s\nLogs saved to:\n  stdout: %s\n  stderr: %s", exitCode, cmdLine, finalStdout, finalStderr)
+		_ = os.Chmod(finalStdout, 0o644)
+		_ = os.Chmod(finalStderr, 0o644)
+		meta.FinishedAt = time.Now().UTC()
+		meta.StdoutLogPath = finalStdout
+		meta.StderrLogPath = finalStderr
+		meta.ExitCode = -1
+		return meta, fmt.Errorf("docker run start failed: %w", err)
 	}
-	// Success path: remove temp logs
+	runErr := cmd.Wait()
+	<-doneCh
+	<-doneCh
+
+	// Ensure any in-progress bar is finalized
+	finishPB()
+	meta.FinishedAt = time.Now().UTC()
+	// Determine exit code
+	exitCode := 0
+	if runErr != nil {
+		if ee, ok := runErr.(*exec.ExitError); ok {
+			exitCode = ee.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+	meta.ExitCode = exitCode
+
+	// Persist logs with a shared timestamp for both success and failure
+	ts := meta.FinishedAt.Format("20060102-150405Z")
+	finalStdout := filepath.Join(logsDir, fmt.Sprintf("%s-stdout-%s.log", containerName, ts))
+	finalStderr := filepath.Join(logsDir, fmt.Sprintf("%s-stderr-%s.log", containerName, ts))
 	stdoutTmpFile.Close()
 	stderrTmpFile.Close()
-	_ = os.Remove(stdoutTmpFile.Name())
-	_ = os.Remove(stderrTmpFile.Name())
-	return nil
+	_ = os.Rename(stdoutTmpFile.Name(), finalStdout)
+	_ = os.Rename(stderrTmpFile.Name(), finalStderr)
+	_ = os.Chmod(finalStdout, 0o644)
+	_ = os.Chmod(finalStderr, 0o644)
+	meta.StdoutLogPath = finalStdout
+	meta.StderrLogPath = finalStderr
+
+	// Attempt to read container ID from cidfile (may not exist on early start failures)
+	if b, err := os.ReadFile(cidFile); err == nil {
+		meta.ContainerID = strings.TrimSpace(string(b))
+	}
+
+    // Best-effort cleanup if container should not be kept
+    if !opts.KeepContainer {
+        id := meta.ContainerID
+        if id == "" {
+            id = containerName
+        }
+        // Try a graceful stop first, then force remove
+        _ = exec.Command("docker", "stop", "--time", "10", id).Run()
+        _ = exec.Command("docker", "rm", "-f", id).Run()
+    }
+
+	if runErr != nil {
+		cmdLine := "docker " + strings.Join(args, " ")
+		return meta, fmt.Errorf("docker run failed (exit code %d). Command: %s\nLogs saved to:\n  stdout: %s\n  stderr: %s", exitCode, cmdLine, finalStdout, finalStderr)
+	}
+	return meta, nil
 }

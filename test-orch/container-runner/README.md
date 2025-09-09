@@ -1,127 +1,101 @@
-# Container Runner
+# Container Runner (Python + Bash)
 
-The container runner executes inside Docker containers to perform the actual test execution for the oxidizr-arch test suite. It handles environment setup, YAML test suite execution, and test assertions in an isolated Arch Linux environment.
+A crystal-clear, policy-driven in-container test runner for oxidizr-arch.
 
-## Features
+Strictly aligned with VIBE_CHECK and TESTING_POLICY:
 
-- Environment setup and configuration
-- YAML test suite parsing and execution
-- Test assertions and validation
-- Logging and error reporting
-- Integration with host orchestrator
+- Bash is purely procedural (no functions, no traps); Python orchestrates and asserts.
+- The runner must not mutate product-owned artifacts except via the product CLI.
+- No repo/mirror normalization at runtime; DNS/locale/mirror work is owned by the Dockerfile.
+- Non-zero exit codes are never swallowed.
 
-## Setup phases (performed automatically)
+## Stage pipeline (in order)
 
-The runner performs a well-defined sequence of setup phases inside the container (see `setup/`):
+1. preflight — Print OS info, pacman DB timestamps, rustup/cargo versions; verify the product can be built (no repairs).
+2. deps — Install only strictly required missing packages; fail if repos unavailable.
+3. build — cargo build with explicit profile; cache via mounted target if present; record build metadata.
+4. run_suites — For each YAML suite (deterministic order):
+   - Snapshot selected files/dirs before.
+   - Execute the suite's script blocks; capture structured logs and RC.
+   - Snapshot after and run presence-aware assertions.
+   - Any restore failure = suite FAIL.
+5. collect — Package logs, snapshots, and write a run summary.
 
-1. Workspace staging (`setup/workspace.go`)
-   - Copies the mounted repository into `/root/project/oxidizr-arch`
-2. System dependencies (`setup/deps.go`)
-   - Installs: `base-devel sudo git curl rustup which findutils`
-   - Removes CachyOS-specific repo cache if present to ensure standard behavior
-3. Users (`setup/users.go`)
-   - Ensures `builder` and `spread` users exist
-   - Writes `/etc/sudoers.d/99-builder` with passwordless sudo for CI tasks
-4. AUR helper (`setup/users.go#installAurHelper`)
-   - Installs `paru-bin` from AUR when not present (skips if preinstalled)
-5. Rust toolchain (`setup/rust.go`)
-   - Sets `rustup default stable` for root and `builder`
-6. Build (`setup/build.go`)
-   - `cargo build --release` and installs `/usr/local/bin/oxidizr-arch`
+## Layout
+
+- `test-orch/container-runner/runner.py` — single entrypoint coordinating stages.
+- `test-orch/container-runner/lib/` — tiny Python helpers:
+  - `proc.py` — subprocess wrapper with timeout/env/cwd/rc/stdout/stderr capture.
+  - `log.py` — JSONL logging to `/var/log/runner.jsonl`.
+  - `fs.py` — snapshot and assertion helpers for selected paths (uutils, sudo-rs).
+  - `suites.py` — discover suites, deterministic order, per-suite parsing, distro gating.
+- `test-orch/container-runner/sh/` — procedural-only Bash wrappers (no functions/traps):
+  - `preflight.sh`
+  - `install_deps.sh`
+  - `build_product.sh`
+  - `run_suites.sh`
+  - `collect_artifacts.sh`
+
+## Output locations
+
+- JSONL log: `/var/log/runner.jsonl`
+- Proofs root: `/workspace/.proof/`
+  - Logs: `/workspace/.proof/logs/`
+  - Snapshots: `/workspace/.proof/snapshots/<suite>/`
+  - Results: `/workspace/.proof/results/<suite>/`
+- Summary: `/workspace/.proof/summary.json`
+
+The summary includes an explicit affirmation:
+
+```json
+"harness_policy": "No harness mutation of product-owned artifacts; fail-on-skip enforced"
+```
+
+## Policies enforced (hard)
+
+- Zero masking: no repo/mirror normalization, no alternate toolchains (e.g., BusyBox).
+- No symlink pre-creation/deletion by harness.
+- Fail-on-restore failure: any restore error fails the suite.
+- Presence-aware assertions: assert only based on actually present applets; if missing, expect WARN from product logs.
+- Bash minimalism: wrappers only; all logic in Python.
+
+## Environment variables
+
+- `TEST_FILTER` — run only the suite whose folder name matches this value (exact match).
+- `SUITE_TIMEOUT_SEC` — timeout for a single suite execution block (default: 900).
+- `CARGO_PROFILE` — cargo build profile (default: `release`).
+- `RUSTUP_TOOLCHAIN` — rustup toolchain to use (default: `stable`).
 
 ## Usage
 
-This program is designed to be executed inside Docker containers by the host orchestrator. It accepts commands and environment variables to control its behavior.
+Inside the container with the repository mounted at `/workspace`:
+
+- Run the full pipeline:
 
 ```bash
-# Run internal test suite (called by host orchestrator)
-./container-runner internal-runner
-
-# Show help
-./container-runner --help
-
-# Run only a specific YAML suite (example)
-./container-runner --test-filter="disable-all"
-
-# Fail-on-skip is the default; no extra flags needed
+python3 /workspace/test-orch/container-runner/runner.py all
 ```
 
-## Command Line Options
-
-- `--test-filter` (string): Run only the named YAML suite directory (e.g., `disable-all`). Default: empty (run all)
-
-## Environment Variables
-
-- `VERBOSE`: Controls logging verbosity (0-3). Propagated by the host orchestrator.
-- `TEST_FILTER`: Run specific test YAML file instead of all tests. Set automatically when `--test-filter` is used.
-
-## Commands
-
-- `internal-runner`: Execute the full test suite including YAML tests and assertions
-- `--help`: Show usage information
-
-## Demos
-
-The repository contains a demo that exercises core utilities and sudo, but it is intentionally not part of the YAML test suite. Do not place demos under `tests/`. Demos should live under `test-orch/container-runner/demos/` and be invoked explicitly.
-
-Run the demo manually inside the container image:
+- Or run stage-by-stage via wrappers:
 
 ```bash
-# Inside the running container shell (from host orchestrator --shell)
-# A login hint will be printed automatically.
-demo-utilities.sh --cleanup
+bash /workspace/test-orch/container-runner/sh/preflight.sh
+bash /workspace/test-orch/container-runner/sh/install_deps.sh
+bash /workspace/test-orch/container-runner/sh/build_product.sh
+bash /workspace/test-orch/container-runner/sh/run_suites.sh
+bash /workspace/test-orch/container-runner/sh/collect_artifacts.sh
 ```
 
-Notes:
-- The demo expects the standard container-runner environment (users, sudoers, toolchain).
-- `--cleanup` removes temporary files at the end (skipped in CI by default).
-- The demo does not enable/disable oxidizr-arch for you. If you want to compare behavior, run
-  `oxidizr-arch enable --yes` or `oxidizr-arch disable --yes --all` manually, then re-run the demo.
-
-## Locale and parallel-run handling
-
-Locales are baked into the Docker image at build time (see `test-orch/docker/Dockerfile`), including `de_DE.UTF-8`. The runner may probe/log locale status for visibility. Tests must not SKIP due to locale availability. All suites run across supported Arch-family distros without exceptions; any SKIP is a failure that must be fixed in infra or product. There is no special "full matrix" mode; fail-on-skip is the default.
-
-## Interaction with Dockerfile
-
-The Dockerfile pre-provisions prerequisites for deterministic execution, including baking `de_DE.UTF-8` into the image. User management, Rust toolchain configuration, and AUR helper installation remain the runner's responsibility.
-
-## Interactive shell helper
-
-When launching an interactive container shell, the host orchestrator `--shell` path will automatically run `setup_shell.sh`, compile a release build, symlink it into `/usr/local/bin/oxidizr-arch`, and print a hint for running the demo.
+- Run a single suite (by name, matching its directory under `tests/`):
 
 ```bash
-# You can re-run it manually if needed
-/usr/local/bin/setup_shell.sh
+TEST_FILTER=40-enable-partial python3 /workspace/test-orch/container-runner/runner.py run-suites
 ```
 
-This script simply runs `cargo build --release` in `/workspace` and symlinks the resulting binary. It is not used during CI runs handled by the container runner.
+## Acceptance criteria mapping
 
-## Architecture
-
-The container runner is organized into several packages:
-
-- `setup/`: Environment setup and configuration
-- `yamlrunner/`: YAML test suite execution
-- `assertions/`: Test assertions and validation
-- `util/`: Shared utility functions
-
-## Test Flow
-
-1. Environment setup (Rust toolchain, system packages)
-2. YAML test suite execution
-3. Custom assertions and validations
-4. Result reporting
-
-## Requirements
-
-- Go 1.21 or later
-- Arch Linux environment (provided by Docker container)
-- Access to oxidizr-arch source code (mounted at /workspace)
-
-## Integration
-
-This program works in conjunction with the host orchestrator, which:
-- Builds the Docker image containing this runner
-- Starts containers with appropriate environment variables
-- Mounts the source code and manages container lifecycle
+- Executes exact stage order and produces `runner.jsonl` + `summary.json` + per-suite logs.
+- No direct writes to `/usr/bin/*` outside product invocations; snapshots show only product-driven changes.
+- Restore failures cause suite FAIL.
+- Presence-aware checks behave on Arch + Manjaro.
+- Dockerfile responsibilities are reused; runner never touches DNS/locale/mirror settings at runtime.
