@@ -1,3 +1,4 @@
+# language: en
 Feature: Atomic swap and recovery
   As a system integrator
   I want atomic, reversible filesystem swaps with clear audit and fallback behavior

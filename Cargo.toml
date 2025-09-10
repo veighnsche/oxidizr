@@ -32,7 +32,7 @@ atty = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 fs2 = "0.4"
-switchyard = { path = "switchyard" }
+switchyard = { path = "cargo/switchyard", optional = true }
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -40,13 +40,16 @@ predicates = "3.0"
 tempfile = "3.12"
 
 [workspace]
-members = []
+members = [
+  "cargo/bdd-runner",
+]
 resolver = "2"
 
 [features]
-default = ["switchyard"]
+default = []
 # Enable real Arch Linux system operations (pacman/paru, filesystem changes).
 # When disabled, a no-op System is used.
 arch = []
-# Experimental internal switchyard facade (phase 1). Disabled by default.
-switchyard = []
+# Experimental internal switchyard facade (phase 1). Enable to pull in the local 'switchyard' crate.
+switchyard = ["dep:switchyard"]
+

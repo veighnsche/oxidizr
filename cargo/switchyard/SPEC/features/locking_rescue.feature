@@ -1,3 +1,4 @@
+# language: en
 Feature: Locking and rescue behavior
   As a deployer in production
   I want safe concurrent behavior and a guaranteed rescue profile

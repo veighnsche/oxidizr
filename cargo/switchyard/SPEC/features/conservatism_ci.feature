@@ -1,3 +1,4 @@
+# language: en
 Feature: Conservatism and CI gates
   As a maintainer
   I want dry-run by default, fail-closed policy, and strict CI gates

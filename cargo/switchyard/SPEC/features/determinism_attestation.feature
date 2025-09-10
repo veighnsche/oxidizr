@@ -1,3 +1,4 @@
+# language: en
 Feature: Determinism and attestation
   As an auditor
   I want stable identifiers and signed bundles
@@ -14,3 +15,4 @@ Feature: Determinism and attestation
     Given an apply bundle
     When I complete an apply
     Then an attestation is generated and signed with ed25519 and attached to the facts
+

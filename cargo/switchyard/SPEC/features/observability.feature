@@ -1,3 +1,4 @@
+# language: en
 Feature: Observability, audit, and determinism
   As an operator and auditor
   I want complete, structured, and deterministic facts

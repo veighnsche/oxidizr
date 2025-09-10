@@ -1,3 +1,4 @@
+# language: en
 Feature: Safety preconditions and gating
   As a platform security engineer
   I want strict path safety and environment gating
