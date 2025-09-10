@@ -239,8 +239,6 @@ Errors are emitted in facts as stable identifiers (e.g. `E_POLICY`, `E_LOCKING`)
 
 ---
 
- 
-
 ## 7. Formal Safety Model
 
 ### Invariants (TLA+ sketch)
