@@ -6,7 +6,7 @@ References:
 
 - SPEC: `cargo/switchyard/SPEC/SPEC.md §3.2 Adapters`, `§2.8 Conservatism & Modes`
 - Requirements: `REQ-C1`, `REQ-C2`, `REQ-L1..L4`, `REQ-RC2`
-- Related docs: `impl/20-adapters.md`, `impl/55-preflight.md`, `impl/80-locking-concurrency.md`
+- Related docs: `impl/20-adapters.md`, `impl/45-preflight.md`, `impl/50-locking-concurrency.md`
 
 ## Policy Flags (Planning)
 

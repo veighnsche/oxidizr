@@ -35,7 +35,7 @@ fn preflight(plan: &Plan, adapters: &Adapters, policy: &PolicyFlags) -> Result<P
     let mut rows: Vec<PreflightRow> = vec![];
 
     // Global rescue checks (record as a synthetic row or summary fact)
-    let rescue = verify_rescue_profile(&*adapters.path);    // see impl/95-rescue.md
+    let rescue = verify_rescue_profile(&*adapters.path);    // see impl/65-rescue.md
     if policy.require_rescue && (!rescue.has_rescue_symlinks || !rescue.toolset_ok) {
         return Err(Error{ kind: E_POLICY, msg: "rescue profile not satisfied" });
     }

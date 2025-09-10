@@ -89,7 +89,7 @@ fsync(parent) within 50ms                                    // REQ-BND1
 
 ## Error Mapping
 
-- Invalid `SafePath` → `E_POLICY` (maps to `policy_violation` exit code). See `impl/60-errors-and-exit-codes.md`.
+- Invalid `SafePath` → `E_POLICY` (maps to `policy_violation` exit code). See `impl/30-errors-and-exit-codes.md`.
 - Attempts that require following symlinks on parent are rejected by design.
 
 ## SPEC/Test Mapping
