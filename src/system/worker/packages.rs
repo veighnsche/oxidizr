@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 
 use crate::error::{Error, Result};
 use crate::logging::{audit_event_fields, AuditFields};
-use which::which;
 
 impl super::Worker {
     /// Ensure AUR build prerequisites are present or install them under --assume-yes.
@@ -186,7 +185,9 @@ impl super::Worker {
         // Selective policy: allow AUR fallback only for uutils-findutils-bin
         if package == "uutils-findutils-bin" {
             let candidates = self.aur_helper_candidates();
-            let available_iter = candidates.into_iter().filter(|h| which(h).is_ok());
+            let available_iter = candidates
+                .into_iter()
+                .filter(|h| self.which(h).ok().flatten().is_some());
             let mut tried_any = false;
 
             for h in available_iter {

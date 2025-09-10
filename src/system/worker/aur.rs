@@ -1,13 +1,12 @@
 use crate::error::Result;
 use crate::logging::{audit_event_fields, AuditFields};
-use which::which;
 
 impl super::Worker {
     /// Get available AUR helper name if any
     pub fn aur_helper_name(&self) -> Result<Option<String>> {
         let candidates = self.aur_helper_candidates();
         for h in &candidates {
-            if which(h).is_ok() {
+            if self.which(h).ok().flatten().is_some() {
                 let _ = audit_event_fields(
                     "worker",
                     "aur_helper_name",
