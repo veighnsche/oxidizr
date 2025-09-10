@@ -1,4 +1,4 @@
-# Switchyard Specification (Reproducible v1.2)
+# Switchyard Specification (Reproducible v1.3)
 
 ## 0. Domain & Purpose
 
@@ -7,15 +7,28 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 
 ---
 
-## 1. Core Guarantees
+## 1. Main Guarantees
 
-### 1.1 Atomicity
+- Atomic, crash-safe swaps with no user-visible broken/missing path.
+- Complete, idempotent rollback; automatic reverse-order rollback on any apply failure; partial restoration state reported if rollback fails.
+- SafePath everywhere for mutations; TOCTOU-safe sequence (open parent O_DIRECTORY|O_NOFOLLOW → openat → renameat → fsync(parent)).
+- Deterministic plans and outputs: UUIDv5 IDs over normalized inputs; dry-run facts byte-identical after timestamp redactions.
+- Locking required in production with bounded wait → E_LOCKING; facts include lock_wait_ms.
+- Rescue profile always available; at least one fallback toolset (GNU/BusyBox) present on PATH.
+- Auditable, tamper-evident facts (schema v1): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance.
+- Conservative by default: dry-run mode; fail-closed on critical compatibility differences unless policy overrides.
+- Health verification required: minimal smoke suite runs post-apply; failure triggers auto-rollback (unless explicitly disabled).
+- Cross-filesystem safety: EXDEV fallback with degraded-mode policy and telemetry.
+
+## 2. Normative Requirements
+
+### 2.1 Atomicity
 
 - REQ-A1: A swap **MUST** be atomic with respect to crashes.
 - REQ-A2: At no time **MUST** a user-visible broken or missing path exist.
 - REQ-A3: All-or-nothing per plan: either all actions succeed, or no visible changes remain.
 
-### 1.2 Rollback
+### 2.2 Rollback
 
 - REQ-R1: Every change **MUST** be reversible by rollback.
 - REQ-R2: Rollback **MUST** restore the exact prior link/file topology.
@@ -23,7 +36,7 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-R4: On any apply failure, already-applied actions **MUST** be rolled back in reverse plan order automatically.
 - REQ-R5: If rollback itself fails, facts **MUST** capture partial restoration state and guidance for operator recovery.
 
-### 1.3 Safety Preconditions
+### 2.3 Safety Preconditions
 
 - REQ-S1: Paths **MUST NOT** contain `..` or escape allowed roots.
 - REQ-S2: Operations **MUST** fail if target FS is read-only, `noexec`, or immutable.
@@ -31,7 +44,7 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-S4: If `strict_ownership=true`, targets **MUST** be package-owned (via adapter).
 - REQ-S5: Preservation gating: FS capabilities for ownership, mode, timestamps, xattrs/ACLs/caps **MUST** be probed during preflight; if required by policy but unsupported, preflight **MUST** STOP (fail-closed) unless explicitly overridden.
 
-### 1.4 Observability
+### 2.4 Observability & Audit
 
 - REQ-O1: Every step **MUST** emit a structured fact (JSON).
 - REQ-O2: Dry-run facts **MUST** be byte-identical to real-run facts.
@@ -39,42 +52,48 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-O4: Attestations (signatures, SBOM-lite fragments) **MUST** be generated and signed for each apply bundle.
 - REQ-O5: For every mutated file, `before_hash` and `after_hash` **MUST** be recorded using SHA-256 (`hash_alg=sha256`).
 - REQ-O6: Secret masking **MUST** be enforced across all audit sinks; no free-form secrets are permitted.
-- REQ-O7: Provenance **MUST** include origin (repo/AUR/manual), helper, uid/gid, and confirmation of environment sanitization; AUR usage **MUST** be explicit via policy (`allow_aur`).
+- REQ-O7: Provenance **MUST** include origin (repo/AUR/manual), helper, uid/gid, and confirmation of environment sanitization. Policy gating for external sources is out of scope of this core spec and MAY be enforced by adapters.
 
-### 1.5 Locking
+### 2.5 Locking
 
 - REQ-L1: Only one `apply()` **MUST** mutate at a time.
 - REQ-L2: If no lock manager, concurrent `apply()` is **UNSUPPORTED** (dev/test only) and a WARN fact **MUST** be emitted.
 - REQ-L3: Lock acquisition **MUST** use a bounded wait with timeout → `E_LOCKING`, and facts **MUST** record `lock_wait_ms`.
 - REQ-L4: In production deployments, a `LockManager` **MUST** be present. Omission is permitted only in development/testing.
 
-### 1.6 Rescue
+### 2.6 Rescue
 
 - REQ-RC1: A rescue profile (backup symlink set) **MUST** always remain available.
 - REQ-RC2: Preflight **MUST** verify at least one functional fallback path.
 - REQ-RC3: At least one fallback binary set (GNU or BusyBox) **MUST** remain executable and present on `PATH` for recovery.
 
-### 1.7 Determinism
+### 2.7 Determinism
 
 - REQ-D1: `plan_id` and `action_id` are UUIDv5 values derived from the normalized plan input using a project-defined, stable namespace.
 - REQ-D2: Dry-run redactions are pinned: timestamps are zeroed (or expressed as monotonic deltas). Dry-run facts **MUST** be byte-identical to real-run facts after redaction.
 
-### 1.8 Conservatism & Modes
+### 2.8 Conservatism & Modes
 
 - REQ-C1: Dry-run is the default mode; side effects require explicit operator approval (e.g., `--assume-yes`).
 - REQ-C2: Critical compatibility violations (e.g., ownership, policy, filesystem capability) **MUST** fail closed unless explicitly overridden by policy.
 
-### 1.9 Health Verification
+### 2.9 Health Verification
 
 - REQ-H1: A minimal post-apply smoke suite **MUST** run (ls, cp, mv, rm, ln, stat, readlink, sha256sum, sort, date) with specified arguments.
 - REQ-H2: Any mismatch or non-zero exit **MUST** trigger automatic rollback unless explicitly disabled by policy.
 - REQ-H3: Health verification is part of commit; it is not optional.
 
+### 2.10 Filesystems & Degraded Mode
+
+- REQ-F1: When staging and target parents reside on different filesystems (EXDEV), the engine **MUST** use a safe copy + fsync + rename fallback that preserves atomic visibility.
+- REQ-F2: If degraded fallback is used and policy allows, facts **MUST** record `degraded=true`; if policy disallows degraded operation, apply **MUST** fail.
+- REQ-F3: Supported/tested filesystems include ext4, xfs, btrfs, and tmpfs; semantics are verified in acceptance tests.
+
 ---
 
-## 2. Interfaces
+## 3. Public Interfaces
 
-### 2.1 Public API
+### 3.1 Public API
 
 ```rust
 fn plan(input: PlanInput) -> Plan;
@@ -85,7 +104,7 @@ fn plan_rollback_of(report: &ApplyReport) -> Plan;
 
 All path-carrying fields within `PlanInput` and `Plan` **MUST** be typed as `SafePath`. Mutating entry points do not accept `PathBuf`.
 
-### 2.2 Adapters
+### 3.2 Adapters
 
 ```rust
 trait OwnershipOracle { fn owner_of(&self, path: &SafePath) -> Result<OwnershipInfo>; }
@@ -95,7 +114,7 @@ trait Attestor { fn sign(&self, bundle: &[u8]) -> Result<Signature>; }
 trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; }
 ```
 
-### 2.3 SafePath
+### 3.3 SafePath
 
 - Constructed via `SafePath::from_rooted(root, candidate)`.
 - Rejects `..` after normalization.
@@ -105,7 +124,34 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
 
 ---
 
-## 3. Facts & Audit Schema
+## 4. Preflight Diff (Normative Schema)
+
+**YAML schema (`/SPEC/preflight.yaml`):**
+
+```yaml
+type: sequence
+items:
+  type: map
+  mapping:
+    action_id: { type: str }
+    path: { type: str }
+    current_kind: { enum: [missing, file, dir, symlink] }
+    planned_kind: { enum: [symlink, restore_from_backup, skip] }
+    policy_ok: { type: bool }
+    provenance:
+      type: map
+      mapping:
+        uid: { type: int }
+        gid: { type: int }
+        pkg: { type: str }
+    notes: { type: seq, sequence: { type: str } }
+```
+
+Dry-run output must match real-run preflight rows byte-for-byte.
+
+---
+
+## 5. Audit Facts (JSON Schema v1)
 
 **JSON Schema (`/SPEC/audit_event.schema.json`):**
 
@@ -147,8 +193,7 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
         "uid": {"type":"integer"},
         "gid": {"type":"integer"},
         "pkg": {"type":"string"},
-        "env_sanitized": {"type":"boolean"},
-        "allow_aur": {"type":"boolean"}
+        "env_sanitized": {"type":"boolean"}
       }
     },
     "preservation": {
@@ -172,7 +217,7 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
 
 ---
 
-## 4. Error Taxonomy & Exit Codes
+## 6. Error Taxonomy & Exit Codes
 
 **TOML (`/SPEC/error_codes.toml`):**
 
@@ -194,48 +239,23 @@ Errors are emitted in facts as stable identifiers (e.g. `E_POLICY`, `E_LOCKING`)
 
 ---
 
-## 5. Preflight Diff
+ 
 
-**YAML schema (`/SPEC/preflight.yaml`):**
+## 7. Formal Safety Model
 
-```yaml
-type: sequence
-items:
-  type: map
-  mapping:
-    action_id: { type: str }
-    path: { type: str }
-    current_kind: { enum: [missing, file, dir, symlink] }
-    planned_kind: { enum: [symlink, restore_from_backup, skip] }
-    policy_ok: { type: bool }
-    provenance:
-      type: map
-      mapping:
-        uid: { type: int }
-        gid: { type: int }
-        pkg: { type: str }
-    notes: { type: seq, sequence: { type: str } }
-```
-
-Dry-run output must match real-run preflight rows byte-for-byte.
-
----
-
-## 6. Formal Safety Model
-
-### 6.1 Invariants (TLA+ sketch)
+### Invariants (TLA+ sketch)
 
 - **NoBrokenLinks:** No symlink points to a missing file.
 - **Rollbackable:** After any sequence of steps, `CanRollback` holds.
 
-### 6.2 Properties
+### Properties
 
 - **AtomicReplace:** property-based tests ensure no intermediate “missing” visible.
 - **IdempotentRollback:** applying rollback twice yields same FS state.
 
 ---
 
-## 7. Acceptance Tests (BDD-style)
+## 8. Acceptance Tests (BDD-style)
 
 ```gherkin
 Feature: Atomic swap
@@ -262,21 +282,10 @@ Feature: Atomic swap
 
 ---
 
-## 8. Operational Bounds
+## 9. Operational Bounds
 
 - `fsync(parent)` MUST occur ≤50ms after rename.
 - Plan size default max = 1000 actions (configurable).
-
----
-
-## 9. Compliance Mapping
-
-- REQ-A1/A2/A3 → Atomic tests, TLA invariants.
-- REQ-R1/R2/R3 → Rollback tests, property-based tests.
-- REQ-S\* → Preflight validations.
-- REQ-O\* → Audit JSON schema compliance.
-- REQ-L\* → Lock tests.
-- REQ-RC\* → Rescue profile tests.
 
 ---
 
@@ -328,28 +337,26 @@ Golden JSON fixtures MUST exist for plan, preflight, apply, and rollback facts. 
 
 Core types (e.g., `Plan`, apply engine) are `Send + Sync`. `apply()` MAY be called from multiple threads, but only one mutator proceeds at a time under the `LockManager`. Without a `LockManager`, concurrent apply is unsupported and intended only for dev/test.
 
-## 15. Extended Metadata Preservation
+## 15. Security Requirements Summary
 
-By default, the engine preserves ownership (uid/gid), mode (permissions), and timestamps. Preservation of extended attributes (xattrs), ACLs, and capabilities (caps) is policy-controlled:
+- Automatic reverse-order rollback on mid-plan failure; idempotent rollback; partial-restoration facts on rollback error.
+- SafePath-only mutations and TOCTOU-safe sequence (open parent O_DIRECTORY|O_NOFOLLOW → openat → renameat → fsync(parent)).
+- Deterministic plan/action IDs (UUIDv5); dry-run facts byte-identical after timestamp redactions.
+- Production locking required; bounded wait with timeout → E_LOCKING; facts include lock_wait_ms.
+- Rescue profile with at least one fallback toolset on PATH; preflight verifies availability.
+- Audit facts schema v1 with SHA-256 before/after hashes; signed attestation bundles; strict secret masking; complete provenance.
+- Preflight Diff schema with stable ordering and keys.
+- Cross-filesystem EXDEV fallback with degraded-mode policy and telemetry.
+- Minimal smoke suite with exact args; failure → auto-rollback unless explicitly disabled.
+- Golden fixtures and zero-SKIP CI gate.
 
-- Preflight MUST probe filesystem support for these attributes.
-- If preservation is unsupported and policy requires it, preflight MUST STOP (fail closed) unless explicitly overridden.
-- Facts SHOULD record what preservation was applied via `preservation` and whether it was supported via `preservation_supported`.
+## 16. Change Log (v1.2 → v1.3)
 
-## 16. Modes & Conservatism
-
-- Dry-run is the default mode; side effects require explicit operator approval (e.g., `--assume-yes`).
-- Critical compatibility differences (ownership, policy gating, FS capability checks) MUST stop execution unless explicitly overridden by policy.
-
-## 17. Supply Chain Integrity
-
-- Provenance MUST include origin (repo/AUR/manual), helper, uid/gid, and confirmation that the environment was sanitized.
-- AUR usage is permitted only when `allow_aur=true` per policy; this MUST be reflected in provenance facts.
-- Attestation bundles MUST be signed (Ed25519) and made available for external verification.
-
-## 18. Verbosity & Log Discipline
-
-Verbosity levels (v0–v3) are normative, and logs SHOULD include a consistent prefix, e.g., `[distro][vN][scope]`. Emission volume and fields scale with level, without weakening masking or security requirements at lower levels.
+- Restructured document to the new canonical order and introduced “Main Guarantees”.
+- Clarified OS-agnostic stance; removed policy coupling (no `allow_aur` in core schema).
+- Consolidated preservation gating, provenance completeness, and health verification into Normative Requirements.
+- Moved Preflight Diff ahead of Audit Facts; kept schemas minimal and valid.
+- Removed “Compliance Mapping” and standalone sections for Modes/Preservation/Supply Chain/Verbosity; replaced with Security Requirements Summary.
 
 ---
 
