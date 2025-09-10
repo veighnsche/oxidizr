@@ -5,6 +5,19 @@ use crate::ui::progress;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+#[cfg(feature = "switchyard")]
+use crate::switchyard::{ApplyMode, FactsEmitter, AuditSink, LinkRequest, PlanInput, Policy, RestoreRequest, Switchyard};
+
+#[cfg(feature = "switchyard")]
+struct NullFacts;
+#[cfg(feature = "switchyard")]
+impl FactsEmitter for NullFacts {}
+
+#[cfg(feature = "switchyard")]
+struct NullAudit;
+#[cfg(feature = "switchyard")]
+impl AuditSink for NullAudit {}
+
 /// Resolve a target path under /usr/bin
 pub fn resolve_usrbin(filename: &str) -> PathBuf {
     Path::new("/usr/bin").join(filename)
@@ -16,6 +29,12 @@ pub fn create_symlinks<F>(worker: &Worker, applets: &[(String, PathBuf)], resolv
 where
     F: Fn(&str) -> PathBuf,
 {
+    // Optional: run via switchyard facade when feature is enabled
+    #[cfg(feature = "switchyard")]
+    {
+        return create_symlinks_via_switchyard(worker, applets, resolve);
+    }
+
     let mut pb = progress::new_bar(applets.len() as u64);
     let _quiet_guard = if pb.is_some() {
         Some(progress::enable_symlink_quiet())
@@ -87,8 +106,49 @@ where
     Ok(())
 }
 
+#[cfg(feature = "switchyard")]
+fn create_symlinks_via_switchyard<F>(
+    worker: &Worker,
+    applets: &[(String, PathBuf)],
+    resolve: F,
+) -> Result<()>
+where
+    F: Fn(&str) -> PathBuf,
+{
+    let policy = Policy {
+        allow_roots: vec![PathBuf::from("/usr")],
+        forbid_paths: vec![],
+        strict_ownership: worker.strict_ownership,
+        force_untrusted_source: worker.force_override_untrusted,
+        force_restore_best_effort: worker.force_restore_best_effort,
+    };
+    let sx = Switchyard::new(NullFacts, NullAudit, policy);
+    let mut input = PlanInput::default();
+    for (filename, src) in applets.iter() {
+        let target = resolve(filename);
+        input.link.push(LinkRequest { source: src.clone(), target });
+    }
+    let plan = sx.plan(input);
+    let pre = sx.preflight(&plan);
+    if !pre.ok {
+        return Err(Error::ExecutionFailed(format!("preflight failed: {}", pre.stops.join(", "))));
+    }
+    let mode = if worker.dry_run { ApplyMode::DryRun } else { ApplyMode::Commit };
+    let rep = sx.apply(&plan, mode);
+    if !rep.errors.is_empty() {
+        return Err(Error::ExecutionFailed(format!("apply errors: {}", rep.errors.join(", "))));
+    }
+    Ok(())
+}
+
 /// Restore a list of targets, logging each and surfacing errors with context.
 pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
+    // Optional: run via switchyard facade when feature is enabled
+    #[cfg(feature = "switchyard")]
+    {
+        return restore_targets_via_switchyard(worker, targets);
+    }
+
     let mut pb = progress::new_bar(targets.len() as u64);
     let _quiet_guard = if pb.is_some() {
         Some(progress::enable_symlink_quiet())
@@ -144,6 +204,33 @@ pub fn restore_targets(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
         }
     }
     progress::finish(pb);
+    Ok(())
+}
+
+#[cfg(feature = "switchyard")]
+fn restore_targets_via_switchyard(worker: &Worker, targets: &[PathBuf]) -> Result<()> {
+    let policy = Policy {
+        allow_roots: vec![PathBuf::from("/usr")],
+        forbid_paths: vec![],
+        strict_ownership: worker.strict_ownership,
+        force_untrusted_source: worker.force_override_untrusted,
+        force_restore_best_effort: worker.force_restore_best_effort,
+    };
+    let sx = Switchyard::new(NullFacts, NullAudit, policy);
+    let mut input = PlanInput::default();
+    for t in targets {
+        input.restore.push(RestoreRequest { target: t.clone() });
+    }
+    let plan = sx.plan(input);
+    let pre = sx.preflight(&plan);
+    if !pre.ok {
+        return Err(Error::ExecutionFailed(format!("preflight failed: {}", pre.stops.join(", "))));
+    }
+    let mode = if worker.dry_run { ApplyMode::DryRun } else { ApplyMode::Commit };
+    let rep = sx.apply(&plan, mode);
+    if !rep.errors.is_empty() {
+        return Err(Error::ExecutionFailed(format!("apply errors: {}", rep.errors.join(", "))));
+    }
     Ok(())
 }
 

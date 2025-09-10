@@ -43,3 +43,5 @@ default = []
 # Enable real Arch Linux system operations (pacman/paru, filesystem changes).
 # When disabled, a no-op System is used.
 arch = []
+# Experimental internal switchyard facade (phase 1). Disabled by default.
+switchyard = []

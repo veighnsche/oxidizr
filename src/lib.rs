@@ -7,6 +7,7 @@ pub mod symlink;
 pub mod system;
 pub mod ui;
 pub mod state;
+pub mod switchyard;
 
 pub use error::{Error, Result};
 
