@@ -1,4 +1,4 @@
-# Switchyard Specification (Reproducible v1.3)
+# Switchyard Specification (RFC-2119)
 
 ## 0. Domain & Purpose
 
@@ -347,21 +347,3 @@ Core types (e.g., `Plan`, apply engine) are `Send + Sync`. `apply()` MAY be call
 - Cross-filesystem EXDEV fallback with degraded-mode policy and telemetry.
 - Minimal smoke suite with exact args; failure → auto-rollback unless explicitly disabled.
 - Golden fixtures and zero-SKIP CI gate.
-
-## 16. Change Log (v1.2 → v1.3)
-
-- Restructured document to the new canonical order and introduced “Main Guarantees”.
-- Clarified OS-agnostic stance; removed policy coupling (no `allow_aur` in core schema).
-- Consolidated preservation gating, provenance completeness, and health verification into Normative Requirements.
-- Moved Preflight Diff ahead of Audit Facts; kept schemas minimal and valid.
-- Removed “Compliance Mapping” and standalone sections for Modes/Preservation/Supply Chain/Verbosity; replaced with Security Requirements Summary.
-
----
-
-✅ This spec is **reproducible**:
-
-- Human-readable requirements (RFC-2119).
-- Machine-checkable YAML/TOML/JSON schemas.
-- Formalizable invariants (TLA+).
-- BDD acceptance tests.
-- Property-based tests for atomicity.
