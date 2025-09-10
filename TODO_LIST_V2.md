@@ -4,26 +4,35 @@ This list prioritizes remediation work from the fresh audit of `src/` (entrypoin
 
 ## P0 — Immediate Safety and Transaction Guarantees
 
-- __Transaction rollback across multi-target operations__
-  - Implement a transactional guard in `experiments/util.rs::create_symlinks()` that records per-target actions (backup created, target replaced) and automatically restores on the first failure.
-  - Strategy: build an in-memory journal and use RAII to roll back unless an explicit `commit()` is called at the end.
-  - Touch points: `symlink/ops.rs::{replace_file_with_symlink, restore_file}`, `experiments/*::enable()` callers.
+- __Profiles layout + single active pointer flip__ (replaces multi-target journaling)
+  - Why: Touching N symlinks one-by-one increases blast radius and rollback complexity; a single `renameat` of an active profile pointer is safer and smaller.
+  - Actionable Steps:
+    - Create profiles: `/usr/lib/oxidizr-arch/profiles/{gnu,uutils}/bin` and `active -> <profile>`.
+    - Link `/usr/bin/*` to `.../active/bin/<applet>`; during flips, update `active` via atomic `renameat`.
+    - Migrate current state to profiles; keep `restore_file()` for emergency repair paths.
+  - References: `symlink/ops.rs::{atomic_symlink_swap, restore_file}`, `experiments/coreutils.rs::{enable,disable}`, `state/mod.rs`.
 
 - __Preflight plan and diff__
   - Compute and print a preflight plan of intended changes before mutating the system.
   - Add `--preflight` (on by default unless `--assume-yes`) to show a diff-like summary: target path, current state (file/symlink->dest), planned state (symlink->source).
   - Touch points: `experiments/*::enable()`, `experiments/util.rs::create_symlinks()` and `list_targets()`.
 
-- __Strict metadata backup & restore__
-  - Back up and restore timestamps (atime/mtime), owner (uid/gid), and permissions for regular files; for symlinks, preserve link target and lstat metadata when possible.
-  - Extend `symlink/ops.rs` copy/backup logic to set timestamps (via `libc::utimensat`), and optionally record xattrs/ACLs (see P1 items) to sidecar `.meta` file.
+- __Metadata backup & restore (file vs symlink split)__
+  - Why: Full xattrs/ACL/timestamps on symlinks are not meaningful here; preserving linkness + target is sufficient for symlinks.
+  - Actionable Steps:
+    - Regular files: after `fs::copy`, restore owner/mode and set mtime/atime via `utimensat`.
+    - Symlinks: keep current link-aware backup/restore; skip deep metadata unless a policy requires it.
+  - References: `symlink/ops.rs::{replace_file_with_symlink, restore_file, atomic_symlink_swap}`.
 
 ## P1 — Auditability and Supply Chain
 
-- __Before/after cryptographic hashes in audit logs__
-  - For each target, compute `sha256` (or `blake3`) of the real file contents before change and of the resulting symlink destination binary after change, and include in `AuditFields`.
-  - Add fields: `before_hash`, `after_hash` (extend `logging/audit.rs::AuditFields`).
-  - Touch points: `experiments/util.rs::create_symlinks()`, `symlink/ops.rs`.
+- __Selective hashing for audit (changed or untrusted sources)__
+  - Why: Hashing every applet each run is expensive and unnecessary when official repo provenance is recorded.
+  - Actionable Steps:
+    - Hash only targets mutated during the current run; always hash when `query_file_owner()` returns `None` or the source is under `$HOME`/non-repo.
+    - Cache by `(inode, mtime, size)` to avoid re-hashing unchanged paths; add `--hash` to force full hashing.
+    - Extend `AuditFields` with optional `before_hash`, `after_hash`.
+  - References: `experiments/util.rs::create_symlinks()`, `symlink/ops.rs`, `system/worker/packages.rs::query_file_owner()`.
 
 - __Record actor, provenance, versions, and exit codes__
   - Actor: add `uid`, `euid`, `user` into audit envelope using `nix::unistd` and (optionally) `users` crate.
@@ -33,14 +42,24 @@ This list prioritizes remediation work from the fresh audit of `src/` (entrypoin
 
 - __Append-only, tamper-evident audit log__
   - Ensure open with O_APPEND semantics and 0640 perms; document log rotation.
-  - Add chained hashing: include previous line hash in each record (`prev_hash`) to create a verifiable chain.
-  - Touch points: `logging/init.rs::AuditMakeWriter`, `logging/audit.rs`.
+  - Why: Per-line chained hashes complicate rotation and are brittle on partial loss.
+  - Lean replacement: per-operation detached signature (`audit-<op_id>.jsonl` + `.sig`).
+  - Actionable Steps:
+    - Buffer audit events per `op_id` and flush to `audit-<op_id>.jsonl` at end of run.
+    - Sign with Ed25519 to `audit-<op_id>.jsonl.sig`; add `oxidizr-arch audit verify --op <op_id>`.
+  - References: `logging/init.rs::AuditMakeWriter`, `logging/audit.rs::audit_event_fields`.
 
 - __Supply chain: signature verification and SBOM fragments__
   - For official packages, rely on pacman’s signature verification; record verification result in audit (`pacman -Qi` fields like `Validated By`).
   - For AUR builds, record makepkg checksum verification results in audit; optionally verify downloaded artifacts against upstream signatures.
   - Generate minimal SBOM fragment: package name, version, source repo, installed files subset relevant to linked applets.
   - Touch points: `system/worker/packages.rs`, `experiments/*` discovery.
+
+- __AUR opt-in policy (repo-first)__
+  - Why: Implicit AUR invocation increases trust surface; require explicit operator consent.
+  - Actionable Steps:
+    - Gate AUR paths behind `--allow-aur` and `--aur-user`; otherwise emit the exact helper command for the operator.
+  - References: `system/worker/packages.rs::{install_package, ensure_aur_preflight}`.
 
 - __Mask sensitive fields in structured audit events__
   - Extend `logging/audit.rs::AuditFields` pipeline (or pre-call sanitization) to mask secrets in `audit_event_fields()` similar to `audit_event()`.
@@ -58,9 +77,12 @@ This list prioritizes remediation work from the fresh audit of `src/` (entrypoin
   - If any test fails, trigger transaction rollback via the journal (P0) and surface a clear error.
   - Touch points: `experiments/*::enable()`, new `experiments/util.rs::run_smoke_tests()`.
 
-- __Rescue toolset and initramfs access__
-  - Add an optional `oxidizr-arch install-rescue` subcommand to install a static `busybox` (or ensure presence) and record its path in state.
-  - Document and/or implement hooks to ensure essential commands available in initramfs (documentation plus optional mkinitcpio hook).
+- __GNU escape path + canary shell (replace BusyBox bundle)__
+  - Why: GNU binaries remain installed; adding a static BusyBox increases attack surface without proportional benefit.
+  - Actionable Steps:
+    - Provide a stable GNU escape profile and document `export PATH=/usr/lib/oxidizr-arch/profiles/gnu/bin:$PATH`.
+    - Add a non-mutating `oxidizr-arch canary --shell` that spawns a shell with GNU PATH for diagnostics (design only here).
+  - References: `experiments/coreutils.rs::{enable,disable}`, `symlink/ops.rs`, `state/mod.rs`.
 
 - __Post-restore verifiers for non-sudo experiments__
   - After `disable`, verify restored targets are regular files (not symlinks) for coreutils/findutils/checksums, mirroring `sudors.rs` checks.
@@ -69,8 +91,10 @@ This list prioritizes remediation work from the fresh audit of `src/` (entrypoin
 ## P2 — Determinism and Minimal Trusted Surface
 
 - __Determinism guardrails__
-  - Reduce reliance on ambient env: standardize locale (`LC_ALL=C`), clear nonessential env for external calls, and make progress/UI non-randomized.
-  - Consider a `--deterministic` flag to enforce stricter behavior (timestamps normalization in logs, stable ordering of operations).
+  - Why: A global "deterministic mode" is over-broad for this tool.
+  - Actionable Steps:
+    - Standardize locale (`LC_ALL=C`), sanitize env for external commands, and ensure stable ordering of operations and log fields.
+  - References: `system/worker/packages.rs` (Command env), `logging/audit.rs`.
 
 - __Dependencies review__
   - Evaluate replacing `which` crate with small PATH search; consider removing heavy deps where possible.
@@ -102,8 +126,10 @@ This list prioritizes remediation work from the fresh audit of `src/` (entrypoin
   - Touch points: `symlink/ops.rs`, `system/worker/fs_ops.rs`.
 
 - __Pacman lock handling ergonomics__
-  - Add optional jitter/backoff and cancellation hooks during pacman DB lock waits to improve UX; surface clearer progress messages while waiting.
-  - Touch points: `system/worker/packages.rs::wait_for_pacman_lock_clear()`.
+  - Why: Elaborate backoff/cancel logic is overkill; keep behavior simple and predictable.
+  - Actionable Steps:
+    - Maintain a simple bounded wait with small jitter and clear progress messages while waiting for the lock.
+  - References: `system/worker/packages.rs::wait_for_pacman_lock_clear()`.
 
 ## P2 — Tests and CI
 
@@ -132,3 +158,37 @@ This list prioritizes remediation work from the fresh audit of `src/` (entrypoin
   
 - __Exit code mapping__
   - Document the exit code table from `src/error.rs::Error::exit_code()` in the README or a dedicated doc.
+
+## Detected Overkill (from code scan)
+
+- [experiments/coreutils.rs::discover_applets]
+  - Why overkill: Over-broad fallback search paths (e.g., `/usr/lib/cargo/bin/coreutils/`, `/usr/lib/cargo/bin/`) add surface and latency without clear benefit.
+  - Safer, smaller replacement: Prefer unified binary or configured bin directory; otherwise fall back to PATH only.
+  - Actionable Steps:
+    - Trim candidates to `{bin_directory, unified binary, PATH}` and log final resolution.
+  - References: `src/experiments/coreutils.rs::discover_applets()`.
+  - Priority: P2 (simplifies discovery, reduces surprises).
+
+- [system/worker/packages.rs::install_package]
+  - Why overkill: Implicit AUR fallback for `uutils-findutils-bin` runs helpers automatically.
+  - Safer, smaller replacement: Repo-first; require `--allow-aur` + `--aur-user` for AUR, else print exact helper command.
+  - Actionable Steps:
+    - Add CLI gating and condition the AUR path on opt-in; improve audit logs to record decision.
+  - References: `src/system/worker/packages.rs::{install_package, ensure_aur_preflight}`.
+  - Priority: P1 (reduces trusted surface for supply chain).
+
+- [system/worker/packages.rs]
+  - Why overkill: Dependency on `which` crate for a small number of PATH lookups.
+  - Safer, smaller replacement: Implement a tiny PATH search helper and remove the external crate usage.
+  - Actionable Steps:
+    - Add internal `path_search::which()` and replace call sites in worker/experiments.
+  - References: `src/system/worker/packages.rs` (use sites), `experiments/*::discover_applets()`.
+  - Priority: P2 (reduce dependencies).
+
+- [system/worker/packages.rs]
+  - Why overkill: Chatty info logs like “Expected: … Received: …” during normal success paths.
+  - Safer, smaller replacement: Demote to DEBUG; keep INFO for decisions and user-facing prompts.
+  - Actionable Steps:
+    - Review `tracing::info!` calls and adjust levels accordingly.
+  - References: `src/system/worker/packages.rs` success branches.
+  - Priority: P2 (reduce noise, simpler UX).
