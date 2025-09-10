@@ -1,0 +1,345 @@
+# Switchyard Requirements Index (machine-readable)
+# Schema: v1
+# This file mirrors normative requirements from SPEC.md with stable IDs and verification hooks.
+
+schema_version: 1
+spec_version: "Reproducible v1.3"
+generated_from: "cargo/switchyard/SPEC.md"
+last_updated: "2025-09-10"
+
+requirements:
+  - id: REQ-A1
+    title: Atomic crash-safety
+    section: "2.1 Atomicity"
+    level: MUST
+    text: "A swap MUST be atomic with respect to crashes."
+    tags: [atomicity, safety]
+    verify:
+      bdd: ["Atomic swap: Enable and rollback"]
+      property: ["AtomicReplace"]
+      yaml: ["tests/20-enable-default/task.yaml", "tests/40-enable-partial/task.yaml"]
+
+  - id: REQ-A2
+    title: No broken or missing path visible
+    section: "2.1 Atomicity"
+    level: MUST
+    text: "At no time MUST a user-visible broken or missing path exist."
+    tags: [atomicity, visibility]
+    verify:
+      bdd: ["Atomic swap: Enable and rollback"]
+      property: ["AtomicReplace"]
+
+  - id: REQ-A3
+    title: All-or-nothing per plan
+    section: "2.1 Atomicity"
+    level: MUST
+    text: "Either all actions succeed, or no visible changes remain."
+    tags: [atomicity, transactions]
+    verify:
+      bdd: ["Automatic rollback on mid-plan failure"]
+      property: ["IdempotentRollback"]
+
+  - id: REQ-R1
+    title: Rollback reversibility
+    section: "2.2 Rollback"
+    level: MUST
+    text: "Every change MUST be reversible by rollback."
+    tags: [rollback]
+    verify:
+      bdd: ["Atomic swap: Enable and rollback", "Automatic rollback on mid-plan failure"]
+
+  - id: REQ-R2
+    title: Restore exact topology
+    section: "2.2 Rollback"
+    level: MUST
+    text: "Rollback MUST restore the exact prior link/file topology."
+    tags: [rollback, topology]
+
+  - id: REQ-R3
+    title: Idempotent rollback
+    section: "2.2 Rollback"
+    level: MUST
+    text: "Rollback MUST be idempotent."
+    tags: [rollback, idempotency]
+    verify:
+      property: ["IdempotentRollback"]
+
+  - id: REQ-R4
+    title: Auto reverse-order rollback on failure
+    section: "2.2 Rollback"
+    level: MUST
+    text: "On any apply failure, already-applied actions MUST be rolled back in reverse plan order automatically."
+    tags: [rollback, failure-handling]
+    verify:
+      bdd: ["Automatic rollback on mid-plan failure"]
+
+  - id: REQ-R5
+    title: Partial restoration facts on rollback error
+    section: "2.2 Rollback"
+    level: MUST
+    text: "If rollback itself fails, facts MUST capture partial restoration state and guidance for operator recovery."
+    tags: [rollback, audit]
+    verify:
+      schema: ["/SPEC/audit_event.schema.json"]
+
+  - id: REQ-S1
+    title: Safe paths only
+    section: "2.3 Safety Preconditions"
+    level: MUST_NOT
+    text: "Paths MUST NOT contain `..` or escape allowed roots."
+    tags: [safety, path, safepath]
+
+  - id: REQ-S2
+    title: Reject unsupported filesystem states
+    section: "2.3 Safety Preconditions"
+    level: MUST
+    text: "Operations MUST fail if target filesystem is read-only, noexec, or immutable."
+    tags: [safety, filesystem]
+
+  - id: REQ-S3
+    title: Source ownership gating
+    section: "2.3 Safety Preconditions"
+    level: MUST
+    text: "Source files MUST be root-owned and not world-writable, unless policy override."
+    tags: [safety, ownership]
+
+  - id: REQ-S4
+    title: Strict target ownership
+    section: "2.3 Safety Preconditions"
+    level: MUST
+    text: "If strict_ownership=true, targets MUST be package-owned (via adapter)."
+    tags: [safety, ownership, policy]
+
+  - id: REQ-S5
+    title: Preservation capability gating
+    section: "2.3 Safety Preconditions"
+    level: MUST
+    text: "FS capabilities for ownership, mode, timestamps, xattrs/ACLs/caps MUST be probed during preflight; if required by policy but unsupported, preflight MUST STOP (fail-closed) unless explicitly overridden."
+    tags: [safety, preservation, preflight]
+
+  - id: REQ-O1
+    title: Structured fact for every step
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Every step MUST emit a structured fact (JSON)."
+    tags: [audit, observability]
+    verify:
+      schema: ["/SPEC/audit_event.schema.json"]
+
+  - id: REQ-O2
+    title: Dry-run facts identical to real-run
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Dry-run facts MUST be byte-identical to real-run facts."
+    tags: [audit, determinism]
+
+  - id: REQ-O3
+    title: Versioned, stable facts schema
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Facts schema MUST be versioned and stable."
+    tags: [audit, schema]
+    verify:
+      schema: ["/SPEC/audit_event.schema.json"]
+
+  - id: REQ-O4
+    title: Signed attestations per apply bundle
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Attestations (signatures, SBOM-lite fragments) MUST be generated and signed for each apply bundle."
+    tags: [audit, supply-chain]
+
+  - id: REQ-O5
+    title: Before/after hashes for each mutated file
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "For every mutated file, before_hash and after_hash MUST be recorded using SHA-256."
+    tags: [audit, integrity]
+
+  - id: REQ-O6
+    title: Secret masking across all sinks
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Secret masking MUST be enforced across all audit sinks; no free-form secrets are permitted."
+    tags: [audit, security]
+
+  - id: REQ-O7
+    title: Provenance completeness
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Provenance MUST include origin, helper, uid/gid, pkg, and confirmation of environment sanitization."
+    tags: [audit, provenance]
+
+  - id: REQ-L1
+    title: Single mutator
+    section: "2.5 Locking"
+    level: MUST
+    text: "Only one apply() MUST mutate at a time."
+    tags: [locking]
+
+  - id: REQ-L2
+    title: Warn when no lock manager
+    section: "2.5 Locking"
+    level: MUST
+    text: "If no lock manager, concurrent apply() is UNSUPPORTED (dev/test only) and a WARN fact MUST be emitted."
+    tags: [locking]
+
+  - id: REQ-L3
+    title: Bounded lock wait with timeout
+    section: "2.5 Locking"
+    level: MUST
+    text: "Lock acquisition MUST use a bounded wait with timeout → E_LOCKING, and facts MUST record lock_wait_ms."
+    tags: [locking]
+
+  - id: REQ-L4
+    title: LockManager required in production
+    section: "2.5 Locking"
+    level: MUST
+    text: "In production deployments, a LockManager MUST be present; omission only permitted in development/testing."
+    tags: [locking]
+
+  - id: REQ-RC1
+    title: Rescue profile available
+    section: "2.6 Rescue"
+    level: MUST
+    text: "A rescue profile (backup symlink set) MUST always remain available."
+    tags: [rescue]
+
+  - id: REQ-RC2
+    title: Verify fallback path
+    section: "2.6 Rescue"
+    level: MUST
+    text: "Preflight MUST verify at least one functional fallback path."
+    tags: [rescue, preflight]
+
+  - id: REQ-RC3
+    title: Fallback toolset on PATH
+    section: "2.6 Rescue"
+    level: MUST
+    text: "At least one fallback binary set (GNU or BusyBox) MUST remain executable and present on PATH for recovery."
+    tags: [rescue]
+
+  - id: REQ-D1
+    title: Deterministic IDs
+    section: "2.7 Determinism"
+    level: MUST
+    text: "plan_id and action_id are UUIDv5 values derived from normalized input using a stable namespace."
+    tags: [determinism]
+
+  - id: REQ-D2
+    title: Redaction-pinned dry-run
+    section: "2.7 Determinism"
+    level: MUST
+    text: "Timestamps are zeroed or expressed as monotonic deltas; dry-run facts MUST be byte-identical to real-run facts after redaction."
+    tags: [determinism, audit]
+
+  - id: REQ-C1
+    title: Dry-run by default
+    section: "2.8 Conservatism & Modes"
+    level: MUST
+    text: "Dry-run is the default mode; side effects require explicit operator approval."
+    tags: [conservatism, safety]
+
+  - id: REQ-C2
+    title: Fail-closed on critical violations
+    section: "2.8 Conservatism & Modes"
+    level: MUST
+    text: "Critical compatibility violations MUST fail closed unless explicitly overridden by policy."
+    tags: [conservatism, policy]
+
+  - id: REQ-H1
+    title: Minimal smoke suite
+    section: "2.9 Health Verification"
+    level: MUST
+    text: "A minimal post-apply smoke suite MUST run with specified commands/args."
+    tags: [health, smoke]
+
+  - id: REQ-H2
+    title: Auto-rollback on smoke failure
+    section: "2.9 Health Verification"
+    level: MUST
+    text: "Any mismatch or non-zero exit MUST trigger automatic rollback unless explicitly disabled by policy."
+    tags: [health, rollback]
+
+  - id: REQ-H3
+    title: Health verification is part of commit
+    section: "2.9 Health Verification"
+    level: MUST
+    text: "Health verification is part of commit; it is not optional."
+    tags: [health]
+
+  - id: REQ-F1
+    title: EXDEV fallback preserves atomic visibility
+    section: "2.10 Filesystems & Degraded Mode"
+    level: MUST
+    text: "On cross-filesystem, use safe copy + fsync + rename fallback preserving atomic visibility."
+    tags: [filesystem, exdev]
+
+  - id: REQ-F2
+    title: Degraded mode policy & telemetry
+    section: "2.10 Filesystems & Degraded Mode"
+    level: MUST
+    text: "If degraded fallback is used and policy allows, facts MUST record degraded=true; if policy disallows, apply MUST fail."
+    tags: [filesystem, policy, telemetry]
+
+  - id: REQ-F3
+    title: Supported filesystems verified in acceptance tests
+    section: "2.10 Filesystems & Degraded Mode"
+    level: SHOULD
+    text: "Supported/tested filesystems include ext4, xfs, btrfs, tmpfs; semantics are verified in acceptance tests."
+    tags: [filesystem, tests]
+
+  - id: REQ-API1
+    title: SafePath-only for mutating APIs
+    section: "3.3 SafePath"
+    level: MUST
+    text: "All mutating public APIs MUST take SafePath (not PathBuf). Non-mutating APIs that accept raw paths MUST immediately normalize to SafePath."
+    tags: [api, safepath]
+
+  - id: REQ-TOCTOU1
+    title: TOCTOU-safe syscall sequence
+    section: "3.3 SafePath"
+    level: MUST
+    text: "Open parent O_DIRECTORY|O_NOFOLLOW → openat on final component → renameat → fsync(parent) is normative for every mutation."
+    tags: [api, toctou, safety]
+
+  - id: REQ-BND1
+    title: fsync within 50ms of rename
+    section: "9. Operational Bounds"
+    level: MUST
+    text: "fsync(parent) MUST occur ≤50ms after rename."
+    tags: [bounds, performance]
+
+  - id: REQ-CI1
+    title: Golden fixtures existence
+    section: "12. Golden Fixtures & Zero-SKIP CI Gate"
+    level: MUST
+    text: "Golden JSON fixtures MUST exist for plan, preflight, apply, and rollback facts."
+    tags: [ci, fixtures]
+
+  - id: REQ-CI2
+    title: Zero-SKIP gate
+    section: "12. Golden Fixtures & Zero-SKIP CI Gate"
+    level: MUST
+    text: "CI MUST fail if any required test is SKIP."
+    tags: [ci]
+
+  - id: REQ-CI3
+    title: Golden diff gate
+    section: "12. Golden Fixtures & Zero-SKIP CI Gate"
+    level: MUST
+    text: "CI MUST fail if any fixture diff is not byte-identical to the golden reference."
+    tags: [ci, fixtures]
+
+  - id: REQ-VERS1
+    title: Facts carry schema_version
+    section: "13. Schema Versioning & Migration"
+    level: MUST
+    text: "Facts include schema_version (current=v1). Schema changes bump this field."
+    tags: [audit, schema]
+
+# Verification mapping conventions
+# - bdd: Names of scenarios in SPEC.md section 8; .feature files will mirror these names.
+# - yaml: Paths under tests/*/*.yaml that cover this requirement (to be annotated with covers: [REQ-…]).
+# - property: Property-based test/invariant names.
+# - schema: Paths to machine schemas used to validate facts or configurations.

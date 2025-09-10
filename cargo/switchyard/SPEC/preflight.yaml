@@ -1,0 +1,19 @@
+# Preflight Diff schema (YAML schema style)
+# Path: /SPEC/preflight.yaml
+
+type: sequence
+items:
+  type: map
+  mapping:
+    action_id: { type: str }
+    path: { type: str }
+    current_kind: { enum: [missing, file, dir, symlink] }
+    planned_kind: { enum: [symlink, restore_from_backup, skip] }
+    policy_ok: { type: bool }
+    provenance:
+      type: map
+      mapping:
+        uid: { type: int }
+        gid: { type: int }
+        pkg: { type: str }
+    notes: { type: seq, sequence: { type: str } }
