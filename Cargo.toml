@@ -32,6 +32,7 @@ atty = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 fs2 = "0.4"
+switchyard = { path = "switchyard" }
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -39,7 +40,7 @@ predicates = "3.0"
 tempfile = "3.12"
 
 [features]
-default = []
+default = ["switchyard"]
 # Enable real Arch Linux system operations (pacman/paru, filesystem changes).
 # When disabled, a no-op System is used.
 arch = []

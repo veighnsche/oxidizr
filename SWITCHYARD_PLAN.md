@@ -26,6 +26,24 @@ Out of scope (for now): new safety features, packaging/SBOM/signatures/initramfs
 
 ---
 
+## Current Status (2025-09-10 19:30:05+02:00)
+
+- Implemented a reusable workspace crate `switchyard/` and wired the app to depend on it (`Cargo.toml`: `switchyard = { path = "switchyard" }`).
+- Migrated safety mechanisms into `switchyard`:
+  - `switchyard/src/symlink.rs`: pure mechanism for `backup_path`, `is_safe_path`, atomic idempotent `replace_file_with_symlink`, and `restore_file` (no product logging/UI).
+  - `switchyard/src/fs_ops.rs`: `open_dir_nofollow`, `atomic_symlink_swap` using `renameat`, and `fsync_parent_dir`.
+  - `switchyard/src/preflight.rs`: read-only checks `ensure_mount_rw_exec`, `check_immutable`, `check_source_trust`.
+  - `switchyard/src/api.rs`: minimal façade (`Policy`, `Plan`/`Action`, `ApplyMode`, `FactsEmitter`, `AuditSink`, and `Switchyard::{plan, preflight, apply}`).
+- Product now delegates to `switchyard`:
+  - `src/system/fs_checks.rs` calls `switchyard::preflight::*` and maps messages to product `Error`.
+  - `src/symlink/ops.rs` calls `switchyard::symlink::*` for mechanisms while preserving product audit and progress UI logs.
+  - `src/experiments/util.rs` can run through the façade (`Switchyard`) under feature `switchyard` (now enabled by default).
+- Build and tests pass (`cargo check`, `cargo test`).
+
+Behavior/compatibility:
+- Dry-run semantics preserved (façade maps to dry-run; audit sink still controlled by app env `OXIDIZR_DRY_RUN`).
+- Audit/facts continue via product logging; `switchyard` itself contains no global logging.
+
 ## Inventory Map (current code)
 
 - `src/symlink/ops.rs`
@@ -82,7 +100,11 @@ Out of scope (for now): new safety features, packaging/SBOM/signatures/initramfs
   - `rollback.rs`: undo steps & recovery.
   - `facts.rs`: structured event schema; emits via `FactsEmitter`.
   - `audit.rs`: human-readable lines via `AuditSink`.
-  - `errors.rs`, `config.rs`, `types.rs`.
+  - `types.rs`: `SafePath` (validated path newtype), `ActionId`, `PlanId`, `CorrelationId`.
+  - `ownership.rs`: `OwnershipOracle` trait (e.g., pacman -Qo abstraction).
+  - `locking.rs`: advisory per-target/process-wide locking primitives.
+  - `schema.rs`: facts/audit envelope and schema versioning.
+  - `errors.rs`, `config.rs`.
 - Phase 1 (Option A): implement as internal module under `src/switchyard/` and later promote to workspace crate.
 
 ---
@@ -90,88 +112,285 @@ Out of scope (for now): new safety features, packaging/SBOM/signatures/initramfs
 ## Public API Sketch
 
 ```rust
-pub struct Switchyard<E: FactsEmitter, A: AuditSink> { /* facts, audit, policy */ }
+use std::path::PathBuf;
+use uuid::Uuid;
+
+pub struct Switchyard<E: FactsEmitter, A: AuditSink, O: OwnershipOracle> { /* facts, audit, policy, ownership */ }
+
+pub type PlanId = Uuid;
+pub type ActionId = Uuid;
+
+#[derive(Clone)]
+pub struct SafePath(PathBuf); // validated at construction; see Path Safety section
 
 pub struct Policy {
     pub allow_roots: Vec<PathBuf>,
     pub forbid_paths: Vec<PathBuf>,
     pub strict_ownership: bool,
     pub force_untrusted_source: bool,
-    pub force_restore_best_effort: bool,
+    pub preserve_mode: bool,
+    pub preserve_owner: bool,
+    pub preserve_times: bool,
+    pub preserve_xattrs: bool,
 }
 
-pub enum ApplyMode { DryRun, Commit }
+pub enum ApplyMode {
+    DryRun,
+    Commit { allow_best_effort_restore: bool },
+}
 
 pub struct PlanInput { pub link: Vec<LinkRequest>, pub restore: Vec<RestoreRequest> }
-pub struct LinkRequest { pub source: PathBuf, pub target: PathBuf }
-pub struct RestoreRequest { pub target: PathBuf }
+pub struct LinkRequest { pub source: SafePath, pub target: SafePath }
+pub struct RestoreRequest { pub target: SafePath }
 
-pub struct Plan { pub actions: Vec<Action> }
+pub struct Plan { pub id: PlanId, pub actions: Vec<Action> }
 
-pub enum Action {
-    EnsureSymlink { source: PathBuf, target: PathBuf },
-    RestoreFromBackup { target: PathBuf },
+pub struct Action {
+    pub id: ActionId,
+    pub kind: ActionKind,
+    pub depends_on: Vec<ActionId>,
+    pub undo: InverseAction,
 }
 
-pub struct PreflightReport { pub ok: bool, pub warnings: Vec<String>, pub stops: Vec<String> }
-pub struct ApplyReport { pub executed: Vec<Action>, pub skipped: Vec<Action>, pub duration_ms: u64, pub errors: Vec<SwitchyardError> }
+pub enum ActionKind {
+    EnsureSymlink { source: SafePath, target: SafePath },
+    RestoreFromBackup { target: SafePath },
+}
 
-pub trait FactsEmitter { fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: serde_json::Value); }
-pub trait AuditSink { fn log(&self, level: log::Level, msg: &str); }
+pub enum InverseAction {
+    RemoveSymlink { target: SafePath, restore_backup: bool },
+    RevertRestore { target: SafePath },
+}
 
-impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
-    pub fn new(facts: E, audit: A, policy: Policy) -> Self;
-    pub fn plan(&self, input: PlanInput) -> Plan;           // deterministic, pure
+pub struct PreflightReport {
+    pub plan_id: PlanId,
+    pub ok: bool,
+    pub warnings: Vec<String>,
+    pub stops: Vec<String>,
+}
+
+pub struct ApplyReport {
+    pub plan_id: PlanId,
+    pub executed: Vec<ActionId>,
+    pub skipped: Vec<ActionId>,
+    pub duration_ms: u64,
+    pub errors: Vec<SwitchyardError>,
+}
+
+pub trait FactsEmitter {
+    fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: serde_json::Value);
+}
+
+pub trait AuditSink {
+    fn log(&self, level: log::Level, msg: &str);
+}
+
+pub trait OwnershipOracle: Send + Sync {
+    fn owner_of(&self, path: &SafePath) -> Result<OwnershipInfo, SwitchyardError>;
+}
+
+pub struct OwnershipInfo {
+    pub uid: u32,
+    pub gid: u32,
+    pub package: Option<String>,
+}
+
+impl<E: FactsEmitter, A: AuditSink, O: OwnershipOracle> Switchyard<E, A, O> {
+    pub fn new(facts: E, audit: A, policy: Policy, ownership: std::sync::Arc<O>) -> Self;
+    pub fn plan(&self, input: PlanInput) -> Plan;            // deterministic, pure (stable order)
     pub fn preflight(&self, plan: &Plan) -> PreflightReport; // read-only
-    pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> ApplyReport; // atomic/idempotent
+    pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> ApplyReport; // atomic/idempotent, crash-consistent
 }
-```
 
 ---
+
+## Action Graph & Rollback
+
+- Plan is a DAG: each `Action` has a stable `ActionId` and `depends_on: Vec<ActionId>`.
+- Deterministic execution: topological sort with stable tie-breaker (lexicographic by `ActionId`).
+- Rollback edges: each `Action` has an `undo: InverseAction`; register undo intent before any mutation.
+- Failure handling: on first failure or signal, attempt inverse actions for all completed nodes in reverse execution order.
+- Parallelism: DAG enables future parallel apply; initially keep sequential to reduce risk.
+
+## Path Safety (SafePath)
+
+- Introduce `SafePath` newtype validated at construction time:
+  - canonicalize without following symlinks for the final hop (no_follow parent open).
+  - confined to `Policy::allow_roots`; reject traversal (`..`, absolute escapes).
+  - explicit policy for non-UTF-8 names; keep bytes internally, optional UTF-8 rendering for logs.
+- Keep `PathBuf` out of public API where possible; convert to `SafePath` at boundaries.
+
+## Filesystem Semantics (fsync/EXDEV)
+
+- Write strategy for mutating ops:
+  1) write temp in target dir → `fsync(temp)`
+  2) `renameat` over target atomically
+  3) `fsync(parent dir)`
+- Directory creation: `mkdir` (and intermediate) then `fsync(parent of created)`.
+- Cross-device rename (EXDEV): copy to temp → `fsync(temp)` → atomic swap → `fsync(parent)`; document performance and journal implications.
+- Remote/NFS: disallow by default (preflight stop) or warn via policy knob; note semantics caveats.
+- No assumptions about monotonic timestamps; tests must not rely on mtime ordering.
+
+## Interruption & Locking
+
+- Interruption: guarantee crash-consistency for each step; on SIGINT/SIGTERM/kill -9, state is either pre- or post-rename, never torn.
+- Register undo before mutation; emit attempt/start facts prior to side effects.
+- Locking: retain `system::lock::acquire()` process-wide lock; scope documented.
+- Add advisory per-target lock in switchyard to enable safe batching; default off until validated.
+
+## Error Taxonomy & Exit Codes
+
+- Stable categories mapped 1:1 to process exit codes (documented table maintained):
+  - `E_POLICY`, `E_PREFLIGHT`, `E_IO_ATOMICITY`, `E_PATH_SAFETY`, `E_ROLLBACK_PARTIAL`.
+- Machine-parsable cause chains include source OS error codes and contextual fields.
+
+## Facts & Audit Schema Versioning
+
+- Event envelope fields: `schema_version`, `plan_id`, `action_id`, `correlation_id`, `mode`, `dry_run`.
+- Deterministic ordering and stable serialization; golden fixtures assert full records, not substrings.
+
+## Deterministic Dry-run
+
+- Stable sort of actions and deterministic IDs; seeded determinism where randomness exists.
+- Timing fields: use monotonic deltas or redact in DryRun; ensure byte-for-byte stability.
+
+## Restore Semantics & Collision Policy
+
+- Define `RestoreMode::{Strict, BestEffort}` and a collision policy for when target exists with unexpected type (file/symlink/dir).
+- In `Commit { allow_best_effort_restore }`, permit best-effort when policy allows; default to Strict.
+
+## Config Discoverability
+
+- `Policy` originates from CLI/app; switchyard performs no global env reads. All inputs explicit.
+
+## Observability Contract
+
+- Every action emits: planned (preflight), attempt, success|skip|fail, plus final `plan_summary`.
+
+## Metadata Preservation Policy
+
+- `Policy` includes knobs: `{ preserve_mode, preserve_owner, preserve_times, preserve_xattrs }`.
+- Document current gaps (xattrs/ACLs/posix caps) and behavior (warn vs stop) when not supported.
 
 ## Safety Requirements
 
 - Preserve symlink semantics (no materialization).
-- Atomicity: temp + `renameat`, parent `fsync`.
+- Atomicity: temp + `renameat`, parent `fsync`; EXDEV fallback defined.
 - Idempotence: re-running plans converges; already-correct symlink is a no-op.
 - Rollbackability: record inverse ops before mutation; partial-failure recovery.
 - Least privilege; explicit policy flags for overrides.
-- Path safety: normalize; enforce allowed roots; reject traversal.
+- Path safety via `SafePath`: normalize; enforce allowed roots; reject traversal.
 - Metadata handling: preserve permissions today; document gaps for xattrs/ACLs/caps.
 - Observability: every decision/action emits facts + human log line.
 
 ---
 
-## Refactor Plan (stepwise)
+## Refactor Plan (stepwise) — Checklist
 
-1) Freeze behavior with golden fixtures for JSONL audit and human logs across representative flows.
-2) Introduce façade internally (Option A) with pass-through to existing Worker/symlink paths; inject `FactsEmitter`/`AuditSink` adapters to current logging.
-3) Feature-flag pilot: route `experiments/util::{create_symlinks, restore_targets}` through façade under a feature flag; parity check against goldens.
-4) Move internals incrementally: `symlink/ops` → `switchyard/symlink`; `system/fs_checks` → `switchyard/preflight`; add `fs_ops`, `rollback`.
-5) Stabilize errors and mapping to app `Error::exit_code()`.
-6) Flip default to façade; deprecate Worker shims; tighten visibility.
-7) Promote to `switchyard/` workspace crate (Option B) without API changes.
-8) Documentation: `docs/switchyard-architecture.md` with diagrams/examples.
+- [ ] Freeze behavior with golden fixtures for JSONL audit and human logs across representative flows.
+- [x] Introduce façade (adapted): Implemented in external crate `switchyard` as a reusable façade instead of an internal module; app wires to it.
+- [x] Feature-flag pilot: `experiments/util::{create_symlinks, restore_targets}` can execute via façade under feature `switchyard` (enabled by default).
+- [x] Move internals incrementally:
+  - [x] `symlink/ops` → `switchyard/src/symlink.rs` (pure mechanisms; no product logging/UI).
+  - [x] `system/fs_checks` → `switchyard/src/preflight.rs` (read-only checks).
+  - [x] Added `switchyard/src/fs_ops.rs` (O_NOFOLLOW, renameat, fsync).
+  - [ ] Add `rollback` module and wire inverse operations (TBD).
+- [ ] Stabilize errors and mapping to app `Error::exit_code()`:
+  - [x] Preflight messages mapped back to product `Error` in `src/system/fs_checks.rs`.
+  - [ ] Introduce `SwitchyardError` taxonomy in crate and centralize mappings (TBD).
+- [x] Flip default to façade; keep shims for safety. (`switchyard` feature enabled by default.)
+- [x] Promote to `switchyard/` workspace crate (Option B) with minimal public API.
+- [ ] Documentation: Add `docs/switchyard-architecture.md` with diagrams/examples.
 
-Rollback: retain feature flag and shims each step; revert to legacy wiring if regressions.
+Rollback strategy: retain feature flag and shims; revert to legacy path if regressions are detected.
+
+---
+
+## Module TODOs
+
+- [x] /src/switchyard/mod.rs — public facade root module (or lib.rs in external crate)
+- [x] /src/switchyard/api.rs — public facade: Plan, Action, Executor
+- [ ] /src/switchyard/plan.rs — build action graph from inputs/policy
+- [x] /src/switchyard/preflight.rs — read-only validations (permissions, collisions, cycles)
+- [x] /src/switchyard/fs_ops.rs — atomic file/dir/link ops; temp/rename patterns
+- [x] /src/switchyard/symlink.rs — safe (re)pointing, semantics preserved
+- [ ] /src/switchyard/backup.rs — backup/restore strategies; symlink-aware
+- [ ] /src/switchyard/policy.rs — allow/deny rules; constraints
+- [ ] /src/switchyard/rollback.rs — record & perform undo steps
+- [ ] /src/switchyard/facts.rs — structured events (JSON/serde), stable schema
+- [ ] /src/switchyard/audit.rs — human-readable audit lines
+- [ ] /src/switchyard/errors.rs — error taxonomy + exit code mapping
+- [ ] /src/switchyard/config.rs — typed config for policies/paths/modes
+- [ ] /src/switchyard/types.rs — common types; path wrappers; invariants
+
+---
+
+## Cross-Document TODOs
+
+- [ ] Align with `AUDIT_CHECKLIST.md` gaps (map to concrete modules/tests)
+  - [ ] Transactionality: implement graph-based rollback that is automatic and complete (register inverse ops; test partial failure) in `switchyard/rollback.rs`; add integration tests in `src/switchyard/`.
+  - [ ] Auditability: add before/after cryptographic hashes via op buffering and selective hashing (tie-in to Stream C) in `src/logging/audit.rs` and optional `src/logging/attest.rs`.
+  - [ ] Audit completeness: ensure logs record actor, versions, provenance, and exit codes centrally via `AuditFields` in `src/logging/audit.rs`; verify call sites in `experiments//*` and `system/worker/*` attach these.
+  - [ ] Least Intrusion: introduce preflight diff rendering (no mutation) and document metadata preservation policy (mode/owner/times; xattrs/ACLs/caps policy) — `src/experiments/util.rs` renderer + policy knobs in `switchyard/policy.rs`.
+  - [ ] Determinism: stabilize preflight/apply outputs; seed IDs and redact non-deterministic fields in DryRun — assertions in tests under `src/switchyard/`.
+  - [ ] Conservatism: make DryRun the default unless `--assume-yes` (Stream B) — `src/cli/{parser.rs,handler.rs}` + docs.
+  - [ ] Recovery First: document and test one-step rollback (profile pointer re-flip or `restore_file`) — E2E in `tests/` via `test-orch/`.
+  - [ ] Health Verification: add post-commit smoke tests and rollback trigger (Stream A) — `src/experiments/util.rs::run_smoke_tests` and wiring in experiments.
+  - [ ] Supply Chain Integrity: provenance enrichment (owner, repo presence) and per-op signature/SBOM-lite (Stream C/D) — `src/system/worker/packages.rs` + `src/logging/audit.rs` + `src/logging/attest.rs`.
+
+- [ ] Integrate `PROJECT_PLANS/` Streams A–E
+  - [ ] Stream A — Profiles & Atomic Flip + Canary + Smokes + Backup
+    - [ ] Add `rename_active_pointer(active, new_target)` helper (O_NOFOLLOW + `renameat` + fsync) in `src/symlink/ops.rs`.
+    - [ ] Profile scaffolding/helpers and tree population via `src/experiments/util.rs` (reuse `create_symlinks`, target profile dirs).
+    - [ ] Post-flip `run_smoke_tests()` with auto-rollback on failure; wire into `src/experiments/{coreutils.rs,findutils.rs}`.
+    - [ ] CLI: `canary --shell` and `profile --set {gnu|uutils}` in `src/cli/{parser.rs,handler.rs}`.
+    - [ ] Security: detect/preserve `security.capability`; optional label relabel on active tree; ACL detect/warn — `src/system/security.rs` (new) + audits.
+  - [ ] Stream B — Preflight Plan, Compat Detectors, UX
+    - [ ] `--preflight` flag and default-dry-run posture in `src/cli/{parser.rs,handler.rs}`; render plan in human logs via `src/experiments/util.rs`.
+    - [ ] Add `assets/compat_matrix.json` and `src/compat/mod.rs` scanners; gate risky flags/semantics.
+    - [ ] Adjust human log verbosity per `VERBOSITY.md`; attach plan rows to audit (`AuditFields.artifacts`).
+  - [ ] Stream C — Audit Attestation + Docs
+    - [ ] Introduce op buffer/finalizer in `src/logging/audit.rs` to emit per-op `audit-<op_id>.jsonl`.
+    - [ ] Optional signing in `src/logging/attest.rs` (Ed25519), CLI `audit verify` in `src/cli//*`.
+    - [ ] Selective hashing (changed/untrusted targets) with caching keyed by `(dev,inode,mtime,size)`; SBOM-lite JSON.
+    - [ ] Operator docs/playbooks: recovery, exit codes, audit verification.
+  - [ ] Stream D — Supply Chain Policy + Lock Wait UX
+    - [ ] Enforce repo-first/AUR opt-in in `src/system/worker/packages.rs::install_package` with flags `--allow-aur`, `--aur-user`.
+    - [ ] Bounded pacman lock wait with periodic progress in `Worker::wait_for_pacman_lock_clear`.
+    - [ ] Provenance fields (helper, command, repo presence) attached via `audit_event_fields`.
+  - [ ] Stream E — Dependency Footprint Trim
+    - [ ] Implement internal `path_search` behind `Worker.which()` in `src/system/worker/fs_ops.rs`; feature-gate external `which` crate in `Cargo.toml`.
+
+- [ ] Cross-cutting — Tests & CI Pipeline
+  - [ ] Add YAML suites under `tests/` for: preflight-only, profile flip + rollback + smokes, AUR gating behaviors, capability/labels preservation, audit verify/SBOM.
+  - [ ] Expand Rust tests: `src/switchyard/` (rollback, determinism, SafePath), `src/symlink/ops.rs` (atomicity invariants), `src/compat/` (matrix matching).
+  - [ ] Ensure `test-orch/` orchestrators remain the single runner; namespace caches per distro (already implemented) and add xfail markers where infra-limited.
 
 ---
 
 ## Test Plan
 
-- Unit: symlink idempotence; backup strategies; fs_ops atomic swap; preflight rules; error mapping.
-- Property: idempotence (repeated apply is no-op); path normalization determinism.
-- Integration: plan → preflight → apply for DryRun/Commit; partial failure with rollback; symlink edge cases (nested, broken).
-- Golden fixtures: JSONL facts and human logs stable/deterministic.
+- Unit: symlink idempotence; backup strategies; fs_ops atomic swap; preflight rules; `SafePath` validation; EXDEV fallback.
+- Property: idempotence (repeated apply is no-op); path normalization and confinement; stable action ordering.
+- Integration: plan → preflight → apply for `DryRun` and `Commit { allow_best_effort_restore }`; partial failure with rollback; symlink edge cases (nested, broken, nested symlink).
+- Signals: inject SIGINT mid-apply; verify rollback log and crash-consistency.
+- Filesystems: run on tmpfs + ext4 + btrfs (CI containers for two of these at minimum).
+- Edge cases: broken symlink; nested symlink; read-only bind mount; EXDEV; long paths; non-UTF-8 names.
+- Golden fixtures: JSONL facts and human logs byte-for-byte stable across runs.
+- Crash-consistency: simulate power loss at each mutation step boundary and verify post-recovery invariants.
 
 ---
 
 ## Acceptance Criteria
 
 - All switching safety behind `switchyard` façade.
-- Public API documented, minimal, stable.
-- Behavior parity preserved (errors and exit codes) with passing tests.
-- Deterministic facts/audit outputs, documented.
+- Public API documented, minimal, stable, with `SafePath`, `ActionId`, and DAG semantics.
+- Behavior parity preserved; stable error taxonomy mapped 1:1 to exit codes.
+- Crash-consistency demonstrated via simulated interruptions and power-loss tests.
+- Deterministic dry-run with byte-for-byte stable facts/audit outputs.
+- Path confinement property tests for `SafePath` pass; no escapes beyond allowed roots.
+- EXDEV and symlink-preservation tests pass; no “link becomes file” regressions.
+- Locking semantics documented; optional per-target advisory locks gated behind feature.
 - Legacy helpers removed/deprecated; app calls façade.
 
 ---

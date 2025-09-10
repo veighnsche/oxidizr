@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 #[cfg(feature = "switchyard")]
-use crate::switchyard::{ApplyMode, FactsEmitter, AuditSink, LinkRequest, PlanInput, Policy, RestoreRequest, Switchyard};
+use switchyard::{ApplyMode, FactsEmitter, AuditSink, LinkRequest, PlanInput, Policy, RestoreRequest, Switchyard};
 
 #[cfg(feature = "switchyard")]
 struct NullFacts;
