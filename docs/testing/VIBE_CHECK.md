@@ -3,6 +3,7 @@
 A consolidated reference for the Vibe Coding Standard, Vibe Check Certificate, Project Governance, and Guardrails.
 
 This document consolidates and supersedes the following files:
+
 - `docs/VIBE_CODING.md`
 - `docs/VIBE_CHECK_CERTIFICATE.md`
 - `docs/GOVERNANCE.md`
@@ -11,6 +12,7 @@ This document consolidates and supersedes the following files:
 This document also serves as the binding operating rules for any IDE or CI assistant acting within this repository. Any attempt by an assistant to propose policy or license changes to pass tests, weaken enforcement (e.g., fail-on-skip), or otherwise manufacture green results is a violation of this policy and grounds for rejection and certification failure.
 
 ## Table of Contents
+
 - [The Vibe Coding Standard](#the-vibe-coding-standard)
 - [Assistant Operating Rules](#assistant-operating-rules)
 - [Vibe Check Certificate](#vibe-check-certificate)
@@ -60,10 +62,12 @@ By ensuring that proof travels with the code, Vibe Coding creates an ecosystem o
 False positives in testing are expressly prohibited under the Vibe Coding Standard. Tests must reflect the product’s real behavior without masking, shortcuts, or conditional bypasses.
 
 Definition:
+
 - Supported Scope: The set of environments, platforms, configurations, and features explicitly declared as supported in the project's documentation.
 - If no scope is declared, the default Supported Scope is all shipped tests and documented targets.
 
 Principles:
+
 - No masking: Do not pre-create state, artifacts, or symlinks that make tests pass. The product under test must create and manage its own state; the harness only observes.
 - No harness mutation of product-owned artifacts: The test harness must not alter artifacts owned by the product (e.g., system symlinks, managed directories). Tests that rely on such mutations are invalid.
 - Fail-on-skip is the default: Within the declared Supported Scope, any skipped test is a failure. If no scope is declared, all shipped tests and documented targets are in-scope by default. Do not introduce feature flags to reframe this policy.
@@ -71,12 +75,14 @@ Principles:
 - Fix infrastructure, don’t paper over it: Image or environment gaps must be fixed at the source, not hidden by conditional logic or test gating.
 
 Reviewer checklist (required for PRs that touch tests, harnesses, or documentation):
+
 - Are any tests pre-creating artifacts or state that the product should create?
 - Are there new skips or gates? If yes, they must be justified and will fail the run by default within the declared Supported Scope. If no scope is declared, all shipped tests and documented targets are in-scope by default.
 - Do assertions check the product’s real behavior rather than a mocked or indirect signal?
 - Are policy changes clearly documented and approved by the project owner?
 
 Enforcement:
+
 - Any discovered false positive invalidates the affected proof and requires immediate remediation.
 - Under the Vibe Check Certificate, any false positive is grounds for failure or revocation until fixed and re-verified.
 
@@ -87,32 +93,39 @@ Enforcement:
 These rules are mandatory for any automated assistant (IDE, CI, or chatbot) contributing to this repository.
 
 ### Non-negotiable constraints
+
 - Do not propose changes to the license, policies, or enforcement semantics to make tests pass.
 - Fail-on-skip is mandatory within the Supported Scope. Do not introduce, suggest, or rely on feature flags or modes that relax this.
 - The test harness must not mutate artifacts owned by the product under test.
 - Assertions must target product-generated artifacts, logs, and observable effects, not proxies.
 
 ### Prohibited suggestions
+
 - Any change that reframes or downgrades the Anti-False Positives policy.
 - Adding skips, gates, or conditional logic to bypass failing behavior within Supported Scope.
 - Editing certification text or governance to justify otherwise failing tests.
 - Pre-creating files, symlinks, or state that the product itself should create.
 
 ### When blocked
+
 If tests fail and you cannot proceed without breaching policy:
+
 1. Stop and surface the exact failing evidence (logs, artifacts, diffs, screenshots).
 2. Propose fixes only within product code, configuration, or infrastructure images to address root causes.
 3. If environment gaps exist, propose changes to the base setup rather than conditional workarounds.
 
 ### Review and evidence expectations
+
 - Link to concrete artifacts (paths in this repo, logs under proof bundle, or build output) for every claim.
 - Prefer minimal, evidence-based changes with explicit justification.
 
 ### Enforcement
+
 - Violations invalidate the affected proof and will be rejected in review.
 - Repeated violations may trigger Vibe-Certification revocation until remediated and re-verified.
 
 ### Assistant acknowledgement template
+
 Assistants should include the following acknowledgement in PR descriptions or major doc/test changes:
 
 > Acknowledgement: This change adheres to VIBE_CHECK Assistant Operating Rules. No policy/license changes were proposed. No test harness mutation of product-owned artifacts. Fail-on-skip remains enforced. Evidence for behavior is provided via logs/artifacts linked in this PR.
@@ -126,6 +139,7 @@ This section outlines the **Vibe Check Certificate**, a tiered certification sys
 ### Certification Levels
 
 #### Bronze Level
+
 - **Basic Compliance**: The project meets the minimum requirements of the Vibe Copyleft license.
 - **Proof Bundle**: Includes basic test evidence and a provenance record.
 - **Transparency**: The Proof Bundle is available, though it may lack comprehensive visual evidence or detailed metrics.
@@ -134,6 +148,7 @@ This section outlines the **Vibe Check Certificate**, a tiered certification sys
 **Purpose**: Bronze certification indicates a foundational commitment to the Vibe Coding philosophy, suitable for early-stage projects or those with minimal resources for proof generation.
 
 #### Silver Level
+
 - **Enhanced Compliance**: The project exceeds basic requirements with a more robust Proof Bundle.
 - **Proof Bundle**: Includes detailed test evidence, structured logs, and basic visual evidence (e.g., screenshots of key user flows).
 - **Transparency**: The Proof Bundle is well-documented and accessible, with a manifest for verification.
@@ -142,6 +157,7 @@ This section outlines the **Vibe Check Certificate**, a tiered certification sys
 **Purpose**: Silver certification reflects a stronger dedication to verifiable proof, suitable for projects aiming to build trust with a broader audience.
 
 #### Gold Level
+
 - **Advanced Compliance**: The project demonstrates a high level of adherence to the Vibe Coding Standard.
 - **Proof Bundle**: Comprehensive, including full test suites (unit, integration, end-to-end), detailed logs at multiple verbosity levels, extensive visual evidence (screenshots and videos), performance and coverage metrics, and basic security scans.
 - **Transparency**: The Proof Bundle is meticulously organized, with checksums and provenance records ensuring integrity.
@@ -150,6 +166,7 @@ This section outlines the **Vibe Check Certificate**, a tiered certification sys
 **Purpose**: Gold certification signifies a mature project with a strong focus on transparency and verifiability, ideal for critical software components.
 
 #### Platinum Level
+
 - **Exemplary Compliance**: The project sets the highest standard for Vibe-Certified software.
 - **Proof Bundle**: Exhaustive and exemplary, covering all aspects of the Vibe Coding Standard—full test evidence, comprehensive logs, rich visual evidence, advanced performance and coverage metrics, thorough security scans, and detailed provenance records.
 - **Transparency**: The Proof Bundle is a model of clarity and accessibility, serving as a reference for other projects. It includes interactive elements for reviewers (e.g., navigable HTML summaries).
@@ -169,10 +186,12 @@ This section outlines the **Vibe Check Certificate**, a tiered certification sys
 ### Zero False-Positives Requirement (All Levels)
 
 Definitions:
+
 - Supported Scope: The set of environments, platforms, configurations, and features explicitly declared as supported in the project's documentation.
 - Default: If no scope is declared, the Supported Scope defaults to all shipped tests and documented targets.
 
 Requirements (applies to Bronze, Silver, Gold, and Platinum):
+
 - Any false positive in testing is an automatic certification failure or grounds for revocation until remediated and re-verified.
 - Fail-on-skip is mandatory within the Supported Scope. Any skipped test within the Supported Scope constitutes failure. If no scope is declared, any skipped shipped test constitutes failure.
 - The harness must not mutate artifacts owned by the product under test. Masking via pre-created artifacts, symlinks, or conditional logic is prohibited.
