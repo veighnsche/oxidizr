@@ -28,6 +28,39 @@ Acceptance (reuse):
 - No new logging sink or separate process is introduced; audit bundles are emitted through the existing JSONL pipeline.
 - The verifier is implemented as a CLI subcommand under `src/cli/` and uses existing modules for IO and reporting.
 
+## Quality Requirements (Lean & Safety)
+
+- Lean
+  - Single audit sink for JSONL; no alternate file or process outputs.
+  - Op buffering and finalization live in the logging module(s); verifier is a CLI subcommand, not a separate tool.
+  - Minimal dependencies: Ed25519 for signatures; feature-gate signing (`--features signing`) when needed.
+  - Reuse `AuditFields`; avoid creating parallel envelope structures.
+- Safety
+  - Tamper-evident bundles: per-op `.jsonl` plus `.sig` verifies; failures degrade gracefully (write JSONL, mark signature_status=failed).
+  - Secrets masking enforced in all free-form fields; explicit allowlist of fields hashed.
+  - Selective hashing with caching keyed by `(dev,inode,mtime,size)`; stable, deterministic ordering.
+  - Robust verification: no network calls, clear exit codes and audit of verification results.
+
+## Module File Structure Blueprint
+
+- Extend existing modules
+  - `src/logging/audit.rs`
+    - `struct OpBuffer { id, start_ts, events: Vec<...>, artifacts: Vec<PathBuf> }`
+    - `fn start_op() -> OpBuffer`
+    - `fn record_event(&mut self, fields: &AuditFields)`
+    - `fn finalize_op(&mut self, signing: bool) -> Result<OpSummary>` (write `audit-<op_id>.jsonl`, optional `.sig`)
+  - `src/logging/attest.rs` (new, optional)
+    - `fn sign(data: &[u8]) -> Result<Signature>` and `fn verify(data: &[u8], sig: &[u8]) -> Result<bool>`
+    - `fn hash_path(path: &Path) -> Result<String>`; cache layer keyed by `(dev,inode,mtime,size)`
+    - load keys from a predictable path or env var; feature-gated
+  - `src/cli/parser.rs` / `src/cli/handler.rs`
+    - Subcommand: `audit verify --op <id>`
+  - `src/system/worker/packages.rs`
+    - Ensure provenance fields (owner, repo presence) are attached via `AuditFields`
+- Tests
+  - Unit: serialization/masking, signature round-trip, hash cache eviction
+  - Integration: generate bundle, verify signature, inspect selective hashes
+
 ## 2) Rationale & Safety Objectives
 
 - Verifiable attestation per operation without heavy external infra; mask sensitive fields.

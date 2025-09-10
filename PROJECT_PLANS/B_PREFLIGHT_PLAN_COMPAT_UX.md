@@ -25,6 +25,36 @@ Implement preflight by extending existing modules, not by creating parallel logi
 - Perform PATH checks using `Worker.which()`; do not call `which::which` directly.
 - Reuse `src/system/fs_checks.rs` for mount/immutable/trust checks.
 
+## Quality Requirements (Lean & Safety)
+
+- Lean
+  - Preflight is read-only and uses one code path shared with enable/disable discovery. No duplicate plan builders.
+  - A single renderer produces human output; structured rows are attached to audit via `AuditFields`.
+  - One CLI flag `--preflight` toggles the behavior; no parallel binaries.
+  - No new logging sinks; all logs flow through `src/logging/{init.rs,audit.rs}`.
+- Safety
+  - Deterministic output for identical inputs; no mutation or side effects in preflight mode.
+  - Enforce mount checks (`rw,exec`), immutable bit detection, trust/ownership checks.
+  - Policy-driven gating using the compat matrix; explicit warnings/errors with remediation.
+  - Complete plan: every item lists current vs planned state and provenance.
+
+## Module File Structure Blueprint
+
+- Extend existing modules
+  - `src/cli/parser.rs`: add `--preflight` flag and defaults to run preflight first unless `--assume-yes`.
+  - `src/cli/handler.rs`: branch to a preflight execution path that invokes discovery and the renderer without mutation.
+  - `src/experiments/util.rs`:
+    - `struct PreflightItem { target, current_kind, current_dest?, planned_kind, planned_dest?, policy_ok, provenance }`
+    - `fn build_preflight_items(worker: &Worker, exp: &Experiment) -> Result<Vec<PreflightItem>>`
+    - `fn render_preflight_table(items: &[PreflightItem])`
+  - `src/compat/mod.rs`: load `assets/compat_matrix.json`; implement scanners returning policy annotations.
+  - `src/logging/audit.rs`: attach plan rows to `AuditFields.artifacts` (or introduce a specific field) for `event=preflight`.
+- Assets
+  - `assets/compat_matrix.json`: data for risky patterns/flags per applet and suggested actions.
+- Tests
+  - Unit: renderer and matrix matching.
+  - Integration: preflight before/after enable → post-enable preflight produces a zero-diff plan.
+
 ## 2) Rationale & Safety Objectives
 
 - Show users exactly what will change before commit.

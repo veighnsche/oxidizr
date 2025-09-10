@@ -22,6 +22,40 @@ Implement policy and UX enhancements in the existing modules:
 - Lock wait behavior belongs in the `Worker` (see `wait_for_pacman_lock_clear`); add bounded waits and progress messages there, not via a parallel loop.
 - Provenance and command logging continue via `audit_event_fields`; do not introduce a new logging sink.
 
+## Quality Requirements (Lean & Safety)
+
+- Lean
+  - A single installation path is authoritative: `install_package` in `packages.rs` covers repo-first and the AUR fallback, with decisions driven by flags and repo probes.
+  - One place for lock-wait behavior inside the Worker; progress messages and timeouts are implemented there once and reused.
+  - All helper detection uses `Worker.which()`; no duplicate helper probes or shell wrappers elsewhere.
+  - No duplicated provenance sinks; only `audit_event_fields` is used.
+- Safety
+  - Official-first policy enforced; AUR requires explicit `--allow-aur` and a configured/validated helper and user.
+  - Environment for helper calls is sanitized (`LC_ALL=C`, pinned PATH); the exact command is logged with secrets masked.
+  - Lock waits are bounded by `--wait-lock`; periodic progress breadcrumbs emitted; timeout is a clear error.
+  - Root checks enforced for mutating operations; dry-run prints the effective commands.
+  - Comprehensive audit fields include helper, command, exit code, and distro context.
+
+## Module File Structure Blueprint
+
+- Extend existing modules
+  - `src/cli/parser.rs`
+    - Ensure presence of `--allow-aur`, `--aur-user`, `--wait-lock`; thread them to `Worker::new`.
+  - `src/cli/handler.rs`
+    - Pass policy flags to the Worker; keep a single path for enable/remove that relies on `install_package`.
+  - `src/system/worker/packages.rs`
+    - Centralize policy: official repo probes (`repo_has_package`), AUR-only allowlist, `install_package` gating.
+    - Improve progress: when waiting or installing, emit concise progress lines; reuse `audit_event_fields` for provenance.
+  - `src/system/worker/aur.rs`
+    - Keep `aur_helper_name()` and add helpers for running a helper as a specific user with sanitized env.
+  - `src/system/worker.rs`
+    - Enhance `wait_for_pacman_lock_clear()` to emit periodic progress (e.g., every N ms) and respect `wait_lock_secs`.
+  - `src/logging/audit.rs`
+    - Ensure helper name and effective command are included in fields for install/ensure flows.
+- Tests
+  - Matrix across: repo present/absent, `--allow-aur` true/false, helper present/absent, varying timeouts.
+  - E2E: assert provenance fields and bounded lock-wait behavior.
+
 ## 2) Rationale & Safety Objectives
 
 - Reduce trusted surface; enforce explicit consent for AUR.

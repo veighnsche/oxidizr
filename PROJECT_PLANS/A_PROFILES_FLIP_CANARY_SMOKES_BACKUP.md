@@ -35,6 +35,39 @@ Acceptance (reuse):
 - Pointer flip uses a helper in `src/symlink/ops.rs` that performs `renameat` + fsync, not ad‑hoc code in experiments.
 - Experiments call shared helpers from `src/experiments/util.rs`; logs flow via `audit_event_fields` only.
 
+## Quality Requirements (Lean & Safety)
+
+- Lean
+  - Single implementation for link/backup/restore in `src/symlink/ops.rs`; no parallel copies.
+  - Profile pointer flip implemented once as `rename_active_pointer()` (or similar) and reused by all callers.
+  - Discovery and plan building reuse `experiments/*` discovery and `experiments/util.rs::create_symlinks`.
+  - No direct `which::which`; all PATH lookups via `Worker.which()`.
+- Safety
+  - Atomicity: pointer switch via `renameat(2)` anchored at parent dir FD, followed by parent fsync.
+  - Backups: existing semantics preserved (file vs symlink behavior). Rollback must be one-step and idempotent.
+  - Capability/labels: when present, detect before and verify/preserve post-flip per `SAFETY_DECISIONS_AUDIT.md`.
+  - Preflight: verify profile trees, mounts (`rw,exec`), trust and ownership before commit.
+  - Observability: structured audit via `audit_event_fields` with `from_profile`/`to_profile`, elapsed timings, and artifacts.
+
+## Module File Structure Blueprint
+
+- Extend existing modules
+  - `src/symlink/ops.rs`
+    - add `pub fn rename_active_pointer(active: &Path, new_target: &Path) -> Result<()>` (O_NOFOLLOW parent + renameat + fsync)
+  - `src/experiments/util.rs`
+    - add helpers for building/updating profile trees using `create_symlinks` but targeting profile directories
+    - add `run_smoke_tests(worker: &Worker, applets: &[&str]) -> Result<()>` and rollback glue
+  - `src/experiments/{coreutils.rs,findutils.rs}`
+    - wire profile-tree population and pointer flip; continue to compute applets as today
+  - `src/cli/{parser.rs,handler.rs}`
+    - add `canary --shell` and `profile --set {gnu|uutils}` subcommands
+  - `src/logging/audit.rs`
+    - extend `AuditFields` or use `artifacts` to include `from_profile`/`to_profile`
+- Optional new module (thin)
+  - `src/profiles/mod.rs`
+    - layout helpers: resolve `{root}/profiles/{gnu,uutils}/bin` and `active -> profiles/<current>`
+    - validation utilities: check tree completeness and permissions
+
 ## 2) Rationale & Safety Objectives
 
 - Atomicity: one `renameat(2)` to flip `.../active` under `/usr/lib/oxidizr-arch/`.
