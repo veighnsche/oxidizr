@@ -42,7 +42,7 @@ impl FindutilsExperiment {
         }
 
         // Check prerequisites and handle prompts
-        check_download_prerequisites(worker, &self.package_name, assume_yes)?;
+        let reinstall = check_download_prerequisites(worker, &self.package_name, assume_yes)?;
         // AUR preflight for build requirements
         worker.ensure_aur_preflight(assume_yes)?;
         // Visibility: AUR build for findutils will require checksums. These are expected to be provided
@@ -63,7 +63,7 @@ impl FindutilsExperiment {
 
         // Install package
         tracing::info!(event = "package_install", package = %self.package_name, "Installing package: {}", self.package_name);
-        worker.install_package(&self.package_name, assume_yes)?;
+        worker.install_package(&self.package_name, assume_yes, reinstall)?;
 
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
@@ -95,6 +95,7 @@ impl FindutilsExperiment {
             .collect();
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             true,
             &managed,
@@ -118,6 +119,7 @@ impl FindutilsExperiment {
         // Persist state: mark disabled and remove managed targets
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             false,
             &targets,

@@ -79,9 +79,7 @@ impl super::Worker {
         }
 
         if !self.wait_for_pacman_lock_clear()? {
-            return Err(Error::ExecutionFailed(
-                "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
-            ));
+            return Err(Error::PacmanLockTimeout);
         }
 
         let mut args = vec!["-Sy"];
@@ -123,7 +121,7 @@ impl super::Worker {
     }
 
     /// Install a package with policy enforcement
-    pub fn install_package(&self, package: &str, assume_yes: bool) -> Result<()> {
+    pub fn install_package(&self, package: &str, assume_yes: bool, reinstall: bool) -> Result<()> {
         if !Self::is_valid_package_name(package) {
             return Err(Error::ExecutionFailed(format!(
                 "Invalid or unsafe package name: {}",
@@ -132,21 +130,19 @@ impl super::Worker {
         }
 
         if self.dry_run {
-            tracing::info!("[dry-run] pacman -S --noconfirm {}", package);
+            tracing::info!("[dry-run] pacman -S {} {}", if assume_yes { "--noconfirm" } else { "" }, package);
             return Ok(());
         }
 
-        // If already installed, do nothing
-        if self.check_installed(package)? {
+        // If already installed and no reinstall requested, do nothing
+        if self.check_installed(package)? && !reinstall {
             tracing::info!("Package '{}' already installed (skipping)", package);
             tracing::info!("✅ Expected: '{}' installed, Received: present", package);
             return Ok(());
         }
 
         if !self.wait_for_pacman_lock_clear()? {
-            return Err(Error::ExecutionFailed(
-                "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
-            ));
+            return Err(Error::PacmanLockTimeout);
         }
 
         // Try pacman first, unless we know this is an AUR-only package not present in official repos
@@ -157,6 +153,8 @@ impl super::Worker {
             if assume_yes {
                 args.push("--noconfirm");
             }
+            // For normal installs, using --needed avoids reinstall; when reinstall requested, omit it
+            if !reinstall { args.push("--needed"); }
             args.push(package);
 
             tracing::debug!(cmd = %format!("pacman {}", args.join(" ")), "exec");
@@ -287,9 +285,7 @@ impl super::Worker {
         }
 
         if !self.wait_for_pacman_lock_clear()? {
-            return Err(Error::ExecutionFailed(
-                "pacman database lock present at /var/lib/pacman/db.lck; retry later".into(),
-            ));
+            return Err(Error::PacmanLockTimeout);
         }
 
         let mut args = vec!["-R"];

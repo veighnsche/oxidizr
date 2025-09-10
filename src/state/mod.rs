@@ -32,7 +32,11 @@ pub fn load_state(state_dir: Option<&Path>) -> State {
     State::default()
 }
 
-pub fn save_state(state_dir: Option<&Path>, mut st: State) -> Result<()> {
+pub fn save_state(state_dir: Option<&Path>, mut st: State, dry_run: bool) -> Result<()> {
+    if dry_run {
+        tracing::info!("[dry-run] skip save_state to {:?}", state_dir);
+        return Ok(());
+    }
     let dir = state_dir_or(state_dir);
     fs::create_dir_all(&dir)?;
     st.timestamp = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -81,7 +85,7 @@ pub fn write_state_report(state_dir: Option<&Path>, log_dir_override: Option<&Pa
     Ok(report)
 }
 
-pub fn set_enabled(state_dir: Option<&Path>, name: &str, enabled: bool, managed: &[PathBuf]) -> Result<State> {
+pub fn set_enabled(state_dir: Option<&Path>, dry_run: bool, name: &str, enabled: bool, managed: &[PathBuf]) -> Result<State> {
     let mut st = load_state(state_dir);
     if enabled {
         if !st.enabled_experiments.iter().any(|n| n == name) {
@@ -103,6 +107,6 @@ pub fn set_enabled(state_dir: Option<&Path>, name: &str, enabled: bool, managed:
             st.managed_targets.retain(|x| x != &s);
         }
     }
-    save_state(state_dir, st.clone())?;
+    save_state(state_dir, st.clone(), dry_run)?;
     Ok(st)
 }

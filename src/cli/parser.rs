@@ -45,15 +45,15 @@ pub struct Cli {
     pub no_update: bool,
 
     /// Select all known experiments from the registry
-    #[arg(long, short = 'a', global = true)]
+    #[arg(long, short = 'a', global = true, conflicts_with_all = ["experiments", "experiment"])]
     pub all: bool,
 
     /// Select which experiments to operate on (comma separated or repeatable)
-    #[arg(long, value_delimiter = ',', global = true)]
+    #[arg(long, value_delimiter = ',', global = true, conflicts_with = "all")]
     pub experiments: Vec<String>,
 
     /// Backward compatibility: single experiment selection (deprecated)
-    #[arg(long, global = true)]
+    #[arg(long, global = true, conflicts_with_all = ["all", "experiments"])]
     pub experiment: Option<String>,
 
     /// Skip compatibility checks (dangerous)

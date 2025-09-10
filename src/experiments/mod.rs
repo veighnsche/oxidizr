@@ -143,7 +143,7 @@ pub fn check_download_prerequisites(
     worker: &Worker,
     package: &str,
     assume_yes: bool,
-) -> Result<()> {
+) -> Result<bool> {
     // Check repo capabilities
     let extra_available = worker.extra_repo_available()?;
     let aur_helper = worker.aur_helper_name()?;
@@ -242,6 +242,7 @@ pub fn check_download_prerequisites(
     );
 
     // Check if already installed and prompt for reuse
+    let mut reinstall_requested = false;
     if worker.check_installed(package)? {
         let mut reuse = true;
         if !assume_yes {
@@ -271,28 +272,38 @@ pub fn check_download_prerequisites(
                 "Reinstall requested for '{}' (will attempt package install)",
                 package
             );
+            reinstall_requested = true;
         }
     }
 
-    Ok(())
+    Ok(reinstall_requested)
 }
 
 /// Relink previously managed experiments based on persisted state.
 pub fn relink_managed(worker: &Worker, assume_yes: bool, update_lists: bool) -> Result<()> {
-    let st = crate::state::load_state(worker.state_dir_override.as_deref());
+    let mut st = crate::state::load_state(worker.state_dir_override.as_deref());
     if st.enabled_experiments.is_empty() {
         tracing::info!("No persisted experiments to relink");
         return Ok(());
     }
     let registry = all_experiments();
-    for name in st.enabled_experiments {
+    let mut unknown: Vec<String> = Vec::new();
+    for name in st.enabled_experiments.clone() {
         if let Some(exp) = registry.iter().find(|e| e.name() == name) {
             tracing::info!(event = "relink_managed", experiment = %name);
             // Skip compatibility in relink mode (assume prior success)
             exp.enable(worker, assume_yes, update_lists, true)?;
         } else {
             tracing::warn!("Persisted experiment '{}' not in registry; skipping", name);
+            unknown.push(name);
         }
+    }
+    if !unknown.is_empty() {
+        st.enabled_experiments.retain(|n| !unknown.contains(n));
+        // Also drop any managed targets that no longer have an owning experiment (best-effort)
+        // We cannot reliably map targets -> experiment here without additional metadata,
+        // so we keep managed_targets as-is for now.
+        let _ = crate::state::save_state(worker.state_dir_override.as_deref(), st, worker.dry_run);
     }
     Ok(())
 }

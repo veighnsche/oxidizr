@@ -40,11 +40,11 @@ impl SudoRsExperiment {
         }
 
         // Check prerequisites and handle prompts
-        check_download_prerequisites(worker, &self.package_name, assume_yes)?;
+        let reinstall = check_download_prerequisites(worker, &self.package_name, assume_yes)?;
 
         // Install package
         tracing::info!(event = "package_install", package = %self.package_name, "Installing package: {}", self.package_name);
-        worker.install_package(&self.package_name, assume_yes)?;
+        worker.install_package(&self.package_name, assume_yes, reinstall)?;
         if worker.check_installed(&self.package_name)? {
             tracing::info!(
                 "✅ Expected: '{}' installed, Received: present",
@@ -189,6 +189,7 @@ impl SudoRsExperiment {
         ];
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             true,
             &managed,
@@ -216,6 +217,7 @@ impl SudoRsExperiment {
         // Persist state: mark disabled and remove managed targets
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             false,
             &targets,

@@ -53,7 +53,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
     } else {
         // No implicit defaults: require explicit selection
         tracing::error!("No experiments selected. Use --all or --experiments=<names>");
-        return Err(crate::Error::Other("no experiments selected".into()));
+        return Err(crate::Error::CliMisuse("no experiments selected".into()));
     };
 
     let all_exps = all_experiments();
@@ -77,7 +77,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
 
     if exps.is_empty() {
         tracing::error!("No experiments matched the selection");
-        return Err(crate::Error::Other(
+        return Err(crate::Error::CliMisuse(
             "no experiments matched selection".into(),
         ));
     }
@@ -109,7 +109,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                 );
             }
             // Emit final state report
-            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
+            if !cli.dry_run { let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref()); }
         }
         Commands::Disable => {
             let _lock_guard = lock::acquire()?;
@@ -127,7 +127,7 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
                 );
             }
-            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
+            if !cli.dry_run { let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref()); }
         }
         Commands::Remove => {
             let _lock_guard = lock::acquire()?;
@@ -144,14 +144,19 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
                     &AuditFields { target: Some(e.name().to_string()), ..Default::default() },
                 );
             }
-            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
+            if !cli.dry_run { let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref()); }
         }
         Commands::Check => {
             let distro = worker.distribution()?;
+            let mut any_incompatible = false;
             for e in &exps {
                 let ok = e.check_compatible(&distro)?;
                 println!("{}\tCompatible: {}", e.name(), ok);
+                if !ok { any_incompatible = true; }
                 tracing::info!(event = "compatibility_check", experiment = %e.name(), distro = %distro.id, compatible = ok, "compatibility: {} -> {}", e.name(), ok);
+            }
+            if any_incompatible {
+                return Err(crate::Error::Incompatible(format!("one or more experiments incompatible with {}", worker.distribution()?.id)));
             }
         }
         Commands::ListTargets => {
@@ -167,13 +172,19 @@ pub fn handle_cli(cli: Cli) -> Result<()> {
             if !cli.dry_run { enforce_root()?; }
             // Relink previously managed experiments from persisted state
             crate::experiments::relink_managed(&worker, /*assume_yes=*/ true, /*update_lists=*/ false)?;
-            let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref());
+            if !cli.dry_run { let _ = state::write_state_report(worker.state_dir_override.as_deref(), worker.log_dir_override.as_deref()); }
         }
         Commands::InstallHook => {
             let _lock_guard = lock::acquire()?;
             if !cli.dry_run { enforce_root()?; }
-            let path = hook::install_pacman_hook()?;
-            println!("Installed pacman hook at {}", path.display());
+            if cli.dry_run {
+                let path = hook::hook_path();
+                let body = hook::hook_body();
+                println!("[dry-run] Would install pacman hook at {}\n\n{}", path.display(), body);
+            } else {
+                let path = hook::install_pacman_hook()?;
+                println!("Installed pacman hook at {}", path.display());
+            }
         }
     }
 
@@ -185,9 +196,7 @@ fn enforce_root() -> Result<()> {
     {
         use nix::unistd::Uid;
         if !Uid::effective().is_root() {
-            return Err(crate::Error::Other(
-                "This command must be run as root".into(),
-            ));
+            return Err(crate::Error::RootRequired);
         }
     }
     Ok(())

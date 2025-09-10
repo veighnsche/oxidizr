@@ -2,7 +2,7 @@ use std::fmt as StdFmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Once;
+use std::sync::{Once, atomic::{AtomicBool, Ordering}};
 
 use tracing::{Event, Level};
 use tracing_log::LogTracer;
@@ -18,6 +18,7 @@ use tracing_subscriber::{layer::SubscriberExt, Registry};
 use super::audit::AUDIT_LOG_PATH;
 
 static INIT: Once = Once::new();
+static ANNOUNCED_SINK: AtomicBool = AtomicBool::new(false);
 
 /// Initialize global tracing subscribers for human logs and audit JSONL.
 ///
@@ -48,6 +49,12 @@ pub fn init_logging() {
             .with_ansi(atty::is(atty::Stream::Stderr))
             .with_filter(level);
 
+        // Decide whether to attach audit sink (disabled in dry-run)
+        let dry_run = std::env::var("OXIDIZR_DRY_RUN").ok().as_deref() == Some("1");
+        if dry_run {
+            tracing::info!("audit sink: disabled (dry-run)");
+        }
+
         // JSONL audit layer to file, only for target=="audit". We provide our own timestamp field
         // inside audit_event, so we do not attach a timer here to avoid duplicate timestamps.
         let audit_layer = fmt::layer()
@@ -58,8 +65,7 @@ pub fn init_logging() {
             .with_level(false)
             .with_target(false)
             .with_writer(AuditMakeWriter::new(PathBuf::from(AUDIT_LOG_PATH)))
-            .with_filter(FilterFn::new(|meta| meta.target() == "audit"));
-
+            .with_filter(FilterFn::new(move |meta| !dry_run && meta.target() == "audit"));
         let subscriber = Registry::default().with(human_layer).with(audit_layer);
 
         // Install the composed subscriber
@@ -81,10 +87,18 @@ impl AuditMakeWriter {
     fn open(&self) -> io::Result<std::fs::File> {
         // Try primary path, fallback to HOME if needed
         match open_append(&self.primary) {
-            Ok(f) => Ok(f),
+            Ok(f) => {
+                if !ANNOUNCED_SINK.swap(true, Ordering::SeqCst) {
+                    tracing::info!("audit sink: {}", self.primary.display());
+                }
+                Ok(f)
+            }
             Err(_) => {
                 let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
                 let fallback = Path::new(&home).join(".oxidizr-arch-audit.log");
+                if !ANNOUNCED_SINK.swap(true, Ordering::SeqCst) {
+                    tracing::info!("audit sink: {} (fallback)", fallback.display());
+                }
                 open_append(&fallback)
             }
         }

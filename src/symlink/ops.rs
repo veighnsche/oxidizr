@@ -262,9 +262,25 @@ pub fn restore_file(target: &Path, dry_run: bool, force_best_effort: bool) -> Re
         if symlink_info_enabled() {
             tracing::info!("Restoring {} <- {}", target.display(), backup.display());
         }
-        // Remove current target then atomically rename backup into place
+        // Remove current target then atomically rename backup into place with parent no-follow guard
+        let parent = target.parent().unwrap_or_else(|| Path::new("."));
+        let fname = target
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("target");
+        let bname = backup
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("backup");
         let _ = fs::remove_file(target);
-        fs::rename(&backup, target)?;
+        // Open parent directory with O_NOFOLLOW
+        let dirfd = open_dir_nofollow(parent)?;
+        let old_c = std::ffi::CString::new(bname).unwrap();
+        let new_c = std::ffi::CString::new(fname).unwrap();
+        let rc = unsafe { libc::renameat(dirfd, old_c.as_ptr(), dirfd, new_c.as_ptr()) };
+        let last = std::io::Error::last_os_error();
+        unsafe { libc::close(dirfd) };
+        if rc != 0 { return Err(crate::Error::Io(last)); }
         // fsync parent directory to solidify rename
         let _ = fsync_parent_dir(target);
         // Log the restoration

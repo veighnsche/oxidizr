@@ -47,7 +47,7 @@ pub fn ensure_mount_rw_exec(path: &Path) -> Result<()> {
         let has_rw = opts_l.split(',').any(|o| o == "rw");
         let noexec = opts_l.split(',').any(|o| o == "noexec");
         if !has_rw || noexec {
-            return Err(Error::ExecutionFailed(format!(
+            return Err(Error::FilesystemUnsuitable(format!(
                 "Filesystem at '{}' not suitable: requires rw and exec (opts: {})",
                 path.display(), opts
             )));
@@ -69,7 +69,7 @@ pub fn check_immutable(path: &Path) -> Result<()> {
                 let mut fields = line.split_whitespace();
                 if let Some(attrs) = fields.next() {
                     if attrs.contains('i') {
-                        return Err(Error::ExecutionFailed(format!(
+                        return Err(Error::FilesystemUnsuitable(format!(
                             "Target '{}' is immutable (chattr +i). Run 'chattr -i {}' to clear before proceeding.",
                             path.display(), path.display()
                         )));

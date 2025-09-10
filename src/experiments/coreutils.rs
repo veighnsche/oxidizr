@@ -68,11 +68,11 @@ impl CoreutilsExperiment {
             .unwrap_or_else(|| self.package_name.clone());
 
         // Check prerequisites and handle prompts
-        check_download_prerequisites(worker, &effective_package, assume_yes)?;
+        let reinstall = check_download_prerequisites(worker, &effective_package, assume_yes)?;
 
-        // Install package
+        // Install package (honor reinstall request)
         tracing::info!(event = "package_install", package = %effective_package, "Installing package: {}", effective_package);
-        worker.install_package(&effective_package, assume_yes)?;
+        worker.install_package(&effective_package, assume_yes, reinstall)?;
 
         // Discover and link applets
         let applets = self.discover_applets(worker)?;
@@ -106,6 +106,7 @@ impl CoreutilsExperiment {
             .collect();
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             true,
             &managed,
@@ -140,6 +141,7 @@ impl CoreutilsExperiment {
         // Persist state: mark disabled and remove managed targets
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             false,
             &targets,

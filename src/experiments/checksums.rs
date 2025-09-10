@@ -55,9 +55,9 @@ impl ChecksumsExperiment {
                 "No checksum applets found in current system state; ensuring '{}' is installed",
                 provider
             );
-            check_download_prerequisites(worker, &provider, assume_yes)?;
+            let reinstall = check_download_prerequisites(worker, &provider, assume_yes)?;
             tracing::info!("Installing package: {}", provider);
-            worker.install_package(&provider, assume_yes)?;
+            worker.install_package(&provider, assume_yes, reinstall)?;
             // Re-discover after install
             let rediscovered = self.discover_present(worker)?;
             links = rediscovered.0;
@@ -96,6 +96,7 @@ impl ChecksumsExperiment {
             .collect();
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             true,
             &managed,
@@ -113,6 +114,7 @@ impl ChecksumsExperiment {
         // Persist state: mark disabled and remove managed targets
         let _ = state::set_enabled(
             worker.state_dir_override.as_deref(),
+            worker.dry_run,
             self.name(),
             false,
             &targets,

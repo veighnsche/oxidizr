@@ -61,6 +61,12 @@ sudo oxidizr-arch --experiments coreutils disable
 
 # Remove: restore and uninstall provider packages
 sudo oxidizr-arch --experiments coreutils remove
+
+# Relink previously managed targets from persisted state (used by pacman hook)
+sudo oxidizr-arch relink-managed --no_update --no_progress -y
+
+# Install pacman post-transaction hook that runs relink-managed automatically
+sudo oxidizr-arch install-hook
 ```
 
 Common flags (global):
@@ -85,6 +91,17 @@ Common flags (global):
 --package uutils-coreutils              # override package name per experiment
 --bin-dir /usr/lib/uutils/coreutils     # override replacement bin directory
 --unified-binary /usr/bin/coreutils     # override unified dispatcher path
+
+# State/report overrides (useful for tests)
+--state-dir /var/lib/oxidizr-arch       # override state persistence directory
+--log-dir /var/log/oxidizr-arch         # override log directory for state-report
+
+# Ownership and trust policy
+--strict-ownership                      # abort when target ownership is unknown
+--force                                 # bypass source trust checks (dangerous)
+
+# sudo-rs verifier
+--sudo-smoke-user <name>                # run 'sudo -n true' as this user post-enable
 ```
 
 Examples:
@@ -125,6 +142,7 @@ Notes:
   - Installs required packages (`pacman -S` or AUR for `uutils-findutils-bin`).
   - Discovers provider binaries and flips targets with link-aware, atomic symlink swaps.
   - Coreutils deliberately excludes checksum applets; use the `checksums` experiment for those.
+  - Persist state: enabled experiments and managed targets are saved to state for relinking.
 
 - On `disable` (restore-only):
   - Restores targets from backups. Missing backups cause an error unless `--force-restore-best-effort` is set.
@@ -132,13 +150,27 @@ Notes:
 
 - On `remove`:
   - Performs `disable`, then uninstalls provider packages and verifies absence.
+  - Writes a final state report.
+
+## State and Relink Hook
+
+- State is persisted as JSON under `/var/lib/oxidizr-arch/state.json` (override with `--state-dir`).
+- After mutating commands, a human-readable state report is written to `/var/log/oxidizr-arch/state-report.txt` (override with `--log-dir`).
+- `relink-managed` reads persisted state and re-applies required links without running `-Sy` or progress bars; used by the pacman hook.
+- `install-hook` installs `/usr/share/libalpm/hooks/oxidizr-arch-relink.hook` that runs `oxidizr-arch relink-managed --assume-yes --no_update --no_progress` after transactions.
 
 ## Safety model
 
 - Link-aware backups: if the target was a symlink, the backup is a symlink. Restores recreate the original symlink.
-- Atomic swaps: temp symlink + atomic rename with fsync of the parent directory.
+- Atomic swaps with no-follow parent: temp symlink + `renameat` anchored at the parent directory FD opened with `O_DIRECTORY|O_NOFOLLOW`, then fsync of the parent directory.
 - Idempotent switching: re-running enable updates incorrect symlinks in place; disable restores originals where backups exist.
 - Path safety: traversal checks guard against `..` in paths (see `src/symlink/ops.rs::is_safe_path`).
+- Mount preflights: `/usr` and target mountpoints must be `rw` and not `noexec`.
+- Immutable bit check: operations abort if a target path is immutable (`chattr +i`) with remediation guidance.
+- Package owner verification: warns by default when target owner cannot be determined via `pacman -Qo`; with `--strict-ownership`, aborts.
+- Source trust checks: require root-owned, non-world-writable sources on an `exec` mount and not under `$HOME`; `--force` can bypass.
+- Concurrency: a single-instance process lock prevents parallel mutating runs.
+- State-driven relink: pacman transactions that clobber links can be repaired via the installed hook.
 - Audit trail: structured JSONL audit events are written to `/var/log/oxidizr-arch-audit.log` with fallback to `$HOME/.oxidizr-arch-audit.log` (`src/logging/audit.rs`).
 
 ## Exit codes
