@@ -24,26 +24,6 @@ Planning only — no behavior changes implied by this document. This plan extrac
 
 Out of scope (for now): new safety features, packaging/SBOM/signatures/initramfs, or user-visible behavioral changes beyond existing audit-noted bug fixes.
 
----
-
-## Current Status (2025-09-10 19:30:05+02:00)
-
-- Implemented a reusable workspace crate `switchyard/` and wired the app to depend on it (`Cargo.toml`: `switchyard = { path = "switchyard" }`).
-- Migrated safety mechanisms into `switchyard`:
-  - `switchyard/src/symlink.rs`: pure mechanism for `backup_path`, `is_safe_path`, atomic idempotent `replace_file_with_symlink`, and `restore_file` (no product logging/UI).
-  - `switchyard/src/fs_ops.rs`: `open_dir_nofollow`, `atomic_symlink_swap` using `renameat`, and `fsync_parent_dir`.
-  - `switchyard/src/preflight.rs`: read-only checks `ensure_mount_rw_exec`, `check_immutable`, `check_source_trust`.
-  - `switchyard/src/api.rs`: minimal façade (`Policy`, `Plan`/`Action`, `ApplyMode`, `FactsEmitter`, `AuditSink`, and `Switchyard::{plan, preflight, apply}`).
-- Product now delegates to `switchyard`:
-  - `src/system/fs_checks.rs` calls `switchyard::preflight::*` and maps messages to product `Error`.
-  - `src/symlink/ops.rs` calls `switchyard::symlink::*` for mechanisms while preserving product audit and progress UI logs.
-  - `src/experiments/util.rs` can run through the façade (`Switchyard`) under feature `switchyard` (now enabled by default).
-- Build and tests pass (`cargo check`, `cargo test`).
-
-Behavior/compatibility:
-- Dry-run semantics preserved (façade maps to dry-run; audit sink still controlled by app env `OXIDIZR_DRY_RUN`).
-- Audit/facts continue via product logging; `switchyard` itself contains no global logging.
-
 ## Inventory Map (current code)
 
 - `src/symlink/ops.rs`
@@ -89,7 +69,7 @@ Behavior/compatibility:
 
 ## Proposed Module Layout (Option B preferred; start with internal Option A)
 
-- `switchyard/` (new)
+- `switchyard/src/` (new)
   - `api.rs`: façade (Plan, Action, ApplyMode, PreflightReport, ApplyReport; `Switchyard`, `Policy`, traits `FactsEmitter`, `AuditSink`).
   - `plan.rs`: translate inputs + policy → deterministic actions; pure.
   - `preflight.rs`: read-only validations (rw/exec, immutable, trust, collisions, path safety).
@@ -105,7 +85,6 @@ Behavior/compatibility:
   - `locking.rs`: advisory per-target/process-wide locking primitives.
   - `schema.rs`: facts/audit envelope and schema versioning.
   - `errors.rs`, `config.rs`.
-- Phase 1 (Option A): implement as internal module under `src/switchyard/` and later promote to workspace crate.
 
 ---
 
@@ -282,89 +261,6 @@ impl<E: FactsEmitter, A: AuditSink, O: OwnershipOracle> Switchyard<E, A, O> {
 - Path safety via `SafePath`: normalize; enforce allowed roots; reject traversal.
 - Metadata handling: preserve permissions today; document gaps for xattrs/ACLs/caps.
 - Observability: every decision/action emits facts + human log line.
-
----
-
-## Refactor Plan (stepwise) — Checklist
-
-- [ ] Freeze behavior with golden fixtures for JSONL audit and human logs across representative flows.
-- [x] Introduce façade (adapted): Implemented in external crate `switchyard` as a reusable façade instead of an internal module; app wires to it.
-- [x] Feature-flag pilot: `experiments/util::{create_symlinks, restore_targets}` can execute via façade under feature `switchyard` (enabled by default).
-- [x] Move internals incrementally:
-  - [x] `symlink/ops` → `switchyard/src/symlink.rs` (pure mechanisms; no product logging/UI).
-  - [x] `system/fs_checks` → `switchyard/src/preflight.rs` (read-only checks).
-  - [x] Added `switchyard/src/fs_ops.rs` (O_NOFOLLOW, renameat, fsync).
-  - [ ] Add `rollback` module and wire inverse operations (TBD).
-- [ ] Stabilize errors and mapping to app `Error::exit_code()`:
-  - [x] Preflight messages mapped back to product `Error` in `src/system/fs_checks.rs`.
-  - [ ] Introduce `SwitchyardError` taxonomy in crate and centralize mappings (TBD).
-- [x] Flip default to façade; keep shims for safety. (`switchyard` feature enabled by default.)
-- [x] Promote to `switchyard/` workspace crate (Option B) with minimal public API.
-- [ ] Documentation: Add `docs/switchyard-architecture.md` with diagrams/examples.
-
-Rollback strategy: retain feature flag and shims; revert to legacy path if regressions are detected.
-
----
-
-## Module TODOs
-
-- [x] /src/switchyard/mod.rs — public facade root module (or lib.rs in external crate)
-- [x] /src/switchyard/api.rs — public facade: Plan, Action, Executor
-- [ ] /src/switchyard/plan.rs — build action graph from inputs/policy
-- [x] /src/switchyard/preflight.rs — read-only validations (permissions, collisions, cycles)
-- [x] /src/switchyard/fs_ops.rs — atomic file/dir/link ops; temp/rename patterns
-- [x] /src/switchyard/symlink.rs — safe (re)pointing, semantics preserved
-- [ ] /src/switchyard/backup.rs — backup/restore strategies; symlink-aware
-- [ ] /src/switchyard/policy.rs — allow/deny rules; constraints
-- [ ] /src/switchyard/rollback.rs — record & perform undo steps
-- [ ] /src/switchyard/facts.rs — structured events (JSON/serde), stable schema
-- [ ] /src/switchyard/audit.rs — human-readable audit lines
-- [ ] /src/switchyard/errors.rs — error taxonomy + exit code mapping
-- [ ] /src/switchyard/config.rs — typed config for policies/paths/modes
-- [ ] /src/switchyard/types.rs — common types; path wrappers; invariants
-
----
-
-## Cross-Document TODOs
-
-- [ ] Align with `AUDIT_CHECKLIST.md` gaps (map to concrete modules/tests)
-  - [ ] Transactionality: implement graph-based rollback that is automatic and complete (register inverse ops; test partial failure) in `switchyard/rollback.rs`; add integration tests in `src/switchyard/`.
-  - [ ] Auditability: add before/after cryptographic hashes via op buffering and selective hashing (tie-in to Stream C) in `src/logging/audit.rs` and optional `src/logging/attest.rs`.
-  - [ ] Audit completeness: ensure logs record actor, versions, provenance, and exit codes centrally via `AuditFields` in `src/logging/audit.rs`; verify call sites in `experiments//*` and `system/worker/*` attach these.
-  - [ ] Least Intrusion: introduce preflight diff rendering (no mutation) and document metadata preservation policy (mode/owner/times; xattrs/ACLs/caps policy) — `src/experiments/util.rs` renderer + policy knobs in `switchyard/policy.rs`.
-  - [ ] Determinism: stabilize preflight/apply outputs; seed IDs and redact non-deterministic fields in DryRun — assertions in tests under `src/switchyard/`.
-  - [ ] Conservatism: make DryRun the default unless `--assume-yes` (Stream B) — `src/cli/{parser.rs,handler.rs}` + docs.
-  - [ ] Recovery First: document and test one-step rollback (profile pointer re-flip or `restore_file`) — E2E in `tests/` via `test-orch/`.
-  - [ ] Health Verification: add post-commit smoke tests and rollback trigger (Stream A) — `src/experiments/util.rs::run_smoke_tests` and wiring in experiments.
-  - [ ] Supply Chain Integrity: provenance enrichment (owner, repo presence) and per-op signature/SBOM-lite (Stream C/D) — `src/system/worker/packages.rs` + `src/logging/audit.rs` + `src/logging/attest.rs`.
-
-- [ ] Integrate `PROJECT_PLANS/` Streams A–E
-  - [ ] Stream A — Profiles & Atomic Flip + Canary + Smokes + Backup
-    - [ ] Add `rename_active_pointer(active, new_target)` helper (O_NOFOLLOW + `renameat` + fsync) in `src/symlink/ops.rs`.
-    - [ ] Profile scaffolding/helpers and tree population via `src/experiments/util.rs` (reuse `create_symlinks`, target profile dirs).
-    - [ ] Post-flip `run_smoke_tests()` with auto-rollback on failure; wire into `src/experiments/{coreutils.rs,findutils.rs}`.
-    - [ ] CLI: `canary --shell` and `profile --set {gnu|uutils}` in `src/cli/{parser.rs,handler.rs}`.
-    - [ ] Security: detect/preserve `security.capability`; optional label relabel on active tree; ACL detect/warn — `src/system/security.rs` (new) + audits.
-  - [ ] Stream B — Preflight Plan, Compat Detectors, UX
-    - [ ] `--preflight` flag and default-dry-run posture in `src/cli/{parser.rs,handler.rs}`; render plan in human logs via `src/experiments/util.rs`.
-    - [ ] Add `assets/compat_matrix.json` and `src/compat/mod.rs` scanners; gate risky flags/semantics.
-    - [ ] Adjust human log verbosity per `VERBOSITY.md`; attach plan rows to audit (`AuditFields.artifacts`).
-  - [ ] Stream C — Audit Attestation + Docs
-    - [ ] Introduce op buffer/finalizer in `src/logging/audit.rs` to emit per-op `audit-<op_id>.jsonl`.
-    - [ ] Optional signing in `src/logging/attest.rs` (Ed25519), CLI `audit verify` in `src/cli//*`.
-    - [ ] Selective hashing (changed/untrusted targets) with caching keyed by `(dev,inode,mtime,size)`; SBOM-lite JSON.
-    - [ ] Operator docs/playbooks: recovery, exit codes, audit verification.
-  - [ ] Stream D — Supply Chain Policy + Lock Wait UX
-    - [ ] Enforce repo-first/AUR opt-in in `src/system/worker/packages.rs::install_package` with flags `--allow-aur`, `--aur-user`.
-    - [ ] Bounded pacman lock wait with periodic progress in `Worker::wait_for_pacman_lock_clear`.
-    - [ ] Provenance fields (helper, command, repo presence) attached via `audit_event_fields`.
-  - [ ] Stream E — Dependency Footprint Trim
-    - [ ] Implement internal `path_search` behind `Worker.which()` in `src/system/worker/fs_ops.rs`; feature-gate external `which` crate in `Cargo.toml`.
-
-- [ ] Cross-cutting — Tests & CI Pipeline
-  - [ ] Add YAML suites under `tests/` for: preflight-only, profile flip + rollback + smokes, AUR gating behaviors, capability/labels preservation, audit verify/SBOM.
-  - [ ] Expand Rust tests: `src/switchyard/` (rollback, determinism, SafePath), `src/symlink/ops.rs` (atomicity invariants), `src/compat/` (matrix matching).
-  - [ ] Ensure `test-orch/` orchestrators remain the single runner; namespace caches per distro (already implemented) and add xfail markers where infra-limited.
 
 ---
 
