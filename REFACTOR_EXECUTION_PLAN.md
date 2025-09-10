@@ -2,12 +2,22 @@
 
 A staged, low-risk sequence of PRs to refactor within `src/` while preserving behavior, CLI, logs, and exit codes. No external crate extraction yet; this keeps the tree coherent and prepares for a future `oxidizr-core`.
 
+## Refactor Policy (Pre-Release)
+
+- Breaking changes are allowed. Until the first public release, backward compatibility is not guaranteed and existing shims may be removed to simplify the codebase.
+
 ## Step 0 — Guardrails and contracts (docs-only, config)
 
 - Scope: Add CONTRIBUTING section “Authoritative Modules & Reuse Rules” mirroring `PROJECT_PLANS/README.md`. Add CI grep rules to forbid `which::which` outside `fs_ops.rs` and to forbid new ad-hoc symlink ops/log sinks.
 - Risks: None (non-functional).
 - Acceptance: CI passes; rules trigger on deliberate violations in a test commit.
 - Rollback: Remove docs and CI rule changes.
+  
+  Clarifications (Clean Code §18 single authorities):
+  - Enforcement: CI adds two checks and docs back them up in CONTRIBUTING:
+    - PATH lookup: only `src/system/worker/fs_ops.rs` may reference `which::which`; all call sites use `Worker::which()`.
+    - Single authorities: disallow new implementations of symlink ops or logging sinks outside `src/symlink/ops.rs` and `src/logging/init.rs`.
+  - These are docs+CI only; no code changes or new dependencies.
 
 ## Step 1 — Centralize PATH search behind Worker.which (done)
 
@@ -22,6 +32,12 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Introducing a new API; not referenced by product yet.
 - Acceptance: Unit tests green; no product behavior change.
 - Rollback: Remove the new function.
+  
+  Clarifications (Clean Code §6, §10):
+  - API: `fn rename_active_pointer(active: &Path, new_target: &Path) -> Result<()>`.
+  - Preconditions: parent directory exists; both paths under allowed roots; parent is opened with `O_NOFOLLOW`.
+  - Semantics: create a temp pointer, `renameat` within the parent dirfd (atomic), then `fsync` parent; return a single product-level error on failure.
+  - Safety: public API is safe; any libc calls are encapsulated and documented with safety pre/post conditions.
 
 ## Step 3 — Introduce Core namespace boundaries (logical only)
 
@@ -35,6 +51,16 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Module visibility and import churn.
 - Acceptance: All imports compile; behavior unchanged.
 - Rollback: Remove re-exports; search/replace back to previous imports.
+  
+  Clarifications (Clean Code §2, §18):
+  - Re-export stubs only (no moves):
+    - `core::symlink` -> `crate::symlink`
+    - `core::fs_checks` -> `crate::system::fs_checks`
+    - `core::path` -> temporary adapter that calls `Worker::which()`
+    - `core::audit` -> `crate::logging`
+    - `core::state` -> `crate::state`
+    - `core::lock` -> `crate::system::lock`
+  - No behavior change; guardrails in Step 0 enforce single authorities.
 
 ## Step 4 — Worker-to-Core dependency alignment
 
@@ -49,6 +75,10 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Test stability; time fields differ (normalize timestamps).
 - Acceptance: CI green; snapshots updated on intentional schema changes only.
 - Rollback: Remove snapshots.
+  
+  Clarifications (Clean Code §5, §9, §13):
+  - Snapshot scope: representative flows (enable coreutils, disable, install-package pacman and AUR).
+  - Determinism: normalize or drop `ts`, `run_id`, and `container_id` fields; snapshot the remaining envelope and fields.
 
 ## Step 6 — Preflight builder (Stream B scaffolding, read-only)
 
@@ -56,6 +86,10 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Minimal; read-only.
 - Acceptance: Unit tests for builder/renderer; E2E: preflight-only run prints plan and exits.
 - Rollback: Feature-flag or revert.
+  
+  Clarifications (Clean Code §7, §8):
+  - Data model: `PreflightItem { target, current_kind, current_dest?, planned_kind, planned_dest?, policy_ok, provenance }`.
+  - Behavior: invoked by `--preflight`; reuses experiments’ discovery and `experiments/util.rs` renderer; never mutates; default dry-run posture.
 
 ## Step 7 — Provenance tightening (Stream D alignment)
 
@@ -63,6 +97,9 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Log volume; mitigated with INFO-level policy.
 - Acceptance: Logs present in E2E; acceptance messages match README guarantees.
 - Rollback: Adjust log levels or fields only.
+  
+  Clarifications (Clean Code §5):
+  - Ensure `audit_event_fields` includes helper, command, exit code, and distro context for install/ensure flows; do not add new sinks.
 
 ## Step 8 — Optional: internal path_search implementation (Stream E)
 
@@ -70,6 +107,10 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Edge-case divergence.
 - Acceptance: Unit corpus matches external crate; E2E unaffected.
 - Rollback: Re-enable external crate feature.
+  
+  Clarifications (Clean Code §11):
+  - Feature flag: `path-internal` (off by default).
+  - Add a small corpus to compare behaviors vs the `which` crate; keep the external crate as default.
 
 ## Step 9 — Attestation scaffolding (Stream C, gated)
 
@@ -77,6 +118,11 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Crypto key handling; mitigate by feature gate and docs.
 - Acceptance: Unit tests for sign/verify, deterministic hashing; no runtime effect when feature disabled.
 - Rollback: Remove gated files.
+  
+  Clarifications (Clean Code §5, §11, §13):
+  - Feature flag: `signing`.
+  - `OpBuffer` in `logging/audit.rs`; signing/verify helpers in `logging/attest.rs`.
+  - Keys loaded from env or `~/.config/oxidizr-arch/keys/`; no network calls.
 
 ## Step 10 — Profiles pointer flip integration (Stream A, incremental)
 
@@ -84,6 +130,9 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Behavior drift if enabled accidentally.
 - Acceptance: Existing default path unchanged; gated mode E2E passes additional profile tests.
 - Rollback: Disable flag; revert wiring.
+  
+  Clarifications (Clean Code §6, §14):
+  - Hidden gate for tests-only: `OXIDIZR_PROFILE_MODE=1` (or equivalent hidden CLI flag). Default remains current per-target symlink mode.
 
 ## Step 11 — Finalize Core boundary (internal only)
 
@@ -91,6 +140,9 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: Import paths in many files; mitigated by IDE/search.
 - Acceptance: Build & tests pass; call graph intact.
 - Rollback: Move files back or re-export.
+  
+  Clarifications (Clean Code §1):
+  - When moving files physically: the core namespace uses `#![forbid(unsafe_code)]`, exposes FS/system traits for testability, and contains no CLI parsing or global config.
 
 ## Step 12 — Extraction feasibility (no code move)
 
@@ -98,6 +150,9 @@ A staged, low-risk sequence of PRs to refactor within `src/` while preserving be
 - Risks: None (scoping exercise).
 - Acceptance: `cargo check -p oxidizr-arch` unaffected; `core/` draft builds independently in isolation tests.
 - Rollback: Remove draft.
+  
+  Clarifications (Clean Code §1, §11):
+  - Draft `core/Cargo.toml` models a library-only crate with minimal dependencies and no side-effectful defaults; shared error types and logging macros exported cleanly.
 
 ---
 

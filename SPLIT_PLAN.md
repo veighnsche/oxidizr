@@ -75,6 +75,10 @@ Public API surface (Core)
   - `fn check_immutable(path: &Path) -> Result<()>`
   - `fn is_safe_path(path: &Path) -> bool`
   - `fn rename_active_pointer(active: &Path, new_target: &Path) -> Result<()>` (atomic pointer flip; to be added)
+    Clarifications (Clean Code §6, §10):
+    - API is safe and wraps low-level syscalls internally; any libc usage is encapsulated with documented pre/post conditions.
+    - Preconditions: parent directory exists; paths within allowed roots; parent opened with `O_NOFOLLOW`.
+    - Semantics: create temp pointer; perform `renameat` anchored at the parent dirfd (atomic); `fsync` the parent directory; return a single product-level error on failure.
 
 - `core::audit`
   - `struct AuditFields { .. }`
@@ -151,9 +155,22 @@ Event types & schema
   - Experiments -> Worker (package ops) and Core (fs ops, audit, state).
   - Worker -> Core (fs checks, audit, lock, path).
 
+Enforcement (docs + CI; Clean Code §18):
+
+- Add CONTRIBUTING section "Authoritative Modules & Reuse Rules" referencing this plan.
+- CI guardrails:
+  - PATH lookup: only `src/system/worker/fs_ops.rs` may reference `which::which`; all call sites use `Worker::which()`.
+  - Single authorities: disallow introducing new symlink implementations outside `src/symlink/ops.rs` and new logging sinks outside `src/logging/init.rs`.
+
 ## Compatibility Guarantees
 
-- CLI surface unchanged; any new flags come later via Streams (B, D) according to plans.
+Pre-release refactor policy:
+
+- Breaking changes are allowed. Until the first public release, backward compatibility is not guaranteed and shims may be removed.
+
+Post-release guarantees (to be enforced at 1.0+):
+
+- CLI surface stable; any new flags follow Streams (B, D).
 - Exit codes preserved (0,1,10,20,30,40) and mapped from the same error variants.
 - Audit JSONL schema preserved; existing dashboards/consumers unaffected.
 - State JSON schema preserved; relink-managed and pacman hook behavior identical.
