@@ -39,6 +39,10 @@ assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = "3.12"
 
+[workspace]
+members = []
+resolver = "2"
+
 [features]
 default = ["switchyard"]
 # Enable real Arch Linux system operations (pacman/paru, filesystem changes).

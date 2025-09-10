@@ -1,0 +1,13 @@
+[package]
+name = "switchyard"
+version = "0.1.0"
+edition = "2021"
+description = "Switchyard library crate (monorepo skeleton)"
+license = "GPL-3.0-or-later"
+
+[lib]
+name = "switchyard"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1.0"
