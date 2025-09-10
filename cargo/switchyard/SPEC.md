@@ -1,4 +1,4 @@
-# Switchyard Specification (Reproducible v1.0)
+# Switchyard Specification (Reproducible v1.1)
 
 ## 0. Domain & Purpose
 
@@ -38,13 +38,19 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 ### 1.5 Locking
 
 * REQ-L1: Only one `apply()` **MUST** mutate at a time.
-* REQ-L2: If no lock manager, concurrent apply is undefined but a WARN fact **MUST** be emitted.
-* REQ-L3: Lock acquisition **MUST** support bounded wait with timeout → error.
+* REQ-L2: If no lock manager, concurrent `apply()` is **UNSUPPORTED** (dev/test only) and a WARN fact **MUST** be emitted.
+* REQ-L3: Lock acquisition **MUST** use a bounded wait with timeout → `E_LOCKING`, and facts **MUST** record `lock_wait_ms`.
+* REQ-L4: In production deployments, a `LockManager` **MUST** be present. Omission is permitted only in development/testing.
 
 ### 1.6 Rescue
 
 * REQ-RC1: A rescue profile (backup symlink set) **MUST** always remain available.
 * REQ-RC2: Preflight **MUST** verify at least one functional fallback path.
+
+### 1.7 Determinism
+
+* REQ-D1: `plan_id` and `action_id` are UUIDv5 values derived from the normalized plan input using a project-defined, stable namespace.
+* REQ-D2: Dry-run redactions are pinned: timestamps are zeroed (or expressed as monotonic deltas). Dry-run facts **MUST** be byte-identical to real-run facts after redaction.
 
 ---
 
@@ -58,6 +64,8 @@ fn preflight(plan: &Plan) -> PreflightReport;
 fn apply(plan: &Plan, mode: ApplyMode, adapters: &Adapters) -> ApplyReport;
 fn plan_rollback_of(report: &ApplyReport) -> Plan;
 ```
+
+All path-carrying fields within `PlanInput` and `Plan` **MUST** be typed as `SafePath`. Mutating entry points do not accept `PathBuf`.
 
 ### 2.2 Adapters
 
@@ -74,6 +82,8 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
 * Constructed via `SafePath::from_rooted(root, candidate)`.
 * Rejects `..` after normalization.
 * Opened with `O_NOFOLLOW` parent dir handles (TOCTOU defense).
+* All mutating public APIs **MUST** take `SafePath` (not `PathBuf`). Any non-mutating APIs that accept raw paths **MUST** immediately normalize to `SafePath`.
+* TOCTOU-safe syscall sequence is normative for every mutation: open parent with `O_DIRECTORY|O_NOFOLLOW` → `openat` on final component → `renameat` → `fsync(parent)`.
 
 ---
 
@@ -90,10 +100,12 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
   "properties": {
     "ts": {"type":"string","format":"date-time"},
     "plan_id": {"type":"string"},
+    "schema_version": {"type":"integer","enum":[1]},
     "action_id": {"type":"string"},
     "stage": {"enum":["plan","preflight","apply.attempt","apply.result","rollback"]},
     "decision": {"enum":["success","failure","warn"]},
     "severity": {"enum":["info","warn","error"]},
+    "degraded": {"type":["boolean","null"]},
     "path": {"type":"string"},
     "current_kind": {"type":"string"},
     "planned_kind": {"type":"string"},
@@ -109,7 +121,8 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
       }
     },
     "exit_code": {"type":["integer","null"]},
-    "duration_ms": {"type":["integer","null"]}
+    "duration_ms": {"type":["integer","null"]},
+    "lock_wait_ms": {"type":["integer","null"]}
   }
 }
 ```
@@ -189,6 +202,12 @@ Feature: Atomic swap
     And I apply the plan
     Then /usr/bin/ls resolves to providerB/ls atomically
     And rollback restores providerA/ls
+
+  Scenario: Cross-filesystem EXDEV fallback
+    Given the target and staging directories reside on different filesystems
+    When I apply a plan that replaces /usr/bin/cp
+    Then the operation handles EXDEV by copy+sync+rename into place atomically
+    And facts record degraded=true when policy allow_degraded_fs is enabled
 ```
 
 ---
@@ -208,6 +227,56 @@ Feature: Atomic swap
 * REQ-O\* → Audit JSON schema compliance.
 * REQ-L\* → Lock tests.
 * REQ-RC\* → Rescue profile tests.
+
+---
+
+## 10. Filesystems & Degraded Mode
+
+Supported filesystems (tested):
+
+* ext4 — native rename semantics
+* xfs — native rename semantics
+* btrfs — native rename semantics
+* tmpfs — native rename semantics
+
+EXDEV path is explicitly exercised: when staging and target parents are on different filesystems, the engine MUST fall back to a safe copy+fsync+rename strategy. A policy flag `allow_degraded_fs` controls acceptance:
+
+* When `allow_degraded_fs=true`, facts MUST include `degraded=true` and the operation proceeds.
+* When `allow_degraded_fs=false`, the apply MUST fail with `exdev_fallback_failed`.
+
+## 11. Smoke Tests (Normative Minimal Suite)
+
+After apply, the `SmokeTestRunner` MUST, at minimum, run the following commands with specified arguments and treat any non-zero exit or mismatch as failure (which triggers auto-rollback unless explicitly disabled by policy):
+
+* ls -l PATHS
+* cp --reflink=auto SRC DST
+* mv --no-target-directory SRC DST
+* rm -f PATHS
+* ln -sT TARGET LINK
+* stat -c %a,%u,%g PATHS
+* readlink -e PATH
+* sha256sum -c CHECKFILE (tiny checkfile included in test bundle)
+* sort -V INPUT
+* date +%s
+
+Policy MAY disable auto-rollback explicitly (e.g., `policy.disable_auto_rollback=true`); otherwise, smoke failure → auto-rollback.
+
+## 12. Golden Fixtures & Zero-SKIP CI Gate
+
+Golden JSON fixtures MUST exist for plan, preflight, apply, and rollback facts. CI MUST fail if:
+
+* Any required test is SKIP.
+* Any fixture diff is not byte-identical to the golden reference.
+
+## 13. Schema Versioning & Migration
+
+* Facts include `schema_version` (current=v1). Schema changes bump this field.
+* v1→v2 requires a dual-emit period and corresponding fixture updates.
+* Secret-masking rules are explicit and tested: any potentially sensitive strings in facts (e.g., environment-derived values, external command args) MUST be redacted according to policy before emission; tests assert no secrets leak.
+
+## 14. Thread-safety
+
+Core types (e.g., `Plan`, apply engine) are `Send + Sync`. `apply()` MAY be called from multiple threads, but only one mutator proceeds at a time under the `LockManager`. Without a `LockManager`, concurrent apply is unsupported and intended only for dev/test.
 
 ---
 
