@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Crate layout and module boundaries
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-10
 
 ## Context

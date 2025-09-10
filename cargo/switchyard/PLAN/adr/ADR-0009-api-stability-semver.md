@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: API stability and semver commitments
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

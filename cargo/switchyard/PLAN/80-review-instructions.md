@@ -53,7 +53,7 @@ Focus: correctness, feasibility, and internal consistency of the design.
     - `preflight(&Plan) -> PreflightReport`
     - `apply(&Plan, ApplyMode, &Adapters) -> ApplyReport`
     - `plan_rollback_of(&ApplyReport) -> Plan`
-  - Confirm SafePath-only mutations (REQ-API1) and TOCTOU-safe sequence (REQ-TOCTOU1) are captured in modules (`fs_ops.rs`, `api.rs`).
+  - Confirm SafePath-only mutations (REQ-API1) and TOCTOU-safe sequence (REQ-TOCTOU1) are captured in modules (`fs/atomic.rs`, `api.rs`).
   - Check concurrency model and `LockManager` boundaries (REQ-L1..L4; SPEC §14 thread-safety).
 
 - Error Model & Taxonomy
@@ -167,15 +167,20 @@ Focus: evidence sufficiency and reproducibility posture.
 ## Commands & Evidence (One-Click Checks)
 
 - Generate the traceability report and exit on issues:
-```
+
+```bash
 python3 cargo/switchyard/SPEC/tools/traceability.py
 ```
+
 - Validate JSON schema of facts (placeholder example; actual wiring in CI):
-```
+
+```bash
 # Example: use `ajv` or `jsonschema` tool of choice in CI
 ```
+
 - Validate YAML preflight schema (placeholder example; actual wiring in CI):
-```
+
+```bash
 # Example: use `pykwalify` or `yamale` in CI
 ```
 

@@ -28,3 +28,12 @@ Modules discovered in `cargo/switchyard/src/`:
   - Responsibilities: create/replace symlinks via SafePath under TOCTOU-safe sequence
 
 Next: expand with function lists and assign provisional owners.
+
+---
+
+## Migration Note (planning)
+
+Current files under `src/` are placeholders and are not normative for the final layout. Planning documents reference the planned modular structure instead. See:
+
+- `PLAN/impl/00-structure.md` — proposed module tree
+- `PLAN/impl/05-migration.md` — placeholder → planned structure mapping and steps

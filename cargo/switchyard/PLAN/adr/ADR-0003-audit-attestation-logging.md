@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Audit, logging, and attestation strategy
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-10
 
 ## Context

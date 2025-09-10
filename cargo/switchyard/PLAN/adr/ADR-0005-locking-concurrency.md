@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Locking and concurrency model
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

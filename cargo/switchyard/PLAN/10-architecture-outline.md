@@ -1,12 +1,36 @@
 # Architecture Outline
 
-## Modules (current inventory)
+## Modules (planned layout; placeholders will be migrated)
 
-- `src/lib.rs`: crate entry/export surface.
-- `src/api.rs`: high-level operations API (orchestration layer).
-- `src/fs_ops.rs`: safe filesystem operations, atomic swaps.
-- `src/preflight.rs`: safety preconditions and environment checks.
-- `src/symlink.rs`: symlink creation/replacement with safety guarantees.
+- `src/lib.rs` — crate entry/export surface (re-exports).
+- `src/api.rs` — orchestration entrypoints: `plan`, `preflight`, `apply`, `plan_rollback_of`.
+- `src/preflight.rs` — safety preconditions & environment checks; preflight diff.
+- `src/rescue.rs` — rescue profile checks; fallback toolset verification.
+- `src/types/`
+  - `plan.rs` — `PlanInput`, `Plan`, `Action`, `ApplyMode`.
+  - `safepath.rs` — `SafePath` constructors & invariants.
+  - `report.rs` — `PreflightReport`, `ApplyReport`.
+  - `errors.rs` — error taxonomy mapping to SPEC exit codes.
+- `src/adapters/`
+  - `ownership.rs` — `OwnershipOracle`.
+  - `lock.rs` — `LockManager`, `LockGuard`.
+  - `path.rs` — `PathResolver`.
+  - `attest.rs` — `Attestor`.
+  - `smoke.rs` — `SmokeTestRunner`.
+- `src/logging/`
+  - `facts.rs` — JSONL fact builders (schema v1).
+  - `redact.rs` — secret masking and timestamp redaction.
+  - `provenance.rs` — provenance fields & policy.
+- `src/determinism/`
+  - `ids.rs` — UUIDv5 `plan_id`/`action_id`.
+  - `ordering.rs` — stable field ordering & golden determinism.
+- `src/fs/`
+  - `atomic.rs` — TOCTOU-safe rename flow; symlink replacement entrypoints.
+  - `backup.rs` — backup/restore of previous targets.
+  - `exdev.rs` — degraded fallback (copy+sync+rename) for cross-FS.
+  - `symlink.rs` — helpers for symlink creation/replacement.
+- `src/policy/`
+  - `config.rs` — policy flags & conservative defaults.
 
 ## Responsibilities
 
@@ -93,7 +117,7 @@ As per `SPEC.md §3.2` (planning interfaces):
 
 ## Testing & Evidence (planning)
 
-- Test taxonomy: unit (fs_ops, safepath), integration (api orchestration), property (AtomicReplace, IdempotentRollback), BDD (SPEC/features/*.feature), golden fixtures for facts.
+- Test taxonomy: unit (`fs/*`, `types/safepath`), integration (api orchestration), property (AtomicReplace, IdempotentRollback), BDD (SPEC/features/*.feature), golden fixtures for facts.
 - Minimal smoke suite executed via `SmokeTestRunner` post-apply (REQ-H1..H3).
 - CI gates: determinism, safety preconditions, audit schema validation, zero-SKIP golden fixture checks.
 
@@ -102,3 +126,7 @@ As per `SPEC.md §3.2` (planning interfaces):
 - Final public API versioning strategy (semver) and stability policy.
 - Boundaries between `api.rs` orchestration and lower-level modules; trait object vs generics for adapters.
 - Attestation key management (dev/test keys vs prod integration) and SBOM-lite format.
+
+---
+
+Note: Current files under `src/` are placeholders and are not normative. The implementation will migrate to the above structure per `PLAN/impl/00-structure.md` and `PLAN/impl/05-migration.md`.

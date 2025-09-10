@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Determinism and UUIDv5 identifiers
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

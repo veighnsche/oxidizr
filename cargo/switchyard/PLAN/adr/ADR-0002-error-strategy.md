@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Error strategy and taxonomy mapping
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-10
 
 ## Context

@@ -24,7 +24,7 @@
 
 ## Workstreams
 
-- WS-A: Safety Preconditions & FS Ops (`preflight.rs`, `fs_ops.rs`)
+- WS-A: Safety Preconditions & FS Ops (`preflight.rs`, `fs/*`)
 - WS-B: API & Determinism (`api.rs`)
 - WS-C: Observability/Audit & Schema validation
 - WS-D: CI Gates & BDD integration

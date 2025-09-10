@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Minimal smoke tests and auto-rollback policy
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

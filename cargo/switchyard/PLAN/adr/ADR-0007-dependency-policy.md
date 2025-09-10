@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Dependency and supply chain policy
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

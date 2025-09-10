@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: EXDEV degraded mode and cross-filesystem fallback
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

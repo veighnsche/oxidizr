@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: Preflight diff and preservation gating
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context

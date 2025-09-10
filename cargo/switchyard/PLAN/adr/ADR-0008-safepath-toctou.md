@@ -1,7 +1,7 @@
 # ADR Template
 
 - Title: SafePath type and TOCTOU-safe syscall sequence
-- Status: Proposed
+- Status: Accepted
 - Date: 2025-09-11
 
 ## Context
