@@ -171,7 +171,7 @@ fn derive_rollback_actions(apply_report) -> Vec<Action>
 
 ## Facts and Determinism (logging/, determinism/)
 
-```text
+```rust
 fn emit_fact(fields)
   mask_secrets(fields)
   stable_order(fields)

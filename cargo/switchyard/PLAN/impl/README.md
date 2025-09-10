@@ -10,6 +10,7 @@ Related references:
 Documents in this folder:
 
 - `05-migration.md` — planned structure migration steps (planning only)
+- `07-implementation-steps.md` — phase-by-phase steps to implement the crate from this plan
 - `00-structure.md` — proposed crate folder/module structure
 - `10-types-traits.md` — planned types, enums, and traits with purpose
 - `15-policy-and-adapters.md` — policy flags and the `Adapters` bundle (SPEC §2.5, §2.8, §3.2)

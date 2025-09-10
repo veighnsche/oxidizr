@@ -6,7 +6,7 @@ References:
 
 - SPEC: `cargo/switchyard/SPEC/SPEC.md §2.6 Rescue`
 - Requirements: `REQ-RC1..RC3`
-- Also see: `impl/00-structure.md` (adds `rescue.rs`), `impl/30-pseudocode.md` (preflight integration)
+- Also see: `impl/00-structure.md` (adds `rescue.rs`), `impl/70-pseudocode.md` (preflight integration)
 
 ## Goals
 

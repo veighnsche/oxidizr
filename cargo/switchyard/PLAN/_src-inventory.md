@@ -15,7 +15,7 @@ Modules discovered in `cargo/switchyard/src/`:
     - `fn apply(plan: &Plan, mode: ApplyMode, adapters: &Adapters) -> ApplyReport`
     - `fn plan_rollback_of(report: &ApplyReport) -> Plan`
 
-- `fs_ops.rs` — safe filesystem ops and atomic swaps.
+- `fs_ops.rs` — placeholder: safe filesystem ops and atomic swaps; will be split into `fs/{atomic,backup,exdev,symlink}.rs` per `PLAN/impl/05-migration.md`.
   - Provisional owner: Maintainers
   - Responsibilities: SafePath/TOCTOU sequence; atomic rename; EXDEV fallback; backup/restore
 

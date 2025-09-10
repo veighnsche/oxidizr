@@ -77,4 +77,4 @@ fn record_failure_fact(action_id: Option<Uuid>, path: Option<&SafePath>, kind: E
 
 ## Determinism Considerations
 
-- Error handling MUST NOT introduce nondeterministic fields into facts. For dry-run parity, redact timestamps and keep field ordering stable (see `70-facts-logging.md`).
+- Error handling MUST NOT introduce nondeterministic fields into facts. For dry-run parity, redact timestamps and keep field ordering stable (see `impl/40-facts-logging.md`).

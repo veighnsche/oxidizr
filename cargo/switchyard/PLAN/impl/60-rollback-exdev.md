@@ -23,7 +23,7 @@ struct Backup { path: SafePath, tmp: SafePath, before_hash: String }
 
 fn apply(plan: &Plan, mode: ApplyMode, adapters: &Adapters) -> ApplyReport {
     let mut backups: Vec<Backup> = vec![];
-    // ... lock acquisition and attempt facts omitted (see 80-locking-concurrency.md)
+    // ... lock acquisition and attempt facts omitted (see 50-locking-concurrency.md)
 
     for a in &plan.actions {
         emit_fact(Fact{ stage: ApplyAttempt, action_id: Some(a.action_id), path: Some(a.path.abs()), ..Default });
@@ -44,7 +44,7 @@ fn apply(plan: &Plan, mode: ApplyMode, adapters: &Adapters) -> ApplyReport {
         emit_success(a, dry_run=false);
     }
 
-    // ... smoke tests and attestation omitted (see 70-facts-logging.md)
+    // ... smoke tests and attestation omitted (see 40-facts-logging.md)
     ApplyReport{ decision: Success, partial_restoration: None, cause: None }
 }
 
