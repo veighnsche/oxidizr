@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+#![warn(clippy::all, clippy::cargo, clippy::pedantic)]
 //! Switchyard: safe, atomic, reversible filesystem swaps.
 //!
 //! Safety model highlights:

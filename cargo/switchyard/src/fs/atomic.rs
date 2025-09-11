@@ -56,7 +56,8 @@ pub fn atomic_symlink_swap(
     let dirfd = open_dir_nofollow(parent)?;
 
     // Best-effort unlink temporary name if present (ignore errors)
-    let tmp_c = std::ffi::CString::new(tmp_name.as_str()).unwrap();
+    let tmp_c = std::ffi::CString::new(tmp_name.as_str())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
 
     // Create symlink using symlinkat relative to parent dirfd
@@ -64,7 +65,8 @@ pub fn atomic_symlink_swap(
     let src_c = std::ffi::CString::new(source.as_os_str().as_bytes()).map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path")
     })?;
-    let tmp_c2 = std::ffi::CString::new(tmp_name.as_str()).unwrap();
+    let tmp_c2 = std::ffi::CString::new(tmp_name.as_str())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 
     // Atomically rename tmp -> fname within the same directory
@@ -72,7 +74,8 @@ pub fn atomic_symlink_swap(
     if std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1")) {
         return Err(errno_to_io(Errno::XDEV));
     }
-    let new_c = std::ffi::CString::new(fname).unwrap();
+    let new_c = std::ffi::CString::new(fname)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     let t0 = Instant::now();
     match renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str()) {
         Ok(()) => {

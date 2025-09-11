@@ -13,6 +13,7 @@ use base64::Engine;
 use serde_json::json;
 
 use crate::fs;
+use log::Level;
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::{action_id, plan_id};
@@ -46,6 +47,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     );
 
     // Locking (required by default in Commit): acquire process lock with bounded wait; emit telemetry via apply.attempt
+    api.audit.log(Level::Info, "apply: starting");
     let mut lock_wait_ms: Option<u64> = None;
     let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
     if let Some(mgr) = &api.lock {
@@ -64,6 +66,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "exit_code": 30
                 }));
                 let duration_ms = t0.elapsed().as_millis() as u64;
+                api.audit.log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
                 return ApplyReport {
                     executed,
                     duration_ms,
@@ -182,6 +185,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
         }
         if !gating_errors.is_empty() {
+            api.audit.log(Level::Warn, "apply: policy gating rejected plan (E_POLICY)");
             // Emit final failure summary with E_POLICY and exit code
             let ec = exit_code_for(ErrorId::E_POLICY);
             emit_apply_result(&tctx, "failure", json!({
@@ -256,6 +260,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "action_id": _aid.to_string(),
                     "path": target.as_path().display().to_string(),
                     "degraded": if degraded_used { Some(true) } else { None },
+                    "degraded_reason": if degraded_used { Some("exdev_fallback") } else { None },
                     "duration_ms": fsync_ms,
                     "before_kind": before_kind,
                     "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
@@ -473,7 +478,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 
     // Final apply.result summary (after smoke tests/rollback)
     let decision = if errors.is_empty() { "success" } else { "failure" };
-    let mut fields = json!({});
+    let mut fields = json!({
+        "lock_wait_ms": lock_wait_ms,
+    });
     // Optional attestation on success, non-dry-run
     if errors.is_empty() && !dry {
         if let Some(att) = &api.attest {
@@ -514,6 +521,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         }
     }
     emit_apply_result(&tctx, decision, fields);
+    api.audit.log(Level::Info, "apply: finished");
 
     // Compute total duration
     let duration_ms = t0.elapsed().as_millis() as u64;

@@ -43,6 +43,7 @@ fn redact_and_emit(ctx: &AuditCtx, subsystem: &str, event: &str, decision: &str,
         obj.entry("ts").or_insert(json!(ctx.ts));
         obj.entry("plan_id").or_insert(json!(ctx.plan_id));
         obj.entry("path").or_insert(json!(""));
+        obj.entry("dry_run").or_insert(json!(ctx.mode.dry_run));
     }
     // Apply redaction policy in dry-run or when requested
     let out = if ctx.mode.redact { redact_event(fields) } else { fields };
@@ -61,6 +62,7 @@ pub(crate) fn emit_plan_fact(ctx: &AuditCtx, action_id: &str, path: Option<&str>
     redact_and_emit(ctx, "switchyard", "plan", "success", fields);
 }
 
+#[allow(dead_code)]
 pub(crate) fn emit_preflight_fact(
     ctx: &AuditCtx,
     action_id: &str,
@@ -143,6 +145,7 @@ pub(crate) fn emit_apply_result(ctx: &AuditCtx, decision: &str, extra: Value) {
     redact_and_emit(ctx, "switchyard", "apply.result", decision, fields);
 }
 
+#[allow(dead_code)]
 pub(crate) fn emit_summary(ctx: &AuditCtx, stage: &str, decision: &str) {
     let mut fields = json!({
         "stage": stage,

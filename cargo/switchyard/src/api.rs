@@ -155,7 +155,7 @@ mod tests {
         // Inspect captured events
         let evs = facts.events.lock().unwrap();
         assert!(!evs.is_empty(), "no facts captured");
-        // Ensure all facts include schema_version and path
+        // Ensure all facts include schema_version, path, and dry_run
         for (_subsystem, _event, _decision, fields) in evs.iter() {
             assert_eq!(
                 fields.get("schema_version").and_then(|v| v.as_i64()),
@@ -164,6 +164,12 @@ mod tests {
             );
             // path may be null for some summaries; only check presence when present
             let _ = fields.get("path");
+            // Dry-run path in this test should mark all events as dry_run=true
+            assert_eq!(
+                fields.get("dry_run").and_then(|v| v.as_bool()),
+                Some(true),
+                "every fact should include dry_run=true in this test"
+            );
         }
         // Ensure plan_id is consistent and present
         let plan_ids: Vec<String> = evs

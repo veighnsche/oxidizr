@@ -1,6 +1,7 @@
 use super::plan::Action;
 use uuid::Uuid;
 
+#[must_use]
 #[derive(Clone, Debug, Default)]
 pub struct PreflightReport {
     pub ok: bool,
@@ -9,6 +10,7 @@ pub struct PreflightReport {
     pub rows: Vec<serde_json::Value>,
 }
 
+#[must_use]
 #[derive(Clone, Debug, Default)]
 pub struct ApplyReport {
     pub executed: Vec<Action>,
