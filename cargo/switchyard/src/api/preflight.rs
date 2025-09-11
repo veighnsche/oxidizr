@@ -4,7 +4,7 @@ use crate::logging::{FactsEmitter, TS_ZERO};
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, Plan, PreflightReport};
 
-use super::fs_meta::kind_of;
+use super::fs_meta::{kind_of, detect_preservation_capabilities};
 use super::audit::{emit_preflight_fact_ext, emit_summary, AuditCtx, AuditMode};
 
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
@@ -116,6 +116,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     None => None,
                 };
                 let policy_ok = stops.len() == stops_before;
+                let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
                 emit_preflight_fact_ext(
                     &ctx,
                     &aid.to_string(),
@@ -125,15 +126,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     Some(policy_ok),
                     prov,
                     if notes.is_empty() { None } else { Some(notes) },
-                    Some(serde_json::json!({
-                        "owner": false,
-                        "mode": false,
-                        "timestamps": false,
-                        "xattrs": false,
-                        "acls": false,
-                        "caps": false
-                    })),
-                    Some(false),
+                    Some(preservation),
+                    Some(preservation_supported),
                 );
             }
             Action::RestoreFromBackup { target } => {
@@ -190,6 +184,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let idx = plan.actions.iter().position(|a| std::ptr::eq(a, act)).unwrap_or(0);
                 let aid = action_id(&pid, act, idx);
                 let policy_ok = stops.len() == stops_before;
+                let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
                 emit_preflight_fact_ext(
                     &ctx,
                     &aid.to_string(),
@@ -199,15 +194,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     Some(policy_ok),
                     None,
                     if notes.is_empty() { None } else { Some(notes) },
-                    Some(serde_json::json!({
-                        "owner": false,
-                        "mode": false,
-                        "timestamps": false,
-                        "xattrs": false,
-                        "acls": false,
-                        "caps": false
-                    })),
-                    Some(false),
+                    Some(preservation),
+                    Some(preservation_supported),
                 );
             }
         }

@@ -2,11 +2,6 @@
 
 This document defines the non-negotiable rules for tests, CI, harness behavior, and product alignment in the `oxidizr-arch` project.
 
-## Scope
-
-- Applies to all test orchestrators and runners under `test-orch/`, `tests/`, and any CI workflows under `.github/workflows/`.
-- Applies to product code under `src/` and its interaction with test runners.
-
 ## Core Principle
 
 - The product must perform all state mutations. Tests must not mask, pre-create, or repair product-managed artifacts.

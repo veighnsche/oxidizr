@@ -256,14 +256,25 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     // Optional attestation on success, non-dry-run
     if errors.is_empty() && !dry {
         if let Some(att) = &api.attest {
-            let bundle: Vec<u8> = Vec::new(); // TODO: real bundle
+            // Construct a minimal attestation bundle with plan_id and executed actions count
+            let bundle_json = json!({
+                "plan_id": pid.to_string(),
+                "executed": executed.len(),
+                "rolled_back": rolled_back,
+            });
+            let bundle: Vec<u8> = serde_json::to_vec(&bundle_json).unwrap_or_default();
             if let Ok(sig) = att.sign(&bundle) {
                 let sig_b64 = base64::engine::general_purpose::STANDARD.encode(sig.0.clone());
+                // Compute sha256 of bundle for bundle_hash
+                let mut hasher = sha2::Sha256::new();
+                use sha2::Digest as _;
+                hasher.update(&bundle);
+                let bundle_hash = hex::encode(hasher.finalize());
                 let att_json = json!({
                     "sig_alg": "ed25519",
                     "signature": sig_b64,
-                    "bundle_hash": "", // TODO: sha256 of bundle
-                    "public_key_id": "", // TODO
+                    "bundle_hash": bundle_hash,
+                    "public_key_id": att.key_id(),
                 });
                 // Merge attestation into fields
                 let obj = fields.as_object_mut().unwrap();

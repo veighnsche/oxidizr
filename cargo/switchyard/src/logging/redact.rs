@@ -28,6 +28,13 @@ pub fn redact_event(mut v: Value) -> Value {
         // Remove or normalize volatile timings
         obj.remove("duration_ms");
         obj.remove("lock_wait_ms");
+        // Remove volatile flags derived from runtime conditions
+        obj.remove("severity");
+        obj.remove("degraded");
+        // Remove content-hash fields for determinism gating (kept in raw logs)
+        obj.remove("before_hash");
+        obj.remove("after_hash");
+        obj.remove("hash_alg");
         // Placeholder secret masking: if provenance.helper exists, replace with "***"
         if let Some(p) = obj.get_mut("provenance") {
             if let Some(pobj) = p.as_object_mut() {
