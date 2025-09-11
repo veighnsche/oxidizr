@@ -32,7 +32,7 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 - [x] REQ‑L3 Bounded lock wait with timeout — enforced; on timeout emits `E_LOCKING` and records `lock_wait_ms`
 - [x] REQ‑L4 LockManager required in production — policy + docs
 
-- [ ] REQ‑RC1 Rescue profile available — maintain/verify backup symlink set
+- [x] REQ‑RC1 Rescue profile available — maintain/verify backup symlink set
 - [x] REQ‑RC2 Verify fallback path — preflight checks gated by `require_rescue`
 - [x] REQ‑RC3 Fallback toolset on PATH — BusyBox present OR ≥6/10 GNU tools
 
