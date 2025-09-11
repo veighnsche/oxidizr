@@ -135,11 +135,11 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Run golden diff (minimal-plan)
+      - name: Run golden diff (all scenarios)
         id: run_golden
         run: |
           set -e
-          python3 test_ci_runner.py --golden minimal-plan --nocapture
+          python3 test_ci_runner.py --golden all --nocapture
       - name: Upload golden diffs
         if: always()
         uses: actions/upload-artifact@v4

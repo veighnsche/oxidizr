@@ -52,7 +52,17 @@ def main() -> int:
                 "canon_apply_attempt.json",
                 "canon_apply_result.json",
             ],
-        }
+        },
+        "two-action-plan": {
+            "test_name": "golden_two_action_plan_preflight_apply",
+            "committed_dir": Path("cargo/switchyard/tests/golden/two-action-plan"),
+            "canon_files": [
+                "canon_plan.json",
+                "canon_preflight.json",
+                "canon_apply_attempt.json",
+                "canon_apply_result.json",
+            ],
+        },
     }
 
     def load_json(path: Path):

@@ -8,10 +8,120 @@ use switchyard::types::ApplyMode;
 use switchyard::adapters::FsOwnershipOracle;
 use std::fs::File;
 use std::io::Write;
+use jsonschema::JSONSchema;
 
 #[derive(Default, Clone)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+}
+
+#[test]
+fn golden_two_action_plan_preflight_apply() {
+    let facts = TestEmitter::default();
+    let audit = JsonlSink::default();
+    // Setup temp tree with two actions
+    let td = tempfile::tempdir().unwrap();
+    let root = td.path();
+    std::fs::create_dir_all(root.join("bin")).unwrap();
+    std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+    std::fs::create_dir_all(root.join("usr/sbin")).unwrap();
+    std::fs::write(root.join("bin/new1"), b"n1").unwrap();
+    std::fs::write(root.join("bin/new2"), b"n2").unwrap();
+    std::fs::write(root.join("usr/bin/app1"), b"o1").unwrap();
+    std::fs::write(root.join("usr/sbin/app2"), b"o2").unwrap();
+
+    // Build policy allowing only usr/bin so that usr/sbin action violates allow_roots (policy_ok=false)
+    let mut policy = Policy::default();
+    policy.allow_degraded_fs = true;
+    policy.allow_roots.push(root.join("usr/bin"));
+
+    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
+
+    // Build plan with two link actions
+    let s1 = SafePath::from_rooted(root, &root.join("bin/new1")).unwrap();
+    let t1 = SafePath::from_rooted(root, &root.join("usr/bin/app1")).unwrap();
+    let s2 = SafePath::from_rooted(root, &root.join("bin/new2")).unwrap();
+    let t2 = SafePath::from_rooted(root, &root.join("usr/sbin/app2")).unwrap();
+    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s1, target: t1 }, LinkRequest { source: s2, target: t2 }], restore: vec![] });
+
+    // Preflight + Apply(DryRun)
+    let _ = api.preflight(&plan).unwrap();
+    let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
+
+    // Schema validation
+    let schema_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.schema.json");
+    let schema_text = std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.schema.json");
+    let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
+    let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
+    for v in &redacted {
+        let errs: Option<Vec<String>> = { match compiled.validate(v) { Ok(()) => None, Err(it) => Some(it.map(|e| e.to_string()).collect()) } };
+        if let Some(messages) = errs { for m in &messages { eprintln!(" - {}", m); } eprintln!("Schema validation failed:\n{}", serde_json::to_string_pretty(v).unwrap()); panic!("schema validation failed"); }
+    }
+
+    // Canon build
+    let mut got: Vec<Value> = redacted
+        .iter()
+        .map(|f| {
+            let mut v = f.clone();
+            if let Some(o) = v.as_object_mut() { o.remove("path"); }
+            v
+        })
+        .collect();
+    got.sort_by(|a, b| {
+        let ka = format!(
+            "{}:{}",
+            a.get("stage").and_then(|v| v.as_str()).unwrap_or(""),
+            a.get("action_id").and_then(|v| v.as_str()).unwrap_or("")
+        );
+        let kb = format!(
+            "{}:{}",
+            b.get("stage").and_then(|v| v.as_str()).unwrap_or(""),
+            b.get("action_id").and_then(|v| v.as_str()).unwrap_or("")
+        );
+        ka.cmp(&kb)
+    });
+
+    // Assert that at least one preflight per-action event has policy_ok=false (outside allowed roots)
+    assert!(got.iter().any(|e| {
+        e.get("stage") == Some(&Value::from("preflight")) &&
+        e.get("action_id").is_some() &&
+        e.get("policy_ok") == Some(&Value::from(false))
+    }), "expected a preflight policy_ok=false for an out-of-allowed-roots target");
+
+    // Optionally write canon goldens
+    if let Ok(outdir) = std::env::var("GOLDEN_OUT_DIR") {
+        let out = std::path::Path::new(&outdir);
+        std::fs::create_dir_all(out).unwrap();
+
+        let mut canon_plan: Vec<Value> = got.iter().filter_map(|v| {
+            let o = v.as_object()?; if o.get("stage") == Some(&Value::from("plan")) && o.get("action_id").is_some() { Some(serde_json::json!({"stage":"plan","action_id":o.get("action_id").cloned().unwrap()})) } else { None }
+        }).collect();
+        let mut canon_preflight: Vec<Value> = got.iter().filter_map(|v| {
+            let o = v.as_object()?; if o.get("stage") == Some(&Value::from("preflight")) && o.get("action_id").is_some() { Some(serde_json::json!({"stage":"preflight","action_id":o.get("action_id").cloned().unwrap()})) } else { None }
+        }).collect();
+        let mut canon_apply_attempt: Vec<Value> = got.iter().filter_map(|v| {
+            let o = v.as_object()?; if o.get("stage") == Some(&Value::from("apply.attempt")) && o.get("action_id").is_some() { Some(serde_json::json!({"stage":"apply.attempt","action_id":o.get("action_id").cloned().unwrap()})) } else { None }
+        }).collect();
+        let mut canon_apply_result: Vec<Value> = got.iter().filter_map(|v| {
+            let o = v.as_object()?; if o.get("stage") == Some(&Value::from("apply.result")) && o.get("action_id").is_some() { Some(serde_json::json!({"stage":"apply.result","action_id":o.get("action_id").cloned().unwrap(),"decision":o.get("decision").cloned().unwrap_or(Value::from(""))})) } else { None }
+        }).collect();
+        let k = |v: &Value| format!("{}:{}", v.get("stage").and_then(|s| s.as_str()).unwrap_or(""), v.get("action_id").and_then(|s| s.as_str()).unwrap_or(""));
+        canon_plan.sort_by(|a,b| k(a).cmp(&k(b))); canon_preflight.sort_by(|a,b| k(a).cmp(&k(b))); canon_apply_attempt.sort_by(|a,b| k(a).cmp(&k(b))); canon_apply_result.sort_by(|a,b| k(a).cmp(&k(b)));
+
+        let write_pretty = |path: &std::path::Path, val: &Vec<Value>| { let mut f = File::create(path).unwrap(); let s = serde_json::to_string_pretty(val).unwrap(); f.write_all(s.as_bytes()).unwrap(); };
+        write_pretty(&out.join("canon_plan.json"), &canon_plan);
+        write_pretty(&out.join("canon_preflight.json"), &canon_preflight);
+        write_pretty(&out.join("canon_apply_attempt.json"), &canon_apply_attempt);
+        write_pretty(&out.join("canon_apply_result.json"), &canon_apply_result);
+    }
 }
 
 #[test]
@@ -40,6 +150,30 @@ fn golden_determinism_dryrun_equals_commit() {
     // Run DryRun
     let _ = api.preflight(&plan).unwrap();
     let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
+
+    // Load and compile JSON Schema (once per test)
+    let schema_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.schema.json");
+    let schema_text = std::fs::read_to_string(&schema_path)
+        .expect("load SPEC/audit_event.schema.json");
+    let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
+    let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
+
+    // Validate all redacted events (DryRun)
+    for (_, _, _, f) in facts.events.lock().unwrap().iter() {
+        let v = redact_event(f.clone());
+        // Use inner scope to ensure the temporary from validate(&v) is dropped
+        let errs: Option<Vec<String>> = {
+            match compiled.validate(&v) {
+                Ok(()) => None,
+                Err(it) => Some(it.map(|e| e.to_string()).collect()),
+            }
+        };
+        if let Some(messages) = errs {
+            for m in &messages { eprintln!(" - {}", m); }
+            eprintln!("Schema validation failed (DryRun):\n{}", serde_json::to_string_pretty(&v).unwrap());
+            panic!("schema validation failed (DryRun)");
+        }
+    }
 
     // Capture and normalize DryRun events (canonical apply.result per-action only)
     let mut dry: Vec<Value> = facts
@@ -90,6 +224,22 @@ fn golden_determinism_dryrun_equals_commit() {
     let _plan2 = api.plan(PlanInput { link: vec![LinkRequest { source: src2, target: tgt2 }], restore: vec![] });
     let _ = api.preflight(&plan).unwrap();
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
+
+    // Validate all redacted events (Commit)
+    for (_, _, _, f) in facts.events.lock().unwrap().iter() {
+        let v = redact_event(f.clone());
+        let errs: Option<Vec<String>> = {
+            match compiled.validate(&v) {
+                Ok(()) => None,
+                Err(it) => Some(it.map(|e| e.to_string()).collect()),
+            }
+        };
+        if let Some(messages) = errs {
+            for m in &messages { eprintln!(" - {}", m); }
+            eprintln!("Schema validation failed (Commit):\n{}", serde_json::to_string_pretty(&v).unwrap());
+            panic!("schema validation failed (Commit)");
+        }
+    }
 
     // Capture and normalize Commit events (canonical apply.result per-action only)
     let mut com: Vec<Value> = facts
@@ -213,14 +363,40 @@ fn golden_minimal_plan_preflight_apply() {
     let _ = api.preflight(&plan).unwrap();
     let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
 
-    // Normalize events and compare to a minimal golden structure
-    let mut got: Vec<Value> = facts
+    // Load and compile JSON Schema
+    let schema_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.schema.json");
+    let schema_text = std::fs::read_to_string(&schema_path)
+        .expect("load SPEC/audit_event.schema.json");
+    let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
+    let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
+
+    // Validate all redacted events against schema, then canonicalize (remove path) for minimal checks.
+    let redacted: Vec<Value> = facts
         .events
         .lock()
         .unwrap()
         .iter()
-        .map(|(_, _, _, f)| {
-            let mut v = redact_event(f.clone());
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
+    for v in &redacted {
+        let errs: Option<Vec<String>> = {
+            match compiled.validate(v) {
+                Ok(()) => None,
+                Err(it) => Some(it.map(|e| e.to_string()).collect()),
+            }
+        };
+        if let Some(messages) = errs {
+            for m in &messages { eprintln!(" - {}", m); }
+            eprintln!("Schema validation failed:\n{}", serde_json::to_string_pretty(v).unwrap());
+            panic!("schema validation failed");
+        }
+    }
+
+    // Canonicalize for minimal presence checks and golden writing
+    let mut got: Vec<Value> = redacted
+        .iter()
+        .map(|f| {
+            let mut v = f.clone();
             if let Some(o) = v.as_object_mut() {
                 o.remove("path");
             }
@@ -251,6 +427,20 @@ fn golden_minimal_plan_preflight_apply() {
         assert!(e.get("plan_id").is_some());
         assert!(e.get("decision").is_some());
     }
+
+    // Additional sprint-0001 coverage: preflight per-action emits planned_kind/current_kind, policy_ok and preservation_supported
+    let mut saw_pf = false;
+    for e in &got {
+        if e.get("stage") == Some(&Value::from("preflight")) && e.get("action_id").is_some() {
+            saw_pf = true;
+            assert_eq!(e.get("planned_kind"), Some(&Value::from("symlink")));
+            assert!(e.get("current_kind").is_some());
+            assert!(e.get("preservation_supported").is_some());
+            // policy_ok/provenance optional in schema, assert at least one present for coverage
+            assert!(e.get("policy_ok").is_some() || e.get("provenance").is_some());
+        }
+    }
+    assert!(saw_pf, "expected preflight events");
 
     // Optionally write canon golden files when GOLDEN_OUT_DIR is set.
     if let Ok(outdir) = std::env::var("GOLDEN_OUT_DIR") {
