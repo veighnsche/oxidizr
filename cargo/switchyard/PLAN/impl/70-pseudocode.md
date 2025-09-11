@@ -14,7 +14,7 @@ fn plan(input: PlanInput) -> Plan
     current = inspect_target(t)                      // file/dir/symlink/missing
     desired = compute_desired(t, normalize.providers)
     kind = decide_action_kind(current, desired)
-    action_id = uuidv5(plan_id, t)
+    action_id = uuidv5(plan_id, serialize(action_kind, t.rel) + "#" + index)
     actions.push(Action{ action_id, path: t, kind, metadata })
   return Plan{ plan_id, actions }
 
@@ -31,29 +31,29 @@ fn preflight(plan: &Plan) -> PreflightReport
 fn apply(plan: &Plan, mode: ApplyMode, adapters: &Adapters) -> ApplyReport
   if production and no LockManager: emit WARN fact; UNSUPPORTED concurrent apply
   guard = maybe_acquire_lock(adapters.lock_manager, timeout)
-  emit_fact(stage="apply.attempt", plan_id=plan.plan_id)
+  emit_fact(stage="apply.attempt", plan_id=plan.plan_id)   // Minimal Facts v1
   backups = []
   for a in plan.actions:
-    emit_fact(stage="apply.attempt", action_id=a.action_id, path=a.path)
+    emit_fact(stage="apply.attempt", action_id=a.action_id, path=a.path) // Minimal Facts v1
     if mode == DryRun:
-      emit_fact(stage="apply.result", decision="success", dry_run=true)
+      emit_fact(stage="apply.result", decision="success", dry_run=true) // Minimal Facts v1
       continue
     result = match a.kind:
       ReplaceSymlink => replace_symlink(a, &mut backups)
       RestoreFromBackup => restore_backup(a)
       Skip => Ok
     if result is Err:
-      emit_fact(decision="failure")
+      emit_fact(decision="failure")                      // Minimal Facts v1
       rollback(backups)                              // best-effort reverse order
       return ApplyReport{ decision: Failure, partial_restoration_state }
     else:
-      emit_fact(decision="success")
+      emit_fact(decision="success")                     // Minimal Facts v1
   run_smoke = adapters.smoke_runner.run(plan)
   if run_smoke is Err and not policy.disable_auto_rollback:
     emit_fact(E_SMOKE)
     rollback(backups)
     return ApplyReport{ decision: Failure, cause: Smoke }
-  emit_fact(stage="apply.result", decision="success")
+  emit_fact(stage="apply.result", decision="success")  // Minimal Facts v1
   return ApplyReport{ decision: Success }
 
 fn plan_rollback_of(report: &ApplyReport) -> Plan
@@ -69,7 +69,7 @@ fn plan_rollback_of(report: &ApplyReport) -> Plan
 fn replace_symlink(a: &Action, backups: &mut Vec<Backup>) -> Result<(), Error>
   // SafePath invariant holds; TOCTOU-safe sequence enforced
   parent = open_parent_dir_no_follow(a.path)
-  staged = stage_new_symlink(a)
+  staged = stage_new_symlink_at(parent, a)          // use symlinkat under parent dir
   backup = backup_existing_if_any(a.path)
   atomic_rename(parent, staged, a.path)             // renameat
   fsync_parent(parent) within 50ms

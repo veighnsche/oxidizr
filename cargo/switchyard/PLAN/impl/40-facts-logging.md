@@ -15,6 +15,18 @@ References:
 - Facts carry `schema_version = 1`. (REQ-VERS1)
 - Include attestation, provenance, preservation, exit code, timings. (REQ-O3..O7)
 
+## Phased Delivery (Lean)
+
+- Minimal Facts v1 (MVP):
+  - Emit the following fields only: `schema_version=1`, `ts` (zeroed in dry-run), `plan_id`, `stage`, `decision`, `action_id`, `path`.
+  - Deterministic ordering and dry-run redaction must make JSONL byte-identical across runs. (REQ-D2)
+  - Purpose: unblock deterministic ID exposure, golden fixtures, and early CI gates.
+
+- Full Facts v2:
+  - Add hashing (`hash_alg=sha256`, `before_hash`, `after_hash`), provenance, preservation, lock_wait_ms, exit_code.
+  - Add attestation bundle and signature (ed25519) at `apply.result` summary.
+  - Enforce secret masking policy across all sinks.
+
 ## Rust-like Pseudocode (non-compilable)
 
 ```rust
@@ -104,6 +116,10 @@ fn stable_order(f: Fact) -> Fact {
 - `apply()` — one summary fact with attestation after successful completion.
 - `rollback()` — per-step facts during rollback with partial restoration info on failure. (REQ-R5)
 
+### Minimal Facts v1 acceptance
+- For each emission point above, Minimal Facts v1 fields must be present and validate against schema (subset validation permitted via `$defs`).
+- Dry-run vs real-run: byte-identical after redaction for Minimal Facts v1.
+
 ## Attestation & Bundles
 
 - After a successful `apply()`, compute a bundle hash of the facts and plan summary and request a signature from `Attestor`. (REQ-O4)
@@ -122,3 +138,9 @@ fn stable_order(f: Fact) -> Fact {
 
 - Validate emitted facts against `SPEC/audit_event.schema.json`.
 - Compare facts JSONL to golden fixtures byte-for-byte.
+
+## Clean Code Alignment
+
+- Keep structured fields; avoid free-text logs. See `docs/CLEAN_CODE.md §9`.
+- Types encode invariants; model `Stage`/`Decision` as enums. See `docs/CLEAN_CODE.md §3`.
+- Isolate side effects; centralized sink handling. See `docs/CLEAN_CODE.md §6`.

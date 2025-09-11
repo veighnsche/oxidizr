@@ -14,6 +14,26 @@ Legend:
 
 ---
 
+## Implementation Status Summary
+
+- Core mechanics exist (atomic symlink swap, backups, SafePath, basic preflight).
+- New since last update:
+  - Deterministic IDs module (`types/ids.rs`) with UUIDv5 `plan_id`/`action_id`; wired into `api::apply` for execution flow.
+  - Transactional `apply()` with reverse-order rollback for previously executed `EnsureSymlink` steps and `plan_rollback_of()` (basic inverse for symlink actions).
+  - `ApplyReport` extended to include `plan_uuid`, `rolled_back`, and `rollback_errors` for downstream audit/rollback planning.
+
+## Milestones & Next Sprint
+
+- Milestone M1 (in progress):
+  - Harden transactional engine invariants and tests.
+  - Complete TOCTOU sequence with `openat` for final component in `src/fs/*`.
+  - Minimal facts emission (schema v1 core fields) including `plan_id`/`action_id`.
+
+- Next Sprint Focus:
+  - Implement `openat` path in `fs/atomic.rs`/`fs/symlink.rs` to meet REQ‑TOCTOU1.
+  - Emit minimal facts (stage, decision, schema_version, plan_id/action_id, path) and add unit tests.
+  - Add unit tests for rollback and SafePath negatives.
+
 ## 1) Crate Scaffolding & Module Layout
 
 - [x] Library crate scaffolding and module tree present
@@ -26,7 +46,7 @@ Legend:
 - [~] `plan(input: PlanInput) -> Plan` exists in `src/api.rs` (basic link/restore expansion)
 - [~] `preflight(plan: &Plan) -> PreflightReport` exists with basic checks (`src/preflight.rs`, `src/api.rs`)
 - [~] `apply(plan: &Plan, mode: ApplyMode) -> ApplyReport` exists (symlink swap + restore)
-- [ ] `plan_rollback_of(report: &ApplyReport) -> Plan` implemented and exported
+- [~] `plan_rollback_of(report: &ApplyReport) -> Plan` implemented (basic inverse for symlink actions) and exported
 - [x] All path‑carrying fields in mutating API use `SafePath` (see `src/types/plan.rs`)
 
 ## 3) SafePath & TOCTOU Safety (SPEC §2.3, §3.3)
@@ -41,7 +61,7 @@ Legend:
 ## 4) Atomicity & Rollback Engine (SPEC §2.1, §2.2)
 
 - [~] Atomic symlink swap exists (`atomic_symlink_swap`) and backup/restore flows (`src/fs/symlink.rs`)
-- [ ] Transactional apply engine with all‑or‑nothing semantics
+- [~] Transactional apply engine with all‑or‑nothing semantics
   - Auto reverse‑order rollback on mid‑plan failure (REQ‑R4)
   - Idempotent rollback (REQ‑R3) with property tests
   - Partial restoration state captured if rollback fails (REQ‑R5)
@@ -72,7 +92,7 @@ Legend:
 
 ## 8) Determinism & Redactions (SPEC §2.7)
 
-- [ ] Deterministic `plan_id` and `action_id` (UUIDv5 over normalized inputs/namespace) (REQ‑D1)
+- [~] Deterministic `plan_id` and `action_id` (UUIDv5 over normalized inputs/namespace) (REQ‑D1)
 - [ ] Dry‑run redactions pinned (timestamps zeroed/expressed as deltas); dry‑run facts byte‑identical to real‑run after redaction (REQ‑D2)
 - [ ] Stable ordering of plan actions and fact emission streams
 

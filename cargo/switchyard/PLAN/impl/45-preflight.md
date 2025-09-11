@@ -14,6 +14,24 @@ References:
 - Fail-closed on critical violations unless explicitly overridden by policy. (REQ-C2)
 - Verify at least one functional fallback path (rescue check). (REQ-RC2)
 
+## Minimal Preflight v1 (Lean)
+
+- Produce structured rows per `SPEC/preflight.yaml` with the following fields populated:
+  - `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, `provenance.uid/gid/pkg`, `notes`.
+- Sort rows deterministically by (`path`, `action_id`).
+- Enforce fail-closed on critical violations unless explicit policy override is set (loud logs). (REQ-C2)
+
+## Capability Gating & Adapters
+
+- Ownership: use `OwnershipOracle.owner_of(&SafePath)` and require root-owned, not world-writable by default. (REQ-S3)
+- Strict target ownership: when `policy.strict_ownership=true`, targets must be package-owned; otherwise STOP unless overridden. (REQ-S4)
+- Preservation: probe FS capabilities (owner, mode, timestamps, xattrs, ACLs, caps). If policy requires and unsupported, STOP (fail-closed). (REQ-S5)
+
+## Clean Code Alignment
+
+- Types encode invariants (`SafePath`), explicit dependencies via adapter traits; side effects isolated. See `docs/CLEAN_CODE.md §§3,6`.
+- Guard clauses early; clear error messages with remediation for operators. See `docs/CLEAN_CODE.md §19`.
+
 ## Rust-like Pseudocode (non-compilable)
 
 ```rust

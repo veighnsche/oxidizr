@@ -17,7 +17,12 @@ References:
 
 - Namespace: fixed project-specific namespace UUID recorded in ADR `ADR-0006-determinism-ids.md`.
 - `plan_id = uuidv5(NAMESPACE, serialize(normalized PlanInput)`
-- `action_id = uuidv5(plan_id, "action:" + path.rel)`
+- `action_id = uuidv5(plan_id, serialize(action) + "#" + index)`
+
+Notes:
+
+- `serialize(action)` MUST include the action kind (e.g., EnsureSymlink vs RestoreFromBackup) and only the `SafePath.rel()` of paths to keep IDs root-agnostic.
+- The `index` disambiguates multiple actions that may target the same `path.rel` with different semantics.
 
 ## Normalization Inputs
 
@@ -56,3 +61,4 @@ fn compute_action_id(plan_id: Uuid, action: &Action) -> Uuid {
 
 - Golden fixture diff job must pass for two consecutive runs on CI with no changes.
 - Dedicated test that computes `plan_id`/`action_id` for the same input twice and asserts equality.
+- Additional test: compute IDs across different `root` values (with the same `rel` paths) and assert equality.

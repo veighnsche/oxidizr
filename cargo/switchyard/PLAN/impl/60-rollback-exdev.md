@@ -14,6 +14,12 @@ References:
 - On rollback failure, record partial restoration state in facts. (REQ-R5)
 - On cross-filesystem, use safe copy + fsync + rename fallback, gated by policy; facts record `degraded=true` when used. (REQ-F1..F2)
 
+## Minimal Rollback v1 (Lean)
+
+- Reverse-order rollback applies to actions where the inverse is well-defined without additional prestate (e.g., `EnsureSymlink` → `RestoreFromBackup`).
+- For actions that require prestate capture to invert (e.g., `RestoreFromBackup`), Minimal v1 emits a clear partial-restoration entry and operator guidance (facts) instead of attempting an unsafe inverse. (REQ-R5)
+- `ApplyReport` carries `plan_uuid`, `rolled_back`, and `rollback_errors` for reliable orchestration and audit.
+
 ## Rust-like Pseudocode (non-compilable)
 
 ```rust
@@ -102,6 +108,11 @@ fn restore_backup(a: &Action) -> Result<(), Error> {
 
 - A `PartialRestoration` summary fact MUST list any paths that failed to restore and guidance fields for operator recovery. (REQ-R5)
 - Emit per-step rollback facts (stage=`rollback`) with `decision=success|failure` and `exit_code` when applicable.
+
+## Clean Code Alignment
+
+- Design for recovery: know the inverse for each action; log enough evidence to perform it. See `docs/CLEAN_CODE.md §25`.
+- Fail closed, loudly: do not attempt lossy or ambiguous inverses; surface actionable guidance. See `docs/CLEAN_CODE.md §19`.
 
 ## Degraded Mode Policy & Telemetry
 
