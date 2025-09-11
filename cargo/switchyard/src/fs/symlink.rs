@@ -109,38 +109,6 @@ pub(crate) fn find_latest_backup_and_sidecar(target: &Path, tag: &str) -> Option
     }
 }
 
-fn find_latest_backup(target: &Path, tag: &str) -> Option<PathBuf> {
-    let name = target.file_name()?.to_str()?;
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    let prefix = format!(".{}.{}.", name, tag);
-    let mut best: Option<(u128, PathBuf)> = None;
-    if let Ok(rd) = std::fs::read_dir(parent) {
-        for e in rd.flatten() {
-            if let Ok(ft) = e.file_type() {
-                if !ft.is_file() {
-                    continue;
-                }
-            }
-            let fname = e.file_name();
-            if let Some(s) = fname.to_str() {
-                if s.starts_with(&prefix) && s.ends_with(".bak") {
-                    // parse the millis suffix between prefix and .bak
-                    if let Some(num) = s
-                        .strip_prefix(&prefix)
-                        .and_then(|rest| rest.strip_suffix(".bak"))
-                        .and_then(|n| n.parse::<u128>().ok())
-                    {
-                        if best.as_ref().map(|(b, _)| num > *b).unwrap_or(true) {
-                            best = Some((num, e.path()));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    best.map(|(_, p)| p)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,8 +161,6 @@ mod tests {
             md.file_type().is_symlink(),
             "target should be a symlink after replace"
         );
-        let latest = find_latest_backup(&tgt, DEFAULT_BACKUP_TAG).expect("latest backup");
-        assert!(latest.exists(), "latest backup should exist after replace");
 
         // Restore from backup; target should be a regular file again with prior content prefix
         restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();

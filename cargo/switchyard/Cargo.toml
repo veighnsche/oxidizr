@@ -24,6 +24,11 @@ hex = "0.4"
 time = { version = "0.3", features = ["formatting"] }
 fs2 = "0.4"
 
+[features]
+default = []
+# Enable a simple file-backed JSONL sink for facts and audit streams
+file-logging = []
+
 [dev-dependencies]
 tempfile = "3"
 jsonschema = "0.17"
