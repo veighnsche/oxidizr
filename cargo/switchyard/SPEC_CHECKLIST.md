@@ -7,8 +7,8 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 - [~] REQ‑A3 All‑or‑nothing per plan — reverse‑order rollback on failure for applied symlink actions; restore inverse TBD
 
 - [~] REQ‑R1 Rollback reversibility — inverse plan for executed symlink ensures; restore inverse skipped
-- [ ] REQ‑R2 Restore exact topology — extend backup/restore and tests
-- [ ] REQ‑R3 Idempotent rollback — property tests and logic
+- [x] REQ‑R2 Restore exact topology — extend backup/restore and tests
+- [x] REQ‑R3 Idempotent rollback — property tests and logic
 - [x] REQ‑R4 Auto reverse‑order rollback — implemented in engine (apply.rs)
 - [x] REQ‑R5 Partial restoration facts — rollback steps emitted with success/failure and recorded
 
@@ -30,7 +30,7 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 - [x] REQ‑L1 Single mutator — LockManager integration present
 - [x] REQ‑L2 Warn when no lock manager — `apply.attempt` emits `no_lock_manager:true`
 - [x] REQ‑L3 Bounded lock wait with timeout — enforced; on timeout emits `E_LOCKING` and records `lock_wait_ms`
-- [ ] REQ‑L4 LockManager required in production — policy + docs
+- [x] REQ‑L4 LockManager required in production — policy + docs
 
 - [ ] REQ‑RC1 Rescue profile available — maintain/verify backup symlink set
 - [x] REQ‑RC2 Verify fallback path — preflight checks gated by `require_rescue`
@@ -44,7 +44,7 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 
 - [x] REQ‑H1 Minimal smoke suite — default deterministic subset validates symlink target resolves to source
 - [x] REQ‑H2 Auto‑rollback on smoke failure — implemented (unless disabled by policy)
-- [ ] REQ‑H3 Health verification is part of commit — enforce
+- [x] REQ‑H3 Health verification is part of commit — enforce
 
 - [~] REQ‑F1 EXDEV fallback preserves atomic visibility — degraded non‑atomic fallback implemented with telemetry
 - [x] REQ‑F2 Degraded mode policy & telemetry — `allow_degraded_fs` + `degraded` fact

@@ -19,6 +19,15 @@ pub struct Policy {
     /// Require a rescue profile and toolset to be available (e.g., BusyBox or GNU core tools on PATH).
     /// When true and unavailable, preflight/apply MUST STOP (unless override_preflight).
     pub require_rescue: bool,
+    /// Require a LockManager to be present in Commit mode. When true and no lock manager is
+    /// configured, apply() MUST fail early with E_LOCKING (exit code 30) without mutating state.
+    pub require_lock_manager: bool,
+    /// In Commit mode, require that a SmokeTestRunner is configured and passes. When true and
+    /// no runner is configured, apply() MUST fail with E_SMOKE and auto-rollback unless disabled.
+    pub require_smoke_in_commit: bool,
+    /// When verifying rescue profile/tooling, also attempt an executability check (e.g., X_OK
+    /// or spawning "--help" with a very small timeout). Typically enabled in production only.
+    pub rescue_exec_check: bool,
 }
 
 impl Default for Policy {
@@ -35,6 +44,9 @@ impl Default for Policy {
             override_preflight: false,
             require_preservation: false,
             require_rescue: false,
+            require_lock_manager: false,
+            require_smoke_in_commit: false,
+            rescue_exec_check: false,
         }
     }
 }

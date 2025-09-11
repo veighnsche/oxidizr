@@ -11,7 +11,7 @@ use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 
-use super::fs_meta::{resolve_symlink_target, sha256_hex_of};
+use super::fs_meta::{resolve_symlink_target, sha256_hex_of, kind_of};
 use super::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, ensure_provenance, AuditCtx, AuditMode};
 use super::errors::{ErrorId, exit_code_for};
 
@@ -40,6 +40,22 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     // Locking (optional in dev/test): acquire process lock with bounded wait; emit telemetry via apply.attempt
     let mut lock_wait_ms: Option<u64> = None;
     let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
+    // L4: Require lock manager in Commit mode when policy enforces it
+    if !dry && api.policy.require_lock_manager && api.lock.is_none() {
+        emit_apply_attempt(&tctx, "failure", json!({
+            "error_id": "E_LOCKING",
+            "exit_code": 30,
+        }));
+        let duration_ms = t0.elapsed().as_millis() as u64;
+        return ApplyReport {
+            executed,
+            duration_ms,
+            errors: vec!["lock manager required in Commit mode".to_string()],
+            plan_uuid: Some(pid),
+            rolled_back,
+            rollback_errors,
+        };
+    }
     if let Some(mgr) = &api.lock {
         let lt0 = Instant::now();
         match mgr.acquire_process_lock(api.lock_timeout_ms) {
@@ -81,7 +97,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     if !api.policy.override_preflight && !dry {
         let mut gating_errors: Vec<String> = Vec::new();
         // Global rescue check
-        if api.policy.require_rescue && !crate::rescue::verify_rescue_tools() {
+        if api.policy.require_rescue && !crate::rescue::verify_rescue_tools_with_exec(api.policy.rescue_exec_check) {
             gating_errors.push("rescue profile unavailable".to_string());
         }
         for act in &plan.actions {
@@ -179,6 +195,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 }));
                 let mut degraded_used = false;
                 let mut fsync_ms: u64 = 0;
+                let before_kind = kind_of(&target.as_path());
                 // Compute before/after hashes
                 let before_hash = match resolve_symlink_target(&target.as_path()) {
                     Some(p) => sha256_hex_of(&p),
@@ -219,6 +236,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "path": target.as_path().display().to_string(),
                     "degraded": if degraded_used { Some(true) } else { None },
                     "duration_ms": fsync_ms,
+                    "before_kind": before_kind,
+                    "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
                 });
                 if let Some(bh) = before_hash.as_ref() {
                     let obj = extra.as_object_mut().unwrap();
@@ -268,6 +287,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "path": target.as_path().display().to_string(),
                 }));
                 let mut this_err_id: Option<ErrorId> = None;
+                let before_kind = kind_of(&target.as_path());
                 match fs::restore_file(
                     &target.as_path(),
                     dry,
@@ -294,6 +314,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 let mut extra = json!({
                     "action_id": _aid.to_string(),
                     "path": target.as_path().display().to_string(),
+                    "before_kind": before_kind,
+                    "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
                 });
                 ensure_provenance(&mut extra);
                 // Enrich provenance with uid/gid/pkg when oracle is present
@@ -369,6 +391,36 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if let Some(smoke) = &api.smoke {
             if smoke.run(plan).is_err() {
                 errors.push("smoke tests failed".to_string());
+                if !api.policy.disable_auto_rollback {
+                    rolled_back = true;
+                    for prev in executed.iter().rev() {
+                        match prev {
+                            Action::EnsureSymlink { source: _s, target } => {
+                                let _ = fs::restore_file(
+                                    &target.as_path(),
+                                    dry,
+                                    api.policy.force_restore_best_effort,
+                                    &api.policy.backup_tag,
+                                )
+                                .map_err(|e| {
+                                    rollback_errors.push(format!(
+                                        "rollback restore {} failed: {}",
+                                        target.as_path().display(),
+                                        e
+                                    ))
+                                });
+                            }
+                            Action::RestoreFromBackup { .. } => {
+                                rollback_errors.push("rollback of RestoreFromBackup not supported (no prior state)".to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // H3: Missing smoke runner when required
+            if api.policy.require_smoke_in_commit {
+                errors.push("smoke runner missing".to_string());
                 if !api.policy.disable_auto_rollback {
                     rolled_back = true;
                     for prev in executed.iter().rev() {

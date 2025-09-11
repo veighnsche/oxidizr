@@ -25,7 +25,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     );
 
     // Global rescue verification: if required by policy, STOP when unavailable.
-    if api.policy.require_rescue && !crate::rescue::verify_rescue_tools() {
+    let rescue_ok = crate::rescue::verify_rescue_tools_with_exec(api.policy.rescue_exec_check);
+    if api.policy.require_rescue && !rescue_ok {
         stops.push("rescue profile unavailable".to_string());
     }
 
@@ -213,6 +214,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let aid = action_id(&pid, act, idx);
                 let policy_ok = stops.len() == stops_before;
                 let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
+                // Annotate whether backup artifacts are present (payload and/or sidecar)
+                let backup_present = crate::fs::symlink::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
                 // Build preflight row for report
                 let mut row = json!({
                     "action_id": aid.to_string(),
@@ -220,6 +223,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     "current_kind": "unknown",
                     "planned_kind": "restore_from_backup",
                     "policy_ok": policy_ok,
+                    "backup_present": backup_present,
                 });
                 if !notes.is_empty() { if let Some(o) = row.as_object_mut() { o.insert("notes".into(), json!(notes)); } }
                 if let Some(o) = row.as_object_mut() { o.insert("preservation".into(), preservation.clone()); }
@@ -244,7 +248,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     // Per-action preflight facts are emitted above with extended fields.
     // Minimal Facts v1: preflight summary
     let decision = if stops.is_empty() { "success" } else { "failure" };
-    emit_summary(&ctx, "preflight", decision);
+    // Emit preflight summary with rescue_profile for visibility
+    let prof = if rescue_ok { Some("available") } else { Some("none") };
+    let extra = json!({ "rescue_profile": prof });
+    super::audit::emit_summary_extra(&ctx, "preflight", decision, extra);
 
     // Stable ordering of rows by (path, action_id)
     rows.sort_by(|a, b| {
