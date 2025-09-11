@@ -78,7 +78,8 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 - [x] Strict target ownership via `OwnershipOracle` when `policy.strict_ownership` (REQ‑S4)
 - [~] Preservation capability gating: detect whether ownership/mode/timestamps/xattrs/ACLs/caps can be preserved and STOP if policy requires but unsupported (REQ‑S5)
   - Detection + facts emission implemented (`preservation{}`, `preservation_supported`); STOP enforced when `Policy.require_preservation=true`.
-- [ ] Emit structured preflight diff rows per `SPEC/preflight.yaml` (and ensure dry‑run byte identity)
+- [x] Emit structured preflight diff rows per `SPEC/preflight.yaml` (and ensure dry‑run byte identity)
+  - Rows emitted with `policy_ok` and optional `provenance`; helper `preflight::to_yaml(&PreflightReport)` provided for fixtures.
   
 ### Backup Tagging (Multi-CLI)
 
@@ -191,9 +192,9 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 
 ### Doc Sync Matrix (Current)
 
-- SPEC Updates: `SPEC/SPEC_UPDATE_0001.md` (Accepted)
+- SPEC Updates: `SPEC/SPEC_UPDATE_0001.md` (Accepted); `SPEC/SPEC_UPDATE_0002.md` (Accepted)
 - PLAN Impl Notes: `PLAN/impl/00-structure.md`, `PLAN/impl/15-policy-and-adapters.md`
-- ADRs: `PLAN/adr/ADR-0013-backup-tagging.md` (Accepted)
+- ADRs: `PLAN/adr/ADR-0013-backup-tagging.md` (Accepted); `PLAN/adr/ADR-0017-exit-codes-silver-and-ci-gates.md` (Accepted)
 - Design Docs: `DOCS/backup-restore-design.md` (Draft)
 
 ## 19) Safety & Implementation

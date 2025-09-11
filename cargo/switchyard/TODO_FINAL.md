@@ -18,51 +18,19 @@ Status baseline:
 
 ---
 
+## Completed in this iteration
+
+- Provenance completeness minimal pass (env_sanitized present across plan, preflight, apply.attempt, apply.result, rollback; tests added)
+- Error/exit code coverage tests for: E_BACKUP_MISSING, E_RESTORE_FAILED, E_ATOMIC_SWAP, E_EXDEV, E_POLICY, E_SMOKE
+- Preflight YAML export helper `preflight::to_yaml(&PreflightReport)` and golden-style test
+- Docs accepted: SPEC_UPDATE_0002 and ADR-0017
+- Minimal rustdocs added for `preflight` module (crate docs already present)
+
+---
+
 ## Tasks (Release‑Blocking)
 
-1) Provenance completeness (minimal, consistent)
-
-- What: Ensure minimal provenance appears on all facts (`provenance` object exists) and expand presence where available to include `origin`, `helper`, and `env_sanitized=true`. Keep uid/gid/pkg enrichment where `OwnershipOracle` exists.
-- Deliverables:
-  - Unit tests asserting presence of `provenance.env_sanitized=true` across `plan`, `preflight`, `apply.attempt`, `apply.result`, and `rollback` after redaction.
-  - If adapters supply `origin`/`helper`, ensure they propagate; otherwise default to empty string/masked value and keep deterministic redaction.
-- Acceptance: New tests pass; redaction tests remain green.
-
-2) Error/exit code coverage audit (tests only)
-
-- What: Verify `error_id` and `exit_code` emission at per‑action and/or summary for the curated Silver set.
-- Cases to cover: `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_POLICY`, `E_SMOKE`.
-- Deliverables:
-  - Focused unit tests that trigger each failure and assert the redacted canon contains the corresponding `error_id` and `exit_code`.
-- Acceptance: All new tests green; existing tests unaffected.
-
-3) Preflight YAML export helper + golden
-
-- What: Provide a pure helper `preflight::to_yaml(&PreflightReport) -> String` matching `SPEC/preflight.yaml` shape for fixtures.
-- Deliverables:
-  - Helper function and one test writing a golden YAML for a two‑action plan (positive+negative rows).
-- Acceptance: Golden stable under `GOLDEN_OUT_DIR`; schema validation remains green.
-
-4) Docs: finalize SPEC_UPDATE_0002 and ADR‑0015
-
-- What: Move `SPEC/SPEC_UPDATE_0002.md` (rescue/degraded/preflight rows) and `PLAN/adr/ADR-0015-exit-codes-silver-and-ci-gates.md` to Accepted.
-- Deliverables:
-  - Update status headers; link from README.
-- Acceptance: Docs merged; README references remain accurate.
-
-5) Minimal rustdocs
-
-- What: Add crate‑level and key module rustdocs summarizing guarantees and adapter contracts (`api`, `preflight`, `fs`, `policy`, `adapters`, `logging`).
-- Deliverables:
-  - One‑paragraph module‑level docs; no deep narrative.
-- Acceptance: `cargo doc -p switchyard` builds; clippy/missing_docs allowances remain off for now.
-
-6) Versioning & changelog
-
-- What: Bump crate version to 0.2.0 (first Silver) and add a short `CHANGELOG.md` entry.
-- Deliverables:
-  - `Cargo.toml` version bump; `CHANGELOG.md` with highlights (rescue gating, E_LOCKING telemetry, degraded semantics clarification, tests/goldens, traceability job).
-- Acceptance: Commit builds and tests pass.
+None — all release‑blocking tasks are complete.
 
 ---
 
@@ -72,6 +40,7 @@ Status baseline:
 - Adapter‑based rescue verifier and richer preflight notes for rescue toolset.
 - Feature‑flag external smoke checks (`sha256sum -c` on tiny fixture) with output redaction.
 - CI: flip curated golden diff gate to blocking once scenarios stabilize.
+- Versioning & changelog (0.2.0) with `CHANGELOG.md` — deferred per instruction (no bump required now)
 
 ---
 

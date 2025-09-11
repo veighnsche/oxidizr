@@ -47,13 +47,13 @@ Action items
 - [x] Emits per-action rows with `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`
 - [~] Emits `provenance{uid,gid,pkg}` when an `OwnershipOracle` is configured
 - [x] Emits `preservation{}` and `preservation_supported`; policy STOP wired when `Policy.require_preservation=true`
-- [ ] Optional output: materialize `PreflightReport` to YAML conforming to `SPEC/preflight.yaml` for fixtures/artifacts
+- [x] Optional output: materialize `PreflightReport` to YAML conforming to `SPEC/preflight.yaml` for fixtures/artifacts
 
 Action items
 
 - [x] Enforce `Policy.require_preservation` STOP path end-to-end (already recorded in rows)
 - [ ] Add unit tests for negative cases per gate (ro/noexec/immutable/ownership/roots/forbid_paths)
-- [ ] Provide `preflight::to_yaml(&PreflightReport)` helper (pure) for producing spec-aligned YAML when needed
+- [x] Provide `preflight::to_yaml(&PreflightReport)` helper (pure) for producing spec-aligned YAML when needed
 
 ---
 
@@ -156,8 +156,8 @@ Action items
 
 Action items
 
-- [ ] Audit `src/api/apply.rs` branches and add missing `error_id/exit_code` insertions
-- [ ] Add tests verifying presence for `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_POLICY`, `E_SMOKE` (note: `E_LOCKING` covered by `tests/locking_timeout.rs`)
+- [x] Audit `src/api/apply.rs` branches and add missing `error_id/exit_code` insertions
+- [x] Add tests verifying presence for `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_POLICY`, `E_SMOKE` (note: `E_LOCKING` covered by `tests/locking_timeout.rs`)
 
 ---
 

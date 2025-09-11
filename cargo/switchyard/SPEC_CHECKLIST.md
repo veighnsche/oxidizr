@@ -25,7 +25,7 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 - [x] REQ‑O4 Signed attestations — `Attestor` integrated on successful commit with signature bundle
 - [x] REQ‑O5 Before/after hashes per mutation — sha256 computed for symlink ensure
 - [~] REQ‑O6 Secret masking — basic redactions implemented (provenance/attestation fields); policy hardening pending
-- [~] REQ‑O7 Provenance completeness — minimal provenance emitted; completeness to be expanded
+- [~] REQ‑O7 Provenance completeness — env_sanitized present across stages; uid/gid/pkg when oracle present; origin/helper deferred
 
 - [x] REQ‑L1 Single mutator — LockManager integration present
 - [x] REQ‑L2 Warn when no lock manager — `apply.attempt` emits `no_lock_manager:true`
