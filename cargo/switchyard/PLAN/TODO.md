@@ -14,6 +14,12 @@ References:
 - `cargo/switchyard/PLAN/60-adr-template.md` (use under `cargo/switchyard/PLAN/adr/`)
 - `cargo/switchyard/PLAN/70-status-cadence.md`
 
+## Planning Status Summary
+
+- ✅ All planning tasks (sections 0–15) are complete.
+- ⏳ Formal sign-offs are pending (see "Sign-offs" below).
+- Exit criterion to begin implementation: all sign-offs recorded with owners and dates.
+
 ## 0) Planning Setup
 
 - [x] Confirm scope: this TODO is planning-only; no Rust implementation yet
@@ -120,9 +126,42 @@ References:
 ## Sign-offs
 
 - [ ] Product/Stakeholder review of `00-charter.md`
+  - Owner: Product (TBD)
+  - Due: TBD
+  - Notes: Confirm scope, success metrics, and constraints.
+
 - [ ] Architecture review of `10-architecture-outline.md`
+  - Owner: Tech Lead / Architecture (TBD)
+  - Due: TBD
+  - Notes: Validate module boundaries, public API, error model, and cross-cutting concerns.
+
 - [ ] Requirements/QA review of `20-spec-traceability.md`
+  - Owner: QA/Requirements (TBD)
+  - Due: TBD
+  - Notes: Verify requirement mappings to code/test evidence; ensure coverage strategy.
+
 - [ ] Delivery/PMO review of `30-delivery-plan.md`
+  - Owner: PM/Delivery (TBD)
+  - Due: TBD
+  - Notes: Confirm milestones, dependencies, sequencing, and exit criteria.
+
 - [ ] Quality/SRE/Sec review of `40-quality-gates.md`
+  - Owner: SRE/Security (TBD)
+  - Due: TBD
+  - Notes: Validate CI gates (zero-SKIP, golden diffs, schema validation) and operational checks.
+
 - [ ] Risk review of `50-risk-register.md`
+  - Owner: Risk Owner (TBD)
+  - Due: TBD
+  - Notes: Validate mitigations, triggers, and owners; align with delivery plan.
+
 - [ ] Final planning package approval to begin implementation phase
+  - Owner: Steering/Leads (TBD)
+  - Due: TBD
+  - Notes: Go/No-Go decision; after approval, transition to implementation backlog.
+
+### Next Steps to Finish Planning
+
+- Circulate artifacts to the listed owners and schedule brief reviews.
+- Capture decisions in ADRs as needed and update PLAN docs per feedback.
+- Record sign-off dates and move this section’s checkboxes to [x] upon approval.
