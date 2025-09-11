@@ -1,3 +1,11 @@
+//! Atomic symlink swap primitives and helpers.
+//!
+//! This module implements a TOCTOU-safe sequence using directory handles:
+//! `open_dir_nofollow(parent) -> symlinkat(tmp) -> renameat(tmp, final) -> fsync(parent)`.
+//!
+//! Test override knobs:
+//! - `SWITCHYARD_FORCE_EXDEV=1` — simulate a cross-filesystem rename error (EXDEV) to exercise
+//!   degraded fallback paths and telemetry in higher layers.
 use std::fs;
 use std::path::Path;
 

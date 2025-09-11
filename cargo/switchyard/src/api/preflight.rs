@@ -1,4 +1,9 @@
-//! api/preflight.rs — extracted preflight() implementation
+//! Preflight stage: policy gating, preservation probes, and per-action rows emission.
+//!
+//! Side-effects:
+//! - Emits one preflight fact per action with core fields and optional provenance/notes/preservation.
+//! - Emits a preflight summary with a `rescue_profile` status.
+//! - Returns a `PreflightReport` with stable row ordering suitable for YAML export via `preflight::to_yaml()`.
 
 use crate::logging::{FactsEmitter, TS_ZERO};
 use crate::types::ids::{action_id, plan_id};
@@ -6,7 +11,7 @@ use crate::types::{Action, Plan, PreflightReport};
 use serde_json::json;
 
 use super::fs_meta::{kind_of, detect_preservation_capabilities};
-use super::audit::{emit_preflight_fact_ext, emit_summary, AuditCtx, AuditMode};
+use super::audit::{emit_preflight_fact_ext, AuditCtx, AuditMode};
 
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
@@ -25,7 +30,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     );
 
     // Global rescue verification: if required by policy, STOP when unavailable.
-    let rescue_ok = crate::rescue::verify_rescue_tools_with_exec(api.policy.rescue_exec_check);
+    let rescue_ok = crate::rescue::verify_rescue_tools_with_exec_min(
+        api.policy.rescue_exec_check,
+        api.policy.rescue_min_count,
+    );
     if api.policy.require_rescue && !rescue_ok {
         stops.push("rescue profile unavailable".to_string());
     }

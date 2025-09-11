@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use crate::constants::DEFAULT_BACKUP_TAG;
+use crate::constants::RESCUE_MIN_COUNT as DEFAULT_RESCUE_MIN_COUNT;
 
 /// Policy governs preflight gates, apply behavior, and production hardening for Switchyard.
 ///
@@ -51,6 +52,9 @@ pub struct Policy {
     /// When true and unavailable, preflight/apply MUST STOP (unless override_preflight).
     /// Verified via `rescue::verify_rescue_tools_with_exec()` in `src/api/preflight.rs` and gated in apply.
     pub require_rescue: bool,
+    /// Minimum number of GNU rescue tools required when BusyBox is not present.
+    /// Default is `RESCUE_MIN_COUNT` from `constants.rs`.
+    pub rescue_min_count: usize,
     /// Require a LockManager to be present in Commit mode. When true and no lock manager is
     /// configured, apply() MUST fail early with E_LOCKING (exit code 30) without mutating state.
     /// Enforced at the top of `src/api/apply.rs`.
@@ -84,6 +88,7 @@ impl Default for Policy {
             override_preflight: false,
             require_preservation: false,
             require_rescue: false,
+            rescue_min_count: DEFAULT_RESCUE_MIN_COUNT,
             require_lock_manager: false,
             require_smoke_in_commit: false,
             rescue_exec_check: false,

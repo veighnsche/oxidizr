@@ -1,4 +1,11 @@
-//! api/apply.rs — extracted apply() implementation
+//! Apply stage: executes plan actions with atomic symlink swap, backup/restore, and rollback.
+//!
+//! Side-effects:
+//! - Emits Minimal Facts v1 for `apply.attempt` and `apply.result` per action, plus a summary.
+//! - Enforces locking policy and maps failures to `E_LOCKING` with bounded wait.
+//! - Enforces policy gating (unless `override_preflight=true`).
+//! - Optionally runs smoke tests post-apply and triggers auto-rollback on failures.
+//! - Optionally emits an attestation bundle on success.
 
 use std::time::Instant;
 
@@ -106,7 +113,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     if !api.policy.override_preflight && !dry {
         let mut gating_errors: Vec<String> = Vec::new();
         // Global rescue check
-        if api.policy.require_rescue && !crate::rescue::verify_rescue_tools_with_exec(api.policy.rescue_exec_check) {
+        if api.policy.require_rescue && !crate::rescue::verify_rescue_tools_with_exec_min(api.policy.rescue_exec_check, api.policy.rescue_min_count) {
             gating_errors.push("rescue profile unavailable".to_string());
         }
         for act in &plan.actions {

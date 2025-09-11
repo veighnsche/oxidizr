@@ -1,3 +1,13 @@
+//! Rescue tool availability verification.
+//!
+//! This module verifies that a rescue profile is available before mutations happen when
+//! required by policy. Two profiles are supported:
+//! - BusyBox present on PATH (preferred single-binary profile)
+//! - GNU core tools subset present on PATH (configurable minimum count)
+//!
+//! Test override knobs:
+//! - `SWITCHYARD_FORCE_RESCUE_OK=1|0` forces the result for testing.
+//!
 use std::env;
 use crate::constants::{RESCUE_MUST_HAVE, RESCUE_MIN_COUNT};
 
@@ -10,6 +20,11 @@ pub fn verify_rescue_tools() -> bool {
 /// Verify rescue tooling with optional executability check.
 /// When `exec_check` is true, the discovered binaries must have at least one execute bit set.
 pub fn verify_rescue_tools_with_exec(exec_check: bool) -> bool {
+    verify_rescue_tools_with_exec_min(exec_check, RESCUE_MIN_COUNT)
+}
+
+/// Verify rescue tooling with an explicit minimum count for the GNU subset when BusyBox is absent.
+pub fn verify_rescue_tools_with_exec_min(exec_check: bool, min_count: usize) -> bool {
     // Test override knobs:
     if let Some(v) = env::var_os("SWITCHYARD_FORCE_RESCUE_OK") {
         if v == "1" { return true; }
@@ -27,8 +42,8 @@ pub fn verify_rescue_tools_with_exec(exec_check: bool) -> bool {
             if !exec_check || is_executable(&p) { found += 1; }
         }
     }
-    // Heuristic: at least RESCUE_MIN_COUNT present counts as available for rescue in this minimal check
-    found >= RESCUE_MIN_COUNT
+    // Heuristic: at least `min_count` present counts as available for rescue in this minimal check
+    found >= min_count
 }
 
 fn which_on_path(bin: &str) -> Option<String> {

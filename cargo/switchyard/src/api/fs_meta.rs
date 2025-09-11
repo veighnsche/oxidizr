@@ -1,3 +1,16 @@
+//! Filesystem metadata helpers used by preflight/apply for Minimal Facts and gating.
+//!
+//! This module provides conservative, non-mutating probes for:
+//! - `kind_of(path)`: classify node kind (file/dir/symlink/missing/unknown)
+//! - `resolve_symlink_target(path)`: resolve symlink target to an absolute path
+//! - `detect_preservation_capabilities(path)`: detect which preservation dimensions are likely
+//!   supported on the current platform and under current privileges.
+//!
+//! Notes:
+//! - Owner preservation is reported true only when the effective UID is 0 (root).
+//! - xattrs support is probed via the `xattr` crate by attempting to list attributes.
+//! - Timestamps and mode are reported true when metadata is readable for the path.
+//! - ACLs and capabilities are conservatively reported false.
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
@@ -72,11 +85,10 @@ pub(crate) fn detect_preservation_capabilities(path: &Path) -> (serde_json::Valu
         mode = true;
         // timestamps: if metadata is readable, assume we can set atime/mtime (utimensat)
         timestamps = true;
-        // owner: only root can chown arbitrarily; detect effective uid == 0
-        // owner: conservative default — we cannot safely detect EUID without extra features; report false
-        owner = false;
-        // xattrs: conservative default without unsafe syscalls
-        xattrs = false;
+        // owner: only root can chown arbitrarily; detect effective uid == 0 via /proc/self/status
+        owner = effective_uid_is_root();
+        // xattrs: probe availability by attempting to list extended attributes
+        xattrs = xattr::list(path).map(|_| true).unwrap_or(false);
         let _ = md; // silence unused on non-unix targets
     }
 
@@ -91,4 +103,27 @@ pub(crate) fn detect_preservation_capabilities(path: &Path) -> (serde_json::Valu
     // preservation_supported if any dimension can be preserved
     let supported = owner || mode || timestamps || xattrs || acls || caps;
     (preservation, supported)
+}
+
+fn effective_uid_is_root() -> bool {
+    // Parse /proc/self/status and read the second field of the `Uid:` line (effective UID).
+    // Fallback to false on any error for conservatism.
+    if let Ok(mut f) = std::fs::File::open("/proc/self/status") {
+        use std::io::Read as _;
+        let mut s = String::new();
+        if f.read_to_string(&mut s).is_ok() {
+            for line in s.lines() {
+                if line.starts_with("Uid:") {
+                    // Format: Uid:\t<real>\t<eff>\t<saved>\t<fs>
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 3 {
+                        if let Ok(eff) = parts[2].parse::<u32>() {
+                            return eff == 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
 }

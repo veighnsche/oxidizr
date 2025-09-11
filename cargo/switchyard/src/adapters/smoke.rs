@@ -1,3 +1,15 @@
+//! Smoke test adapter used to validate post-apply health.
+//!
+//! Minimal expectations for integrators:
+//! - Implement `SmokeTestRunner` and inject it via `Switchyard::with_smoke_runner(...)`.
+//! - Ensure the runner is deterministic and safe to execute repeatedly.
+//! - At minimum, validate that each `EnsureSymlink` target resolves to the intended source.
+//! - Optionally perform additional invariant checks (e.g., permissions, executable bits).
+//!
+//! Behavior in `ApplyMode::Commit` when `policy.require_smoke_in_commit=true`:
+//! - If no runner is configured, apply fails with `E_SMOKE` and auto-rollback (unless `disable_auto_rollback`).
+//! - If the runner returns `Err(SmokeFailure)`, apply fails with `E_SMOKE` and auto-rollback (unless disabled).
+//!
 use crate::types::plan::Plan;
 
 #[derive(Debug)]

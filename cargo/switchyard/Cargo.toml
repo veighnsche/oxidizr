@@ -23,6 +23,7 @@ sha2 = "0.10"
 hex = "0.4"
 time = { version = "0.3", features = ["formatting"] }
 fs2 = "0.4"
+xattr = "1"
 
 [features]
 default = []
