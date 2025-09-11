@@ -147,3 +147,27 @@ jobs:
           name: golden-diff
           path: golden-diff
           if-no-files-found: ignore
+
+  traceability:
+    name: SPEC Traceability Report (non-blocking)
+    runs-on: ubuntu-latest
+    needs: golden-fixtures
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Generate traceability report
+        run: |
+          set -e
+          python3 cargo/switchyard/SPEC/tools/traceability.py || true
+      - name: Upload traceability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec-traceability
+          path: |
+            cargo/switchyard/SPEC/traceability.json
+            cargo/switchyard/SPEC/traceability/*.json
+          if-no-files-found: ignore

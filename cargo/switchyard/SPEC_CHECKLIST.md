@@ -17,10 +17,11 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 - [~] REQ‑S3 Source ownership gating — checks present (world‑writable, root‑owned) with force override; facts emitted
 - [~] REQ‑S4 Strict target ownership — `OwnershipOracle` integrated when policy.strict_ownership=true
 - [~] REQ‑S5 Preservation capability gating — probes emitted in preflight; gating policy pending
+- [x] REQ‑S5 Preservation capability gating — probes emitted in preflight; STOP enforced when `require_preservation=true`
 
 - [x] REQ‑O1 Structured fact for every step — plan, preflight, apply.attempt/result, rollback emitted
 - [~] REQ‑O2 Dry‑run facts identical to real‑run — timestamps zeroed; volatile fields redacted; identity not enforced
-- [~] REQ‑O3 Versioned, stable facts schema — schema_version=1 present; JSON Schema validation pending
+- [x] REQ‑O3 Versioned, stable facts schema — schema_version=1 present; JSON Schema validation integrated in tests
 - [x] REQ‑O4 Signed attestations — `Attestor` integrated on successful commit with signature bundle
 - [x] REQ‑O5 Before/after hashes per mutation — sha256 computed for symlink ensure
 - [~] REQ‑O6 Secret masking — basic redactions implemented (provenance/attestation fields); policy hardening pending
@@ -28,20 +29,20 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 
 - [x] REQ‑L1 Single mutator — LockManager integration present
 - [x] REQ‑L2 Warn when no lock manager — `apply.attempt` emits `no_lock_manager:true`
-- [~] REQ‑L3 Bounded lock wait with timeout — enforced; on timeout emits `E_LOCKING`; `lock_wait_ms` not captured on error path
+- [x] REQ‑L3 Bounded lock wait with timeout — enforced; on timeout emits `E_LOCKING` and records `lock_wait_ms`
 - [ ] REQ‑L4 LockManager required in production — policy + docs
 
 - [ ] REQ‑RC1 Rescue profile available — maintain/verify backup symlink set
-- [ ] REQ‑RC2 Verify fallback path — preflight checks
-- [ ] REQ‑RC3 Fallback toolset on PATH — verify GNU/BusyBox presence
+- [x] REQ‑RC2 Verify fallback path — preflight checks gated by `require_rescue`
+- [x] REQ‑RC3 Fallback toolset on PATH — BusyBox present OR ≥6/10 GNU tools
 
 - [x] REQ‑D1 Deterministic IDs (UUIDv5) — implemented for plan_id/action_id
 - [x] REQ‑D2 Redaction‑pinned dry‑run — implemented (TS_ZERO + redactor)
 
 - [x] REQ‑C1 Dry‑run by default — `ApplyMode::default()` = DryRun
-- [~] REQ‑C2 Fail‑closed on critical violations — partial; preflight produces stops but apply does not enforce
+- [x] REQ‑C2 Fail‑closed on critical violations — apply refuses when policy fails (E_POLICY; exit_code mapped)
 
-- [~] REQ‑H1 Minimal smoke suite — trait integrated; external runner integration pending
+- [x] REQ‑H1 Minimal smoke suite — default deterministic subset validates symlink target resolves to source
 - [x] REQ‑H2 Auto‑rollback on smoke failure — implemented (unless disabled by policy)
 - [ ] REQ‑H3 Health verification is part of commit — enforce
 
@@ -51,7 +52,7 @@ Below maps each requirement from `SPEC/requirements.yaml` to current status.
 
 - [x] REQ‑TOCTOU1 TOCTOU‑safe syscall sequence — `open_dir_nofollow` + `*at` + `renameat` + parent fsync
 - [~] REQ‑BND1 fsync within 50ms — recorded and WARN‑flagged when exceeded; no hard enforcement
-- [ ] REQ‑CI1 Golden fixtures existence — produce
+- [x] REQ‑CI1 Golden fixtures existence — produced (tests can emit canon when GOLDEN_OUT_DIR is set)
 - [ ] REQ‑CI2 Zero‑SKIP gate — CI config
 - [ ] REQ‑CI3 Golden diff gate — CI config
 - [x] REQ‑VERS1 Facts carry `schema_version` — emit

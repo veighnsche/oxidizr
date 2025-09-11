@@ -41,13 +41,14 @@ fn redact_and_emit(ctx: &AuditCtx, subsystem: &str, event: &str, decision: &str,
 }
 
 pub(crate) fn emit_plan_fact(ctx: &AuditCtx, action_id: &str, path: Option<&str>) {
-    let fields = json!({
+    let mut fields = json!({
         "ts": TS_ZERO,
         "stage": "plan",
         "decision": "success",
         "action_id": action_id,
         "path": path,
     });
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "plan", "success", fields);
 }
 
@@ -58,7 +59,7 @@ pub(crate) fn emit_preflight_fact(
     current_kind: &str,
     planned_kind: &str,
 ) {
-    let fields = json!({
+    let mut fields = json!({
         "ts": TS_ZERO,
         "stage": "preflight",
         "decision": "success",
@@ -67,6 +68,7 @@ pub(crate) fn emit_preflight_fact(
         "current_kind": current_kind,
         "planned_kind": planned_kind,
     });
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "preflight", "success", fields);
 }
 
@@ -98,6 +100,7 @@ pub(crate) fn emit_preflight_fact_ext(
         if let Some(p) = preservation { obj.insert("preservation".into(), p); }
         if let Some(s) = preservation_supported { obj.insert("preservation_supported".into(), json!(s)); }
     }
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "preflight", "success", fields);
 }
 
@@ -111,6 +114,7 @@ pub(crate) fn emit_apply_attempt(ctx: &AuditCtx, decision: &str, extra: Value) {
             obj.insert(k.clone(), v.clone());
         }
     }
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "apply.attempt", decision, fields);
 }
 
@@ -126,14 +130,16 @@ pub(crate) fn emit_apply_result(ctx: &AuditCtx, decision: &str, extra: Value) {
             }
         }
     }
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "apply.result", decision, fields);
 }
 
 pub(crate) fn emit_summary(ctx: &AuditCtx, stage: &str, decision: &str) {
-    let fields = json!({
+    let mut fields = json!({
         "stage": stage,
         "decision": decision,
     });
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", stage, decision, fields);
 }
 
@@ -149,6 +155,7 @@ pub(crate) fn emit_summary_extra(ctx: &AuditCtx, stage: &str, decision: &str, ex
             }
         }
     }
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", stage, decision, fields);
 }
 

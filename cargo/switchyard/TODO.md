@@ -39,7 +39,8 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 - [x] Library crate scaffolding and module tree present
   - Files: `Cargo.toml`, `src/lib.rs`, `src/api.rs`, `src/preflight.rs`, `src/rescue.rs`, `src/fs/*`, `src/types/*`, `src/adapters/*`, `src/logging/*`, `src/policy/*`
 - [x] Public modules exported via `src/lib.rs`
-- [ ] Top‑level crate docs and README for the crate (usage, safety model, adapter model)
+- [~] Top‑level crate docs and README for the crate (usage, safety model, adapter model)
+  - README added (`cargo/switchyard/README.md`); module/crate rustdocs pending
 
 ## 2) Public API Surface (SPEC §3.1)
 
@@ -76,7 +77,7 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
   - `allow_roots` and `forbid_paths` enforcement (policy)
 - [x] Strict target ownership via `OwnershipOracle` when `policy.strict_ownership` (REQ‑S4)
 - [~] Preservation capability gating: detect whether ownership/mode/timestamps/xattrs/ACLs/caps can be preserved and STOP if policy requires but unsupported (REQ‑S5)
-  - Detection + facts emission implemented (`preservation{}`, `preservation_supported`); policy STOP wiring pending.
+  - Detection + facts emission implemented (`preservation{}`, `preservation_supported`); STOP enforced when `Policy.require_preservation=true`.
 - [ ] Emit structured preflight diff rows per `SPEC/preflight.yaml` (and ensure dry‑run byte identity)
   
 ### Backup Tagging (Multi-CLI)
@@ -97,7 +98,8 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 
 - [~] Integrate `LockManager` with bounded wait; record `lock_wait_ms`; timeout → `E_LOCKING` (REQ‑L1..L3)
   - Added `LockManager::acquire_process_lock(timeout_ms)` and optional wiring in `api::apply()`.
-  - Emits `apply.lock` event with `lock_wait_ms` on success; failure returns early with error.
+  - Emits `apply.attempt` failure with `error_id=E_LOCKING`, `exit_code=30`, and records `lock_wait_ms` on timeout.
+  - Emits `apply.attempt` success with `lock_wait_ms` when acquired.
 - [x] Emit WARN fact when no `LockManager` (dev/test only) (REQ‑L2)
 - [~] Ensure core types and engine are `Send + Sync` and document thread‑safety (SPEC §14)
   - Adapter traits now `Send + Sync` where applicable.
@@ -138,8 +140,10 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 ## 12) Rescue Profile (SPEC §2.6)
 
 - [ ] Maintain/verify rescue profile (backup symlink set) always available (REQ‑RC1)
-- [ ] Preflight verifies at least one functional fallback path/toolset on PATH (GNU or BusyBox) (REQ‑RC2, RC3)
-- [ ] Replace `rescue::verify_rescue_tools()` stub with real checks and facts
+- [x] Preflight verifies at least one functional fallback path/toolset on PATH (GNU or BusyBox) (REQ‑RC2, RC3)
+  - Minimal deterministic PATH-based verification (BusyBox present OR ≥6/10 GNU tools), no command execution; gated by `Policy.require_rescue`.
+- [~] Replace `rescue::verify_rescue_tools()` stub with real checks and facts
+  - Basic verification implemented; extend facts/notes and adapter-based probes in a follow-up.
 
 ## 13) Policy Model
 
@@ -175,7 +179,7 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
   - Golden diffs: implemented (blocking job over all scenarios) ✅
   - Schema validation: integrated in tests ✅
   - Zero‑SKIP: enforcement policy documented; wired per-suite as next step ◻️
-  - Traceability artifact: planned; not yet implemented ◻️
+  - Traceability artifact: implemented via non‑blocking job (uploads report) ✅
 
 ## 18) Documentation
 

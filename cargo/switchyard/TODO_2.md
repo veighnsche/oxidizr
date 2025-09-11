@@ -20,10 +20,10 @@ Legend:
 - API split complete (`src/api/{plan,preflight,apply,rollback,fs_meta,errors}.rs`) with centralized audit emission (`src/api/audit.rs`).
 - Preflight emits per-action rows with `policy_ok`, `provenance` (when oracle is present), and `preservation{}` + `preservation_supported`.
 - Apply enforces fail-closed by default unless `Policy.override_preflight=true`; emits Silver-tier `error_id/exit_code` at covered failure sites.
-- Locking adapter (`FileLockManager`) implemented; failure path emits `E_LOCKING` (apply.attempt).
+- Locking adapter (`FileLockManager`) implemented; failure path emits `E_LOCKING` with `lock_wait_ms` (apply.attempt).
 - Hashing and attestation scaffolding present; redaction policy implemented for DryRun vs Commit parity.
-- Golden canon fixtures and schema validation integrated in tests; CI gate not yet wired in this crate.
-- Rescue profile check is a placeholder (`src/rescue.rs`).
+- Golden canon fixtures and schema validation integrated in tests; non-blocking CI traceability job added; golden gate staging remains.
+- Rescue profile: minimal PATH-based verification implemented with `Policy.require_rescue` gating in preflight/apply.
 
 ---
 
@@ -46,12 +46,12 @@ Action items
 
 - [x] Emits per-action rows with `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`
 - [~] Emits `provenance{uid,gid,pkg}` when an `OwnershipOracle` is configured
-- [~] Emits `preservation{}` and `preservation_supported`; requires policy wiring for STOP
+- [x] Emits `preservation{}` and `preservation_supported`; policy STOP wired when `Policy.require_preservation=true`
 - [ ] Optional output: materialize `PreflightReport` to YAML conforming to `SPEC/preflight.yaml` for fixtures/artifacts
 
 Action items
 
-- [ ] Enforce `Policy.require_preservation` STOP path end-to-end (already recorded in rows)
+- [x] Enforce `Policy.require_preservation` STOP path end-to-end (already recorded in rows)
 - [ ] Add unit tests for negative cases per gate (ro/noexec/immutable/ownership/roots/forbid_paths)
 - [ ] Provide `preflight::to_yaml(&PreflightReport)` helper (pure) for producing spec-aligned YAML when needed
 
@@ -88,11 +88,11 @@ Action items
 ## 5) Locking & Concurrency (SPEC §2.5)
 
 - [~] `FileLockManager` with bounded wait and tests; WARN fact when no lock manager
-- [~] On timeout, we emit `apply.attempt` failure with `E_LOCKING`; `lock_wait_ms` not captured on the error path yet
+- [x] On timeout, we emit `apply.attempt` failure with `E_LOCKING`; `lock_wait_ms` captured on the error path
 
 Action items
 
-- [ ] Capture and emit `lock_wait_ms` on the timeout failure path (SPEC_CHECKLIST gap) in `src/api/apply.rs`
+- [x] Capture and emit `lock_wait_ms` on the timeout failure path (SPEC_CHECKLIST gap) in `src/api/apply.rs`
 - [ ] Add golden fragment asserting `E_LOCKING` with `exit_code=30` and presence of `lock_wait_ms` when available
 
 ---
@@ -101,7 +101,7 @@ Action items
 
 - [x] UUIDv5 `plan_id`/`action_id` (see `src/types/ids.rs`)
 - [x] Redaction policy ensuring DryRun == Commit parity for canonicalized events (tests in `tests/sprint_acceptance-0001.rs`)
-- [ ] Extend redaction/masking coverage with unit tests for known volatile fields
+- [x] Extend redaction/masking coverage with unit tests for known volatile fields
 
 Action items
 
@@ -114,12 +114,13 @@ Action items
 
 - [~] Minimal Facts v1 emitted at all stages; schema validation in tests; per-action hashing on symlink swap
 - [~] Attestation bundle created and signed when an `Attestor` is provided; redacted fields masked for determinism
-- [ ] Provenance completeness (origin/helper/uid/gid/pkg/env_sanitized) across all relevant facts
+- [~] Provenance completeness (origin/helper/uid/gid/pkg/env_sanitized) across all relevant facts
 - [ ] Secret masking policy enforcement across all sinks (beyond current helper masking)
 
 Action items
 
-- [ ] Extend apply-level provenance to include `uid/gid/pkg` when an oracle is present; set `origin` where available via adapters
+- [x] Extend apply-level provenance to include `uid/gid/pkg` when an oracle is present.
+- [ ] Populate `origin` and stable `helper` via adapters where available; ensure `env_sanitized=true` across stages
 - [ ] Add policy-driven secret-mask list; ensure `redact_event()` removes/masks configured keys consistently
 - [ ] Add schema validation tests for added provenance fields (allowing omission when N/A)
 
@@ -128,24 +129,23 @@ Action items
 ## 8) Smoke Tests (SPEC §11)
 
 - [~] `SmokeTestRunner` trait implemented; default runner is a no-op; apply integrates auto-rollback on failure
-- [ ] Provide a minimal deterministic default smoke suite (deterministic args; no clock/locale dependence)
+- [x] Provide a minimal deterministic default smoke suite (deterministic checks; no clock/locale dependence) — default runner validates that targets resolve to sources for `EnsureSymlink` actions
 
 Action items
 
-- [ ] Implement `DefaultSmokeRunner` to run a minimal subset (e.g., `true` or `stat -c %a,%u,%g` on staged files) under feature flag to avoid env deps
-- [ ] Add tests asserting auto-rollback facts include `E_SMOKE` + `exit_code=80` (already covered) and that runner output is redacted/sanitized
+- [x] Implement `DefaultSmokeRunner` with deterministic symlink resolution checks (no external commands)
+- [ ] Add tests asserting runner outputs are redacted/sanitized (if/when external commands are added)
 
 ---
 
 ## 9) Rescue Profile (SPEC §2.6)
 
-- [ ] Implement `rescue::verify_rescue_tools()` for real checks (rescue symlink set + GNU/BusyBox on PATH)
-- [ ] Integrate rescue verification into preflight with policy `require_rescue`
+- [~] Implement `rescue::verify_rescue_tools()` for minimal PATH-based checks (BusyBox or ≥6/10 GNU tools) with env override; integrate policy `require_rescue` gating in preflight/apply
 
 Action items
 
-- [ ] Implement rescue checks and emit preflight notes/summary; STOP when `require_rescue=true` and unmet
-- [ ] Unit tests: simulate presence/absence via mock `PathResolver` and verify preflight behavior
+- [x] Implement minimal PATH-based rescue checks and STOP when `require_rescue=true` and unmet
+- [~] Unit tests: rescue preflight gating covered using PATH injection and `SWITCHYARD_FORCE_RESCUE_OK`; adapter-based mock `PathResolver` remains optional follow-up; extend facts with notes/toolset details
 
 ---
 
@@ -157,7 +157,7 @@ Action items
 Action items
 
 - [ ] Audit `src/api/apply.rs` branches and add missing `error_id/exit_code` insertions
-- [ ] Add tests verifying presence for `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_POLICY`, `E_SMOKE`
+- [ ] Add tests verifying presence for `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_POLICY`, `E_SMOKE` (note: `E_LOCKING` covered by `tests/locking_timeout.rs`)
 
 ---
 
@@ -171,20 +171,21 @@ Action items
 
 - [ ] Add property tests
 - [ ] Wire CI jobs (or document upstream CI integration) for schema validate + golden diff + zero-SKIP gate
-- [ ] Add `SPEC/tools/traceability.py` invocation in CI to produce coverage artifact
+- [x] Add `SPEC/tools/traceability.py` invocation in CI to produce coverage artifact (non-blocking job added)
+- [x] Add golden-style fragment for lock timeout asserting `E_LOCKING` + `exit_code=30` (see `tests/locking_timeout.rs`; `lock_wait_ms` omitted from canon due to redaction)
 
 ---
 
 ## 12) Documentation & Doc-Sync
 
-- [ ] SPEC_UPDATE: document new policy flags (`override_preflight`, `require_preservation`) and clarify degraded symlink behavior
-- [ ] ADR: taxonomy boundaries (Silver subset coverage; deferrals)
+- [x] SPEC_UPDATE: document new policy flags (`override_preflight`, `require_preservation`) and clarify degraded symlink behavior
+- [x] ADR: taxonomy boundaries (Silver subset coverage; deferrals)
 - [ ] Update planning docs after changes (PLAN impl notes + discrepancies)
 
 Action items
 
-- [ ] Write `SPEC/SPEC_UPDATE_0002.md` covering policy surface and determinism/redaction clarifications
-- [ ] Add ADR for exit code mapping strategy and locking metrics on failure path
+- [ ] SPEC Updates: `SPEC/SPEC_UPDATE_0001.md` (Accepted); `SPEC/SPEC_UPDATE_0002.md` (Proposed)
+- [ ] ADRs: `PLAN/adr/ADR-0013-backup-tagging.md` (Accepted); `PLAN/adr/ADR-0015-exit-codes-silver-and-ci-gates.md` (Proposed)
 
 ---
 
@@ -280,6 +281,8 @@ Completed in this iteration
 - Locking timeout metrics on failure path:
   - `src/api/apply.rs` now records `lock_wait_ms` even on the timeout failure branch and emits it in `apply.attempt`.
 - Apply provenance enrichment:
+  - Centralized `ensure_provenance()` now applied to all emitted facts.
+  - Added unit tests for redaction masking/field removal.
   - `src/api/apply.rs` per-action results now include `provenance.{uid,gid,pkg}` when an `OwnershipOracle` is present.
 
 Still remaining (new/updated explicit tasks)

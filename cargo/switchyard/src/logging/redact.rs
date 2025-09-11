@@ -9,6 +9,43 @@ pub fn now_iso() -> String {
     OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_else(|_| TS_ZERO.to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn redact_masks_and_removes_expected_fields() {
+        let input = json!({
+            "ts": "2025-01-01T12:00:00Z",
+            "duration_ms": 123,
+            "lock_wait_ms": 45,
+            "severity": "warn",
+            "degraded": true,
+            "before_hash": "abc",
+            "after_hash": "def",
+            "hash_alg": "sha256",
+            "provenance": {"helper":"paru", "uid": 0, "gid": 0, "pkg": "coreutils"},
+            "attestation": {"signature":"sig","bundle_hash":"bh","public_key_id":"pk"}
+        });
+        let out = redact_event(input);
+        assert_eq!(out.get("ts").and_then(|v| v.as_str()), Some(TS_ZERO));
+        assert!(out.get("duration_ms").is_none());
+        assert!(out.get("lock_wait_ms").is_none());
+        assert!(out.get("severity").is_none());
+        assert!(out.get("degraded").is_none());
+        assert!(out.get("before_hash").is_none());
+        assert!(out.get("after_hash").is_none());
+        assert!(out.get("hash_alg").is_none());
+        let prov = out.get("provenance").and_then(|v| v.as_object()).unwrap();
+        assert_eq!(prov.get("helper").and_then(|v| v.as_str()), Some("***"));
+        let att = out.get("attestation").and_then(|v| v.as_object()).unwrap();
+        assert_eq!(att.get("signature").and_then(|v| v.as_str()), Some("***"));
+        assert_eq!(att.get("bundle_hash").and_then(|v| v.as_str()), Some("***"));
+        assert_eq!(att.get("public_key_id").and_then(|v| v.as_str()), Some("***"));
+    }
+}
+
 /// Return a timestamp for facts emission based on mode.
 /// - DryRun: constant zero timestamp for determinism.
 /// - Commit: real, current timestamp in RFC3339.

@@ -344,6 +344,3 @@ Basis: implementation review and tests.
 - Rescue: implement `require_rescue` policy and verification; negative golden.
 - Smoke: formalize adapter, default minimal suite, and failure goldens.
 
----
-
-If you want, I can remove the per‑module `*-tiers.md` files now that this consolidated plan exists, or keep them temporarily until this file is reviewed.

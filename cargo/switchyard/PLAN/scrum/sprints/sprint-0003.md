@@ -71,3 +71,38 @@
 - Apply results include extended provenance where adapters are present; redaction policy and unit tests updated.
 - Traceability artifact produced in CI; linked in PR summary; non-blocking gate green.
 - Deterministic smoke runner subset implemented with unit tests.
+
+---
+
+## Execution Update (2025-09-11)
+
+### Completed
+
+- Rescue policy & gating
+  - Added `Policy.require_rescue` (default false) and integrated minimal PATH-based rescue verification.
+  - Preflight adds STOP when required and unavailable; Apply refuses unless `override_preflight=true`.
+  - Files: `src/policy/config.rs`, `src/rescue.rs`, `src/api/preflight.rs`, `src/api/apply.rs`.
+
+- Locking timeout metrics
+  - On lock acquisition timeout, `apply.attempt` now emits `E_LOCKING`, `exit_code=30`, and records `lock_wait_ms`.
+  - File: `src/api/apply.rs`.
+
+- Provenance enrichment (apply.result)
+  - When an `OwnershipOracle` is configured, `apply.result` includes `provenance.uid/gid/pkg` for the target path.
+  - Files: `src/api/apply.rs` (uses `ensure_provenance()` + enrichment), `src/api/audit.rs`.
+
+- Smoke runner deterministic subset
+  - `DefaultSmokeRunner` now validates each `EnsureSymlink` action's target resolves to the source (canonicalized), avoiding external commands.
+  - File: `src/adapters/smoke.rs`.
+
+### Pending
+
+- Extended provenance across facts (origin/helper/env_sanitized consistently) and masking unit tests.
+- CI: add non-blocking traceability job that runs `SPEC/tools/traceability.py` and uploads artifact.
+- SPEC/ADR doc-sync for policy surface (require_rescue), degraded symlink semantics note, and Silver deferrals.
+- Optional: expand smoke to include a minimal command set under a feature flag once CI environment guarantees are ready.
+
+### Notes
+
+- All tests are green: `cargo test -p switchyard`.
+- Changes align with SPEC v1.1: rescue (§2.6), locking (§2.5), observability/provenance (§2.4/§5), and health verification (§2.9) in a deterministic way.

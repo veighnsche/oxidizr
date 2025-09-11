@@ -3,6 +3,11 @@ use std::env;
 /// Verify that at least one rescue toolset is available on PATH (BusyBox or GNU core utilities).
 /// This is a minimal, non-invasive check for Sprint 3.
 pub fn verify_rescue_tools() -> bool {
+    // Test override knobs:
+    if let Some(v) = env::var_os("SWITCHYARD_FORCE_RESCUE_OK") {
+        if v == "1" { return true; }
+        if v == "0" { return false; }
+    }
     // Prefer BusyBox (single binary) as a compact rescue profile
     if which_on_path("busybox").is_some() {
         return true;
