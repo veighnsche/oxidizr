@@ -56,28 +56,28 @@ Goals of the meta-plan:
 
 ## Artifacts to Produce (the plan to make the plan)
 
-- PLAN/00-charter.md
+- PLAN/meta/00-charter.md
   - Purpose, scope, MVP, stakeholders, constraints, glossary.
 
-- PLAN/10-architecture-outline.md
+- PLAN/meta/10-architecture-outline.md
   - Module boundaries, data flow, interfaces/traits, failure domains, lock/IO patterns.
 
-- PLAN/20-spec-traceability.md
+- PLAN/meta/20-spec-traceability.md
   - Table mapping SPEC requirements and `.feature` scenarios to code and tests.
 
-- PLAN/30-delivery-plan.md
+- PLAN/meta/30-delivery-plan.md
   - Milestones, workstreams, sequencing, estimates, and dependencies.
 
-- PLAN/40-quality-gates.md
+- PLAN/meta/40-quality-gates.md
   - CI gate definitions, required evidence, pass/fail policy and exceptions.
 
-- PLAN/50-risk-register.md
+- PLAN/meta/50-risk-register.md
   - Risks, assumptions, mitigations, owners, and review cadence.
 
-- PLAN/60-adr-template.md & PLAN/adr/ (folder)
+- PLAN/meta/60-adr-template.md & PLAN/meta/adr/ (folder)
   - Lightweight ADR template and a directory to store decisions.
 
-- PLAN/70-status-cadence.md
+- PLAN/meta/70-status-cadence.md
   - Weekly status template, demo criteria, review checklist.
 
 Note: This README is the meta-plan. The above artifacts constitute the “real plan.”
