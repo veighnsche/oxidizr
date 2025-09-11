@@ -10,20 +10,19 @@ This document elaborates on adapter responsibilities and invariants.
   - MUST NOT follow symlinks outside SafePath root.
   - Used during preflight to enforce REQ-S3/REQ-S4.
 
-Rust-like planning types:
+Rust-like planning types (aligned with current implementation):
 
 ```rust
 struct OwnershipInfo {
-    uid: i32,
-    gid: i32,
+    uid: u32,
+    gid: u32,
     pkg: String,              // package or provider name if applicable
-    world_writable: bool,
 }
 ```
 
 Invariants & Errors:
 
-- If `world_writable==true` or uid/gid mismatch under strict policy, return `E_OWNERSHIP` (maps to `ownership_error`).
+- Under `strict_ownership=true`, package ownership MUST be enforced by policy; violations result in STOP during preflight (policy gate) rather than a post-apply error.
 - MUST operate on `SafePath` and reject if path escapes root (caught earlier by SafePath). See `impl/25-safepath.md`.
 
 ## LockManager
@@ -69,10 +68,10 @@ Notes:
 
 - Responsibility: execute the minimal smoke suite post-apply.
 - Contract:
-  - `run(plan: &Plan) -> Result<(), Error>`
-  - Failure returns `E_SMOKE`; engine triggers auto-rollback unless disabled by policy.
+  - `run(plan: &Plan) -> Result<(), SmokeFailure>`
+  - Failure returns `SmokeFailure` and engine maps to `E_SMOKE`; auto-rollback unless disabled by policy.
 
-Telemetry:
+Audit:
 
 - Emit per-test facts or a summary fact recording command, args, and exit status (sanitized). See `SPEC §11` and `impl/40-facts-logging.md`.
 

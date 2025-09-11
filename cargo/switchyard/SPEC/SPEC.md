@@ -147,6 +147,16 @@ items:
         gid: { type: int }
         pkg: { type: str }
     notes: { type: seq, sequence: { type: str } }
+    preservation:
+      type: map
+      mapping:
+        owner: { type: bool }
+        mode: { type: bool }
+        timestamps: { type: bool }
+        xattrs: { type: bool }
+        acls: { type: bool }
+        caps: { type: bool }
+    preservation_supported: { type: bool }
 ```
 
 Dry-run output must match real-run preflight rows byte-for-byte.
@@ -319,6 +329,8 @@ After apply, the `SmokeTestRunner` MUST, at minimum, run the following commands 
 - date +%s
 
 Policy MAY disable auto-rollback explicitly (e.g., `policy.disable_auto_rollback=true`); otherwise, smoke failure → auto-rollback.
+
+Note: The smoke runner is provided via the `SmokeTestRunner` adapter. In production deployments an adapter MUST be configured so the suite runs; omission is permitted only in development/testing contexts.
 
 ## 12. Golden Fixtures & Zero-SKIP CI Gate
 

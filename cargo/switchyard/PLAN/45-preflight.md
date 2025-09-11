@@ -17,7 +17,7 @@ References:
 ## Minimal Preflight v1 (Lean)
 
 - Produce structured rows per `SPEC/preflight.yaml` with the following fields populated:
-  - `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, `provenance.uid/gid/pkg`, `notes`.
+  - `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, `provenance.uid/gid/pkg`, `notes`, `preservation`, `preservation_supported`.
 - Sort rows deterministically by (`path`, `action_id`).
 - Enforce fail-closed on critical violations unless explicit policy override is set (loud logs). (REQ-C2)
 
@@ -102,6 +102,8 @@ Fields map 1:1 to `SPEC/preflight.yaml` keys:
 - `policy_ok` → `policy_ok`
 - `provenance.uid/gid/pkg` → nested map
 - `notes` → `notes`
+- `preservation` → `preservation` (object)
+- `preservation_supported` → `preservation_supported` (bool)
 
 ## Tests & Evidence
 
