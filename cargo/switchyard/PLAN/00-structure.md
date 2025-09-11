@@ -7,7 +7,11 @@ This is a planning artifact for `cargo/switchyard`. No Rust implementation is in
 - `cargo/switchyard/`
   - `src/`
     - `lib.rs` — crate root; re-exports public API and core types
-    - `api.rs` — orchestration entrypoints (`plan`, `preflight`, `apply`, `plan_rollback_of`)
+    - `api/` — orchestration module (planned split of `api.rs`)
+      - `mod.rs` — `Switchyard` type and builders; re-exports
+      - `plan.rs` — `plan()` implementation (stable ordering, UUIDv5)
+      - `preflight.rs` — `preflight()` implementation (policy/ownership/preservation probes)
+      - `apply.rs` — `apply()` and `plan_rollback_of()` implementations (locking, hashing, rollback)
     - `preflight.rs` — environment and policy gating; preflight diff generation
     - `rescue.rs` — rescue profile checks and fallback toolset verification (GNU/BusyBox)
     - `types/`
@@ -26,7 +30,7 @@ This is a planning artifact for `cargo/switchyard`. No Rust implementation is in
     - `logging/`
       - `facts.rs` — JSONL fact builders (schema v1)
       - `redact.rs` — secret masking and timestamp redaction
-      - `provenance.rs` — provenance fields and policy
+      - `provenance.rs` — provenance fields and policy (planned)
     - `determinism/`
       - `ids.rs` — UUIDv5 `plan_id`/`action_id`
       - `ordering.rs` — stable field ordering; golden determinism

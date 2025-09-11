@@ -25,5 +25,6 @@ Documents in this folder:
 - `65-rescue.md` — rescue profile and fallback toolset verification (SPEC §2.6)
 - `70-pseudocode.md` — high-level pseudocode for core functions and flows (no code)
 - `80-testing-mapping.md` — test strategy and fixture layout mapped to SPEC
+- `12-api-module.md` — API module responsibilities and planned split of `src/api.rs` into `src/api/`
 
 Review instructions: see `cargo/switchyard/PLAN/80-review-instructions.md`.
