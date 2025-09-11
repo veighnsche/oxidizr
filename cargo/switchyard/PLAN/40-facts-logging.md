@@ -117,6 +117,7 @@ fn stable_order(f: Fact) -> Fact {
 - `rollback()` — per-step facts during rollback with partial restoration info on failure. (REQ-R5)
 
 ### Minimal Facts v1 acceptance
+
 - For each emission point above, Minimal Facts v1 fields must be present and validate against schema (subset validation permitted via `$defs`).
 - Dry-run vs real-run: byte-identical after redaction for Minimal Facts v1.
 

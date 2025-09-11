@@ -1,17 +1,57 @@
-/// Placeholder
 use std::time::Instant;
 
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
-use crate::logging::{AuditSink, FactsEmitter};
+use crate::logging::{AuditSink, FactsEmitter, TS_ZERO, ts_for_mode};
 use crate::policy::Policy;
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 use crate::{fs, preflight};
 use base64::Engine;
 use serde_json::json;
+use sha2::{Digest, Sha256};
+use std::path::Path;
 
-// Temporary deterministic timestamp until redaction policy is implemented
-const TS_ZERO: &str = "1970-01-01T00:00:00Z";
+fn sha256_hex_of(path: &Path) -> Option<String> {
+    let mut f = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut f, &mut hasher).ok()?;
+    let out = hasher.finalize();
+    Some(hex::encode(out))
+}
+
+fn resolve_symlink_target(target: &Path) -> Option<std::path::PathBuf> {
+    if let Ok(md) = std::fs::symlink_metadata(target) {
+        if md.file_type().is_symlink() {
+            if let Ok(mut link) = std::fs::read_link(target) {
+                if link.is_relative() {
+                    if let Some(parent) = target.parent() {
+                        link = parent.join(link);
+                    }
+                }
+                return Some(link);
+            }
+        }
+    }
+    None
+}
+
+fn kind_of(path: &Path) -> String {
+    match std::fs::symlink_metadata(path) {
+        Ok(md) => {
+            let ft = md.file_type();
+            if ft.is_symlink() {
+                "symlink".to_string()
+            } else if ft.is_file() {
+                "file".to_string()
+            } else if ft.is_dir() {
+                "dir".to_string()
+            } else {
+                "unknown".to_string()
+            }
+        }
+        Err(_) => "missing".to_string(),
+    }
+}
 
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
@@ -21,6 +61,7 @@ pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     owner: Option<Box<dyn OwnershipOracle>>, // for strict ownership gating
     attest: Option<Box<dyn Attestor>>,  // for final summary attestation
     smoke: Option<Box<dyn SmokeTestRunner>>, // for post-apply health verification
+    lock_timeout_ms: u64,
 }
 
 impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
@@ -33,6 +74,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             owner: None,
             attest: None,
             smoke: None,
+            lock_timeout_ms: 5000,
         }
     }
 
@@ -56,6 +98,11 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         self
     }
 
+    pub fn with_lock_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.lock_timeout_ms = timeout_ms;
+        self
+    }
+
     pub fn plan(&self, input: PlanInput) -> Plan {
         let mut actions: Vec<Action> = Vec::new();
         for l in input.link {
@@ -67,6 +114,18 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         for r in input.restore {
             actions.push(Action::RestoreFromBackup { target: r.target });
         }
+        // Stable ordering: sort actions by deterministic key (target rel path), then by kind
+        actions.sort_by(|a, b| {
+            let ka = match a {
+                Action::EnsureSymlink { target, .. } => (0u8, target.rel().to_string_lossy().to_string()),
+                Action::RestoreFromBackup { target } => (1u8, target.rel().to_string_lossy().to_string()),
+            };
+            let kb = match b {
+                Action::EnsureSymlink { target, .. } => (0u8, target.rel().to_string_lossy().to_string()),
+                Action::RestoreFromBackup { target } => (1u8, target.rel().to_string_lossy().to_string()),
+            };
+            ka.cmp(&kb)
+        });
         let plan = Plan { actions };
         // Minimal Facts v1: emit one fact per action at stage=plan
         let pid = plan_id(&plan);
@@ -230,6 +289,16 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     Some(target.as_path().display().to_string())
                 }
             };
+            let (current_kind, planned_kind) = match act {
+                Action::EnsureSymlink { target, .. } => (
+                    kind_of(&target.as_path()),
+                    "symlink".to_string(),
+                ),
+                Action::RestoreFromBackup { .. } => (
+                    "unknown".to_string(),
+                    "restore_from_backup".to_string(),
+                ),
+            };
             let fields = json!({
                 "schema_version": 1,
                 "ts": TS_ZERO,
@@ -238,6 +307,8 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                 "decision": "success",
                 "action_id": aid.to_string(),
                 "path": path,
+                "current_kind": current_kind,
+                "planned_kind": planned_kind,
             });
             self.facts
                 .emit("switchyard", "preflight", "success", fields);
@@ -273,13 +344,14 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let mut rolled_back = false;
         let dry = matches!(mode, ApplyMode::DryRun);
         let pid = plan_id(plan);
+        let ts_now = ts_for_mode(&mode);
 
         // Locking (optional in dev/test): acquire process lock with bounded wait; emit telemetry via apply.attempt
         let mut lock_wait_ms: Option<u64> = None;
         let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
         if let Some(mgr) = &self.lock {
             let lt0 = Instant::now();
-            match mgr.acquire_process_lock(5000) {
+            match mgr.acquire_process_lock(self.lock_timeout_ms) {
                 Ok(guard) => {
                     lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
                     _lock_guard = Some(guard);
@@ -287,7 +359,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                 Err(e) => {
                     let fields = json!({
                         "schema_version": 1,
-                        "ts": TS_ZERO,
+                        "ts": ts_now,
                         "plan_id": pid.to_string(),
                         "stage": "apply.attempt",
                         "decision": "failure",
@@ -311,7 +383,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         } else {
             let fields = json!({
                 "schema_version": 1,
-                "ts": TS_ZERO,
+                "ts": ts_now,
                 "plan_id": pid.to_string(),
                 "stage": "apply.attempt",
                 "decision": "warn",
@@ -325,7 +397,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
         let fields = json!({
             "schema_version": 1,
-            "ts": TS_ZERO,
+            "ts": ts_now,
             "plan_id": pid.to_string(),
             "stage": "apply.attempt",
             "decision": "success",
@@ -342,7 +414,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     // Minimal Facts v1: per-action attempt
                     let fields = json!({
                         "schema_version": 1,
-                        "ts": TS_ZERO,
+                        "ts": ts_now,
                         "plan_id": pid.to_string(),
                         "stage": "apply.attempt",
                         "decision": "success",
@@ -353,6 +425,12 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         .emit("switchyard", "apply.attempt", "success", fields);
                     let mut degraded_used = false;
                     let mut fsync_ms: u64 = 0;
+                    // Compute before/after hashes
+                    let before_hash = match resolve_symlink_target(&target.as_path()) {
+                        Some(p) => sha256_hex_of(&p),
+                        None => sha256_hex_of(&target.as_path()),
+                    };
+                    let after_hash = sha256_hex_of(&source.as_path());
                     match fs::replace_file_with_symlink(
                         &source.as_path(),
                         &target.as_path(),
@@ -380,7 +458,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     };
                     let mut fields = json!({
                         "schema_version": 1,
-                        "ts": TS_ZERO,
+                        "ts": ts_now,
                         "plan_id": pid.to_string(),
                         "stage": "apply.result",
                         "decision": decision,
@@ -389,6 +467,31 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         "degraded": if degraded_used { Some(true) } else { None },
                         "duration_ms": fsync_ms,
                     });
+                    if let Some(bh) = before_hash.as_ref() {
+                        let obj = fields.as_object_mut().unwrap();
+                        obj.insert("hash_alg".to_string(), json!("sha256"));
+                        obj.insert("before_hash".to_string(), json!(bh));
+                    }
+                    if let Some(ah) = after_hash.as_ref() {
+                        let obj = fields.as_object_mut().unwrap();
+                        obj.insert("hash_alg".to_string(), json!("sha256"));
+                        obj.insert("after_hash".to_string(), json!(ah));
+                    }
+                    // Add provenance placeholders
+                    {
+                        let obj = fields.as_object_mut().unwrap();
+                        let uid = unsafe { libc::geteuid() } as u32;
+                        let gid = unsafe { libc::getegid() } as u32;
+                        obj.insert(
+                            "provenance".to_string(),
+                            json!({
+                                "helper": "",
+                                "uid": uid,
+                                "gid": gid,
+                                "env_sanitized": true
+                            }),
+                        );
+                    }
                     if errors.is_empty() && fsync_ms > 50 {
                         // Warn on fsync bound breach
                         let obj = fields.as_object_mut().unwrap();
@@ -401,7 +504,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     // Minimal Facts v1: per-action attempt
                     let fields = json!({
                         "schema_version": 1,
-                        "ts": TS_ZERO,
+                        "ts": ts_now,
                         "plan_id": pid.to_string(),
                         "stage": "apply.attempt",
                         "decision": "success",
@@ -429,15 +532,29 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     } else {
                         "failure"
                     };
-                    let fields = json!({
+                    let mut fields = json!({
                         "schema_version": 1,
-                        "ts": TS_ZERO,
+                        "ts": ts_now,
                         "plan_id": pid.to_string(),
                         "stage": "apply.result",
                         "decision": decision,
                         "action_id": _aid.to_string(),
                         "path": target.as_path().display().to_string(),
                     });
+                    {
+                        let obj = fields.as_object_mut().unwrap();
+                        let uid = unsafe { libc::geteuid() } as u32;
+                        let gid = unsafe { libc::getegid() } as u32;
+                        obj.insert(
+                            "provenance".to_string(),
+                            json!({
+                                "helper": "",
+                                "uid": uid,
+                                "gid": gid,
+                                "env_sanitized": true
+                            }),
+                        );
+                    }
                     self.facts
                         .emit("switchyard", "apply.result", decision, fields);
                 }
@@ -462,7 +579,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                                     Ok(()) => {
                                         let fields = json!({
                                             "schema_version": 1,
-                                            "ts": TS_ZERO,
+                                            "ts": ts_now,
                                             "plan_id": pid.to_string(),
                                             "stage": "rollback",
                                             "decision": "success",
@@ -483,7 +600,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                                         ));
                                         let fields = json!({
                                             "schema_version": 1,
-                                            "ts": TS_ZERO,
+                                            "ts": ts_now,
                                             "plan_id": pid.to_string(),
                                             "stage": "rollback",
                                             "decision": "failure",
@@ -506,7 +623,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                                 );
                                 let fields = json!({
                                     "schema_version": 1,
-                                    "ts": TS_ZERO,
+                                    "ts": ts_now,
                                     "plan_id": pid.to_string(),
                                     "stage": "rollback",
                                     "decision": "failure",
@@ -563,7 +680,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         };
         let mut fields = json!({
             "schema_version": 1,
-            "ts": TS_ZERO,
+            "ts": ts_now,
             "plan_id": pid.to_string(),
             "stage": "apply.result",
             "decision": decision,
