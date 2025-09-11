@@ -3,12 +3,13 @@
 use std::time::Instant;
 
 use crate::{preflight, fs};
-use crate::adapters::{LockManager, OwnershipOracle};
+use crate::adapters::{LockManager, OwnershipOracle, Attestor, SmokeTestRunner};
 use crate::logging::{FactsEmitter, AuditSink};
 use crate::policy::Policy;
 use crate::types::{PlanInput, Plan, Action, PreflightReport, ApplyMode, ApplyReport};
 use crate::types::ids::{plan_id, action_id};
 use serde_json::json;
+use base64::Engine;
 
 // Temporary deterministic timestamp until redaction policy is implemented
 const TS_ZERO: &str = "1970-01-01T00:00:00Z";
@@ -19,10 +20,12 @@ pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     policy: Policy,
     lock: Option<Box<dyn LockManager>>, // None in dev/test; required in production
     owner: Option<Box<dyn OwnershipOracle>>, // for strict ownership gating
+    attest: Option<Box<dyn Attestor>>, // for final summary attestation
+    smoke: Option<Box<dyn SmokeTestRunner>>, // for post-apply health verification
 }
 
 impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
-    pub fn new(facts: E, audit: A, policy: Policy) -> Self { Self { facts, audit, policy, lock: None, owner: None } }
+    pub fn new(facts: E, audit: A, policy: Policy) -> Self { Self { facts, audit, policy, lock: None, owner: None, attest: None, smoke: None } }
 
     pub fn with_lock_manager(mut self, lock: Box<dyn LockManager>) -> Self {
         self.lock = Some(lock);
@@ -31,6 +34,16 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
 
     pub fn with_ownership_oracle(mut self, owner: Box<dyn OwnershipOracle>) -> Self {
         self.owner = Some(owner);
+        self
+    }
+
+    pub fn with_attestor(mut self, attest: Box<dyn Attestor>) -> Self {
+        self.attest = Some(attest);
+        self
+    }
+
+    pub fn with_smoke_runner(mut self, smoke: Box<dyn SmokeTestRunner>) -> Self {
+        self.smoke = Some(smoke);
         self
     }
 
@@ -247,8 +260,9 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         "path": target.as_path().display().to_string(),
                     });
                     self.facts.emit("switchyard", "apply.attempt", "success", fields);
-                    match fs::replace_file_with_symlink(&source.as_path(), &target.as_path(), dry) {
-                        Ok(()) => executed.push(act.clone()),
+                    let mut degraded_used = false;
+                    match fs::replace_file_with_symlink(&source.as_path(), &target.as_path(), dry, self.policy.allow_degraded_fs) {
+                        Ok(d) => { degraded_used = d; executed.push(act.clone()); },
                         Err(e) => errors.push(format!(
                             "symlink {} -> {} failed: {}",
                             source.as_path().display(),
@@ -266,6 +280,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         "decision": decision,
                         "action_id": _aid.to_string(),
                         "path": target.as_path().display().to_string(),
+                        "degraded": if degraded_used { Some(true) } else { None },
                     });
                     self.facts.emit("switchyard", "apply.result", decision, fields);
                 }
@@ -311,17 +326,48 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     for prev in executed.iter().rev() {
                         match prev {
                             Action::EnsureSymlink { source: _source, target } => {
-                                if let Err(e) = fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort) {
-                                    rollback_errors.push(format!(
-                                        "rollback restore {} failed: {}",
-                                        target.as_path().display(),
-                                        e
-                                    ));
+                                match fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort) {
+                                    Ok(()) => {
+                                        let fields = json!({
+                                            "schema_version": 1,
+                                            "ts": TS_ZERO,
+                                            "plan_id": pid.to_string(),
+                                            "stage": "rollback",
+                                            "decision": "success",
+                                            "path": target.as_path().display().to_string(),
+                                        });
+                                        self.facts.emit("switchyard", "rollback", "success", fields);
+                                    }
+                                    Err(e) => {
+                                        rollback_errors.push(format!(
+                                            "rollback restore {} failed: {}",
+                                            target.as_path().display(),
+                                            e
+                                        ));
+                                        let fields = json!({
+                                            "schema_version": 1,
+                                            "ts": TS_ZERO,
+                                            "plan_id": pid.to_string(),
+                                            "stage": "rollback",
+                                            "decision": "failure",
+                                            "path": target.as_path().display().to_string(),
+                                        });
+                                        self.facts.emit("switchyard", "rollback", "failure", fields);
+                                    }
                                 }
                             }
                             Action::RestoreFromBackup { .. } => {
                                 // No reliable inverse without prior state capture; record informational error.
                                 rollback_errors.push("rollback of RestoreFromBackup not supported (no prior state)".to_string());
+                                let fields = json!({
+                                    "schema_version": 1,
+                                    "ts": TS_ZERO,
+                                    "plan_id": pid.to_string(),
+                                    "stage": "rollback",
+                                    "decision": "failure",
+                                    "path": "",
+                                });
+                                self.facts.emit("switchyard", "rollback", "failure", fields);
                             }
                         }
                     }
@@ -330,9 +376,32 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             }
         }
 
-        // Minimal Facts v1: final apply.result summary
+        // Optional smoke tests post-apply (only in Commit mode)
+        if errors.is_empty() && !dry {
+            if let Some(smoke) = &self.smoke {
+                if smoke.run(plan).is_err() {
+                    errors.push("smoke tests failed".to_string());
+                    if !self.policy.disable_auto_rollback {
+                        rolled_back = true;
+                        for prev in executed.iter().rev() {
+                            match prev {
+                                Action::EnsureSymlink { source: _s, target } => {
+                                    let _ = fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort)
+                                        .map_err(|e| rollback_errors.push(format!("rollback restore {} failed: {}", target.as_path().display(), e)));
+                                }
+                                Action::RestoreFromBackup { .. } => {
+                                    rollback_errors.push("rollback of RestoreFromBackup not supported (no prior state)".to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Final apply.result summary (after smoke tests/rollback)
         let decision = if errors.is_empty() { "success" } else { "failure" };
-        let fields = json!({
+        let mut fields = json!({
             "schema_version": 1,
             "ts": TS_ZERO,
             "plan_id": pid.to_string(),
@@ -340,6 +409,24 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             "decision": decision,
             "path": "",
         });
+        // Optional attestation on success, non-dry-run
+        if errors.is_empty() && !dry {
+            if let Some(att) = &self.attest {
+                let bundle: Vec<u8> = Vec::new(); // TODO: real bundle
+                if let Ok(sig) = att.sign(&bundle) {
+                    let sig_b64 = base64::engine::general_purpose::STANDARD.encode(sig.0);
+                    let att_json = json!({
+                        "sig_alg": "ed25519",
+                        "signature": sig_b64,
+                        "bundle_hash": "", // TODO: sha256 of bundle
+                        "public_key_id": "", // TODO
+                    });
+                    // Merge attestation into fields
+                    let obj = fields.as_object_mut().unwrap();
+                    obj.insert("attestation".to_string(), att_json);
+                }
+            }
+        }
         self.facts.emit("switchyard", "apply.result", decision, fields);
 
         // Compute total duration

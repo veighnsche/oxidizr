@@ -98,9 +98,11 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 ```rust
 fn plan(input: PlanInput) -> Plan;
 fn preflight(plan: &Plan) -> PreflightReport;
-fn apply(plan: &Plan, mode: ApplyMode, adapters: &Adapters) -> ApplyReport;
+fn apply(plan: &Plan, mode: ApplyMode) -> ApplyReport;
 fn plan_rollback_of(report: &ApplyReport) -> Plan;
 ```
+
+Adapters are configured on the host `Switchyard` object via builder methods (e.g., `with_lock_manager`, `with_ownership_oracle`) rather than passed per-call to `apply()`. This ensures deterministic behavior and clearer lifecycle management of adapters.
 
 All path-carrying fields within `PlanInput` and `Plan` **MUST** be typed as `SafePath`. Mutating entry points do not accept `PathBuf`.
 
@@ -108,7 +110,7 @@ All path-carrying fields within `PlanInput` and `Plan` **MUST** be typed as `Saf
 
 ```rust
 trait OwnershipOracle { fn owner_of(&self, path: &SafePath) -> Result<OwnershipInfo>; }
-trait LockManager { fn acquire_process_lock(&self) -> Result<LockGuard>; }
+trait LockManager { fn acquire_process_lock(&self, timeout_ms: u64) -> Result<LockGuard>; }
 trait PathResolver { fn resolve(&self, bin: &str) -> Result<SafePath>; }
 trait Attestor { fn sign(&self, bundle: &[u8]) -> Result<Signature>; }
 trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; }

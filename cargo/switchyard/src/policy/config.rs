@@ -7,4 +7,6 @@ pub struct Policy {
     pub strict_ownership: bool,
     pub force_untrusted_source: bool,
     pub force_restore_best_effort: bool,
+    pub allow_degraded_fs: bool,
+    pub disable_auto_rollback: bool,
 }

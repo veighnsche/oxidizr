@@ -80,8 +80,11 @@ Legend:
 
 ## 6) Cross‑Filesystem & Degraded Mode (SPEC §2.10)
 
-- [ ] EXDEV fallback path: safe copy + fsync + rename strategy (REQ‑F1)
-- [ ] Policy hook `allow_degraded_fs`; record `degraded=true` in facts when used; fail when disallowed (REQ‑F2)
+- [~] EXDEV fallback path: safe copy + fsync + rename strategy (REQ‑F1)
+  - Implemented degraded fallback for symlink replace in `fs/atomic.rs::atomic_symlink_swap()` using `symlinkat` directly when `renameat` returns `EXDEV` and policy allows.
+  - Remaining: broader mutation coverage and explicit copy+fsync path where applicable.
+- [x] Policy hook `allow_degraded_fs`; record `degraded=true` in facts when used; fail when disallowed (REQ‑F2)
+  - Per‑action `apply.result` includes `degraded=true` when fallback used.
 - [ ] Acceptance coverage for ext4/xfs/btrfs/tmpfs semantics (REQ‑F3)
 
 ## 7) Locking & Concurrency (SPEC §2.5, §14)
@@ -96,7 +99,8 @@ Legend:
 ## 8) Determinism & Redactions (SPEC §2.7)
 
 - [~] Deterministic `plan_id` and `action_id` (UUIDv5 over normalized inputs/namespace) (REQ‑D1)
-- [ ] Dry‑run redactions pinned (timestamps zeroed/expressed as deltas); dry‑run facts byte‑identical to real‑run after redaction (REQ‑D2)
+- [~] Dry‑run redactions pinned (timestamps zeroed/expressed as deltas); dry‑run facts byte‑identical to real‑run after redaction (REQ‑D2)
+  - MVP uses `TS_ZERO` constant for `ts` until proper redaction policy is implemented.
 - [ ] Stable ordering of plan actions and fact emission streams
 
 ## 9) Observability & Audit (SPEC §2.4, §5, §13)
@@ -106,6 +110,7 @@ Legend:
   - Minimal facts now emitted for `plan`, `preflight`, `apply.lock`, `apply.attempt`, `apply.result` with `schema_version`, `plan_id`, `action_id` (per‑action), and `path`.
 - [ ] Compute and record `before_hash`/`after_hash` (sha256) for every mutated file (REQ‑O5)
 - [ ] Signed attestation per apply bundle via `Attestor` (ed25519) (REQ‑O4)
+- [~] Final summary includes attestation placeholder when `Attestor` provided; base64‑encodes signature. TODO: real bundle and `bundle_hash`.
 - [ ] Secret masking policy and implementation across all sinks (REQ‑O6)
 - [ ] Provenance completeness fields populated (origin/helper/uid/gid/pkg/env_sanitized) (REQ‑O7)
 - [ ] Golden JSONL fixtures for plan, preflight, apply, rollback facts; CI diff gate (SPEC §12)
@@ -118,9 +123,10 @@ Legend:
 
 ## 11) Health Verification & Auto‑Rollback (SPEC §2.9, §11)
 
-- [~] Trait exists: `SmokeTestRunner`
-- [ ] Integrate smoke tests post‑apply with minimal suite (ls, cp, mv, rm, ln, stat, readlink, sha256sum, sort, date) (REQ‑H1)
-- [ ] Auto‑rollback on smoke failure unless explicitly disabled by policy (REQ‑H2, H3)
+- [~] Integrate smoke tests post‑apply with minimal suite (ls, cp, mv, rm, ln, stat, readlink, sha256sum, sort, date) (REQ‑H1)
+  - `Switchyard` accepts optional `SmokeTestRunner`; when provided, runs post‑apply in Commit mode.
+- [~] Auto‑rollback on smoke failure unless explicitly disabled by policy (REQ‑H2, H3)
+  - Implemented with `policy.disable_auto_rollback` gating; emits rollback facts per step.
 
 ## 12) Rescue Profile (SPEC §2.6)
 

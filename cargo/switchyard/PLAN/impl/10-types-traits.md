@@ -8,6 +8,24 @@ Rust terminology and tentative signatures for review. No implementation code.
 // Planning-only: conceptual types
 pub struct SafePath { /* invariant: rooted; no ".." after normalization */ }
 
+/// Switchyard host object (adapters via builder, not apply() args)
+pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
+    facts: E,
+    audit: A,
+    policy: PolicyFlags,
+    adapters: Adapters, // optional components allowed (e.g., lock in dev/test)
+}
+
+impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
+    fn new(facts: E, audit: A, policy: PolicyFlags) -> Self { /* ... */ }
+    fn with_lock_manager(mut self, lock: Box<dyn LockManager + Send + Sync>) -> Self { /* ... */ }
+    fn with_ownership_oracle(mut self, owner: Box<dyn OwnershipOracle + Send + Sync>) -> Self { /* ... */ }
+    fn plan(&self, input: PlanInput) -> Plan { /* ... */ }
+    fn preflight(&self, plan: &Plan) -> PreflightReport { /* ... */ }
+    fn apply(&self, plan: &Plan, mode: ApplyMode) -> ApplyReport { /* ... */ }
+    fn plan_rollback_of(&self, report: &ApplyReport) -> Plan { /* ... */ }
+}
+
 pub struct PlanInput {
     pub targets: Vec<SafePath>,           // paths to mutate (symlinks/links)
     pub providers: Vec<SafePath>,         // candidate sources
@@ -73,7 +91,7 @@ pub trait OwnershipOracle {
 }
 
 pub trait LockManager {
-    fn acquire_process_lock(&self) -> Result<LockGuard, Error>;
+    fn acquire_process_lock(&self, timeout_ms: u64) -> Result<LockGuard, Error>;
 }
 
 pub trait PathResolver {

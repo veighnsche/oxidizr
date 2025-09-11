@@ -40,7 +40,7 @@ mod tests {
         std::fs::write(&src, b"hello").unwrap();
 
         // Perform atomic swap: create symlink at target -> source
-        crate::fs::atomic::atomic_symlink_swap(&src, &tgt).unwrap();
+        let _ = crate::fs::atomic::atomic_symlink_swap(&src, &tgt, false).unwrap();
 
         // Verify target is a symlink pointing to source
         let md = std::fs::symlink_metadata(&tgt).unwrap();
@@ -65,7 +65,7 @@ mod tests {
         }
 
         // Replace target with symlink to source; backup should be created
-        replace_file_with_symlink(&src, &tgt, false).unwrap();
+        let _ = replace_file_with_symlink(&src, &tgt, false, false).unwrap();
         let md = std::fs::symlink_metadata(&tgt).unwrap();
         assert!(md.file_type().is_symlink(), "target should be a symlink after replace");
         let backup = backup_path(&tgt);
@@ -92,8 +92,9 @@ pub fn is_safe_path(path: &Path) -> bool {
 }
 
 /// Atomically replace a file with a symlink, creating a backup. Emits no logs; pure mechanism.
-pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) -> std::io::Result<()> {
-    if source == target { return Ok(()); }
+/// Returns Ok(true) when degraded EXDEV fallback was used (non-atomic), Ok(false) otherwise.
+pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool, allow_degraded: bool) -> std::io::Result<bool> {
+    if source == target { return Ok(false); }
     if !is_safe_path(source) || !is_safe_path(target) {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "unsafe path"));
     }
@@ -108,7 +109,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
     let is_symlink = metadata.as_ref().map(|m| m.file_type().is_symlink()).unwrap_or(false);
     let current_dest = if is_symlink { fs::read_link(target).ok() } else { None };
 
-    if dry_run { return Ok(()); }
+    if dry_run { return Ok(false); }
 
     if is_symlink {
         let desired = fs::canonicalize(source).unwrap_or_else(|_| source.to_path_buf());
@@ -117,7 +118,7 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
             if let Some(parent) = target.parent() { resolved_current = parent.join(resolved_current); }
         }
         let resolved_current = fs::canonicalize(&resolved_current).unwrap_or(resolved_current);
-        if resolved_current == desired { return Ok(()); }
+        if resolved_current == desired { return Ok(false); }
 
         // Backup symlink by creating a symlink backup pointing to the same destination
         if let Some(curr) = current_dest.as_ref() {
@@ -130,8 +131,8 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
         }
         // Atomically swap
         let _ = fs::remove_file(target);
-        atomic_symlink_swap(source, target)?;
-        return Ok(());
+        let degraded = atomic_symlink_swap(source, target, allow_degraded)?;
+        return Ok(degraded);
     }
 
     // Regular file: backup then replace with symlink
@@ -150,8 +151,8 @@ pub fn replace_file_with_symlink(source: &Path, target: &Path, dry_run: bool) ->
 
     if let Some(parent) = target.parent() { fs::create_dir_all(parent)?; }
     let _ = fs::remove_file(target);
-    atomic_symlink_swap(source, target)?;
-    Ok(())
+    let degraded = atomic_symlink_swap(source, target, allow_degraded)?;
+    Ok(degraded)
 }
 
 /// Restore a file from its backup. When no backup exists, return an error unless force_best_effort is true.
