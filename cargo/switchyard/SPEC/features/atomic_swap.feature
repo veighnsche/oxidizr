@@ -16,8 +16,9 @@ Feature: Atomic swap and recovery
   Scenario: Cross-filesystem EXDEV fallback
     Given the target and staging directories reside on different filesystems
     When I apply a plan that replaces /usr/bin/cp
-    Then the operation handles EXDEV by copy+sync+rename into place atomically
+    Then the operation uses a best-effort degraded fallback for symlink replacement (unlink + symlink) when EXDEV occurs
     And facts record degraded=true when policy allow_degraded_fs is enabled
+    And the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled
 
   @REQ-R4 @REQ-R5 @REQ-A3
   Scenario: Automatic rollback on mid-plan failure

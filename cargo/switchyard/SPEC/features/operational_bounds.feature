@@ -9,3 +9,4 @@ Feature: Operational bounds
     Given a rename completes for a staged swap
     When the engine performs fsync on the parent directory
     Then the fsync occurs within 50ms of the rename and is recorded in telemetry
+    And if the fsync duration exceeds 50ms the fact is recorded with severity=warn

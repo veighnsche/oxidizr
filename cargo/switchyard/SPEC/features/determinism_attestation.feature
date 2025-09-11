@@ -14,5 +14,5 @@ Feature: Determinism and attestation
   Scenario: Signed attestation per apply bundle
     Given an apply bundle
     When I complete an apply
-    Then an attestation is generated and signed with ed25519 and attached to the facts
+    Then an attestation is attached to the apply.result summary fact with sig_alg=ed25519, signature, bundle_hash, and public_key_id
 

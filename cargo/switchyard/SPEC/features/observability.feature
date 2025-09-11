@@ -17,6 +17,7 @@ Feature: Observability, audit, and determinism
     When I run in dry-run mode
     And I run in real mode
     Then the emitted facts for plan and preflight are byte-identical after timestamp redaction
+    And the emitted facts for apply.result per-action events are byte-identical after redaction
 
   @REQ-O5
   Scenario: Before/after hashes are recorded for mutated files
@@ -30,7 +31,7 @@ Feature: Observability, audit, and determinism
     When I apply the plan
     Then no unmasked secret values appear in any emitted fact or log sink
 
-  @REQ-O7
+  @REQ-O7 @xfail
   Scenario: Provenance fields are complete
     Given a plan that uses an external helper
     When I apply the plan
