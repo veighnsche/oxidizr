@@ -14,6 +14,14 @@ References:
 - Preflight verifies at least one functional fallback path. (REQ-RC2)
 - At least one fallback binary set (GNU or BusyBox) remains executable and present on PATH. (REQ-RC3)
 
+Implementation (Sprint 3)
+
+- Added `Policy.require_rescue` flag (default false) in `src/policy/config.rs`.
+- Implemented minimal rescue verification in `src/rescue.rs`:
+  - Pass if `busybox` is on `PATH`, otherwise require a subset of GNU tools (`cp,mv,rm,ln,stat,readlink,sha256sum,sort,date,ls`); heuristic ≥6/10 present.
+- Integrated checks into `preflight()` (STOP with note when required and unavailable) and into `apply()` gating (refuse when required and unavailable unless `override_preflight=true`).
+- Tests remain deterministic; no external command execution is performed.
+
 ## Rust-like Pseudocode (non-compilable)
 
 ```rust
@@ -45,12 +53,12 @@ fn verify_rescue_profile(path: &PathResolver) -> RescueProfileCheckResult {
 
 ## Preflight Integration
 
-- `preflight()` MUST include a row summarizing rescue checks.
+- `preflight()` adds a STOP note when rescue checks fail and `Policy.require_rescue=true`.
 - If rescue checks fail and policy requires rescue guarantees, preflight MUST fail-closed (E_POLICY) unless explicitly overridden.
 
 ## Facts & Provenance
 
-- Facts SHOULD record which fallback toolset was verified and whether rescue symlinks exist.
+- Facts MAY record which fallback toolset was verified and whether rescue symlinks exist in future iterations; current implementation records STOP conditions only.
 - Provenance MAY include PATH snapshot or sanitized indicators to support debugging.
 
 ## Tests & Evidence

@@ -119,6 +119,8 @@ steps:
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) the emitted facts for plan and preflight are byte-identical after timestamp redaction$
   - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) the emitted facts for apply\.result per-action events are byte-identical after redaction$
+  - kind: Then
     pattern: ^(?:Given|When|Then|And|But) the resulting facts include hash_alg=sha256 and both before_hash and after_hash$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) no unmasked secret values appear in any emitted fact or log sink$
@@ -126,6 +128,8 @@ steps:
     pattern: ^(?:Given|When|Then|And|But) facts include origin, helper, uid, gid, pkg, and env_sanitized=true$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) lock acquisition uses a bounded wait and times out with E_LOCKING when exceeded$
+  - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) the failure is emitted with error_id=E_LOCKING and exit_code=30$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) concurrent apply is UNSUPPORTED and a WARN fact is emitted$
   - kind: Then
@@ -139,11 +143,17 @@ steps:
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) facts record degraded=true when policy allow_degraded_fs is enabled$
   - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) the operation uses a best-effort degraded fallback for symlink replacement \(unlink \+ symlink\) when EXDEV occurs$
+  - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$
+  - kind: Then
     pattern: ^(?:Given|When|Then|And|But) each fact carries schema_version=1$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) facts clearly indicate partial restoration state if any rollback step fails$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) facts record lock_wait_ms$
+  - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) facts record lock_wait_ms when available$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) at least one smoke command will fail with a non-zero exit$
   - kind: Then
@@ -161,7 +171,11 @@ steps:
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) an attestation is generated and signed with ed25519 and attached to the facts$
   - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) an attestation is attached to the apply\.result summary fact with sig_alg=ed25519, signature, bundle_hash, and public_key_id$
+  - kind: Then
     pattern: ^(?:Given|When|Then|And|But) the fsync occurs within 50ms of the rename and is recorded in telemetry$
+  - kind: Then
+    pattern: ^(?:Given|When|Then|And|But) if the fsync duration exceeds 50ms the fact is recorded with severity=warn$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) SafePath normalization rejects the path as unsafe$
   - kind: Then
