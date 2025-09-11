@@ -43,6 +43,10 @@ impl SafePath {
     pub fn as_path(&self) -> PathBuf {
         self.root.join(&self.rel)
     }
+
+    pub fn rel(&self) -> &Path {
+        &self.rel
+    }
 }
 
 #[cfg(test)]
