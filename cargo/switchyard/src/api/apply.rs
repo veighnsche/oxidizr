@@ -48,6 +48,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 _lock_guard = Some(guard);
             }
             Err(e) => {
+                lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
                 emit_apply_attempt(&tctx, "failure", json!({
                     "lock_wait_ms": lock_wait_ms,
                     "error": e.to_string(),
@@ -79,6 +80,10 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
     if !api.policy.override_preflight && !dry {
         let mut gating_errors: Vec<String> = Vec::new();
+        // Global rescue check
+        if api.policy.require_rescue && !crate::rescue::verify_rescue_tools() {
+            gating_errors.push("rescue profile unavailable".to_string());
+        }
         for act in &plan.actions {
             match act {
                 Action::EnsureSymlink { source, target } => {
@@ -226,6 +231,20 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     obj.insert("after_hash".to_string(), json!(ah));
                 }
                 ensure_provenance(&mut extra);
+                // Enrich provenance with uid/gid/pkg when oracle is present
+                if let Some(oracle) = &api.owner {
+                    if let Ok(info) = oracle.owner_of(target) {
+                        if let Some(obj) = extra.as_object_mut() {
+                            let prov = obj
+                                .entry("provenance").or_insert(json!({}))
+                                .as_object_mut()
+                                .unwrap();
+                            prov.insert("uid".to_string(), json!(info.uid));
+                            prov.insert("gid".to_string(), json!(info.gid));
+                            prov.insert("pkg".to_string(), json!(info.pkg));
+                        }
+                    }
+                }
                 if errors.is_empty() && fsync_ms > 50 {
                     let obj = extra.as_object_mut().unwrap();
                     obj.insert("severity".to_string(), json!("warn"));
@@ -277,6 +296,20 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "path": target.as_path().display().to_string(),
                 });
                 ensure_provenance(&mut extra);
+                // Enrich provenance with uid/gid/pkg when oracle is present
+                if let Some(oracle) = &api.owner {
+                    if let Ok(info) = oracle.owner_of(target) {
+                        if let Some(obj) = extra.as_object_mut() {
+                            let prov = obj
+                                .entry("provenance").or_insert(json!({}))
+                                .as_object_mut()
+                                .unwrap();
+                            prov.insert("uid".to_string(), json!(info.uid));
+                            prov.insert("gid".to_string(), json!(info.gid));
+                            prov.insert("pkg".to_string(), json!(info.pkg));
+                        }
+                    }
+                }
                 if decision == "failure" {
                     let obj = extra.as_object_mut().unwrap();
                     if let Some(id) = this_err_id {

@@ -16,6 +16,9 @@ pub struct Policy {
     /// Require filesystem preservation capabilities (owner/mode/timestamps/xattrs/acl/caps).
     /// When true and the target path lacks support, preflight MUST STOP (unless override_preflight).
     pub require_preservation: bool,
+    /// Require a rescue profile and toolset to be available (e.g., BusyBox or GNU core tools on PATH).
+    /// When true and unavailable, preflight/apply MUST STOP (unless override_preflight).
+    pub require_rescue: bool,
 }
 
 impl Default for Policy {
@@ -31,6 +34,7 @@ impl Default for Policy {
             backup_tag: "switchyard".to_string(),
             override_preflight: false,
             require_preservation: false,
+            require_rescue: false,
         }
     }
 }

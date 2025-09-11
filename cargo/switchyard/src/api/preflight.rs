@@ -24,6 +24,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         AuditMode { dry_run: true, redact: true },
     );
 
+    // Global rescue verification: if required by policy, STOP when unavailable.
+    if api.policy.require_rescue && !crate::rescue::verify_rescue_tools() {
+        stops.push("rescue profile unavailable".to_string());
+    }
+
     for act in &plan.actions {
         match act {
             Action::EnsureSymlink { source, target } => {
