@@ -6,7 +6,7 @@ use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use libc;
 
-use crate::fs_ops::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
+use super::atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
 
 const BACKUP_SUFFIX: &str = ".oxidizr.bak";
 
