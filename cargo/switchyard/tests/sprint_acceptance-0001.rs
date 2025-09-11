@@ -16,6 +16,103 @@ struct TestEmitter {
 }
 
 #[test]
+fn preflight_rows_schema_and_ordering() {
+    let facts = TestEmitter::default();
+    let audit = JsonlSink::default();
+    // Build policy allowing only usr/bin so that usr/sbin violates allow_roots
+    let mut policy = Policy::default();
+    let td = tempfile::tempdir().unwrap();
+    let root = td.path();
+    std::fs::create_dir_all(root.join("bin")).unwrap();
+    std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+    std::fs::create_dir_all(root.join("usr/sbin")).unwrap();
+    std::fs::write(root.join("bin/new1"), b"n1").unwrap();
+    std::fs::write(root.join("bin/new2"), b"n2").unwrap();
+    std::fs::write(root.join("usr/bin/app1"), b"o1").unwrap();
+    std::fs::write(root.join("usr/sbin/app2"), b"o2").unwrap();
+    policy.allow_roots.push(root.join("usr/bin"));
+
+    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
+
+    let s1 = SafePath::from_rooted(root, &root.join("bin/new1")).unwrap();
+    let t1 = SafePath::from_rooted(root, &root.join("usr/bin/app1")).unwrap();
+    let s2 = SafePath::from_rooted(root, &root.join("bin/new2")).unwrap();
+    let t2 = SafePath::from_rooted(root, &root.join("usr/sbin/app2")).unwrap();
+    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s1, target: t1 }, LinkRequest { source: s2, target: t2 }], restore: vec![] });
+
+    let pf = api.preflight(&plan).unwrap();
+    assert_eq!(pf.rows.len(), 2);
+    // At least one row should have policy_ok=false
+    assert!(pf.rows.iter().any(|r| r.get("policy_ok") == Some(&Value::from(false))), "expected a policy_ok=false row");
+    // Check required keys present
+    for r in &pf.rows {
+        let o = r.as_object().expect("row object");
+        assert!(o.get("action_id").is_some());
+        assert!(o.get("path").is_some());
+        assert!(o.get("current_kind").is_some());
+        assert!(o.get("planned_kind").is_some());
+        assert!(o.get("policy_ok").is_some());
+    }
+    // Verify stable ordering by (path, action_id)
+    let mut sorted = pf.rows.clone();
+    sorted.sort_by(|a, b| {
+        let pa = a.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        let pb = b.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        match pa.cmp(pb) {
+            std::cmp::Ordering::Equal => {
+                let aa = a.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+                let ab = b.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+                aa.cmp(ab)
+            }
+            other => other,
+        }
+    });
+    assert_eq!(pf.rows, sorted, "rows should be deterministically ordered by (path, action_id)");
+}
+
+#[test]
+fn apply_fail_closed_on_policy_violation() {
+    let facts = TestEmitter::default();
+    let audit = JsonlSink::default();
+    let mut policy = Policy::default();
+    // Fail-closed default; allow only usr/bin so usr/sbin target violates policy
+    let td = tempfile::tempdir().unwrap();
+    let root = td.path();
+    std::fs::create_dir_all(root.join("bin")).unwrap();
+    std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+    std::fs::create_dir_all(root.join("usr/sbin")).unwrap();
+    std::fs::write(root.join("bin/new"), b"new").unwrap();
+    std::fs::write(root.join("usr/sbin/app"), b"old").unwrap();
+    policy.allow_roots.push(root.join("usr/bin"));
+
+    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
+
+    let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
+    let t = SafePath::from_rooted(root, &root.join("usr/sbin/app")).unwrap();
+    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+
+    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
+    assert!(!report.errors.is_empty(), "apply should stop due to policy violation");
+
+    // Redacted events should include a failure apply.result with E_POLICY and exit code 10
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
+    assert!(redacted.iter().any(|e| {
+        e.get("stage") == Some(&Value::from("apply.result")) &&
+        e.get("decision") == Some(&Value::from("failure")) &&
+        e.get("error_id") == Some(&Value::from("E_POLICY")) &&
+        e.get("exit_code") == Some(&Value::from(10))
+    }), "expected E_POLICY failure with exit_code=10 in apply.result");
+}
+
+#[test]
 fn golden_two_action_plan_preflight_apply() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
@@ -130,6 +227,9 @@ fn golden_determinism_dryrun_equals_commit() {
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
     policy.allow_degraded_fs = true;
+    // Commit path now enforces preflight fail-closed unless overridden.
+    // Permit untrusted (non-root-owned) sources in this deterministic test.
+    policy.force_untrusted_source = true;
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
