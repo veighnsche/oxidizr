@@ -6,6 +6,7 @@ use crate::{preflight, fs};
 use crate::logging::{FactsEmitter, AuditSink};
 use crate::policy::Policy;
 use crate::types::{PlanInput, Plan, Action, PreflightReport, ApplyMode, ApplyReport};
+use crate::types::ids::{plan_id, action_id};
 
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
@@ -95,9 +96,13 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let t0 = Instant::now();
         let mut executed: Vec<Action> = Vec::new();
         let mut errors: Vec<String> = Vec::new();
+        let mut rollback_errors: Vec<String> = Vec::new();
+        let mut rolled_back = false;
         let dry = matches!(mode, ApplyMode::DryRun);
+        let pid = plan_id(plan);
 
-        for act in &plan.actions {
+        for (idx, act) in plan.actions.iter().enumerate() {
+            let _aid = action_id(&pid, act, idx);
             match act {
                 Action::EnsureSymlink { source, target } => {
                     match fs::replace_file_with_symlink(source.as_path(), target.as_path(), dry) {
@@ -121,9 +126,49 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     }
                 }
             }
+
+            // On first failure, attempt reverse-order rollback for already executed actions.
+            if !errors.is_empty() {
+                if !dry {
+                    rolled_back = true;
+                    for prev in executed.iter().rev() {
+                        match prev {
+                            Action::EnsureSymlink { source: _source, target } => {
+                                if let Err(e) = fs::restore_file(target.as_path(), dry, self.policy.force_restore_best_effort) {
+                                    rollback_errors.push(format!(
+                                        "rollback restore {} failed: {}",
+                                        target.as_path().display(),
+                                        e
+                                    ));
+                                }
+                            }
+                            Action::RestoreFromBackup { target: _ } => {
+                                // No reliable inverse without prior state capture; record informational error.
+                                rollback_errors.push("rollback of RestoreFromBackup not supported (no prior state)".to_string());
+                            }
+                        }
+                    }
+                }
+                break;
+            }
         }
 
         let duration_ms = t0.elapsed().as_millis() as u64;
-        ApplyReport { executed, duration_ms, errors }
+        ApplyReport { executed, duration_ms, errors, plan_uuid: Some(pid), rolled_back, rollback_errors }
+    }
+
+    pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
+        let mut actions: Vec<Action> = Vec::new();
+        for act in report.executed.iter().rev() {
+            match act {
+                Action::EnsureSymlink { source: _s, target } => {
+                    actions.push(Action::RestoreFromBackup { target: target.clone() });
+                }
+                Action::RestoreFromBackup { .. } => {
+                    // Unknown prior state; skip generating an inverse.
+                }
+            }
+        }
+        Plan { actions }
     }
 }
