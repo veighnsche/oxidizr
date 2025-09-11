@@ -25,7 +25,7 @@ A living checklist of items to refine before declaring the Switchyard crate prod
   - [x] In `adapters/lock_file.rs`, use `const LOCK_POLL_MS: u64 = 25`
 - [x] Rescue tool heuristic
   - [x] In `rescue.rs`, extract `RESCUE_MUST_HAVE: &[&str]` and `RESCUE_MIN_COUNT: usize`
-  - [ ] Consider promoting the threshold to `Policy` if configurability is desired
+  - [x] Promote the minimum threshold to `Policy` (`policy.rescue_min_count`) and plumb through preflight/apply
 - [x] UUIDv5 namespace
   - [x] In `types/ids.rs`, document `NS_TAG` origin and SPEC link; moved to shared `constants`
 - [x] Attestation algorithm label
@@ -42,28 +42,28 @@ A living checklist of items to refine before declaring the Switchyard crate prod
 
 - [x] Smoke tests
   - [x] `with_smoke_runner(...)` works; `DefaultSmokeRunner` validates symlink target resolution
-  - [ ] Document minimal expectations for integrators
+  - [x] Document minimal expectations for integrators (`adapters/smoke.rs` module docs)
 - [x] Attestor
   - [x] Extend `Attestor` with `fn algorithm(&self) -> &'static str` to avoid hardcoding labels
 
 ## Dead code / unused interfaces
 
-- [ ] `adapters/path.rs::PathResolver` is currently unused
-  - [ ] Either implement and wire it, or remove for now to avoid drift
+- [x] `adapters/path.rs::PathResolver` was unused — removed from public API exports (module not compiled)
+  - [ ] Optionally delete the file entirely in a follow-up cleanup PR
 
 ## Test override knobs (document or feature-gate)
 
-- [ ] Document test overrides clearly in module docs:
-  - [ ] `fs/atomic.rs`: `SWITCHYARD_FORCE_EXDEV` simulates XDEV for testing
-  - [ ] `rescue.rs`: `SWITCHYARD_FORCE_RESCUE_OK` toggles rescue availability (mentioned in README; add module docs)
+- [x] Document test overrides clearly in module docs:
+  - [x] `fs/atomic.rs`: `SWITCHYARD_FORCE_EXDEV` simulates EXDEV for testing
+  - [x] `rescue.rs`: `SWITCHYARD_FORCE_RESCUE_OK` toggles rescue availability (now documented in module docs)
 - [ ] Optional: guard override knobs behind `#[cfg(test)]` or `#[cfg(feature = "test-overrides")]`
 
 ## Preservation capability detection (future refinement)
 
-- [ ] Improve `api/fs_meta.rs::detect_preservation_capabilities(...)`
-  - [ ] Detect effective UID to set `owner` more accurately (root vs non-root)
-  - [ ] Probe xattrs via `rustix`/`xattr` crate instead of defaulting to false
-  - [ ] Document conservative defaults with SPEC pointer
+- [x] Improve `api/fs_meta.rs::detect_preservation_capabilities(...)`
+  - [x] Detect effective UID to set `owner` more accurately (root vs non-root)
+  - [x] Probe xattrs via the `xattr` crate instead of defaulting to false
+  - [x] Document conservative defaults with SPEC pointer (module docs)
 
 ## Logging sinks
 
@@ -72,7 +72,7 @@ A living checklist of items to refine before declaring the Switchyard crate prod
 
 ## Documentation polish
 
-- [ ] Add module-level docs for `api/*` describing side-effects and fact emissions
+- [x] Add module-level docs for `api/*` describing side-effects and fact emissions (`api/audit.rs`, `api/preflight.rs`, `api/apply.rs`)
 - [x] Add brief doc to `fs/symlink.rs` describing backup+sidecar format and atomic swap semantics
 
 ## Acceptance checks (quick wins)
