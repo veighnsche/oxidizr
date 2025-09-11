@@ -14,20 +14,31 @@ References
 
 Bronze
 
-- Emit one row per action per `SPEC/preflight.yaml`; deterministic ordering.
-- Check mount `rw+exec`, immutability, allowed/forbidden roots; compute `policy_ok`; emit per‑action + summary facts.
+- Emit one row per action per `SPEC/preflight.yaml`; deterministic ordering (sort by `path`, then `action_id`).
+- Gating: check `/usr` mount `rw+exec`, target mount `rw+exec`, immutability (chattr +i), allowed roots, forbidden paths.
+- Compute `policy_ok` as the conjunction of gating checks (with explicit overrides only via policy).
+- Emit per‑action preflight facts with `current_kind`, `planned_kind`, `policy_ok`, `notes`, and preservation fields; plus a summary fact indicating decision.
+- Evidence: unit tests for each gating dimension; redaction parity in facts; planning alignment with `PLAN/45-preflight.md`.
 
 Silver
 
-- Add strict ownership, source trust, and preservation capability probes; policy controls enforcement; `apply()` refuses when `policy_ok=false` unless overridden.
+- Ownership: when `strict_ownership=true`, require package ownership via `OwnershipOracle`; emit provenance `{uid,gid,pkg}` where available.
+- Source trust: verify link source; `force_untrusted_source=true` permits with WARN and note.
+- Preservation probes: detect support (owner, mode, timestamps, xattrs, ACLs, caps) and record `preservation` + `preservation_supported`.
+- `apply()` refuses when any action has `policy_ok=false` unless `override_preflight=true`; emit `E_POLICY` and `exit_code`.
+- Evidence: golden for a negative scenario (forbidden path), deterministic YAML diff, and apply refusal.
 
 Gold
 
-- Golden fixtures for positive/negative scenarios; byte‑identical after redaction; CI gate for curated set.
+- Golden fixtures for positive/negative scenarios; byte‑identical after redaction for stable fields.
+- CI gate on curated preflight scenarios; artifact upload on diff.
+- Coverage report enumerating enforced policy dimensions and capability probes.
 
 Platinum
 
-- Cross‑platform capability coverage; schema versioning/migration; performance budgets and measurements.
+- Cross‑platform and cross‑filesystem coverage for preservation probes; documented differences and policy toggles.
+- Schema versioning/migration with dual‑emit if necessary; deprecation notes.
+- Performance budgets for preflight latency with measurements recorded in facts.
 
 ---
 
@@ -35,21 +46,29 @@ Platinum
 
 Bronze
 
-- TOCTOU‑safe sequence: open parent `O_DIRECTORY|O_NOFOLLOW` → `openat` → `renameat` → `fsync(parent)`; DryRun parity; minimal facts.
-- Rollback attempt on failure; record partial restoration.
+- TOCTOU‑safe sequence: open parent `O_DIRECTORY|O_NOFOLLOW` → `openat` final component → stage → `renameat` → `fsync(parent)` within bound.
+- DryRun parity: emit identical (redacted) facts with `TS_ZERO`; no side effects.
+- Emit per‑action `apply.attempt` and `apply.result` minimal facts; include `action_id`, `path`, and decision.
+- On first failure, attempt rollback of executed actions; record partial restoration in report and facts.
 
 Silver
 
-- Enforce preflight (`policy_ok=false` refuses unless override); map failures to `E_POLICY`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_GENERIC`.
-- Optional bounded locking with `E_LOCKING`; provenance in facts; deterministic ordering & IDs.
+- Enforce preflight (`policy_ok=false` refuses unless override) prior to mutation in Commit mode; emit `E_POLICY` + `exit_code_for`.
+- Map swap errors to `E_ATOMIC_SWAP`; map EXDEV to `E_EXDEV` and honor `allow_degraded_fs`; include `degraded=true` when used.
+- Optional bounded locking via `LockManager`; on timeout emit `E_LOCKING` with `lock_wait_ms` and abort.
+- Ensure provenance fields on results (after_hash/before_hash, hash_alg) and deterministic ordering/IDs.
 
 Gold
 
-- Golden fixtures for representative apply/rollback paths; CI gate; contention tests.
+- Golden fixtures for representative apply/rollback paths (success, swap failure, EXDEV degraded, restore failure).
+- CI gate for curated apply scenarios; property tests on rollback idempotency.
+- Contention tests validate bounded wait and error mapping to `E_LOCKING` with stable exit codes.
 
 Platinum
 
-- Performance budgets in facts; degraded mode (EXDEV) coverage; optional attestation on success.
+- Performance budgets recorded per action (`duration_ms`, fsync bound warn threshold); guidance for tuning.
+- Degraded mode paths tested across filesystems; policy forbids respected; facts include `degraded=true`.
+- Optional attestation in summary on success (signature, bundle hash) recorded in facts.
 
 ---
 
@@ -57,19 +76,23 @@ Platinum
 
 Bronze
 
-- Restore last backup for tag; preserve owner/mode where supported; emit rollback facts; note partial restoration.
+- Restore the most recent backup matching `backup_tag`; location adjacent to target; preserve owner/mode where supported.
+- Emit `rollback.attempt` and `rollback.result` per step; record partial restoration and guidance notes when incomplete.
 
 Silver
 
-- Enforce `backup_tag`; deterministic candidate selection; preserve timestamps and attempt xattrs/ACLs/caps; record support.
+- Deterministic candidate selection policy documented (most recent same-tag); clear notes when backup missing.
+- Preserve timestamps; attempt xattrs/ACLs/caps when supported; record preservation support in facts.
 
 Gold
 
-- Golden fixtures for success/partial/missing backup; error ids/exit codes consistent.
+- Goldens for (a) success, (b) missing backup → `E_BACKUP_MISSING`, (c) restore failure → `E_RESTORE_FAILED`.
+- CI gate for curated rollback scenarios; exit codes verified.
 
 Platinum
 
-- Cross‑fs aware flows; retention/cleanup guidance with audit trail.
+- Cross‑filesystem restoration behavior validated; degraded policy interactions documented.
+- Retention/cleanup guidance with safe pruning and audit trail; operator checklist.
 
 ---
 
@@ -77,19 +100,21 @@ Platinum
 
 Bronze
 
-- Create `.basename.<backup_tag>.<unix_millis>.bak` adjacent to target; preserve owner/mode; audit notes.
+- Create `.basename.<backup_tag>.<unix_millis>.bak` adjacent to target to maximize atomicity; create parent dirs as needed.
+- Preserve owner/mode; record backup path and tag in apply facts.
 
 Silver
 
-- Tag discipline; timestamps; attempt xattrs/ACLs/caps; record preservation support.
+- Enforce `backup_tag` segregation across tools; preserve timestamps; attempt xattrs/ACLs/caps.
+- Record preservation capabilities and outcomes in facts for observability.
 
 Gold
 
-- Goldens for naming/presence/restore coupling; consistent error mapping.
+- Goldens asserting naming pattern, presence, and restore coupling; consistent `E_*` mapping for failures.
 
 Platinum
 
-- Retention/cleanup policy; degraded‑mode aware backups; performance budgets.
+- Retention policy (count/age) and safe cleanup; degraded‑mode aware backups across filesystems; performance budgets.
 
 ---
 
@@ -97,19 +122,21 @@ Platinum
 
 Bronze
 
-- No‑op/default locking acceptable in dev/test; single‑process assumption documented.
+- No‑op/default locking acceptable in dev/test; single‑process assumption documented in README/PLAN.
+- Emit WARN attempt fact when no `LockManager` is configured.
 
 Silver
 
-- Production `LockManager` with bounded wait; on timeout emit `E_LOCKING` with `lock_wait_ms` and abort.
+- Bounded wait with configurable timeout; return `E_LOCKING` on timeout; include `lock_wait_ms` and policy in facts.
+- Lock scope defined (per process vs per target) and justified; deadlock avoidance strategy documented.
 
 Gold
 
-- Concurrency tests simulate contention; golden fixture for locking failure.
+- Contention tests simulate competing processes; golden for timeout path; CI verifies stability of facts.
 
 Platinum
 
-- Queue/hold time metrics; tuning guidance; multi‑host story documented or explicitly out of scope.
+- Record queue/hold time metrics in facts; guidance for tuning; HA/multi‑host story documented or explicitly non‑goal.
 
 ---
 
@@ -117,19 +144,21 @@ Platinum
 
 Bronze
 
-- UUIDv5 `plan_id`/`action_id` from normalized inputs; stable ordering; `TS_ZERO` timestamp zeroing.
+- UUIDv5 `plan_id`/`action_id` from normalized inputs; stable ordering for rows and facts; `TS_ZERO` timestamp zeroing.
+- Normalize input ordering and remove non-deterministic iteration from core paths.
 
 Silver
 
-- Broader redaction and normalization of environment inputs; DryRun vs Commit parity tests.
+- Redact volatile fields (timestamps, durations where needed) and mask secrets; normalize PATH/locale or record as provenance.
+- Parity tests for DryRun vs Commit facts for covered scenarios.
 
 Gold
 
-- CI gate on determinism goldens; property tests for ordering/IDs.
+- CI gate on determinism goldens; property tests for stable ID derivation and ordering.
 
 Platinum
 
-- Strict reproducibility mode; schema/version migration that preserves determinism.
+- Strict reproducibility mode (fail build if non-determinism detected); schema/version migration preserving determinism.
 
 ---
 
@@ -137,19 +166,23 @@ Platinum
 
 Bronze
 
-- Facts for all stages with `schema_version=1` to JSONL sink; basic redaction (TS_ZERO in DryRun).
+- Emit facts for all stages with `schema_version=1` to a JSONL sink; TS_ZERO applied in DryRun; append-only writes.
+- Include `plan_id`, `action_id` where applicable; consistent `stage/decision/severity` fields.
 
 Silver
 
-- `error_id` everywhere it applies; exit codes for covered set; redaction policy documented and tested; provenance (redacted) included.
+- Ensure `error_id` and `exit_code` at covered failure sites; broaden redaction with unit tests.
+- Include provenance in facts (subject to redaction); ensure schema validation (JSON Schema) in tests.
 
 Gold
 
-- Golden fixtures for facts; schema version pinned; migration notes; CI gate on curated set.
+- Golden fixtures for facts across plan/preflight/apply/rollback; CI gate on curated set; diff artifacts uploaded.
+- Schema version pinned; migration notes and dual-emit strategy documented when evolving.
 
 Platinum
 
-- Multiple sinks (file/stderr/syslog/custom) with consistent redaction; optional attestations on success.
+- Multiple sinks supported with consistent redaction; optional attestations captured in summary facts.
+- Secret-masking guarantees documented with tests and fuzzing where applicable.
 
 ---
 
@@ -157,19 +190,22 @@ Platinum
 
 Bronze
 
-- Parse and carry policy flags (`allow_roots`, `forbid_paths`, `strict_ownership`, `force_untrusted_source`, `allow_degraded_fs`, `disable_auto_rollback`, `backup_tag`, `override_preflight`).
+- Parse and surface policy flags end-to-end; default `override_preflight=false` (fail-closed).
+- Notes in preflight facts reflect active policy dimensions.
 
 Silver
 
-- Preflight computes `policy_ok`; `apply()` refuses when `policy_ok=false` unless overridden; `E_POLICY` with details.
+- Preflight computes `policy_ok` across all gates; `apply()` refuses when `policy_ok=false` unless overridden explicitly.
+- Emit `E_POLICY` with `exit_code` and specific notes identifying the violated dimension.
 
 Gold
 
-- Golden scenarios for policy stops/overrides; deterministic outputs; coverage report.
+- Goldens for stops (forbidden path, outside allowed roots) and overrides; deterministic outputs.
+- Coverage report enumerating enforced policy flags and evidence locations.
 
 Platinum
 
-- Policy versioning; deprecation paths; lints/guardrails for dangerous combinations.
+- Versioning of policy schema; migration and deprecation guidance; lints for dangerous combinations (e.g., broad `allow_roots` + `override_preflight`).
 
 ---
 
@@ -177,19 +213,20 @@ Platinum
 
 Bronze
 
-- Define `SmokeTestRunner` and minimal suite; no auto‑rollback.
+- Define `SmokeTestRunner` trait and minimal default suite (e.g., `true`, shell probe); no auto‑rollback.
+- Emit audit of runner invocation and results (even if not enforced).
 
 Silver
 
-- Post‑apply integration; on failure and `!disable_auto_rollback`, trigger auto‑rollback and emit `E_SMOKE`.
+- Integrate runner post‑apply; failures trigger `E_SMOKE` and auto‑rollback when policy allows; record outputs (redacted).
 
 Gold
 
-- Pluggable suites; goldens for failure; machine‑readable reports.
+- Pluggable suites by provider; goldens for failure cases; machine‑readable reports uploaded in CI.
 
 Platinum
 
-- Tunables (timeouts/parallelism); curated per environment; provenance recorded.
+- Tunable timeouts/parallelism; curated suite per environment; record runner provenance and environment.
 
 ---
 
@@ -197,19 +234,19 @@ Platinum
 
 Bronze
 
-- At least one stable golden (dry‑run); regeneration instructions; redaction masking of volatile fields.
+- At least one stable golden (dry‑run); documented regeneration and review process; redaction masks volatile fields.
 
 Silver
 
-- Negative goldens (policy stop, locking) and apply/rollback basics; non‑blocking CI check.
+- Add negative goldens (policy stop, locking) and apply/rollback basics; non‑blocking CI check for presence and validity.
 
 Gold
 
-- Blocking CI gate on curated golden set; diff artifacts uploaded.
+- Blocking CI gate on curated golden set; machine-readable diff artifacts uploaded for failures.
 
 Platinum
 
-- Coverage across preflight/apply/rollback/smoke/degrade; traceability linking goldens ↔ requirements.
+- Coverage expanded across preflight/apply/rollback/smoke/degrade; traceability report linking REQ-* ↔ tests ↔ goldens.
 
 ---
 
@@ -217,19 +254,19 @@ Platinum
 
 Bronze
 
-- PATH scan for required rescue binaries; preflight summary note.
+- PATH scan for required rescue binaries (GNU core or BusyBox); preflight summary note indicates status.
 
 Silver
 
-- Optional `require_rescue` policy gates; facts list missing binaries and backup symlinks.
+- Policy extension `require_rescue`: preflight fails closed if unmet; facts list missing binaries and backup symlinks.
 
 Gold
 
-- Verify rescue symlinks and minimal command health; golden for missing rescue.
+- Verify rescue symlinks and a minimal command health check; golden for missing rescue scenario.
 
 Platinum
 
-- Extended checks (e.g., initramfs access) and operator drills; metrics for verification time.
+- Extended checks (initramfs access, recovery shell availability) and documented operator drills; record verification time.
 
 ---
 
@@ -237,20 +274,21 @@ Platinum
 
 Bronze
 
-- Provisional `error_id`; `exit_code` optional except where already stable (locking timeout → 30).
+- Provisional `error_id`; `exit_code` optional except where already stable (locking timeout → 30); placeholder mapping exists.
+- Document incomplete mapping with `// INCOMPLETE` and tests asserting shape only.
 
 Silver
 
 - Implement `exit_code_for()` for curated subset: `E_LOCKING`, `E_POLICY`, `E_GENERIC`, `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_SMOKE`.
-- Ensure facts at those failure sites include `error_id` and `exit_code`.
+- Ensure facts at those failure sites include `error_id` and `exit_code`; document mapping table in code with Covered/Deferred markers.
 
 Gold
 
-- Expand coverage to all core paths exercised by tests; goldens for error scenarios; CI gate.
+- Expand coverage to all core paths exercised by tests; goldens for error scenarios; CI gate on curated subset.
 
 Platinum
 
-- Finalize full mapping in SPEC; versioned table; traceability to tests.
+- Finalize full mapping in SPEC (`SPEC/error_codes.toml`); versioned table and migration notes; traceability to tests.
 
 ---
 
