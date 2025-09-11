@@ -69,3 +69,63 @@ Notes
 
 - Stop adding scope if SPEC/PLAN/code drift risk appears; open a new SPEC_UPDATE number only when necessary.
 - Any additional scope must be tied to an epic and have clear tests/doc updates.
+
+---
+
+## Sprint 01 Status Update — 2025-09-11
+
+Summary: Good progress across Determinism, Observability, and Locking. Minimal schema v1 facts are flowing; redaction policy implemented; a reference file-based lock manager added. Planning artifacts updated to track the `api/` module split.
+
+Progress
+
+- __Determinism__: 
+  - Implemented `logging/redact.rs` with `TS_ZERO`, `ts_for_mode()`, and `redact_event()` to normalize timestamps and mask volatile fields (duration, lock_wait_ms, attestation bundle IDs) for DryRun vs Commit comparison.
+  - Stabilized action ordering in `api::plan()` by sorting actions by kind and `SafePath.rel()`.
+  - Added tests to assert schema validation and DryRun==Commit event equivalence after redaction.
+
+- __Observability & Audit__:
+  - Emitted Minimal Facts v1 across `plan`, `preflight`, `apply.attempt`, `apply.result`, and `rollback` with `schema_version=1`.
+  - Added integrity scaffolding: optional `hash_alg=sha256`, `before_hash`, `after_hash` for symlink replacements.
+  - Added provenance placeholders: `{uid, gid, env_sanitized, helper:""}` to `apply.result`.
+  - Validated facts against `SPEC/audit_event.schema.json` via unit tests.
+
+- __Locking & Concurrency__:
+  - Verified `adapters/lock.rs` is the trait definition and added `adapters/lock_file.rs` as the concrete reference `FileLockManager` using `fs2` file locks.
+  - Integrated bounded wait in `api::apply()` with configurable `lock_timeout_ms` (default 5000 ms) and `lock_wait_ms` telemetry.
+  - Added unit tests for the file-lock manager’s timeout and success paths.
+
+- __Planning Artifacts__:
+  - Created `PLAN/12-api-module.md` documenting the responsibilities of an `api/` module and a no-behavior-change split plan for `src/api.rs`.
+  - Updated `PLAN/00-structure.md` to reflect the planned `api/` module layout (`mod.rs`, `plan.rs`, `preflight.rs`, `apply.rs`).
+  - Updated `PLAN/README.md` to include the new API planning document.
+
+Decisions (recorded)
+
+- __Timestamp policy__: Commit mode uses real RFC3339 timestamps; DryRun uses `TS_ZERO`. Redaction normalizes both to `TS_ZERO` for diffing (SPEC §2.7).
+- __Locking default__: Require a `LockManager` in production; default `lock_timeout_ms = 5000`. In dev/test, WARN fact when lock manager not provided.
+- __Schema scope__: Minimal Facts v1 fields are required now; integrity/provenance optional fields are present where available and omitted otherwise to satisfy schema (`null` avoided).
+- __Stable ordering__: Actions within a plan are deterministically ordered before computing IDs and emitting facts.
+- __API split__: Proceed with an internal refactor to `src/api/` once current feature work stabilizes; no behavioral changes expected (tracked in `PLAN/12-api-module.md`).
+
+Blockers / Risks
+
+- __Ownership & Preservation__: Strict `OwnershipOracle` integration is stubbed at the trait level; richer provenance (pkg origin) and preservation probes (mode/owner/timestamps/xattrs/ACLs/caps) are not yet implemented.
+- __Attestation bundle__: The final `apply.result` attestation includes a placeholder bundle hash and public key id; needs full bundle construction and hashing.
+- __Golden fixtures / CI gate__: JSONL golden generation and byte-for-byte gate not wired in CI yet; local tests validate schema and redaction only.
+- __Smoke tests__: `SmokeTestRunner` adapter exists but no default commands; auto-rollback path covered but test assets pending.
+- __EXDEV acceptance__: Cross-filesystem matrix not yet exercised from this crate; integration with `test-orch/` needed.
+
+Next Steps (target before sprint end)
+
+- __Ownership & Preservation__ (EPIC-5):
+  - Implement `OwnershipOracle` default adapter (pkg/UID/GID) and emit preflight failures with structured facts.
+  - Add preservation capability detection and `preservation{}` facts; gate by policy.
+
+- __Attestation__ (EPIC-4):
+  - Build the attestation bundle (plan, facts digest) and compute `bundle_hash` (sha256). Wire an injected `Attestor` key id.
+
+- __Golden & CI__ (EPIC-8):
+  - Add a golden fixtures generator and byte-identical diff gate; ensure DryRun vs Commit equivalence post-redaction.
+
+- __API Module Refactor__:
+  - Execute the split of `src/api.rs` into `src/api/` per `PLAN/12-api-module.md` (no behavior change) once tests remain green for two runs.

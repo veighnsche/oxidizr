@@ -477,17 +477,13 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         obj.insert("hash_alg".to_string(), json!("sha256"));
                         obj.insert("after_hash".to_string(), json!(ah));
                     }
-                    // Add provenance placeholders
+                    // Add provenance placeholders (avoid unsafe; leave uid/gid to adapters in future)
                     {
                         let obj = fields.as_object_mut().unwrap();
-                        let uid = unsafe { libc::geteuid() } as u32;
-                        let gid = unsafe { libc::getegid() } as u32;
                         obj.insert(
                             "provenance".to_string(),
                             json!({
                                 "helper": "",
-                                "uid": uid,
-                                "gid": gid,
                                 "env_sanitized": true
                             }),
                         );
@@ -543,14 +539,10 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     });
                     {
                         let obj = fields.as_object_mut().unwrap();
-                        let uid = unsafe { libc::geteuid() } as u32;
-                        let gid = unsafe { libc::getegid() } as u32;
                         obj.insert(
                             "provenance".to_string(),
                             json!({
                                 "helper": "",
-                                "uid": uid,
-                                "gid": gid,
                                 "env_sanitized": true
                             }),
                         );
