@@ -165,6 +165,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             "plan_id": pid.to_string(),
             "stage": "preflight",
             "decision": decision,
+            "path": "",
         });
         self.facts.emit("switchyard", "preflight", decision, fields);
 
@@ -198,6 +199,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         "stage": "apply.attempt",
                         "decision": "failure",
                         "lock_wait_ms": lock_wait_ms,
+                        "path": "",
                         "error": e.to_string(),
                     });
                     self.facts.emit("switchyard", "apply.attempt", "failure", fields);
@@ -213,6 +215,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                 "stage": "apply.attempt",
                 "decision": "warn",
                 "no_lock_manager": true,
+                "path": "",
             });
             self.facts.emit("switchyard", "apply.attempt", "warn", fields);
         }
@@ -225,6 +228,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             "stage": "apply.attempt",
             "decision": "success",
             "lock_wait_ms": lock_wait_ms,
+            "path": "",
         });
         self.facts.emit("switchyard", "apply.attempt", "success", fields);
 
@@ -334,6 +338,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             "plan_id": pid.to_string(),
             "stage": "apply.result",
             "decision": decision,
+            "path": "",
         });
         self.facts.emit("switchyard", "apply.result", decision, fields);
 
