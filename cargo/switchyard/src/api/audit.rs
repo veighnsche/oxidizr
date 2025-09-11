@@ -160,20 +160,24 @@ pub(crate) fn emit_summary_extra(ctx: &AuditCtx, stage: &str, decision: &str, ex
 }
 
 pub(crate) fn emit_rollback_step(ctx: &AuditCtx, decision: &str, path: &str) {
-    let fields = json!({
+    let mut fields = json!({
         "stage": "rollback",
         "decision": decision,
         "path": path,
     });
+    ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "rollback", decision, fields);
 }
 
 // Optional helper to ensure a provenance object is present; callers may extend as needed.
 pub(crate) fn ensure_provenance(extra: &mut Value) {
     if let Some(obj) = extra.as_object_mut() {
-        obj.entry("provenance").or_insert(json!({
-            "helper": "",
-            "env_sanitized": true
-        }));
+        let prov = obj
+            .entry("provenance")
+            .or_insert(json!({}))
+            .as_object_mut()
+            .unwrap();
+        // Only enforce env_sanitized presence by default; origin/helper are adapter-provided.
+        prov.entry("env_sanitized").or_insert(json!(true));
     }
 }

@@ -76,6 +76,8 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __Preflight Diff (YAML)__ — Deterministically ordered rows with keys: `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, `provenance.{uid,gid,pkg}`, `notes`. See `SPEC/preflight.yaml`.
 
+- __Provenance__ — Origin metadata for changes: `origin` (`repo|aur|manual`), `helper`, `uid`, `gid`, `pkg`, `env_sanitized`. Emitted in facts and subject to masking. See `audit_event.schema.json`, `SPEC §2.4`, `PLAN/45-preflight.md`.
+
 - __`policy_ok`__ — Boolean field in each preflight row summarizing whether policy gates passed for that action. When `false`, `apply()` must refuse to proceed unless a policy override is set. See `src/api/preflight.rs`, `PLAN/45-preflight.md`.
 
 - __Override Preflight (`override_preflight`)__ — Policy switch that allows proceeding despite `policy_ok=false` (for controlled contexts). Its use must be explicit and logged. See `PLAN/45-preflight.md`, `src/policy/config.rs`.

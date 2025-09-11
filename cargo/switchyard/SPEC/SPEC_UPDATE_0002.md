@@ -1,7 +1,7 @@
 # SPEC_UPDATE_0002 (2025-09-11)
 
 Title: Rescue Gating (require_rescue), Degraded Symlink Semantics, and Preflight Row Clarifications
-Status: Proposed
+Status: Accepted
 Applies-to: SPEC/SPEC.md v1.1
 
 ## Summary

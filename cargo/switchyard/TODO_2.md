@@ -184,8 +184,8 @@ Action items
 
 Action items
 
-- [ ] SPEC Updates: `SPEC/SPEC_UPDATE_0001.md` (Accepted); `SPEC/SPEC_UPDATE_0002.md` (Proposed)
-- [ ] ADRs: `PLAN/adr/ADR-0013-backup-tagging.md` (Accepted); `PLAN/adr/ADR-0015-exit-codes-silver-and-ci-gates.md` (Proposed)
+- [ ] SPEC Updates: `SPEC/SPEC_UPDATE_0001.md` (Accepted); `SPEC/SPEC_UPDATE_0002.md` (Accepted)
+- [ ] ADRs: `PLAN/adr/ADR-0013-backup-tagging.md` (Accepted); `PLAN/adr/ADR-0017-exit-codes-silver-and-ci-gates.md` (Accepted)
 
 ---
 

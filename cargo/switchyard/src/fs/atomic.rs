@@ -59,6 +59,10 @@ pub fn atomic_symlink_swap(
     symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 
     // Atomically rename tmp -> fname within the same directory
+    // Test override: simulate EXDEV for coverage when requested via env var.
+    if std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1")) {
+        return Err(errno_to_io(Errno::XDEV));
+    }
     let new_c = std::ffi::CString::new(fname).unwrap();
     let t0 = Instant::now();
     match renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str()) {
