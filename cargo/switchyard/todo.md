@@ -80,6 +80,17 @@ Risks/Mitigations:
 - Multiple backups per target: we continue selecting the latest by timestamp (already implemented). Sidecars keyed to the same basename avoids mismatch.
 - Cross‑fs (EXDEV) on restore symlink: use existing degraded path logic for staging and atomic appearance.
 
+Feasibility & Complexity:
+
+- Feasibility: High — primitives exist for backup/restore and TOCTOU-safe ops.
+- Complexity: Medium — add sidecar write/read and restore branching, plus tests.
+- Evidence:
+  - Current restore is a simple rename of backup → target (topology-agnostic): `src/fs/symlink.rs::restore_file()`.
+  - Symlink and file backups already created: `src/fs/symlink.rs::replace_file_with_symlink()`.
+  - Kind detection and symlink resolution helpers: `src/api/fs_meta.rs::{kind_of, resolve_symlink_target}`.
+  - Audit schema allows additional fields (no additionalProperties=false): `SPEC/audit_event.schema.json`.
+- Blockers: None.
+
 ---
 
 ## 2) REQ‑R3 Idempotent rollback — Blocker
@@ -116,6 +127,15 @@ Risks/Mitigations:
 
 - Sidecar drift if a third‑party modifies target between runs. We detect divergence and perform restore if possible; otherwise we return appropriate error ids for visibility.
 
+Feasibility & Complexity:
+
+- Feasibility: High — incremental to R2 (sidecar presence enables idempotent checks).
+- Complexity: Low–Medium — conditional no-op checks + telemetry reason; unit/integration tests.
+- Evidence:
+  - Missing-backup behavior currently returns NotFound unless best-effort: `src/fs/symlink.rs::restore_file()`.
+  - Rollback loop already tolerates per-step failures and emits facts: `src/api/apply.rs` (rollback sections).
+- Blockers: None.
+
 ---
 
 ## 3) REQ‑L4 LockManager required in production — Blocker
@@ -145,6 +165,16 @@ Acceptance criteria:
 - L4 checked off in checklist; CI green.
 
 Estimate: 0.5 days.
+
+Feasibility & Complexity:
+
+- Feasibility: High — reuse existing E_LOCKING path and facts; add a policy flag and early-fail.
+- Complexity: Low — add `Policy.require_lock_manager` and a short check in `apply.rs` for Commit.
+- Evidence:
+  - Missing policy flag today: `src/policy/config.rs` has no `require_lock_manager`.
+  - Lock timeout path already emits `E_LOCKING`, `lock_wait_ms`: `src/api/apply.rs` (lock acquire block) and `tests/locking_timeout.rs`.
+  - Stable error-id/exit-code mapping exists: `src/api/errors.rs`.
+- Blockers: None.
 
 ---
 
@@ -182,6 +212,16 @@ Risks/Mitigations:
 
 - Minimal derivative Docker images may lack even `--help`; keep the exec check policy‑gated.
 
+Feasibility & Complexity:
+
+- Feasibility: High — verification and gating already wired; minimal hardening and facts enrichment.
+- Complexity: Low–Medium — small enhancements in `src/rescue.rs` and preflight/apply facts.
+- Evidence:
+  - Toolset verification function exists: `src/rescue.rs::verify_rescue_tools()`.
+  - Preflight STOP when `require_rescue=true`: `src/api/preflight.rs`.
+  - Apply gating includes rescue check before mutation: `src/api/apply.rs`.
+- Blockers: None.
+
 ---
 
 ## 5) REQ‑H3 Health verification is part of commit — Blocker
@@ -212,6 +252,15 @@ Acceptance criteria:
 - H3 checked off; CI green.
 
 Estimate: 0.5 days.
+
+Feasibility & Complexity:
+
+- Feasibility: High — smoke runner path and E_SMOKE mapping already present.
+- Complexity: Low — add `Policy.require_smoke_in_commit` and enforce presence/success in Commit.
+- Evidence:
+  - Smoke failure triggers auto-rollback and emits `E_SMOKE`: `src/api/apply.rs` and `tests/smoke_rollback.rs`.
+  - Error mapping present: `src/api/errors.rs` (E_SMOKE → 80).
+- Blockers: None.
 
 ---
 
@@ -245,6 +294,17 @@ Risks/Mitigations:
 
 - Docker base image may lack `mkfs.*`; ensure the container runner installs needed packages (`e2fsprogs`, `btrfs-progs`, `xfsprogs`) for the test phase only.
 
+Feasibility & Complexity:
+
+- Feasibility: Medium — product code is ready; infra changes needed for privileged mounts.
+- Complexity: High — requires privileged container runs and additional packages in the image plus CI/orchestrator wiring.
+- Evidence:
+  - Current Dockerfile lacks mkfs tool packages: `test-orch/docker/Dockerfile`.
+  - Host orchestrator `docker run` args lack `--privileged`/cap adds: `test-orch/host-orchestrator/dockerutil/run_args.go`.
+  - GH Actions workflow does not run the containerized suite; only cargo and golden diff: `.github/workflows/ci.yml`.
+- Blockers:
+  - GH-hosted runners typically disallow privileged containers. Mitigate via self-hosted runners or make FS matrix non-blocking in GH CI.
+
 ---
 
 ## 7) REQ‑CI2 / REQ‑CI3 Zero‑SKIP + Golden diff gate — Blocker
@@ -277,6 +337,16 @@ Estimate: 0.5–1.0 days.
 Risks/Mitigations:
 
 - Golden drift: require explicit `GOLDEN_UPDATE=1` (or a make target) to regenerate and commit new fixtures.
+
+Feasibility & Complexity:
+
+- Feasibility: High (CI3 golden diff already integrated); Medium for Zero‑SKIP if YAML runner must be enforced in GH.
+- Complexity: Low–Medium — golden is done; zero‑SKIP requires parsing runner logs or integrating `test-orch` in GH.
+- Evidence:
+  - Golden diff job present: `.github/workflows/ci.yml` (golden-fixtures job) + `test_ci_runner.py` scenarios.
+  - GH workflow does not run the Docker orchestrator; zero‑SKIP for YAML is currently outside GH.
+- Blockers:
+  - Enforcing zero‑SKIP for YAML suites in GH requires Docker privileged access or self-hosted runners.
 
 ---
 
