@@ -43,10 +43,10 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 
 ## 2) Public API Surface (SPEC §3.1)
 
-- [~] `plan(input: PlanInput) -> Plan` exists in `src/api.rs` (basic link/restore expansion)
-- [~] `preflight(plan: &Plan) -> PreflightReport` exists with basic checks (`src/preflight.rs`, `src/api.rs`)
-- [~] `apply(plan: &Plan, mode: ApplyMode) -> ApplyReport` exists (symlink swap + restore)
-- [~] `plan_rollback_of(report: &ApplyReport) -> Plan` implemented (basic inverse for symlink actions) and exported
+- [~] `plan(input: PlanInput) -> Plan` exists and delegates to `src/api/plan.rs` (basic link/restore expansion)
+- [~] `preflight(plan: &Plan) -> PreflightReport` exists and delegates to `src/api/preflight.rs` (basic checks)
+- [~] `apply(plan: &Plan, mode: ApplyMode) -> ApplyReport` exists and delegates to `src/api/apply.rs` (symlink swap + restore)
+- [~] `plan_rollback_of(report: &ApplyReport) -> Plan` implemented via `src/api/rollback.rs` (basic inverse for symlink actions)
 - [x] All path‑carrying fields in mutating API use `SafePath` (see `src/types/plan.rs`)
 
 ## 3) SafePath & TOCTOU Safety (SPEC §2.3, §3.3)
@@ -106,14 +106,14 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 - [~] Deterministic `plan_id` and `action_id` (UUIDv5 over normalized inputs/namespace) (REQ‑D1)
 - [~] Dry‑run redactions pinned (timestamps zeroed/expressed as deltas); dry‑run facts byte‑identical to real‑run after redaction (REQ‑D2)
   - MVP uses `TS_ZERO` constant for `ts` until proper redaction policy is implemented.
-- [ ] Stable ordering of plan actions and fact emission streams
+- [~] Stable ordering of plan actions and fact emission streams
 
 ## 9) Observability & Audit (SPEC §2.4, §5, §13)
 
 - [~] Traits exist: `FactsEmitter`, `AuditSink`, `JsonlSink` (stubs)
 - [~] Emit structured facts for every step, validating against `SPEC/audit_event.schema.json` (REQ‑O1, REQ‑O3, REQ‑VERS1)
-  - Minimal facts now emitted for `plan`, `preflight`, `apply.lock`, `apply.attempt`, `apply.result` with `schema_version`, `plan_id`, `action_id` (per‑action), and `path`.
-- [ ] Compute and record `before_hash`/`after_hash` (sha256) for every mutated file (REQ‑O5)
+  - Minimal facts emitted via centralized `src/api/audit.rs` for `plan`, `preflight`, `apply.lock`, `apply.attempt`, `apply.result` with `schema_version`, `plan_id`, `action_id` (per‑action), and `path`.
+- [~] Compute and record `before_hash`/`after_hash` (sha256) for mutated files (REQ‑O5) — implemented for symlink ensure; remaining mutations pending
 - [ ] Signed attestation per apply bundle via `Attestor` (ed25519) (REQ‑O4)
 - [~] Final summary includes attestation placeholder when `Attestor` provided; base64‑encodes signature. TODO: real bundle and `bundle_hash`.
 - [ ] Secret masking policy and implementation across all sinks (REQ‑O6)
@@ -148,7 +148,7 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 ## 14) Error Model & Taxonomy (SPEC §6)
 
 - [~] Basic error types exist (`src/types/errors.rs`)
-- [ ] Map errors to SPEC exit codes / stable identifiers (E_POLICY, E_LOCKING, etc.)
+- [~] Map errors to SPEC exit codes / stable identifiers (E_POLICY, E_LOCKING, etc.) — scaffold `ErrorId` + `exit_code_for()` in `src/api/errors.rs`; partial emission (locking + generic) in facts
 - [ ] Enrich error contexts; plumb through to facts
 
 ## 15) Filesystem Ops Hardening

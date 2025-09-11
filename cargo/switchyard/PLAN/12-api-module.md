@@ -204,3 +204,28 @@ Next steps proposed:
 * Remove unused `src/api/telemetry.rs` file.
 
 — Cascade
+
+## UPDATE #2025-09-11T14:49:32+02:00
+
+Author: Cascade (AI)
+
+Incremental changes since previous update:
+
+* Tightened visibility across API submodules (`pub(crate)`) to keep the public surface minimal and the facade (`src/api.rs`) clean.
+* Centralized redaction and emission via `redact_and_emit()` in `src/api/audit.rs` ensuring `schema_version`, `ts`, `plan_id`, `path` fields are present and `redact_event()` is applied when appropriate.
+* Added `ensure_provenance(&mut Value)` in `src/api/audit.rs`; all apply results now use the helper instead of duplicating provenance assembly.
+* Added stable error scaffolding in `src/api/errors.rs` (`ErrorId`, `exit_code_for`) and started emitting `error_id` and `exit_code` in facts:
+  * Locking failure: `E_LOCKING`, `exit_code=30` (per SPEC/error_codes.toml).
+  * Generic per-action failure placeholder: `E_GENERIC`, `exit_code=1` (to be refined by mapping specific failure branches).
+* Routed rollback facts via `emit_rollback_step()` (already done previously, reiterated for completeness).
+* Removed legacy `src/api/telemetry.rs` (manually pruned in the repo).
+
+State: tests green; Minimal Facts v1 fields remain unchanged apart from the explicitly added error fields on failures.
+
+Next:
+
+* Classify additional error sites with specific `ErrorId`s (e.g., restore failures → `E_RESTORE_FAILED`), and include `exit_code` consistently.
+* Implement structured preflight diff rows per SPEC.
+* Add golden fixtures and schema validation.
+
+— Cascade
