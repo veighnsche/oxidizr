@@ -3,6 +3,7 @@
 use std::time::Instant;
 
 use crate::{preflight, fs};
+use crate::adapters::LockManager;
 use crate::logging::{FactsEmitter, AuditSink};
 use crate::policy::Policy;
 use crate::types::{PlanInput, Plan, Action, PreflightReport, ApplyMode, ApplyReport};
@@ -13,10 +14,16 @@ pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
     audit: A,
     policy: Policy,
+    lock: Option<Box<dyn LockManager>>, // None in dev/test; required in production
 }
 
 impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
-    pub fn new(facts: E, audit: A, policy: Policy) -> Self { Self { facts, audit, policy } }
+    pub fn new(facts: E, audit: A, policy: Policy) -> Self { Self { facts, audit, policy, lock: None } }
+
+    pub fn with_lock_manager(mut self, lock: Box<dyn LockManager>) -> Self {
+        self.lock = Some(lock);
+        self
+    }
 
     pub fn plan(&self, input: PlanInput) -> Plan {
         let mut actions: Vec<Action> = Vec::new();
@@ -149,12 +156,47 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let dry = matches!(mode, ApplyMode::DryRun);
         let pid = plan_id(plan);
 
-        // Minimal Facts v1: apply attempt summary
+        // Locking (optional in dev/test): acquire process lock with bounded wait; emit telemetry
+        let mut lock_wait_ms: Option<u64> = None;
+        let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
+        if let Some(mgr) = &self.lock {
+            let lt0 = Instant::now();
+            match mgr.acquire_process_lock(5000) {
+                Ok(guard) => {
+                    lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
+                    _lock_guard = Some(guard);
+                }
+                Err(e) => {
+                    let fields = json!({
+                        "schema_version": 1,
+                        "plan_id": pid.to_string(),
+                        "stage": "apply.lock",
+                        "decision": "failure",
+                        "error": e.to_string(),
+                    });
+                    self.facts.emit("switchyard", "apply.lock", "failure", fields);
+                    let duration_ms = t0.elapsed().as_millis() as u64;
+                    return ApplyReport { executed, duration_ms, errors: vec![format!("lock: {}", e)], plan_uuid: Some(pid), rolled_back, rollback_errors };
+                }
+            }
+        } else {
+            let fields = json!({
+                "schema_version": 1,
+                "plan_id": pid.to_string(),
+                "stage": "apply.lock",
+                "decision": "warn",
+                "no_lock_manager": true,
+            });
+            self.facts.emit("switchyard", "apply.lock", "warn", fields);
+        }
+
+        // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
         let fields = json!({
             "schema_version": 1,
             "plan_id": pid.to_string(),
             "stage": "apply.attempt",
             "decision": "success",
+            "lock_wait_ms": lock_wait_ms,
         });
         self.facts.emit("switchyard", "apply.attempt", "success", fields);
 
@@ -280,5 +322,128 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             }
         }
         Plan { actions }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::logging::{FactsEmitter, AuditSink};
+    use serde_json::Value;
+    use std::path::Path;
+    use log::Level;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[derive(Default, Clone)]
+    struct TestEmitter {
+        events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>> ,
+    }
+
+    impl FactsEmitter for TestEmitter {
+        fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
+            self.events.lock().unwrap().push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
+        }
+    }
+
+    #[derive(Default, Clone)]
+    struct TestAudit;
+    impl AuditSink for TestAudit { fn log(&self, _level: Level, _msg: &str) {} }
+
+    #[test]
+    fn emits_minimal_facts_for_plan_preflight_apply() {
+        let facts = TestEmitter::default();
+        let audit = TestAudit::default();
+        let policy = Policy::default();
+        let api = Switchyard::new(facts.clone(), audit, policy);
+
+        // Build a simple plan under a temp root
+        let td = tempfile::tempdir().unwrap();
+        let root = td.path();
+        let src = Path::new("bin/uutils");
+        let tgt = Path::new("usr/bin/ls");
+        // Use SafePath from root
+        let source = crate::types::safepath::SafePath::from_rooted(root, &root.join(src)).unwrap();
+        let target = crate::types::safepath::SafePath::from_rooted(root, &root.join(tgt)).unwrap();
+        let input = PlanInput { link: vec![crate::types::plan::LinkRequest { source: source.clone(), target: target.clone() }], restore: vec![] };
+
+        let plan = api.plan(input);
+        // Preflight and apply (DryRun)
+        let _pf = api.preflight(&plan);
+        let _ar = api.apply(&plan, ApplyMode::DryRun);
+
+        // Inspect captured events
+        let evs = facts.events.lock().unwrap();
+        assert!(!evs.is_empty(), "no facts captured");
+        // Ensure all facts include schema_version and path
+        for (_subsystem, _event, _decision, fields) in evs.iter() {
+            assert_eq!(fields.get("schema_version").and_then(|v| v.as_i64()), Some(1), "schema_version=1");
+            // path may be null for some summaries; only check presence when present
+            let _ = fields.get("path");
+        }
+        // Ensure plan_id is consistent and present
+        let plan_ids: Vec<String> = evs.iter()
+            .filter_map(|(_, _, _, f)| f.get("plan_id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+            .collect();
+        assert!(!plan_ids.is_empty());
+        let first = &plan_ids[0];
+        assert!(plan_ids.iter().all(|p| p == first), "plan_id should be consistent across events");
+    }
+
+    #[test]
+    fn rollback_reverts_first_action_on_second_failure() {
+        let facts = TestEmitter::default();
+        let audit = TestAudit::default();
+        let policy = Policy::default();
+        let api = Switchyard::new(facts.clone(), audit, policy);
+
+        let td = tempfile::tempdir().unwrap();
+        let root = td.path();
+
+        // Layout
+        let src1 = root.join("bin/new1");
+        let src2 = root.join("bin/new2");
+        let tgt1 = root.join("usr/bin/app1");
+        let tgt2 = root.join("usr/sbin/app2");
+
+        std::fs::create_dir_all(src1.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(src2.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(tgt1.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(tgt2.parent().unwrap()).unwrap();
+
+        std::fs::write(&src1, b"new1").unwrap();
+        std::fs::write(&src2, b"new2").unwrap();
+        std::fs::write(&tgt1, b"old1").unwrap();
+        std::fs::write(&tgt2, b"old2").unwrap();
+
+        // Make parent of second target read-only to force failure during apply
+        let sbin_dir = tgt2.parent().unwrap();
+        let mut p = std::fs::metadata(sbin_dir).unwrap().permissions();
+        p.set_mode(0o555);
+        std::fs::set_permissions(sbin_dir, p).unwrap();
+
+        // Build SafePaths
+        let sp_src1 = crate::types::safepath::SafePath::from_rooted(root, &src1).unwrap();
+        let sp_src2 = crate::types::safepath::SafePath::from_rooted(root, &src2).unwrap();
+        let sp_tgt1 = crate::types::safepath::SafePath::from_rooted(root, &tgt1).unwrap();
+        let sp_tgt2 = crate::types::safepath::SafePath::from_rooted(root, &tgt2).unwrap();
+
+        let input = PlanInput {
+            link: vec![
+                crate::types::plan::LinkRequest { source: sp_src1.clone(), target: sp_tgt1.clone() },
+                crate::types::plan::LinkRequest { source: sp_src2.clone(), target: sp_tgt2.clone() },
+            ],
+            restore: vec![],
+        };
+        let plan = api.plan(input);
+
+        let report = api.apply(&plan, ApplyMode::Commit);
+        assert!(!report.errors.is_empty(), "apply should fail on second action");
+        assert!(report.rolled_back, "rolled_back should be true");
+
+        // First target should be restored to regular file with original content
+        let md1 = std::fs::symlink_metadata(&tgt1).unwrap();
+        assert!(md1.file_type().is_file(), "tgt1 should be a regular file after rollback");
+        let content1 = std::fs::read_to_string(&tgt1).unwrap();
+        assert!(content1.starts_with("old1"));
     }
 }

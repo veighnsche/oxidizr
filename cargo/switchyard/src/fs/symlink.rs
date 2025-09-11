@@ -20,6 +20,66 @@ pub fn backup_path(target: &Path) -> PathBuf {
     parent.join(format!(".{}{}", name, BACKUP_SUFFIX))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn tmpdir() -> tempfile::TempDir {
+        tempfile::tempdir().expect("tempdir")
+    }
+
+    #[test]
+    fn atomic_swap_creates_symlink_pointing_to_source() {
+        let td = tmpdir();
+        let root = td.path();
+        let src = root.join("source.txt");
+        let tgt = root.join("target.txt");
+
+        // Create source file
+        std::fs::write(&src, b"hello").unwrap();
+
+        // Perform atomic swap: create symlink at target -> source
+        crate::fs::atomic::atomic_symlink_swap(&src, &tgt).unwrap();
+
+        // Verify target is a symlink pointing to source
+        let md = std::fs::symlink_metadata(&tgt).unwrap();
+        assert!(md.file_type().is_symlink(), "target should be a symlink");
+        let link = std::fs::read_link(&tgt).unwrap();
+        // Depending on platform, the link may be absolute (we pass absolute src), so compare directly
+        assert_eq!(link, src);
+    }
+
+    #[test]
+    fn replace_and_restore_roundtrip() {
+        let td = tmpdir();
+        let root = td.path();
+        let src = root.join("bin-new");
+        let tgt = root.join("bin-old");
+
+        // Create source and target files
+        std::fs::write(&src, b"new").unwrap();
+        {
+            let mut f = std::fs::File::create(&tgt).unwrap();
+            writeln!(f, "old").unwrap();
+        }
+
+        // Replace target with symlink to source; backup should be created
+        replace_file_with_symlink(&src, &tgt, false).unwrap();
+        let md = std::fs::symlink_metadata(&tgt).unwrap();
+        assert!(md.file_type().is_symlink(), "target should be a symlink after replace");
+        let backup = backup_path(&tgt);
+        assert!(backup.exists(), "backup should exist after replace");
+
+        // Restore from backup; target should be a regular file again with prior content prefix
+        restore_file(&tgt, false, false).unwrap();
+        let md2 = std::fs::symlink_metadata(&tgt).unwrap();
+        assert!(md2.file_type().is_file(), "target should be a regular file after restore");
+        let content = std::fs::read_to_string(&tgt).unwrap();
+        assert!(content.starts_with("old"), "restored content should match prior file");
+    }
+}
+
 /// Validate path to prevent directory traversal attacks
 pub fn is_safe_path(path: &Path) -> bool {
     for component in path.components() {

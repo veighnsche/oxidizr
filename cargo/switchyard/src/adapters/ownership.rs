@@ -7,6 +7,6 @@ pub struct OwnershipInfo {
     pub pkg: String,
 }
 
-pub trait OwnershipOracle {
+pub trait OwnershipOracle: Send + Sync {
     fn owner_of(&self, path: &SafePath) -> Result<OwnershipInfo>;
 }

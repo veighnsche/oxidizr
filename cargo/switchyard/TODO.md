@@ -30,9 +30,9 @@ Legend:
   - Minimal facts emission (schema v1 core fields) including `plan_id`/`action_id`.
 
 - Next Sprint Focus:
-  - Implement `openat` path in `fs/atomic.rs`/`fs/symlink.rs` to meet REQ‑TOCTOU1.
-  - Emit minimal facts (stage, decision, schema_version, plan_id/action_id, path) and add unit tests.
-  - Add unit tests for rollback and SafePath negatives.
+  - [x] Implement TOCTOU-safe final component using *at syscalls (`symlinkat`/`unlinkat` + `renameat`) in `fs/atomic.rs` to meet REQ‑TOCTOU1.
+  - [x] Emit minimal facts (stage, decision, schema_version, plan_id/action_id, path) and add unit tests.
+  - [~] Add unit tests for rollback and SafePath negatives.
 
 ## 1) Crate Scaffolding & Module Layout
 
@@ -53,14 +53,14 @@ Legend:
 
 - [x] `SafePath` type rejects `..` and escaping roots (`src/types/safepath.rs`)
 - [~] All mutating entry points accept `SafePath` (API uses `SafePath` but `fs/*` operate on `&Path` internally)
-- [~] TOCTOU‑safe syscall sequence
-  - Present: `open_dir_nofollow`, `renameat`, `fsync(parent)` (`src/fs/atomic.rs`)
-  - Missing: `openat` on final component for symlink create/replace; enforce sequence consistently across all mutations
-- [ ] Unit/property tests for `SafePath` normalization and negative cases beyond `rejects_dotdot`
+- [x] TOCTOU‑safe syscall sequence
+  - Present: `open_dir_nofollow`, `symlinkat`/`unlinkat`, `renameat`, `fsync(parent)` (`src/fs/atomic.rs`)
+  - Note: final component creation uses *at variants for TOCTOU safety; additional mutation types still need the same pattern enforced.
+- [~] Unit/property tests for `SafePath` normalization and negative cases beyond `rejects_dotdot`
 
 ## 4) Atomicity & Rollback Engine (SPEC §2.1, §2.2)
 
-- [~] Atomic symlink swap exists (`atomic_symlink_swap`) and backup/restore flows (`src/fs/symlink.rs`)
+- [x] Atomic symlink swap exists (`atomic_symlink_swap`) and backup/restore flows (`src/fs/symlink.rs`) with unit tests
 - [~] Transactional apply engine with all‑or‑nothing semantics
   - Auto reverse‑order rollback on mid‑plan failure (REQ‑R4)
   - Idempotent rollback (REQ‑R3) with property tests
@@ -86,9 +86,12 @@ Legend:
 
 ## 7) Locking & Concurrency (SPEC §2.5, §14)
 
-- [ ] Integrate `LockManager` with bounded wait; record `lock_wait_ms`; timeout → `E_LOCKING` (REQ‑L1..L3)
-- [ ] Emit WARN fact when no `LockManager` (dev/test only) (REQ‑L2)
-- [ ] Ensure core types and engine are `Send + Sync` and document thread‑safety (SPEC §14)
+- [~] Integrate `LockManager` with bounded wait; record `lock_wait_ms`; timeout → `E_LOCKING` (REQ‑L1..L3)
+  - Added `LockManager::acquire_process_lock(timeout_ms)` and optional wiring in `api::apply()`.
+  - Emits `apply.lock` event with `lock_wait_ms` on success; failure returns early with error.
+- [x] Emit WARN fact when no `LockManager` (dev/test only) (REQ‑L2)
+- [~] Ensure core types and engine are `Send + Sync` and document thread‑safety (SPEC §14)
+  - Adapter traits now `Send + Sync` where applicable.
 
 ## 8) Determinism & Redactions (SPEC §2.7)
 
@@ -99,7 +102,8 @@ Legend:
 ## 9) Observability & Audit (SPEC §2.4, §5, §13)
 
 - [~] Traits exist: `FactsEmitter`, `AuditSink`, `JsonlSink` (stubs)
-- [ ] Emit structured facts for every step, validating against `SPEC/audit_event.schema.json` (REQ‑O1, REQ‑O3, REQ‑VERS1)
+- [~] Emit structured facts for every step, validating against `SPEC/audit_event.schema.json` (REQ‑O1, REQ‑O3, REQ‑VERS1)
+  - Minimal facts now emitted for `plan`, `preflight`, `apply.lock`, `apply.attempt`, `apply.result` with `schema_version`, `plan_id`, `action_id` (per‑action), and `path`.
 - [ ] Compute and record `before_hash`/`after_hash` (sha256) for every mutated file (REQ‑O5)
 - [ ] Signed attestation per apply bundle via `Attestor` (ed25519) (REQ‑O4)
 - [ ] Secret masking policy and implementation across all sinks (REQ‑O6)
@@ -150,7 +154,8 @@ Legend:
 
 ## 17) Testing & CI (SPEC §8, §12)
 
-- [ ] Unit tests for `fs/*`, `types/*`, policy/preflight, determinism IDs, locking behavior
+- [~] Unit tests for `fs/*`, `types/*`, policy/preflight, determinism IDs, locking behavior
+  - Added unit tests for atomic swap and restore roundtrip; added minimal facts emission test in `api`.
 - [ ] BDD features wired up with `cargo/bdd-runner` and golden fixtures
 - [ ] Property tests for invariants: `AtomicReplace`, `IdempotentRollback`
 - [ ] CI gates: zero‑SKIP, schema validation, golden diffs, traceability report generation (`SPEC/tools/traceability.py`)

@@ -59,4 +59,29 @@ mod tests {
         let root = Path::new("/tmp");
         assert!(SafePath::from_rooted(root, Path::new("../etc")).is_err());
     }
+
+    #[test]
+    fn accepts_absolute_inside_root() {
+        let root = Path::new("/tmp/root");
+        let candidate = Path::new("/tmp/root/usr/bin/ls");
+        let sp = SafePath::from_rooted(root, candidate).expect("inside root");
+        assert!(sp.as_path().starts_with(root));
+        assert_eq!(sp.rel(), Path::new("usr/bin/ls"));
+    }
+
+    #[test]
+    fn rejects_absolute_outside_root() {
+        let root = Path::new("/tmp/root");
+        let candidate = Path::new("/etc/passwd");
+        assert!(SafePath::from_rooted(root, candidate).is_err());
+    }
+
+    #[test]
+    fn normalizes_curdir_components() {
+        let root = Path::new("/tmp/root");
+        let candidate = Path::new("./usr/./bin/./ls");
+        let sp = SafePath::from_rooted(root, candidate).expect("normalize");
+        assert_eq!(sp.rel(), Path::new("usr/bin/ls"));
+        assert_eq!(sp.as_path(), Path::new("/tmp/root/usr/bin/ls"));
+    }
 }
