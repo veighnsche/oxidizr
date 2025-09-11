@@ -1,5 +1,4 @@
 /// placeholder
-
 use std::fs;
 use std::io::Read;
 use std::os::unix::fs::MetadataExt;
@@ -12,20 +11,29 @@ fn mount_entry_for(path: &Path) -> Option<(PathBuf, String)> {
         Err(_) => return None,
     };
     let mut s = String::new();
-    if f.read_to_string(&mut s).is_err() { return None; }
-    let p = match path.canonicalize() { Ok(p) => p, Err(_) => path.to_path_buf() };
+    if f.read_to_string(&mut s).is_err() {
+        return None;
+    }
+    let p = match path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => path.to_path_buf(),
+    };
     let mut best: Option<(PathBuf, String)> = None;
     for line in s.lines() {
         // format: <src> <mountpoint> <fstype> <opts> ...
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 4 { continue; }
+        if parts.len() < 4 {
+            continue;
+        }
         let mnt = PathBuf::from(parts[1]);
         if p.starts_with(&mnt) {
             let opts = parts[3].to_string();
             match &best {
                 None => best = Some((mnt, opts)),
                 Some((b, _)) => {
-                    if mnt.as_os_str().len() > b.as_os_str().len() { best = Some((mnt, opts)); }
+                    if mnt.as_os_str().len() > b.as_os_str().len() {
+                        best = Some((mnt, opts));
+                    }
                 }
             }
         }
@@ -43,7 +51,8 @@ pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
         if !has_rw || noexec {
             return Err(format!(
                 "Filesystem at '{}' not suitable: requires rw and exec (opts: {})",
-                path.display(), opts
+                path.display(),
+                opts
             ));
         }
     }

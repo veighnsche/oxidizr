@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use cucumber::World;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[derive(Debug, World)]
@@ -18,6 +18,11 @@ impl Default for TestWorld {
     fn default() -> Self {
         let tmp = TempDir::new().expect("create scenario tempdir");
         let work = tmp.path().to_path_buf();
-        Self { work, audit_events: Vec::new(), last_exit_code: None, _tmp: tmp }
+        Self {
+            work,
+            audit_events: Vec::new(),
+            last_exit_code: None,
+            _tmp: tmp,
+        }
     }
 }

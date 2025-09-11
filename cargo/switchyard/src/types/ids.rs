@@ -1,6 +1,9 @@
 use uuid::Uuid;
 
-use super::{plan::{Plan, Action}, safepath::SafePath};
+use super::{
+    plan::{Action, Plan},
+    safepath::SafePath,
+};
 
 const NS_TAG: &str = "https://oxidizr-arch/switchyard";
 

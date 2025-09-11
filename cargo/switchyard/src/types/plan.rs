@@ -7,7 +7,9 @@ pub enum ApplyMode {
 }
 
 impl Default for ApplyMode {
-    fn default() -> Self { ApplyMode::DryRun }
+    fn default() -> Self {
+        ApplyMode::DryRun
+    }
 }
 
 #[derive(Clone, Debug)]

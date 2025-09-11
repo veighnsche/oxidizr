@@ -1,2 +1,2 @@
-pub mod error_codes;
 pub mod audit_schema;
+pub mod error_codes;

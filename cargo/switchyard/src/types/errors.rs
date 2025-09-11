@@ -2,9 +2,12 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ErrorKind {
-    #[error("invalid path")] InvalidPath,
-    #[error("io error")] Io,
-    #[error("policy violation")] Policy,
+    #[error("invalid path")]
+    InvalidPath,
+    #[error("io error")]
+    Io,
+    #[error("policy violation")]
+    Policy,
 }
 
 #[derive(Debug, Error)]

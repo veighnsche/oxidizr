@@ -6,13 +6,13 @@
 //! - Public mutating APIs operate on `SafePath` only; internal FS code uses capability-style directory handles.
 //! - This crate forbids `unsafe` and uses `rustix` for syscalls.
 
+pub mod adapters;
 pub mod api;
+pub mod fs;
+pub mod logging;
+pub mod policy;
 pub mod preflight;
 pub mod rescue;
 pub mod types;
-pub mod adapters;
-pub mod logging;
-pub mod fs;
-pub mod policy;
 
 pub use api::*;

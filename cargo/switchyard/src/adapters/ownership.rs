@@ -1,4 +1,4 @@
-use crate::types::{safepath::SafePath, errors::Result};
+use crate::types::{errors::Result, safepath::SafePath};
 
 #[derive(Clone, Debug)]
 pub struct OwnershipInfo {

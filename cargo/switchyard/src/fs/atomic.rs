@@ -31,10 +31,17 @@ pub fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn atomic_symlink_swap(source: &Path, target: &Path, allow_degraded: bool) -> std::io::Result<(bool, u64)> {
+pub fn atomic_symlink_swap(
+    source: &Path,
+    target: &Path,
+    allow_degraded: bool,
+) -> std::io::Result<(bool, u64)> {
     // Open parent directory with O_DIRECTORY | O_NOFOLLOW to prevent traversal and races
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
+    let fname = target
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("target");
     let tmp_name = format!(".{}.oxidizr.tmp", fname);
 
     let dirfd = open_dir_nofollow(parent)?;
@@ -45,8 +52,9 @@ pub fn atomic_symlink_swap(source: &Path, target: &Path, allow_degraded: bool) -
 
     // Create symlink using symlinkat relative to parent dirfd
     use std::os::unix::ffi::OsStrExt;
-    let src_c = std::ffi::CString::new(source.as_os_str().as_bytes())
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path"))?;
+    let src_c = std::ffi::CString::new(source.as_os_str().as_bytes()).map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path")
+    })?;
     let tmp_c2 = std::ffi::CString::new(tmp_name.as_str()).unwrap();
     symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 

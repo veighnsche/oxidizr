@@ -1,3 +1,3 @@
 pub mod facts;
 
-pub use facts::{FactsEmitter, AuditSink, JsonlSink};
+pub use facts::{AuditSink, FactsEmitter, JsonlSink};

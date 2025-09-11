@@ -1,5 +1,5 @@
-use cucumber::{given, then, when};
 use crate::world::TestWorld;
+use cucumber::{given, then, when};
 
 // Generic catch-all step definitions to confirm runner wiring.
 // They simply log the step text; replace with specific implementations later.

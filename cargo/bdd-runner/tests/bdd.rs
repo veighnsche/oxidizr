@@ -1,15 +1,15 @@
 #![allow(dead_code)]
 
-#[path = "../src/world.rs"]
-mod world;
 #[path = "../src/steps_common.rs"]
 mod steps_common;
+#[path = "../src/world.rs"]
+mod world;
 
-use world::TestWorld;
-use cucumber::World as _;
 use cucumber::writer::Json;
+use cucumber::World as _;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
+use world::TestWorld;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
