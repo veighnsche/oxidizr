@@ -176,6 +176,99 @@ See `docs/testing/TESTING_POLICY.md` for project-wide rules (zero SKIPs, harness
 
 ---
 
+## Production Policy Preset
+
+For production, enable the following policy toggles to satisfy SPEC v1.1 requirements (L4, H3, RC1) and harden rescue checks:
+
+```rust
+use switchyard::policy::Policy;
+
+let mut policy = Policy::default();
+// Rescue required, with executability checks (BusyBox or ≥6/10 GNU tools must be present and executable)
+policy.require_rescue = true;
+policy.rescue_exec_check = true;
+// Locking and health gates in Commit
+policy.require_lock_manager = true;
+policy.require_smoke_in_commit = true;
+// Optional depending on environment
+policy.allow_degraded_fs = true; // allow EXDEV fallback with telemetry
+// Keep fail-closed behavior (override_preflight=false) unless explicitly overridden for dev
+
+let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+    .with_lock_manager(Box::new(your_lock_manager))
+    .with_smoke_runner(Box::new(your_smoke_runner))
+    .with_ownership_oracle(Box::new(your_ownership_oracle));
+```
+
+These toggles ensure:
+
+- Lock manager is mandatory in Commit; absence fails with `E_LOCKING` (exit code 30).
+- Smoke verification is mandatory in Commit; missing or failing runner yields `E_SMOKE` with auto‑rollback.
+- Rescue profile is verified (presence and X bits) before mutate when required.
+
+---
+
+## Rescue How‑To (Manual Rollback)
+
+When the library cannot run (e.g., toolchain broken) you can manually restore using BusyBox/GNU coreutils.
+
+Backup artifacts next to the target use:
+
+- Backup payload: `.<name>.<tag>.<millis>.bak`
+- Sidecar (JSON): `.<name>.<tag>.<millis>.bak.meta.json`
+
+The sidecar schema (`backup_meta.v1`) includes:
+
+- `prior_kind`: `file` | `symlink` | `none`
+- `prior_dest`: original symlink destination (for `symlink`)
+- `mode`: octal string for file mode (for `file`)
+
+Steps (run in the parent directory of the target):
+
+1) Locate the latest pair (highest `<millis>`):
+
+```sh
+ls -1a .<name>.*.bak* | sort -t '.' -k 4,4n | tail -n 2
+```
+
+2) Read `prior_kind` (and `prior_dest`/`mode`) from the sidecar:
+
+```sh
+jq -r '.prior_kind,.prior_dest,.mode' .<name>.<tag>.<millis>.bak.meta.json
+```
+
+3) Restore according to prior_kind:
+
+- file
+
+```sh
+mv .<name>.<tag>.<millis>.bak <name>
+[ -n "$(jq -r '.mode' .<name>.<tag>.<millis>.bak.meta.json)" ] && \
+  chmod "$(jq -r '.mode' .<name>.<tag>.<millis>.bak.meta.json)" <name>
+sync
+```
+
+- symlink
+
+```sh
+rm -f <name>
+ln -s "$(jq -r '.prior_dest' .<name>.<tag>.<millis>.bak.meta.json)" <name>
+sync
+```
+
+- none
+
+```sh
+rm -f <name>
+sync
+```
+
+Notes:
+
+- Relative `prior_dest` values are relative to the parent directory of `<name>`.
+- The sidecar is retained to allow idempotent retries; do not delete it.
+- Prefer `busybox jq` (or ship a minimal `jq`) for convenience; if `jq` is unavailable, you can inspect the JSON manually.
+
 ## Documentation and Change Control
 
 - Baseline SPEC: `SPEC/SPEC.md`

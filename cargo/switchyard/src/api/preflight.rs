@@ -216,6 +216,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
                 // Annotate whether backup artifacts are present (payload and/or sidecar)
                 let backup_present = crate::fs::symlink::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
+                if api.policy.require_rescue && !backup_present {
+                    stops.push("restore requested but no backup artifacts present".to_string());
+                    notes.push("no backup artifacts present".to_string());
+                }
                 // Build preflight row for report
                 let mut row = json!({
                     "action_id": aid.to_string(),

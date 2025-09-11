@@ -50,3 +50,31 @@ impl Default for Policy {
         }
     }
 }
+
+impl Policy {
+    /// Construct a Policy configured with recommended production defaults.
+    /// This enables:
+    /// - `require_rescue = true` (with `rescue_exec_check = true`)
+    /// - `require_lock_manager = true`
+    /// - `require_smoke_in_commit = true`
+    ///
+    /// Other flags like `allow_degraded_fs` remain at their defaults and should be
+    /// set explicitly depending on your environment.
+    pub fn production_preset() -> Self {
+        let mut p = Self::default();
+        p.require_rescue = true;
+        p.rescue_exec_check = true;
+        p.require_lock_manager = true;
+        p.require_smoke_in_commit = true;
+        p
+    }
+
+    /// Mutate this Policy to apply the recommended production defaults.
+    pub fn apply_production_preset(&mut self) -> &mut Self {
+        self.require_rescue = true;
+        self.rescue_exec_check = true;
+        self.require_lock_manager = true;
+        self.require_smoke_in_commit = true;
+        self
+    }
+}

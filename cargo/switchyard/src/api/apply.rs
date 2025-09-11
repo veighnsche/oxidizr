@@ -217,9 +217,14 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     }
                     Err(e) => {
                         // Map to Silver-tier error ids for atomic swap/exdev
-                        this_err_id = Some(match e.raw_os_error() {
-                            Some(code) if code == libc::EXDEV => ErrorId::E_EXDEV,
-                            _ => ErrorId::E_ATOMIC_SWAP,
+                        let emsg = e.to_string();
+                        this_err_id = Some(if emsg.contains("sidecar write failed") {
+                            ErrorId::E_POLICY
+                        } else {
+                            match e.raw_os_error() {
+                                Some(code) if code == libc::EXDEV => ErrorId::E_EXDEV,
+                                _ => ErrorId::E_ATOMIC_SWAP,
+                            }
                         });
                         errors.push(format!(
                             "symlink {} -> {} failed: {}",

@@ -335,7 +335,11 @@ pub fn replace_file_with_symlink(
                 prior_dest: Some(curr.display().to_string()),
                 mode: None,
             };
-            let _ = write_sidecar(&backup, &sc);
+            if let Err(e) = write_sidecar(&backup, &sc) {
+                if !dry_run {
+                    return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("sidecar write failed: {}", e)));
+                }
+            }
             let _elapsed_ms = t0.elapsed().as_millis() as u64;
             let _ = _elapsed_ms; // reserved for future telemetry
         }
@@ -400,7 +404,11 @@ pub fn replace_file_with_symlink(
                 prior_dest: None,
                 mode: Some(format!("{:o}", mode)),
             };
-            let _ = write_sidecar(&backup_pb, &sc);
+            if let Err(e) = write_sidecar(&backup_pb, &sc) {
+                if !dry_run {
+                    return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("sidecar write failed: {}", e)));
+                }
+            }
             // Remove original target (will be replaced by atomic swap below)
             unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty())
                 .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
@@ -419,7 +427,11 @@ pub fn replace_file_with_symlink(
             prior_dest: None,
             mode: None,
         };
-        let _ = write_sidecar(&backup, &sc);
+        if let Err(e) = write_sidecar(&backup, &sc) {
+            if !dry_run {
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("sidecar write failed: {}", e)));
+            }
+        }
     }
 
     if let Some(parent) = target.parent() {
