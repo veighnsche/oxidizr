@@ -74,8 +74,9 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
   - immutable bit via `lsattr -d` (best‑effort) (REQ‑S2)
   - source ownership/world‑writable gating with `policy.force_untrusted_source` (REQ‑S3)
   - `allow_roots` and `forbid_paths` enforcement (policy)
-- [ ] Strict target ownership via `OwnershipOracle` when `policy.strict_ownership` (REQ‑S4)
-- [ ] Preservation capability gating: detect whether ownership/mode/timestamps/xattrs/ACLs/caps can be preserved and STOP if policy requires but unsupported (REQ‑S5)
+- [x] Strict target ownership via `OwnershipOracle` when `policy.strict_ownership` (REQ‑S4)
+- [~] Preservation capability gating: detect whether ownership/mode/timestamps/xattrs/ACLs/caps can be preserved and STOP if policy requires but unsupported (REQ‑S5)
+  - Detection + facts emission implemented (`preservation{}`, `preservation_supported`); policy STOP wiring pending.
 - [ ] Emit structured preflight diff rows per `SPEC/preflight.yaml` (and ensure dry‑run byte identity)
   
 ### Backup Tagging (Multi-CLI)
@@ -103,10 +104,10 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 
 ## 8) Determinism & Redactions (SPEC §2.7)
 
-- [~] Deterministic `plan_id` and `action_id` (UUIDv5 over normalized inputs/namespace) (REQ‑D1)
-- [~] Dry‑run redactions pinned (timestamps zeroed/expressed as deltas); dry‑run facts byte‑identical to real‑run after redaction (REQ‑D2)
-  - MVP uses `TS_ZERO` constant for `ts` until proper redaction policy is implemented.
-- [~] Stable ordering of plan actions and fact emission streams
+- [x] Deterministic `plan_id` and `action_id` (UUIDv5 over normalized inputs/namespace) (REQ‑D1)
+- [x] Dry‑run redactions pinned; dry‑run facts byte‑identical to real‑run after redaction (REQ‑D2)
+  - Redaction policy extended to remove timings, severity, degraded, content hashes, and mask attestation fields for diffing.
+- [x] Stable ordering of plan actions and fact emission streams
 
 ## 9) Observability & Audit (SPEC §2.4, §5, §13)
 
@@ -114,8 +115,8 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 - [~] Emit structured facts for every step, validating against `SPEC/audit_event.schema.json` (REQ‑O1, REQ‑O3, REQ‑VERS1)
   - Minimal facts emitted via centralized `src/api/audit.rs` for `plan`, `preflight`, `apply.lock`, `apply.attempt`, `apply.result` with `schema_version`, `plan_id`, `action_id` (per‑action), and `path`.
 - [~] Compute and record `before_hash`/`after_hash` (sha256) for mutated files (REQ‑O5) — implemented for symlink ensure; remaining mutations pending
-- [ ] Signed attestation per apply bundle via `Attestor` (ed25519) (REQ‑O4)
-- [~] Final summary includes attestation placeholder when `Attestor` provided; base64‑encodes signature. TODO: real bundle and `bundle_hash`.
+- [~] Signed attestation per apply bundle via `Attestor` (ed25519) (REQ‑O4)
+  - Implemented bundle construction (JSON), `bundle_hash` (sha256), and `public_key_id`; signature included when `Attestor` provided.
 - [ ] Secret masking policy and implementation across all sinks (REQ‑O6)
 - [ ] Provenance completeness fields populated (origin/helper/uid/gid/pkg/env_sanitized) (REQ‑O7)
 - [ ] Golden JSONL fixtures for plan, preflight, apply, rollback facts; CI diff gate (SPEC §12)

@@ -6,6 +6,8 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 use switchyard::adapters::FsOwnershipOracle;
+use std::fs::File;
+use std::io::Write;
 
 #[derive(Default, Clone)]
 struct TestEmitter {
@@ -248,5 +250,80 @@ fn golden_minimal_plan_preflight_apply() {
         assert_eq!(e.get("schema_version"), Some(&Value::from(1)));
         assert!(e.get("plan_id").is_some());
         assert!(e.get("decision").is_some());
+    }
+
+    // Optionally write canon golden files when GOLDEN_OUT_DIR is set.
+    if let Ok(outdir) = std::env::var("GOLDEN_OUT_DIR") {
+        let out = std::path::Path::new(&outdir);
+        std::fs::create_dir_all(out).unwrap();
+
+        // Build per-stage canon arrays with minimal stable fields.
+        // plan: per-action plan facts -> keep stage + action_id
+        let mut canon_plan: Vec<Value> = got
+            .iter()
+            .filter_map(|v| {
+                let o = v.as_object()?;
+                if o.get("stage") == Some(&Value::from("plan")) && o.get("action_id").is_some() {
+                    let aid = o.get("action_id").cloned().unwrap_or(Value::from(""));
+                    Some(serde_json::json!({"stage": "plan", "action_id": aid}))
+                } else { None }
+            })
+            .collect();
+        // preflight: per-action preflight facts -> keep stage + action_id
+        let mut canon_preflight: Vec<Value> = got
+            .iter()
+            .filter_map(|v| {
+                let o = v.as_object()?;
+                if o.get("stage") == Some(&Value::from("preflight")) && o.get("action_id").is_some() {
+                    let aid = o.get("action_id").cloned().unwrap_or(Value::from(""));
+                    Some(serde_json::json!({"stage": "preflight", "action_id": aid}))
+                } else { None }
+            })
+            .collect();
+        // apply.attempt: per-action attempts (those with action_id) -> keep stage + action_id
+        let mut canon_apply_attempt: Vec<Value> = got
+            .iter()
+            .filter_map(|v| {
+                let o = v.as_object()?;
+                if o.get("stage") == Some(&Value::from("apply.attempt")) && o.get("action_id").is_some() {
+                    let aid = o.get("action_id").cloned().unwrap_or(Value::from(""));
+                    Some(serde_json::json!({"stage": "apply.attempt", "action_id": aid}))
+                } else { None }
+            })
+            .collect();
+        // apply.result: per-action results (those with action_id) -> keep stage + action_id + decision
+        let mut canon_apply_result: Vec<Value> = got
+            .iter()
+            .filter_map(|v| {
+                let o = v.as_object()?;
+                if o.get("stage") == Some(&Value::from("apply.result")) && o.get("action_id").is_some() {
+                    let decision = o.get("decision").cloned().unwrap_or(Value::from(""));
+                    let aid = o.get("action_id").cloned().unwrap_or(Value::from(""));
+                    Some(serde_json::json!({"stage": "apply.result", "action_id": aid, "decision": decision}))
+                } else { None }
+            })
+            .collect();
+
+        // Sort by (stage, action_id) for determinism.
+        let key2 = |v: &Value| {
+            let s = v.get("stage").and_then(|x| x.as_str()).unwrap_or("");
+            let a = v.get("action_id").and_then(|x| x.as_str()).unwrap_or("");
+            format!("{}:{}", s, a)
+        };
+        canon_plan.sort_by(|a,b| key2(a).cmp(&key2(b)));
+        canon_preflight.sort_by(|a,b| key2(a).cmp(&key2(b)));
+        canon_apply_attempt.sort_by(|a,b| key2(a).cmp(&key2(b)));
+        canon_apply_result.sort_by(|a,b| key2(a).cmp(&key2(b)));
+
+        // Write files
+        let write_pretty = |path: &std::path::Path, val: &Vec<Value>| {
+            let mut f = File::create(path).unwrap();
+            let s = serde_json::to_string_pretty(val).unwrap();
+            f.write_all(s.as_bytes()).unwrap();
+        };
+        write_pretty(&out.join("canon_plan.json"), &canon_plan);
+        write_pretty(&out.join("canon_preflight.json"), &canon_preflight);
+        write_pretty(&out.join("canon_apply_attempt.json"), &canon_apply_attempt);
+        write_pretty(&out.join("canon_apply_result.json"), &canon_apply_result);
     }
 }

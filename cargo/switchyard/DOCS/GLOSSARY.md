@@ -42,6 +42,8 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __Golden Fixtures__ — Canonical JSONL outputs for plan/preflight/apply/rollback facts, compared byte-for-byte in CI with a zero‑SKIP gate. See `SPEC §12`.
 
+- __Bronze/Silver/Gold/Platinum Tier__ — Maturity levels that apply to a mechanism’s process (e.g., golden fixtures, smoke tests, rollback). “Gold tier” is not the same as “golden fixtures”. See `DOCS/GOLDEN_FIXTURES.md` → Terminology Disambiguation.
+
 - __Health Verification (Smoke Tests)__ — Minimal post-apply command suite; any failure triggers auto-rollback unless explicitly disabled by policy. See `SPEC §2.9`, `SPEC §11`.
 
 - __LockGuard__ — Opaque guard returned by a `LockManager` to serialize mutations. Released on drop. See `SPEC §3.2`, `PLAN/50-locking-concurrency.md`.
