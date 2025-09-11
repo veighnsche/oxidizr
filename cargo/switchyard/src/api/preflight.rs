@@ -3,6 +3,7 @@
 use crate::logging::{FactsEmitter, TS_ZERO};
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, Plan, PreflightReport};
+use serde_json::json;
 
 use super::fs_meta::{kind_of, detect_preservation_capabilities};
 use super::audit::{emit_preflight_fact_ext, emit_summary, AuditCtx, AuditMode};
@@ -13,6 +14,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
 ) -> PreflightReport {
     let mut warnings: Vec<String> = Vec::new();
     let mut stops: Vec<String> = Vec::new();
+    let mut rows: Vec<serde_json::Value> = Vec::new();
     // Shared audit context for preflight stage
     let pid = plan_id(plan);
     let ctx = AuditCtx::new(
@@ -115,13 +117,34 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     },
                     None => None,
                 };
-                let policy_ok = stops.len() == stops_before;
                 let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
+                if api.policy.require_preservation && !preservation_supported {
+                    stops.push("preservation unsupported for target".to_string());
+                }
+                let policy_ok = stops.len() == stops_before;
+                // Build preflight row for report
+                let current_kind = kind_of(&target.as_path());
+                let mut row = json!({
+                    "action_id": aid.to_string(),
+                    "path": target.as_path().display().to_string(),
+                    "current_kind": current_kind,
+                    "planned_kind": "symlink",
+                    "policy_ok": policy_ok,
+                });
+                if let Some(p) = prov.as_ref() {
+                    if let Some(o) = row.as_object_mut() { o.insert("provenance".into(), p.clone()); }
+                }
+                if !notes.is_empty() {
+                    if let Some(o) = row.as_object_mut() { o.insert("notes".into(), json!(notes)); }
+                }
+                if let Some(o) = row.as_object_mut() { o.insert("preservation".into(), preservation.clone()); }
+                if let Some(o) = row.as_object_mut() { o.insert("preservation_supported".into(), json!(preservation_supported)); }
+                rows.push(row);
                 emit_preflight_fact_ext(
                     &ctx,
                     &aid.to_string(),
                     Some(target.as_path().display().to_string()),
-                    &kind_of(&target.as_path()),
+                    &current_kind,
                     "symlink",
                     Some(policy_ok),
                     prov,
@@ -185,6 +208,18 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let aid = action_id(&pid, act, idx);
                 let policy_ok = stops.len() == stops_before;
                 let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
+                // Build preflight row for report
+                let mut row = json!({
+                    "action_id": aid.to_string(),
+                    "path": target.as_path().display().to_string(),
+                    "current_kind": "unknown",
+                    "planned_kind": "restore_from_backup",
+                    "policy_ok": policy_ok,
+                });
+                if !notes.is_empty() { if let Some(o) = row.as_object_mut() { o.insert("notes".into(), json!(notes)); } }
+                if let Some(o) = row.as_object_mut() { o.insert("preservation".into(), preservation.clone()); }
+                if let Some(o) = row.as_object_mut() { o.insert("preservation_supported".into(), json!(preservation_supported)); }
+                rows.push(row);
                 emit_preflight_fact_ext(
                     &ctx,
                     &aid.to_string(),
@@ -206,9 +241,19 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     let decision = if stops.is_empty() { "success" } else { "failure" };
     emit_summary(&ctx, "preflight", decision);
 
-    PreflightReport {
-        ok: stops.is_empty(),
-        warnings,
-        stops,
-    }
+    // Stable ordering of rows by (path, action_id)
+    rows.sort_by(|a, b| {
+        let pa = a.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        let pb = b.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        match pa.cmp(pb) {
+            std::cmp::Ordering::Equal => {
+                let aa = a.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+                let ab = b.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+                aa.cmp(ab)
+            }
+            other => other,
+        }
+    });
+
+    PreflightReport { ok: stops.is_empty(), warnings, stops, rows }
 }

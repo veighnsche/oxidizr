@@ -10,6 +10,12 @@ pub struct Policy {
     pub allow_degraded_fs: bool,
     pub disable_auto_rollback: bool,
     pub backup_tag: String,
+    /// When true, apply() proceeds even if preflight has policy_ok=false rows.
+    /// Default is false (fail-closed). See PLAN/45-preflight.md.
+    pub override_preflight: bool,
+    /// Require filesystem preservation capabilities (owner/mode/timestamps/xattrs/acl/caps).
+    /// When true and the target path lacks support, preflight MUST STOP (unless override_preflight).
+    pub require_preservation: bool,
 }
 
 impl Default for Policy {
@@ -23,6 +29,8 @@ impl Default for Policy {
             allow_degraded_fs: false,
             disable_auto_rollback: false,
             backup_tag: "switchyard".to_string(),
+            override_preflight: false,
+            require_preservation: false,
         }
     }
 }

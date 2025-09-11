@@ -6,6 +6,7 @@ pub struct PreflightReport {
     pub ok: bool,
     pub warnings: Vec<String>,
     pub stops: Vec<String>,
+    pub rows: Vec<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Default)]

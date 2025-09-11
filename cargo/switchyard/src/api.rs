@@ -185,7 +185,9 @@ mod tests {
     fn rollback_reverts_first_action_on_second_failure() {
         let facts = TestEmitter::default();
         let audit = TestAudit::default();
-        let policy = Policy::default();
+        let mut policy = Policy::default();
+        // Allow untrusted sources in test to avoid preflight fail-closed gating
+        policy.force_untrusted_source = true;
         let api = Switchyard::new(facts.clone(), audit, policy);
 
         let td = tempfile::tempdir().unwrap();

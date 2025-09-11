@@ -156,3 +156,65 @@ Sprint Theme: Preflight Diff + Error Mapping + Smoke + Acceptance + Traceability
 - `SPEC/audit_event.schema.json`, `SPEC/preflight.yaml`, `SPEC/traceability.md`
 - `src/api/{plan,preflight,apply,audit,errors}.rs`, `src/logging/redact.rs`, `src/adapters/*`
 - `tests/sprint_acceptance-0001.rs` golden scenarios; `test_ci_runner.py`
+
+---
+
+## Sprint 02 — Execution Update (2025-09-11)
+
+### Completed
+
+- Preflight Diff Rows (SPEC §4)
+  - Implemented per-action preflight rows with full fields and stable ordering.
+  - Fields: `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, `provenance{uid,gid,pkg}`, `notes`, `preservation`, `preservation_supported`.
+  - Code: `src/api/preflight.rs`, `src/types/report.rs` (added `PreflightReport.rows`).
+  - Tests: `tests/sprint_acceptance-0001.rs::preflight_rows_schema_and_ordering`.
+
+- Error Model → Exit Codes (Silver)
+  - Mapped covered failure sites to `ErrorId`→`exit_code` and emitted in facts (`apply.result`).
+  - Covered: `E_POLICY`, `E_ATOMIC_SWAP`, `E_EXDEV`, `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_SMOKE` (+ fallback `E_GENERIC`).
+  - Code: `src/api/apply.rs` (per-action + summary); taxonomy lives in `src/api/errors.rs`.
+  - Tests: assertions added in acceptance tests to verify `error_id/exit_code` emission.
+
+- Minimal Smoke Runner
+  - Added default adapter `DefaultSmokeRunner` (`src/adapters/smoke.rs`).
+  - `apply()` invokes smoke in Commit mode when adapter is provided; auto-rollback on failure unless disabled by policy.
+  - Test: `tests/smoke_rollback.rs` verifies rollback and `E_SMOKE` with exit code.
+
+- Policy & Preservation Gating
+  - Fail-closed gating in `apply()` unless `Policy.override_preflight=true`.
+  - Added `Policy.require_preservation`; preflight marks STOP when unsupported.
+  - Code: `src/policy/config.rs`, `src/api/preflight.rs`, `src/api/apply.rs`.
+  - Test: `apply_fail_closed_on_policy_violation` in `tests/sprint_acceptance-0001.rs`.
+
+- Deterministic Acceptance Scenarios
+  - Extended acceptance tests; ensured DryRun vs Commit identity post-redaction.
+  - Goldens remain stable; optional canon writers preserved.
+
+### Remaining (Sprint 02)
+
+- Traceability (non-blocking CI artifact)
+  - Tool exists at `SPEC/tools/traceability.py`; CI wiring to generate/upload artifact is pending.
+  - Deliverable: attach machine-readable REQ→tests/fixtures mapping to CI artifacts.
+
+- Doc-Sync
+  - SPEC_UPDATE: note `override_preflight` and `require_preservation` policy flags and preflight row emission status.
+  - PLAN/ADR updates: brief notes on Silver coverage scope and policy gating decisions.
+
+### Drift Assessment
+
+- SPEC vs Code
+  - Preflight rows now match `SPEC/preflight.yaml` (fields present, ordering deterministic). No drift.
+  - Error Silver subset matches `DOCS/EXIT_CODES_TIERS.md`; additional IDs remain Bronze/deferred as planned. No drift.
+  - Policy surface expanded (`override_preflight`, `require_preservation`) — requires SPEC_UPDATE (minor). Drift: Pending doc-sync only.
+
+- PLAN vs Code
+  - Stories 1–4 and 6 are implemented and tested.
+  - Story 5 (Traceability CI artifact) is partially done (tool present, CI wiring pending). Drift: Execution-only; plan remains accurate.
+
+### DoD Status
+
+- Code/tests: `cargo test -p switchyard` is green with new tests.
+- Redaction parity holds for DryRun vs Commit scenarios.
+- CI: traceability artifact not yet wired (non-blocking). Doc-sync updates pending.
+
+---
