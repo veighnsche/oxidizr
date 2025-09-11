@@ -4,8 +4,9 @@ use super::{
     plan::{Action, Plan},
     safepath::SafePath,
 };
-
-const NS_TAG: &str = "https://oxidizr-arch/switchyard";
+// UUIDv5 namespace tag for deterministic plan/action IDs.
+// See SPEC Reproducible v1.1 (Determinism) for guidance.
+use crate::constants::NS_TAG;
 
 fn namespace() -> Uuid {
     Uuid::new_v5(&Uuid::NAMESPACE_URL, NS_TAG.as_bytes())

@@ -10,6 +10,7 @@ use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
+use crate::constants::FSYNC_WARN_MS;
 
 use super::fs_meta::{resolve_symlink_target, sha256_hex_of, kind_of};
 use super::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, ensure_provenance, AuditCtx, AuditMode};
@@ -37,25 +38,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         AuditMode { dry_run: dry, redact: dry },
     );
 
-    // Locking (optional in dev/test): acquire process lock with bounded wait; emit telemetry via apply.attempt
+    // Locking (required by default in Commit): acquire process lock with bounded wait; emit telemetry via apply.attempt
     let mut lock_wait_ms: Option<u64> = None;
     let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
-    // L4: Require lock manager in Commit mode when policy enforces it
-    if !dry && api.policy.require_lock_manager && api.lock.is_none() {
-        emit_apply_attempt(&tctx, "failure", json!({
-            "error_id": "E_LOCKING",
-            "exit_code": 30,
-        }));
-        let duration_ms = t0.elapsed().as_millis() as u64;
-        return ApplyReport {
-            executed,
-            duration_ms,
-            errors: vec!["lock manager required in Commit mode".to_string()],
-            plan_uuid: Some(pid),
-            rolled_back,
-            rollback_errors,
-        };
-    }
     if let Some(mgr) = &api.lock {
         let lt0 = Instant::now();
         match mgr.acquire_process_lock(api.lock_timeout_ms) {
@@ -83,9 +68,33 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
         }
     } else {
-        emit_apply_attempt(&tctx, "warn", json!({
-            "no_lock_manager": true,
-        }));
+        if !dry {
+            // Enforce by default unless explicitly allowed through policy, or when require_lock_manager is set.
+            let must_fail = api.policy.require_lock_manager || !api.policy.allow_unlocked_commit;
+            if must_fail {
+                emit_apply_attempt(&tctx, "failure", json!({
+                    "error_id": "E_LOCKING",
+                    "exit_code": 30,
+                }));
+                let duration_ms = t0.elapsed().as_millis() as u64;
+                return ApplyReport {
+                    executed,
+                    duration_ms,
+                    errors: vec!["lock manager required in Commit mode".to_string()],
+                    plan_uuid: Some(pid),
+                    rolled_back,
+                    rollback_errors,
+                };
+            } else {
+                emit_apply_attempt(&tctx, "warn", json!({
+                    "no_lock_manager": true,
+                }));
+            }
+        } else {
+            emit_apply_attempt(&tctx, "warn", json!({
+                "no_lock_manager": true,
+            }));
+        }
     }
 
     // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
@@ -269,7 +278,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         }
                     }
                 }
-                if errors.is_empty() && fsync_ms > 50 {
+                if errors.is_empty() && fsync_ms > FSYNC_WARN_MS {
                     let obj = extra.as_object_mut().unwrap();
                     obj.insert("severity".to_string(), json!("warn"));
                 }
@@ -476,7 +485,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 hasher.update(&bundle);
                 let bundle_hash = hex::encode(hasher.finalize());
                 let att_json = json!({
-                    "sig_alg": "ed25519",
+                    "sig_alg": att.algorithm(),
                     "signature": sig_b64,
                     "bundle_hash": bundle_hash,
                     "public_key_id": att.key_id(),

@@ -5,6 +5,7 @@ use rustix::fd::OwnedFd;
 use rustix::fs::{openat, renameat, symlinkat, unlinkat, AtFlags, Mode, OFlags, CWD};
 use rustix::io::Errno;
 use std::time::Instant;
+use crate::constants::TMP_SUFFIX;
 
 fn errno_to_io(e: Errno) -> std::io::Error {
     std::io::Error::from_raw_os_error(e.raw_os_error())
@@ -42,7 +43,7 @@ pub fn atomic_symlink_swap(
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("target");
-    let tmp_name = format!(".{}.oxidizr.tmp", fname);
+    let tmp_name = format!(".{}{}", fname, TMP_SUFFIX);
 
     let dirfd = open_dir_nofollow(parent)?;
 

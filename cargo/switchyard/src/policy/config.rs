@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use crate::constants::DEFAULT_BACKUP_TAG;
 
 /// Policy governs preflight gates, apply behavior, and production hardening for Switchyard.
 ///
@@ -54,6 +55,11 @@ pub struct Policy {
     /// configured, apply() MUST fail early with E_LOCKING (exit code 30) without mutating state.
     /// Enforced at the top of `src/api/apply.rs`.
     pub require_lock_manager: bool,
+    /// Allow Commit mode to proceed without a LockManager. Defaults to true for development
+    /// ergonomics; set to false in hardened environments to fail-closed unless a lock manager
+    /// is configured. If both `require_lock_manager` and `allow_unlocked_commit` are set, the
+    /// requirement takes precedence and missing lock will fail.
+    pub allow_unlocked_commit: bool,
     /// In Commit mode, require that a SmokeTestRunner is configured and passes. When true and
     /// no runner is configured, apply() MUST fail with E_SMOKE and auto-rollback unless disabled.
     /// Enforced in the post-apply smoke section of `src/api/apply.rs`.
@@ -74,13 +80,14 @@ impl Default for Policy {
             force_restore_best_effort: false,
             allow_degraded_fs: false,
             disable_auto_rollback: false,
-            backup_tag: "switchyard".to_string(),
+            backup_tag: DEFAULT_BACKUP_TAG.to_string(),
             override_preflight: false,
             require_preservation: false,
             require_rescue: false,
             require_lock_manager: false,
             require_smoke_in_commit: false,
             rescue_exec_check: false,
+            allow_unlocked_commit: true,
         }
     }
 }

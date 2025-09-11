@@ -121,7 +121,7 @@
 
 ---
 
-## 16) `unsafe` With Proof Obligations
+## 16) `unsafe` With Proof Obligations (`unsafe` IS FORBIDDEN PER CURRENT POLICY)
 
 * Default to `#![forbid(unsafe_code)]`.
 * If needed, isolate `unsafe` in a small module:

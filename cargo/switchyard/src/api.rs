@@ -4,6 +4,7 @@ use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
+use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 
 // Internal API submodules (planned split)
 #[path = "api/fs_meta.rs"]
@@ -42,7 +43,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             owner: None,
             attest: None,
             smoke: None,
-            lock_timeout_ms: 5000,
+            lock_timeout_ms: DEFAULT_LOCK_TIMEOUT_MS,
         }
     }
 

@@ -1,4 +1,17 @@
-/// placeholder
+//! Symlink replacement and backup/restore primitives.
+//!
+//! This module provides TOCTOU-safe helpers used by the higher-level API to:
+//! - Atomically replace a target with a symlink to a source within the same directory
+//!   using `open_dir_nofollow` + `symlinkat` + `renameat` + `fsync(parent)`.
+//! - Create timestamped backup artifacts next to the target before mutation.
+//!   Backup payload and sidecar naming:
+//!     - Backup payload: `.<name>.<tag>.<millis>.bak`
+//!     - Sidecar (JSON): `.<name>.<tag>.<millis>.bak.meta.json`
+//!   The sidecar follows schema `backup_meta.v1` and records `prior_kind` (file|symlink|none),
+//!   `prior_dest` for symlinks, and `mode` (octal string) for files to allow exact restoration.
+//! - Restore a target from its latest backup according to the sidecar, idempotently.
+//!
+//! These helpers are pure mechanism and perform no logging; policy and fact emission live in `api/*`.
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
@@ -8,8 +21,6 @@ use super::atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
 use rustix::fs::{fchmod, openat, renameat, unlinkat, AtFlags, Mode, OFlags};
 use std::os::unix::fs::PermissionsExt;
 use serde::{Deserialize, Serialize};
-
-const DEFAULT_BACKUP_TAG: &str = "switchyard";
 
 /// Generate a unique backup path for a target file (includes a timestamp).
 pub fn backup_path_with_tag(target: &Path, tag: &str) -> PathBuf {
@@ -134,6 +145,7 @@ fn find_latest_backup(target: &Path, tag: &str) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use std::io::Write;
+    use crate::constants::DEFAULT_BACKUP_TAG;
 
     fn tmpdir() -> tempfile::TempDir {
         tempfile::tempdir().expect("tempdir")

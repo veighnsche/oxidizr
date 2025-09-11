@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use crate::types::errors::{Error, ErrorKind, Result};
 use fs2::FileExt;
+use crate::constants::LOCK_POLL_MS;
 
 use super::{LockGuard, LockManager};
 
@@ -46,7 +47,7 @@ impl LockManager for FileLockManager {
                     if t0.elapsed() >= Duration::from_millis(timeout_ms) {
                         return Err(Error { kind: ErrorKind::Policy, msg: "E_LOCKING: timeout acquiring process lock".to_string() });
                     }
-                    thread::sleep(Duration::from_millis(25));
+                    thread::sleep(Duration::from_millis(LOCK_POLL_MS));
                 }
             }
         }

@@ -1,4 +1,5 @@
 use std::env;
+use crate::constants::{RESCUE_MUST_HAVE, RESCUE_MIN_COUNT};
 
 /// Verify that at least one rescue toolset is available on PATH (BusyBox or GNU core utilities).
 /// Wrapper that does not enforce executability checks.
@@ -19,15 +20,15 @@ pub fn verify_rescue_tools_with_exec(exec_check: bool) -> bool {
         if !exec_check || is_executable(&p) { return true; }
     }
     // Fallback: require a tiny subset of GNU core tools to be present
-    let must_have = ["cp", "mv", "rm", "ln", "stat", "readlink", "sha256sum", "sort", "date", "ls"];
+    let must_have = RESCUE_MUST_HAVE;
     let mut found = 0usize;
     for bin in must_have.iter() {
         if let Some(p) = which_on_path(bin) {
             if !exec_check || is_executable(&p) { found += 1; }
         }
     }
-    // Heuristic: at least 6/10 present counts as available for rescue in this minimal check
-    found >= 6
+    // Heuristic: at least RESCUE_MIN_COUNT present counts as available for rescue in this minimal check
+    found >= RESCUE_MIN_COUNT
 }
 
 fn which_on_path(bin: &str) -> Option<String> {
