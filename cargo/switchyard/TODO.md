@@ -32,8 +32,8 @@ Legend:
 - [x] `SafePath` type rejects `..` and escaping roots (`src/types/safepath.rs`)
 - [~] All mutating entry points accept `SafePath` (API uses `SafePath` but `fs/*` operate on `&Path` internally)
 - [x] TOCTOU‑safe syscall sequence
-  - Present: `open_dir_nofollow`, `symlinkat`/`unlinkat`, `renameat`, `fsync(parent)` (`src/fs/atomic.rs`)
-  - Note: final component creation uses *at variants for TOCTOU safety; additional mutation types still need the same pattern enforced.
+  - Present: `openat` (via `rustix`), `symlinkat`/`unlinkat`, `renameat`, `fsync(parent)` (`src/fs/atomic.rs`)
+  - All mutations use capability-style directory handles and the *at APIs.
 - [~] Unit/property tests for `SafePath` normalization and negative cases beyond `rejects_dotdot`
 
 ## 4) Atomicity & Rollback Engine (SPEC §2.1, §2.2)
@@ -55,6 +55,10 @@ Legend:
 - [ ] Strict target ownership via `OwnershipOracle` when `policy.strict_ownership` (REQ‑S4)
 - [ ] Preservation capability gating: detect whether ownership/mode/timestamps/xattrs/ACLs/caps can be preserved and STOP if policy requires but unsupported (REQ‑S5)
 - [ ] Emit structured preflight diff rows per `SPEC/preflight.yaml` (and ensure dry‑run byte identity)
+  
+### Backup Tagging (Multi-CLI)
+- [x] Policy includes `backup_tag` (default `"switchyard"`); CLIs set their own tag to isolate backups.
+- [x] Backup naming `.basename.<backup_tag>.<unix_millis>.bak`; restore selects latest matching tag.
 
 ## 6) Cross‑Filesystem & Degraded Mode (SPEC §2.10)
 
@@ -126,7 +130,7 @@ Legend:
 
 ## 15) Filesystem Ops Hardening
 
-- [ ] Use `openat` + `O_NOFOLLOW` for final component operations to fully meet TOCTOU sequence (REQ‑TOCTOU1)
+- [x] Use `openat` + `O_NOFOLLOW` for final component operations to fully meet TOCTOU sequence (REQ‑TOCTOU1)
 - [ ] Bound `fsync(parent)` timing ≤ 50ms after rename; record telemetry (REQ‑BND1)
 - [ ] Preserve and/or gate ownership/mode/timestamps/xattrs/ACLs/caps as required by policy (ties to REQ‑S5)
 
@@ -149,6 +153,14 @@ Legend:
 - [ ] Crate‑level docs: guarantees, safety model, adapter interfaces, examples
 - [ ] Module‑level docs for `fs`, `preflight`, `api`, `types`, `adapters`, `logging`, `policy`
 - [ ] Update `PLAN/20-spec-traceability.md` as implementation proceeds
+  - [x] Updated PLAN impl docs: `impl/00-structure.md` (rustix & unsafe ban notes) and `impl/15-policy-and-adapters.md` (backup_tag policy).
+  - [x] Updated SPEC: safe Rust policy (`#![forbid(unsafe_code)]`), rustix capability style, backup_tag.
+
+## 19) Safety & Implementation
+
+- [x] Migrate FS layer to `rustix` and eliminate `unsafe`/`libc` in crate.
+- [~] Record and emit fsync timing per mutation; WARN on >50ms with `severity=warn`.
+- [ ] Schema validation for facts and golden fixtures.
 
 ---
 

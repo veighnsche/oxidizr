@@ -19,6 +19,7 @@ struct PolicyFlags {
     disable_auto_rollback: bool,  // allow skipping auto-rollback on smoke failure (REQ-H2)
     require_rescue: bool,         // require rescue profile & fallback toolset (REQ-RC2)
     override_preflight: bool,     // allow operator to override certain gates (dangerous)
+    backup_tag: String,           // selects the CLI/user namespace for backups (e.g., "switchyard" by default)
 }
 ```
 
@@ -30,6 +31,14 @@ Defaults are conservative:
 - `disable_auto_rollback = false`.
 - `require_rescue = true` by default in production.
 - `override_preflight = false`.
+- `backup_tag = "switchyard"` by default. CLI integrators MUST override this tag to their own namespace when multiple CLIs co-exist and share Switchyard.
+
+### Backup Tagging
+
+- Each mutating operation that creates a backup writes to a file named:
+  `.basename.<backup_tag>.<unix_millis>.bak`
+- On restore, Switchyard selects the latest matching backup for the given `backup_tag` only. This avoids cross-CLI interference.
+- The tag is provided via `Policy.backup_tag` and SHOULD be set by the embedding application/CLI.
 
 ## Adapters Bundle
 
@@ -49,6 +58,7 @@ Notes:
 
 - All adapter traits are `Send + Sync` to support thread-safe use (SPEC §14).
 - In production deployments, `lock` MUST be present (REQ-L4); omission is allowed only in dev/test where WARN facts are emitted (REQ-L2).
+- Filesystem syscalls are made via `rustix` with capability-style directory handles; this crate forbids `unsafe` (`#![forbid(unsafe_code)]`).
 
 ## Stability & Semver (Planning)
 

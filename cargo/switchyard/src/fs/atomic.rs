@@ -1,18 +1,26 @@
-/// placeholder
-
 use std::fs;
-use std::os::unix::io::RawFd;
 use std::path::Path;
-use libc;
 
-pub fn open_dir_nofollow(dir: &Path) -> std::io::Result<RawFd> {
+use rustix::fd::OwnedFd;
+use rustix::fs::{openat, renameat, symlinkat, unlinkat, AtFlags, Mode, OFlags, CWD};
+use rustix::io::Errno;
+use std::time::Instant;
+
+fn errno_to_io(e: Errno) -> std::io::Error {
+    std::io::Error::from_raw_os_error(e.raw_os_error())
+}
+
+pub fn open_dir_nofollow(dir: &Path) -> std::io::Result<OwnedFd> {
     use std::os::unix::ffi::OsStrExt;
     let c = std::ffi::CString::new(dir.as_os_str().as_bytes())
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))?;
-    let flags = libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW;
-    let fd = unsafe { libc::open(c.as_ptr(), flags, 0) };
-    if fd < 0 { return Err(std::io::Error::last_os_error()); }
-    Ok(fd)
+    openat(
+        &CWD,
+        c.as_c_str(),
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+        Mode::empty(),
+    )
+    .map_err(errno_to_io)
 }
 
 pub fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
@@ -23,7 +31,7 @@ pub fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn atomic_symlink_swap(source: &Path, target: &Path, allow_degraded: bool) -> std::io::Result<bool> {
+pub fn atomic_symlink_swap(source: &Path, target: &Path, allow_degraded: bool) -> std::io::Result<(bool, u64)> {
     // Open parent directory with O_DIRECTORY | O_NOFOLLOW to prevent traversal and races
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
     let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
@@ -33,43 +41,32 @@ pub fn atomic_symlink_swap(source: &Path, target: &Path, allow_degraded: bool) -
 
     // Best-effort unlink temporary name if present (ignore errors)
     let tmp_c = std::ffi::CString::new(tmp_name.as_str()).unwrap();
-    unsafe { libc::unlinkat(dirfd, tmp_c.as_ptr(), 0) };
+    let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
 
     // Create symlink using symlinkat relative to parent dirfd
-    // Note: symlink "target" argument is the link's content (where it points to)
     use std::os::unix::ffi::OsStrExt;
     let src_c = std::ffi::CString::new(source.as_os_str().as_bytes())
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path"))?;
     let tmp_c2 = std::ffi::CString::new(tmp_name.as_str()).unwrap();
-    let rc_symlink = unsafe { libc::symlinkat(src_c.as_ptr(), dirfd, tmp_c2.as_ptr()) };
-    if rc_symlink != 0 {
-        let e = std::io::Error::last_os_error();
-        unsafe { libc::close(dirfd) };
-        return Err(e);
-    }
+    symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 
     // Atomically rename tmp -> fname within the same directory
     let new_c = std::ffi::CString::new(fname).unwrap();
-    let rc = unsafe { libc::renameat(dirfd, tmp_c2.as_ptr(), dirfd, new_c.as_ptr()) };
-    if rc != 0 {
-        let last = std::io::Error::last_os_error();
-        if last.raw_os_error() == Some(libc::EXDEV) && allow_degraded {
-            // Fall back: best-effort non-atomic replacement
-            // Remove final if present
-            unsafe { libc::unlinkat(dirfd, new_c.as_ptr(), 0) };
-            // Create symlink directly at final name
-            let rc2 = unsafe { libc::symlinkat(src_c.as_ptr(), dirfd, new_c.as_ptr()) };
-            let last2 = std::io::Error::last_os_error();
-            unsafe { libc::close(dirfd) };
-            if rc2 != 0 { return Err(last2); }
+    let t0 = Instant::now();
+    match renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str()) {
+        Ok(()) => {
             let _ = fsync_parent_dir(target);
-            return Ok(true);
-        } else {
-            unsafe { libc::close(dirfd) };
-            return Err(last);
+            let fsync_ms = t0.elapsed().as_millis() as u64;
+            Ok((false, fsync_ms))
         }
+        Err(e) if e == Errno::XDEV && allow_degraded => {
+            // Fall back: best-effort non-atomic replacement
+            let _ = unlinkat(&dirfd, new_c.as_c_str(), AtFlags::empty());
+            symlinkat(src_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(errno_to_io)?;
+            let _ = fsync_parent_dir(target);
+            let fsync_ms = t0.elapsed().as_millis() as u64;
+            Ok((true, fsync_ms))
+        }
+        Err(e) => Err(errno_to_io(e)),
     }
-    let _ = fsync_parent_dir(target);
-    unsafe { libc::close(dirfd) };
-    Ok(false)
 }

@@ -52,6 +52,15 @@ This is a planning artifact for `cargo/switchyard`. No Rust implementation is in
 - EXDEV fallback per `ADR-0011-exdev-degraded-mode.md`.
 - Rescue profile always available; preflight verifies fallback toolset on PATH (GNU or BusyBox) (REQ-RC1..RC3).
 
+### Implementation Notes (Rustix & Unsafe Ban)
+
+- System calls are performed via `rustix`, not `libc` nor raw FDs. We use:
+  - `openat` with `OFlags::DIRECTORY | OFlags::NOFOLLOW` for parent handles.
+  - `symlinkat`, `renameat`, and `unlinkat` for final-component operations.
+  - Capability-style API: operations are expressed relative to an `OwnedFd` for the parent directory; no ambient absolute path traversal.
+- The crate has `#![forbid(unsafe_code)]` at `src/lib.rs`. Any attempt to introduce `unsafe` will fail the build.
+- The FS layer records `fsync(parent)` timings and surfaces telemetry to the API for WARN-on-breach of the ≤50ms bound (REQ-BND1).
+
 ## Placeholder Migration Mapping (planning)
 
 Current placeholder files under `src/` will be reorganized into the proposed modules as follows. This planning intentionally does not constrain itself to the current placeholder layout.

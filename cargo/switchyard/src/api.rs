@@ -261,8 +261,9 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     });
                     self.facts.emit("switchyard", "apply.attempt", "success", fields);
                     let mut degraded_used = false;
-                    match fs::replace_file_with_symlink(&source.as_path(), &target.as_path(), dry, self.policy.allow_degraded_fs) {
-                        Ok(d) => { degraded_used = d; executed.push(act.clone()); },
+                    let mut fsync_ms: u64 = 0;
+                    match fs::replace_file_with_symlink(&source.as_path(), &target.as_path(), dry, self.policy.allow_degraded_fs, &self.policy.backup_tag) {
+                        Ok((d, ms)) => { degraded_used = d; fsync_ms = ms; executed.push(act.clone()); },
                         Err(e) => errors.push(format!(
                             "symlink {} -> {} failed: {}",
                             source.as_path().display(),
@@ -272,7 +273,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     }
                     // Minimal Facts v1: per-action result
                     let decision = if errors.is_empty() { "success" } else { "failure" };
-                    let fields = json!({
+                    let mut fields = json!({
                         "schema_version": 1,
                         "ts": TS_ZERO,
                         "plan_id": pid.to_string(),
@@ -281,7 +282,13 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         "action_id": _aid.to_string(),
                         "path": target.as_path().display().to_string(),
                         "degraded": if degraded_used { Some(true) } else { None },
+                        "duration_ms": fsync_ms,
                     });
+                    if errors.is_empty() && fsync_ms > 50 {
+                        // Warn on fsync bound breach
+                        let obj = fields.as_object_mut().unwrap();
+                        obj.insert("severity".to_string(), json!("warn"));
+                    }
                     self.facts.emit("switchyard", "apply.result", decision, fields);
                 }
                 Action::RestoreFromBackup { target } => {
@@ -296,7 +303,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         "path": target.as_path().display().to_string(),
                     });
                     self.facts.emit("switchyard", "apply.attempt", "success", fields);
-                    match fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort) {
+                    match fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort, &self.policy.backup_tag) {
                         Ok(()) => executed.push(act.clone()),
                         Err(e) => errors.push(format!(
                             "restore {} failed: {}",
@@ -326,7 +333,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     for prev in executed.iter().rev() {
                         match prev {
                             Action::EnsureSymlink { source: _source, target } => {
-                                match fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort) {
+                                match fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort, &self.policy.backup_tag) {
                                     Ok(()) => {
                                         let fields = json!({
                                             "schema_version": 1,
@@ -386,7 +393,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         for prev in executed.iter().rev() {
                             match prev {
                                 Action::EnsureSymlink { source: _s, target } => {
-                                    let _ = fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort)
+                                    let _ = fs::restore_file(&target.as_path(), dry, self.policy.force_restore_best_effort, &self.policy.backup_tag)
                                         .map_err(|e| rollback_errors.push(format!("rollback restore {} failed: {}", target.as_path().display(), e)));
                                 }
                                 Action::RestoreFromBackup { .. } => {
