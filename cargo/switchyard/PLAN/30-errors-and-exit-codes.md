@@ -75,6 +75,12 @@ fn record_failure_fact(action_id: Option<Uuid>, path: Option<&SafePath>, kind: E
 - Lock acquisition timeouts MUST yield `E_LOCKING` and capture `lock_wait_ms` (REQ-L3).
 - On rollback failure, facts MUST capture partial restoration state and guidance (REQ-R5). Prefer specific kinds (`E_RESTORE_FAILED`).
 
+## Sprint 02 Tier Target (Silver)
+
+- Covered this sprint (Silver): `E_LOCKING`, `E_POLICY`, `E_BACKUP_MISSING`, `E_RESTORE_FAILED`, `E_SMOKE`.
+- Deferred (remain Bronze): `E_ATOMIC_SWAP`, `E_EXDEV`, `E_OWNERSHIP` (beyond policy stops), and any additional granular IDs discovered during development.
+- Policy: Follow `DOCS/EXIT_CODES_TIERS.md` and ADR-0014 — do not over-claim coverage; mapping comments must clearly mark Covered vs Deferred.
+
 ## Determinism Considerations
 
 - Error handling MUST NOT introduce nondeterministic fields into facts. For dry-run parity, redact timestamps and keep field ordering stable (see `impl/40-facts-logging.md`).

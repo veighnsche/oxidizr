@@ -21,6 +21,11 @@ References:
 - Sort rows deterministically by (`path`, `action_id`).
 - Enforce fail-closed on critical violations unless explicit policy override is set (loud logs). (REQ-C2)
 
+### Apply Wiring Note (Sprint 02 scope)
+
+- `apply()` MUST refuse to execute mutations when corresponding preflight rows indicate `policy_ok=false`, unless an explicit override flag in `Policy` is set (e.g., `override_preflight=true`).
+- When refused, emit a failure fact with `error_id=E_POLICY` and an appropriate `exit_code` per tier (see Exit Codes Silver coverage in `PLAN/30-errors-and-exit-codes.md`).
+
 ## Capability Gating & Adapters
 
 - Ownership: use `OwnershipOracle.owner_of(&SafePath)` and require root-owned, not world-writable by default. (REQ-S3)
