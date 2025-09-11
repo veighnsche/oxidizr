@@ -1,73 +1,11 @@
 /// Placeholder
 
-use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::{preflight, symlink};
-
-/// Structured facts emitter (machine-readable events). Kept minimal for phase 1.
-pub trait FactsEmitter {
-    fn emit(&self, _subsystem: &str, _event: &str, _decision: &str, _fields: serde_json::Value) {}
-}
-
-/// Human-readable audit sink (lines/messages). Kept minimal for phase 1.
-pub trait AuditSink {
-    fn log(&self, _level: log::Level, _msg: &str) {}
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Policy {
-    pub allow_roots: Vec<PathBuf>,
-    pub forbid_paths: Vec<PathBuf>,
-    pub strict_ownership: bool,
-    pub force_untrusted_source: bool,
-    pub force_restore_best_effort: bool,
-}
-
-#[derive(Clone, Debug)]
-pub enum ApplyMode {
-    DryRun,
-    Commit,
-}
-
-impl Default for ApplyMode {
-    fn default() -> Self { ApplyMode::DryRun }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct LinkRequest { pub source: PathBuf, pub target: PathBuf }
-
-#[derive(Clone, Debug, Default)]
-pub struct RestoreRequest { pub target: PathBuf }
-
-#[derive(Clone, Debug, Default)]
-pub struct PlanInput {
-    pub link: Vec<LinkRequest>,
-    pub restore: Vec<RestoreRequest>,
-}
-
-#[derive(Clone, Debug)]
-pub enum Action {
-    EnsureSymlink { source: PathBuf, target: PathBuf },
-    RestoreFromBackup { target: PathBuf },
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Plan { pub actions: Vec<Action> }
-
-#[derive(Clone, Debug, Default)]
-pub struct PreflightReport {
-    pub ok: bool,
-    pub warnings: Vec<String>,
-    pub stops: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct ApplyReport {
-    pub executed: Vec<Action>,
-    pub duration_ms: u64,
-    pub errors: Vec<String>,
-}
+use crate::{preflight, fs};
+use crate::logging::{FactsEmitter, AuditSink};
+use crate::policy::Policy;
+use crate::types::{PlanInput, Plan, Action, PreflightReport, ApplyMode, ApplyReport};
 
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
@@ -96,21 +34,17 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         for act in &plan.actions {
             match act {
                 Action::EnsureSymlink { source, target } => {
-                    if !symlink::is_safe_path(source) || !symlink::is_safe_path(target) {
-                        stops.push(format!("unsafe path (traversal): source={} target={}", source.display(), target.display()));
-                        continue;
-                    }
                     if let Err(e) = preflight::ensure_mount_rw_exec(std::path::Path::new("/usr")) {
                         stops.push(format!("/usr not rw+exec: {}", e));
                     }
                     if let Err(e) = preflight::ensure_mount_rw_exec(target.as_path()) {
-                        stops.push(format!("target not rw+exec: {} (target={})", e, target.display()));
+                        stops.push(format!("target not rw+exec: {} (target={})", e, target.as_path().display()));
                     }
                     if let Err(e) = preflight::check_immutable(target.as_path()) {
-                        stops.push(format!("immutable target: {} (target={})", e, target.display()));
+                        stops.push(format!("immutable target: {} (target={})", e, target.as_path().display()));
                     }
                     match preflight::check_source_trust(source.as_path(), self.policy.force_untrusted_source) {
-                        Ok(()) => {},
+                        Ok(()) => {}
                         Err(e) => {
                             if self.policy.force_untrusted_source {
                                 warnings.push(format!("untrusted source allowed by policy: {}", e));
@@ -120,33 +54,35 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                         }
                     }
                     if !self.policy.allow_roots.is_empty() {
-                        let in_allowed = self.policy.allow_roots.iter().any(|r| target.starts_with(r));
-                        if !in_allowed { stops.push(format!("target outside allowed roots: {}", target.display())); }
+                        let target_abs = target.as_path();
+                        let in_allowed = self.policy.allow_roots.iter().any(|r| target_abs.starts_with(r));
+                        if !in_allowed {
+                            stops.push(format!("target outside allowed roots: {}", target_abs.display()));
+                        }
                     }
-                    if self.policy.forbid_paths.iter().any(|f| target.starts_with(f)) {
-                        stops.push(format!("target in forbidden path: {}", target.display()));
+                    if self.policy.forbid_paths.iter().any(|f| target.as_path().starts_with(f)) {
+                        stops.push(format!("target in forbidden path: {}", target.as_path().display()));
                     }
                 }
                 Action::RestoreFromBackup { target } => {
-                    if !symlink::is_safe_path(target) {
-                        stops.push(format!("unsafe target path (traversal): {}", target.display()));
-                        continue;
-                    }
                     if let Err(e) = preflight::ensure_mount_rw_exec(std::path::Path::new("/usr")) {
                         stops.push(format!("/usr not rw+exec: {}", e));
                     }
                     if let Err(e) = preflight::ensure_mount_rw_exec(target.as_path()) {
-                        stops.push(format!("target not rw+exec: {} (target={})", e, target.display()));
+                        stops.push(format!("target not rw+exec: {} (target={})", e, target.as_path().display()));
                     }
                     if let Err(e) = preflight::check_immutable(target.as_path()) {
-                        stops.push(format!("immutable target: {} (target={})", e, target.display()));
+                        stops.push(format!("immutable target: {} (target={})", e, target.as_path().display()));
                     }
                     if !self.policy.allow_roots.is_empty() {
-                        let in_allowed = self.policy.allow_roots.iter().any(|r| target.starts_with(r));
-                        if !in_allowed { stops.push(format!("target outside allowed roots: {}", target.display())); }
+                        let target_abs = target.as_path();
+                        let in_allowed = self.policy.allow_roots.iter().any(|r| target_abs.starts_with(r));
+                        if !in_allowed {
+                            stops.push(format!("target outside allowed roots: {}", target_abs.display()));
+                        }
                     }
-                    if self.policy.forbid_paths.iter().any(|f| target.starts_with(f)) {
-                        stops.push(format!("target in forbidden path: {}", target.display()));
+                    if self.policy.forbid_paths.iter().any(|f| target.as_path().starts_with(f)) {
+                        stops.push(format!("target in forbidden path: {}", target.as_path().display()));
                     }
                 }
             }
@@ -164,15 +100,24 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         for act in &plan.actions {
             match act {
                 Action::EnsureSymlink { source, target } => {
-                    match symlink::replace_file_with_symlink(source.as_path(), target.as_path(), dry) {
+                    match fs::replace_file_with_symlink(source.as_path(), target.as_path(), dry) {
                         Ok(()) => executed.push(act.clone()),
-                        Err(e) => errors.push(format!("symlink {} -> {} failed: {}", source.display(), target.display(), e)),
+                        Err(e) => errors.push(format!(
+                            "symlink {} -> {} failed: {}",
+                            source.as_path().display(),
+                            target.as_path().display(),
+                            e
+                        )),
                     }
                 }
                 Action::RestoreFromBackup { target } => {
-                    match symlink::restore_file(target.as_path(), dry, self.policy.force_restore_best_effort) {
+                    match fs::restore_file(target.as_path(), dry, self.policy.force_restore_best_effort) {
                         Ok(()) => executed.push(act.clone()),
-                        Err(e) => errors.push(format!("restore {} failed: {}", target.display(), e)),
+                        Err(e) => errors.push(format!(
+                            "restore {} failed: {}",
+                            target.as_path().display(),
+                            e
+                        )),
                     }
                 }
             }
