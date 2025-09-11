@@ -1,16 +1,15 @@
-use crate::logging::TS_ZERO;
-use crate::logging::FactsEmitter;
-use serde_json::json;
+use crate::logging::{redact_event, FactsEmitter, TS_ZERO};
+use serde_json::{json, Value};
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub(crate) const SCHEMA_VERSION: i64 = 1;
 
 #[derive(Clone, Debug, Default)]
-pub struct AuditMode {
+pub(crate) struct AuditMode {
     pub dry_run: bool,
     pub redact: bool,
 }
 
-pub struct AuditCtx<'a> {
+pub(crate) struct AuditCtx<'a> {
     pub facts: &'a dyn FactsEmitter,
     pub plan_id: String,
     pub ts: String,
@@ -18,25 +17,41 @@ pub struct AuditCtx<'a> {
 }
 
 impl<'a> AuditCtx<'a> {
-    pub fn new(facts: &'a dyn FactsEmitter, plan_id: String, ts: String, mode: AuditMode) -> Self {
+    pub(crate) fn new(
+        facts: &'a dyn FactsEmitter,
+        plan_id: String,
+        ts: String,
+        mode: AuditMode,
+    ) -> Self {
         Self { facts, plan_id, ts, mode }
     }
 }
 
-pub fn emit_plan_fact(ctx: &AuditCtx, action_id: &str, path: Option<&str>) {
+fn redact_and_emit(ctx: &AuditCtx, subsystem: &str, event: &str, decision: &str, mut fields: Value) {
+    // Ensure minimal envelope fields
+    if let Some(obj) = fields.as_object_mut() {
+        obj.entry("schema_version").or_insert(json!(SCHEMA_VERSION));
+        obj.entry("ts").or_insert(json!(ctx.ts));
+        obj.entry("plan_id").or_insert(json!(ctx.plan_id));
+        obj.entry("path").or_insert(json!(""));
+    }
+    // Apply redaction policy in dry-run or when requested
+    let out = if ctx.mode.redact { redact_event(fields) } else { fields };
+    ctx.facts.emit(subsystem, event, decision, out);
+}
+
+pub(crate) fn emit_plan_fact(ctx: &AuditCtx, action_id: &str, path: Option<&str>) {
     let fields = json!({
-        "schema_version": SCHEMA_VERSION,
         "ts": TS_ZERO,
-        "plan_id": ctx.plan_id,
         "stage": "plan",
         "decision": "success",
         "action_id": action_id,
         "path": path,
     });
-    ctx.facts.emit("switchyard", "plan", "success", fields);
+    redact_and_emit(ctx, "switchyard", "plan", "success", fields);
 }
 
-pub fn emit_preflight_fact(
+pub(crate) fn emit_preflight_fact(
     ctx: &AuditCtx,
     action_id: &str,
     path: Option<&str>,
@@ -44,9 +59,7 @@ pub fn emit_preflight_fact(
     planned_kind: &str,
 ) {
     let fields = json!({
-        "schema_version": SCHEMA_VERSION,
         "ts": TS_ZERO,
-        "plan_id": ctx.plan_id,
         "stage": "preflight",
         "decision": "success",
         "action_id": action_id,
@@ -54,34 +67,26 @@ pub fn emit_preflight_fact(
         "current_kind": current_kind,
         "planned_kind": planned_kind,
     });
-    ctx.facts.emit("switchyard", "preflight", "success", fields);
+    redact_and_emit(ctx, "switchyard", "preflight", "success", fields);
 }
 
-pub fn emit_apply_attempt(ctx: &AuditCtx, decision: &str, extra: serde_json::Value) {
+pub(crate) fn emit_apply_attempt(ctx: &AuditCtx, decision: &str, extra: Value) {
     let mut fields = json!({
-        "schema_version": SCHEMA_VERSION,
-        "ts": ctx.ts,
-        "plan_id": ctx.plan_id,
         "stage": "apply.attempt",
         "decision": decision,
-        "path": "",
     });
     if let Some(obj) = fields.as_object_mut() {
         for (k, v) in extra.as_object().unwrap_or(&serde_json::Map::new()).iter() {
             obj.insert(k.clone(), v.clone());
         }
     }
-    ctx.facts.emit("switchyard", "apply.attempt", decision, fields);
+    redact_and_emit(ctx, "switchyard", "apply.attempt", decision, fields);
 }
 
-pub fn emit_apply_result(ctx: &AuditCtx, decision: &str, extra: serde_json::Value) {
+pub(crate) fn emit_apply_result(ctx: &AuditCtx, decision: &str, mut extra: Value) {
     let mut fields = json!({
-        "schema_version": SCHEMA_VERSION,
-        "ts": ctx.ts,
-        "plan_id": ctx.plan_id,
         "stage": "apply.result",
         "decision": decision,
-        "path": "",
     });
     if let Some(obj) = fields.as_object_mut() {
         if let Some(eobj) = extra.as_object() {
@@ -90,29 +95,32 @@ pub fn emit_apply_result(ctx: &AuditCtx, decision: &str, extra: serde_json::Valu
             }
         }
     }
-    ctx.facts.emit("switchyard", "apply.result", decision, fields);
+    redact_and_emit(ctx, "switchyard", "apply.result", decision, fields);
 }
 
-pub fn emit_summary(ctx: &AuditCtx, stage: &str, decision: &str) {
+pub(crate) fn emit_summary(ctx: &AuditCtx, stage: &str, decision: &str) {
     let fields = json!({
-        "schema_version": SCHEMA_VERSION,
-        "ts": ctx.ts,
-        "plan_id": ctx.plan_id,
         "stage": stage,
         "decision": decision,
-        "path": "",
     });
-    ctx.facts.emit("switchyard", stage, decision, fields);
+    redact_and_emit(ctx, "switchyard", stage, decision, fields);
 }
 
-pub fn emit_rollback_step(ctx: &AuditCtx, decision: &str, path: &str) {
+pub(crate) fn emit_rollback_step(ctx: &AuditCtx, decision: &str, path: &str) {
     let fields = json!({
-        "schema_version": SCHEMA_VERSION,
-        "ts": ctx.ts,
-        "plan_id": ctx.plan_id,
         "stage": "rollback",
         "decision": decision,
         "path": path,
     });
-    ctx.facts.emit("switchyard", "rollback", decision, fields);
+    redact_and_emit(ctx, "switchyard", "rollback", decision, fields);
+}
+
+// Optional helper to ensure a provenance object is present; callers may extend as needed.
+pub(crate) fn ensure_provenance(extra: &mut Value) {
+    if let Some(obj) = extra.as_object_mut() {
+        obj.entry("provenance").or_insert(json!({
+            "helper": "",
+            "env_sanitized": true
+        }));
+    }
 }

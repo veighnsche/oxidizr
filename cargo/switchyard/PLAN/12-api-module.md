@@ -163,7 +163,44 @@ pub fn emit_summary(ctx: &TelemetryCtx, stage: &str, decision: &str) { /* ... */
 * **Golden tests**: facts JSON, compared byte-for-byte against fixtures.
 * **Integration tests**: full apply cycle with mock adapters.
 
----
+## UPDATE #2025-09-11T14:32:33+02:00
 
-✅ This is a **drop-in planning document** you can substitute for your earlier draft.
-It captures your intent but adds **telemetry centralization, rollback separation, error taxonomy, and test guarantees** so the refactor is safer and more auditable.
+Author: Cascade (AI)
+
+Summary of work implemented in code to align with this plan and SPEC terminology:
+
+* Renamed planned "telemetry" surface to `audit` to match SPEC (§2.4, §5) and the project's existing `SPEC/audit_event.schema.json`.
+* Created `src/api/audit.rs` centralizing Minimal Facts v1 emission:
+  * Helpers: `emit_plan_fact`, `emit_preflight_fact`, `emit_apply_attempt`, `emit_apply_result`, `emit_summary`, and `emit_rollback_step`.
+  * Uses `schema_version=1`, `logging::redact::TS_ZERO` and `ts_for_mode()` for timestamp policy.
+* Split monolithic `src/api.rs` into modules and delegated calls:
+  * `src/api/plan.rs` (build plan, per-action plan facts)
+  * `src/api/preflight.rs` (checks + per-action and summary preflight facts)
+  * `src/api/apply.rs` (locking, per-action attempt/result, rollback, attestation placeholder)
+  * `src/api/rollback.rs` (inverse planning for rollback)
+  * `src/api/fs_meta.rs` (helpers: `sha256_hex_of`, `resolve_symlink_target`, `kind_of`)
+  * `src/api/errors.rs` (introduces `ApiError` scaffolding)
+* Adjusted facade signatures to typed errors (Plan step 6):
+  * `preflight(&self, plan: &Plan) -> Result<PreflightReport, ApiError>`
+  * `apply(&self, plan: &Plan, mode: ApplyMode) -> Result<ApplyReport, ApiError>`
+  * Tests updated to unwrap; behavior unchanged.
+* Routed rollback facts through `emit_rollback_step` to keep all emissions centralized.
+* Preserved Minimal Facts v1 fields exactly; hashing/provenance remain placeholders where already present.
+* Added `PLAN/discrepancies/0001-terminology-and-api-surface.md` documenting:
+  * Telemetry→Audit naming decision
+  * `Result`-returning API vs SPEC §3.1 prior signatures
+  * Pending gaps: exit-code mapping, structured preflight rows, expanded redaction, and emission helper usage for every path.
+
+State:
+
+* `cargo test -p switchyard` passes locally.
+* No behavioral changes intended; refactor only.
+
+Next steps proposed:
+
+* Map `ApiError` → `SPEC/error_codes.toml` and include `exit_code` + stable identifiers (`E_POLICY`, `E_LOCKING`, …) in facts.
+* Implement structured preflight diff rows per `SPEC/preflight.yaml` with byte-identical dry-run.
+* Enforce central `redact_event()` in `api/audit.rs` for all emissions (mask secrets and volatile fields).
+* Remove unused `src/api/telemetry.rs` file.
+
+— Cascade

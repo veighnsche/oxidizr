@@ -7,7 +7,7 @@ use crate::types::{Action, Plan, PlanInput};
 use super::audit::{emit_plan_fact, AuditCtx, AuditMode};
 
 /// Build a deterministic plan from input and emit per-action plan facts.
-pub(super) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
+pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
     input: PlanInput,
 ) -> Plan {

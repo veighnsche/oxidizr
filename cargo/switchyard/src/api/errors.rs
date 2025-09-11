@@ -27,3 +27,59 @@ impl From<crate::types::errors::Error> for ApiError {
         }
     }
 }
+
+// Stable identifiers aligned with SPEC/error_codes.toml
+#[derive(Clone, Copy, Debug)]
+pub enum ErrorId {
+    E_POLICY,
+    E_OWNERSHIP,
+    E_LOCKING,
+    E_ATOMIC_SWAP,
+    E_EXDEV,
+    E_BACKUP_MISSING,
+    E_RESTORE_FAILED,
+    E_SMOKE,
+    E_GENERIC,
+}
+
+pub fn id_str(id: ErrorId) -> &'static str {
+    match id {
+        ErrorId::E_POLICY => "E_POLICY",
+        ErrorId::E_OWNERSHIP => "E_OWNERSHIP",
+        ErrorId::E_LOCKING => "E_LOCKING",
+        ErrorId::E_ATOMIC_SWAP => "E_ATOMIC_SWAP",
+        ErrorId::E_EXDEV => "E_EXDEV",
+        ErrorId::E_BACKUP_MISSING => "E_BACKUP_MISSING",
+        ErrorId::E_RESTORE_FAILED => "E_RESTORE_FAILED",
+        ErrorId::E_SMOKE => "E_SMOKE",
+        ErrorId::E_GENERIC => "E_GENERIC",
+    }
+}
+
+pub fn exit_code_for(id: ErrorId) -> i32 {
+    match id {
+        ErrorId::E_POLICY => 10,
+        ErrorId::E_OWNERSHIP => 20,
+        ErrorId::E_LOCKING => 30,
+        ErrorId::E_ATOMIC_SWAP => 40,
+        ErrorId::E_EXDEV => 50,
+        ErrorId::E_BACKUP_MISSING => 60,
+        ErrorId::E_RESTORE_FAILED => 70,
+        ErrorId::E_SMOKE => 80,
+        ErrorId::E_GENERIC => 1,
+    }
+}
+
+pub fn exit_code_for_id_str(s: &str) -> Option<i32> {
+    match s {
+        "E_POLICY" => Some(10),
+        "E_OWNERSHIP" => Some(20),
+        "E_LOCKING" => Some(30),
+        "E_ATOMIC_SWAP" => Some(40),
+        "E_EXDEV" => Some(50),
+        "E_BACKUP_MISSING" => Some(60),
+        "E_RESTORE_FAILED" => Some(70),
+        "E_SMOKE" => Some(80),
+        _ => None,
+    }
+}

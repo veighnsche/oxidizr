@@ -7,7 +7,7 @@ use crate::types::{Action, Plan, PreflightReport};
 use super::fs_meta::kind_of;
 use super::audit::{emit_preflight_fact, emit_summary, AuditCtx, AuditMode};
 
-pub(super) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
+pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,
 ) -> PreflightReport {

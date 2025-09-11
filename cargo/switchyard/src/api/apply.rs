@@ -12,9 +12,9 @@ use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 
 use super::fs_meta::{resolve_symlink_target, sha256_hex_of};
-use super::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode};
+use super::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, ensure_provenance, AuditCtx, AuditMode};
 
-pub(super) fn run<E: FactsEmitter, A: AuditSink>(
+pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,
     mode: ApplyMode,
@@ -50,6 +50,8 @@ pub(super) fn run<E: FactsEmitter, A: AuditSink>(
                 emit_apply_attempt(&tctx, "failure", json!({
                     "lock_wait_ms": lock_wait_ms,
                     "error": e.to_string(),
+                    "error_id": "E_LOCKING",
+                    "exit_code": 30
                 }));
                 let duration_ms = t0.elapsed().as_millis() as u64;
                 return ApplyReport {
@@ -127,19 +129,15 @@ pub(super) fn run<E: FactsEmitter, A: AuditSink>(
                     obj.insert("hash_alg".to_string(), json!("sha256"));
                     obj.insert("after_hash".to_string(), json!(ah));
                 }
-                {
-                    let obj = extra.as_object_mut().unwrap();
-                    obj.insert(
-                        "provenance".to_string(),
-                        json!({
-                            "helper": "",
-                            "env_sanitized": true
-                        }),
-                    );
-                }
+                ensure_provenance(&mut extra);
                 if errors.is_empty() && fsync_ms > 50 {
                     let obj = extra.as_object_mut().unwrap();
                     obj.insert("severity".to_string(), json!("warn"));
+                }
+                if decision == "failure" {
+                    let obj = extra.as_object_mut().unwrap();
+                    obj.insert("error_id".to_string(), json!("E_GENERIC"));
+                    obj.insert("exit_code".to_string(), json!(1));
                 }
                 emit_apply_result(&tctx, decision, extra);
             }
@@ -168,15 +166,11 @@ pub(super) fn run<E: FactsEmitter, A: AuditSink>(
                     "action_id": _aid.to_string(),
                     "path": target.as_path().display().to_string(),
                 });
-                {
+                ensure_provenance(&mut extra);
+                if decision == "failure" {
                     let obj = extra.as_object_mut().unwrap();
-                    obj.insert(
-                        "provenance".to_string(),
-                        json!({
-                            "helper": "",
-                            "env_sanitized": true
-                        }),
-                    );
+                    obj.insert("error_id".to_string(), json!("E_GENERIC"));
+                    obj.insert("exit_code".to_string(), json!(1));
                 }
                 emit_apply_result(&tctx, decision, extra);
             }
