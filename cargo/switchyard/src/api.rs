@@ -3,25 +3,34 @@
 use std::time::Instant;
 
 use crate::{preflight, fs};
-use crate::adapters::LockManager;
+use crate::adapters::{LockManager, OwnershipOracle};
 use crate::logging::{FactsEmitter, AuditSink};
 use crate::policy::Policy;
 use crate::types::{PlanInput, Plan, Action, PreflightReport, ApplyMode, ApplyReport};
 use crate::types::ids::{plan_id, action_id};
 use serde_json::json;
 
+// Temporary deterministic timestamp until redaction policy is implemented
+const TS_ZERO: &str = "1970-01-01T00:00:00Z";
+
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
     audit: A,
     policy: Policy,
     lock: Option<Box<dyn LockManager>>, // None in dev/test; required in production
+    owner: Option<Box<dyn OwnershipOracle>>, // for strict ownership gating
 }
 
 impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
-    pub fn new(facts: E, audit: A, policy: Policy) -> Self { Self { facts, audit, policy, lock: None } }
+    pub fn new(facts: E, audit: A, policy: Policy) -> Self { Self { facts, audit, policy, lock: None, owner: None } }
 
     pub fn with_lock_manager(mut self, lock: Box<dyn LockManager>) -> Self {
         self.lock = Some(lock);
+        self
+    }
+
+    pub fn with_ownership_oracle(mut self, owner: Box<dyn OwnershipOracle>) -> Self {
+        self.owner = Some(owner);
         self
     }
 
@@ -44,6 +53,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             };
             let fields = json!({
                 "schema_version": 1,
+                "ts": TS_ZERO,
                 "plan_id": pid.to_string(),
                 "stage": "plan",
                 "decision": "success",
@@ -78,6 +88,18 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                                 warnings.push(format!("untrusted source allowed by policy: {}", e));
                             } else {
                                 stops.push(format!("untrusted source: {}", e));
+                            }
+                        }
+                    }
+                    if self.policy.strict_ownership {
+                        match &self.owner {
+                            Some(oracle) => {
+                                if let Err(e) = oracle.owner_of(target) {
+                                    stops.push(format!("strict ownership check failed: {}", e));
+                                }
+                            }
+                            None => {
+                                stops.push("strict ownership policy requires OwnershipOracle".to_string());
                             }
                         }
                     }
@@ -126,6 +148,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             };
             let fields = json!({
                 "schema_version": 1,
+                "ts": TS_ZERO,
                 "plan_id": pid.to_string(),
                 "stage": "preflight",
                 "decision": "success",
@@ -138,6 +161,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let decision = if stops.is_empty() { "success" } else { "failure" };
         let fields = json!({
             "schema_version": 1,
+            "ts": TS_ZERO,
             "plan_id": pid.to_string(),
             "stage": "preflight",
             "decision": decision,
@@ -156,7 +180,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let dry = matches!(mode, ApplyMode::DryRun);
         let pid = plan_id(plan);
 
-        // Locking (optional in dev/test): acquire process lock with bounded wait; emit telemetry
+        // Locking (optional in dev/test): acquire process lock with bounded wait; emit telemetry via apply.attempt
         let mut lock_wait_ms: Option<u64> = None;
         let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
         if let Some(mgr) = &self.lock {
@@ -169,12 +193,14 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                 Err(e) => {
                     let fields = json!({
                         "schema_version": 1,
+                        "ts": TS_ZERO,
                         "plan_id": pid.to_string(),
-                        "stage": "apply.lock",
+                        "stage": "apply.attempt",
                         "decision": "failure",
+                        "lock_wait_ms": lock_wait_ms,
                         "error": e.to_string(),
                     });
-                    self.facts.emit("switchyard", "apply.lock", "failure", fields);
+                    self.facts.emit("switchyard", "apply.attempt", "failure", fields);
                     let duration_ms = t0.elapsed().as_millis() as u64;
                     return ApplyReport { executed, duration_ms, errors: vec![format!("lock: {}", e)], plan_uuid: Some(pid), rolled_back, rollback_errors };
                 }
@@ -182,17 +208,19 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         } else {
             let fields = json!({
                 "schema_version": 1,
+                "ts": TS_ZERO,
                 "plan_id": pid.to_string(),
-                "stage": "apply.lock",
+                "stage": "apply.attempt",
                 "decision": "warn",
                 "no_lock_manager": true,
             });
-            self.facts.emit("switchyard", "apply.lock", "warn", fields);
+            self.facts.emit("switchyard", "apply.attempt", "warn", fields);
         }
 
         // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
         let fields = json!({
             "schema_version": 1,
+            "ts": TS_ZERO,
             "plan_id": pid.to_string(),
             "stage": "apply.attempt",
             "decision": "success",
@@ -207,6 +235,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     // Minimal Facts v1: per-action attempt
                     let fields = json!({
                         "schema_version": 1,
+                        "ts": TS_ZERO,
                         "plan_id": pid.to_string(),
                         "stage": "apply.attempt",
                         "decision": "success",
@@ -227,6 +256,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     let decision = if errors.is_empty() { "success" } else { "failure" };
                     let fields = json!({
                         "schema_version": 1,
+                        "ts": TS_ZERO,
                         "plan_id": pid.to_string(),
                         "stage": "apply.result",
                         "decision": decision,
@@ -239,6 +269,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     // Minimal Facts v1: per-action attempt
                     let fields = json!({
                         "schema_version": 1,
+                        "ts": TS_ZERO,
                         "plan_id": pid.to_string(),
                         "stage": "apply.attempt",
                         "decision": "success",
@@ -258,6 +289,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     let decision = if errors.is_empty() { "success" } else { "failure" };
                     let fields = json!({
                         "schema_version": 1,
+                        "ts": TS_ZERO,
                         "plan_id": pid.to_string(),
                         "stage": "apply.result",
                         "decision": decision,
@@ -298,6 +330,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let decision = if errors.is_empty() { "success" } else { "failure" };
         let fields = json!({
             "schema_version": 1,
+            "ts": TS_ZERO,
             "plan_id": pid.to_string(),
             "stage": "apply.result",
             "decision": decision,
