@@ -12,6 +12,28 @@ Legend:
 - [ ] TODO (not implemented)
 - [~] Partial (some parts present, needs completion)
 
+## Cyclical Development Process
+
+We follow a tight build–test–document cycle to avoid plan/spec drift:
+
+- Implement: Small, verifiable increments with unit tests.
+- Test: `cargo test -p switchyard` must stay green; add tests for new behaviors.
+- Document: Update PLAN (impl or ADR) and append immutable SPEC_UPDATE_####.md entries for any normative change.
+- Sync Review: Ensure PLAN, SPEC_UPDATEs, ADRs, and this TODO remain consistent; link items where relevant.
+- Repeat: Iterate with small scope until the milestone feature is complete.
+
+## Documentation Sync Policy
+
+- SPEC baseline (`SPEC/SPEC.md`) remains stable; normative changes are appended as immutable `SPEC/SPEC_UPDATE_####.md` files.
+- PLAN remains the living design: `PLAN/impl/*` for implementation notes; decisions recorded in `PLAN/adr/ADR-*.md`.
+- Each TODO item that changes behavior should reference the relevant SPEC_UPDATE and ADR once accepted.
+- Doc Sync Checklist (run per PR):
+  - SPEC_UPDATE added/updated for normative behavior.
+  - PLAN impl notes updated for approach and API surfaces.
+  - ADR added/updated for decisions (numbered, dated, status Accepted/Proposed).
+  - TODO updated to reflect current state; cross-links added.
+  - Tests updated to reflect and verify behavior.
+
 ## 1) Crate Scaffolding & Module Layout
 
 - [x] Library crate scaffolding and module tree present
@@ -154,7 +176,14 @@ Legend:
 - [ ] Module‑level docs for `fs`, `preflight`, `api`, `types`, `adapters`, `logging`, `policy`
 - [ ] Update `PLAN/20-spec-traceability.md` as implementation proceeds
   - [x] Updated PLAN impl docs: `impl/00-structure.md` (rustix & unsafe ban notes) and `impl/15-policy-and-adapters.md` (backup_tag policy).
-  - [x] Updated SPEC: safe Rust policy (`#![forbid(unsafe_code)]`), rustix capability style, backup_tag.
+  - [x] SPEC updated via immutable `SPEC/SPEC_UPDATE_0001.md` (safe Rust policy with rustix/capability-style handles, TOCTOU sequence & fsync bound, EXDEV degraded mode, backup_tag).
+
+### Doc Sync Matrix (Current)
+
+- SPEC Updates: `SPEC/SPEC_UPDATE_0001.md` (Accepted)
+- PLAN Impl Notes: `PLAN/impl/00-structure.md`, `PLAN/impl/15-policy-and-adapters.md`
+- ADRs: `PLAN/adr/ADR-0013-backup-tagging.md` (Accepted)
+- Design Docs: `DOCS/backup-restore-design.md` (Draft)
 
 ## 19) Safety & Implementation
 

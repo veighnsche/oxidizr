@@ -1,4 +1,4 @@
-# ADR 50 — Backup Tagging for Multi-CLI Isolation
+# ADR 0013 — Backup Tagging for Multi-CLI Isolation
 
 Status: Accepted
 Date: 2025-09-11
