@@ -70,6 +70,37 @@ pub(crate) fn emit_preflight_fact(
     redact_and_emit(ctx, "switchyard", "preflight", "success", fields);
 }
 
+pub(crate) fn emit_preflight_fact_ext(
+    ctx: &AuditCtx,
+    action_id: &str,
+    path: Option<String>,
+    current_kind: &str,
+    planned_kind: &str,
+    policy_ok: Option<bool>,
+    provenance: Option<Value>,
+    notes: Option<Vec<String>>,
+    preservation: Option<Value>,
+    preservation_supported: Option<bool>,
+){
+    let mut fields = json!({
+        "ts": TS_ZERO,
+        "stage": "preflight",
+        "decision": "success",
+        "action_id": action_id,
+        "path": path,
+        "current_kind": current_kind,
+        "planned_kind": planned_kind,
+    });
+    if let Some(obj) = fields.as_object_mut() {
+        if let Some(ok) = policy_ok { obj.insert("policy_ok".into(), json!(ok)); }
+        if let Some(p) = provenance { obj.insert("provenance".into(), p); }
+        if let Some(n) = notes { obj.insert("notes".into(), json!(n)); }
+        if let Some(p) = preservation { obj.insert("preservation".into(), p); }
+        if let Some(s) = preservation_supported { obj.insert("preservation_supported".into(), json!(s)); }
+    }
+    redact_and_emit(ctx, "switchyard", "preflight", "success", fields);
+}
+
 pub(crate) fn emit_apply_attempt(ctx: &AuditCtx, decision: &str, extra: Value) {
     let mut fields = json!({
         "stage": "apply.attempt",
@@ -83,7 +114,7 @@ pub(crate) fn emit_apply_attempt(ctx: &AuditCtx, decision: &str, extra: Value) {
     redact_and_emit(ctx, "switchyard", "apply.attempt", decision, fields);
 }
 
-pub(crate) fn emit_apply_result(ctx: &AuditCtx, decision: &str, mut extra: Value) {
+pub(crate) fn emit_apply_result(ctx: &AuditCtx, decision: &str, extra: Value) {
     let mut fields = json!({
         "stage": "apply.result",
         "decision": decision,
@@ -103,6 +134,21 @@ pub(crate) fn emit_summary(ctx: &AuditCtx, stage: &str, decision: &str) {
         "stage": stage,
         "decision": decision,
     });
+    redact_and_emit(ctx, "switchyard", stage, decision, fields);
+}
+
+pub(crate) fn emit_summary_extra(ctx: &AuditCtx, stage: &str, decision: &str, extra: Value) {
+    let mut fields = json!({
+        "stage": stage,
+        "decision": decision,
+    });
+    if let Some(obj) = fields.as_object_mut() {
+        if let Some(eobj) = extra.as_object() {
+            for (k, v) in eobj.iter() {
+                obj.insert(k.clone(), v.clone());
+            }
+        }
+    }
     redact_and_emit(ctx, "switchyard", stage, decision, fields);
 }
 

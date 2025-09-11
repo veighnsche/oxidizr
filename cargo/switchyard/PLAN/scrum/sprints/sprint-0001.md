@@ -129,3 +129,116 @@ Next Steps (target before sprint end)
 
 - __API Module Refactor__:
   - Execute the split of `src/api.rs` into `src/api/` per `PLAN/12-api-module.md` (no behavior change) once tests remain green for two runs.
+
+---
+
+## Sprint 01 Status Update — 2025-09-11 (PM)
+
+Summary: The API split landed. The monolithic `src/api.rs` has been modularized into `src/api/` with centralized audit emission. Unit tests remain green. We introduced typed `Result` signatures for `preflight()` and `apply()` with an `ApiError` scaffold; field-level facts remain schema‑identical.
+
+Progress
+
+- __API split & centralization__:
+  - Extracted modules: `src/api/plan.rs`, `preflight.rs`, `apply.rs`, `rollback.rs`, `fs_meta.rs`.
+  - Centralized facts emission in `src/api/audit.rs` (schema_version=1; uses `TS_ZERO`/`ts_for_mode()`; applies redaction consistently).
+  - Added `src/api/errors.rs` with `ApiError` and initial `ErrorId` → `exit_code` scaffolding; `apply()` emits `E_LOCKING` and `E_GENERIC` where applicable.
+  - `src/api.rs` now delegates to the above via `plan_impl`, `preflight_impl`, and `apply_impl`.
+
+- __Determinism & tests__:
+  - Tests continue to pass (`cargo test -p switchyard`).
+  - The DryRun vs Commit redaction equivalence test remains valid after refactor.
+
+- __Docs & plan alignment__:
+  - `PLAN/12-api-module.md` updated to reflect reality (Audit vs Telemetry naming, centralization, fs_meta helpers, typed Result).
+
+Entrenchment assessment (parallel AI work)
+
+- The implemented split aligns with our plan and SPEC v1.1 direction:
+  - Centralized audit emission prevents schema drift (good).
+  - `Result` return types for `preflight()`/`apply()` improve error plumbing; we will complete error→exit‑code mapping per SPEC.
+  - Minor lint nits remain (non‑CamelCase error variants) — non‑blocking.
+- Recommendation: keep the current surface (no need to "break the API"). Follow up with small cleanups below.
+
+Risks / Gaps
+
+- Error taxonomy mapping is partial; additional sites need specific `ErrorId`s and `exit_code`s.
+- Structured preflight diff rows per `SPEC/preflight.yaml` not yet emitted.
+- Golden fixtures CI gate not wired; local schema validation exists only in unit tests.
+- OwnershipOracle default adapter and preservation probes remain TODOs.
+
+Next Steps (before sprint end)
+
+- __Errors & facts__:
+  - Finish mapping failure sites to stable `ErrorId`s (e.g., `E_RESTORE_FAILED`, policy violations) and include `exit_code` in facts consistently.
+  - Rename error variants to CamelCase (or add `#[allow(non_camel_case_types)]` with justification) to clear warnings.
+
+- __Preflight__:
+  - Implement structured diff rows and include them in facts; ensure DryRun byte identity.
+
+- __Ownership & preservation__:
+  - Implement default `OwnershipOracle`; add preservation capability probes and facts; gate by policy flags.
+
+- __Determinism gate__:
+  - Add golden fixtures and a byte‑identical diff gate; integrate into CI with zero‑SKIP policy.
+
+- __Acceptance__:
+  - Exercise EXDEV matrix via `test-orch/` and document results.
+
+---
+
+## Sprint 01 Status Update — 2025-09-11 (Late PM)
+
+Summary: Implemented a default `OwnershipOracle` and enriched preflight facts with `policy_ok`, `provenance`, and `notes`, keeping schema v1 envelope stable. Clarified lint policy for SPEC-aligned `ErrorId`s. Tests remain green.
+
+Progress
+
+- __Ownership & provenance__:
+  - Added `src/adapters/ownership_default.rs::FsOwnershipOracle` (Unix) and exported in `adapters/mod.rs`.
+  - Preflight now includes provenance `{uid,gid,pkg}` when an oracle is wired.
+
+- __Preflight facts enrichment__:
+  - Added `emit_preflight_fact_ext(...)` to `src/api/audit.rs` with `policy_ok`, `provenance`, and `notes`.
+  - Updated `src/api/preflight.rs` to emit per-action extended preflight rows; kept summary.
+
+- __Error Ids & lints__:
+  - Kept SPEC-aligned SCREAMING_SNAKE_CASE `ErrorId` with `#[allow(non_camel_case_types)]` to avoid churn.
+
+- __Quality__:
+  - Cleared a minor lint in `emit_apply_result` and reran tests — all passing.
+
+What remains (Sprint 01)
+
+- __Errors & facts__ (defer mapping until features stabilize):
+  - Add consistent `error_id` + `exit_code` across apply/preflight failure sites (e.g., `E_RESTORE_FAILED`).
+
+- __Preflight diff completeness__:
+  - Add preservation capability detection and include `preservation{}` and `preservation_supported` in facts.
+
+- __Ownership & preservation__:
+  - Wire `FsOwnershipOracle` in test scaffolding and optionally as default under a feature flag; add tests.
+
+- __Determinism gate__:
+  - Golden fixtures + CI byte-identical gate for facts.
+
+- __Acceptance__:
+  - EXDEV matrix through `test-orch/` and documentation of outcomes.
+
+Next developer steps
+
+- Wire `FsOwnershipOracle` into unit tests to validate provenance fields.
+- Implement preservation capability probe placeholders and emit `preservation{}` + `preservation_supported` (always `null/false` for now) to complete fields.
+- Prepare golden fixtures scaffolding (local harness) without CI wire-up yet.
+
+### Blockers (current)
+
+- Golden fixtures harness design: choosing stable ordering and redaction points to ensure byte-identical diffs without flakiness.
+- EXDEV matrix execution via `test-orch/`: requires environment provisioning and container FS setup (ext4/xfs/btrfs/tmpfs) which is not instant.
+- Policy-driven preservation probes: deciding minimal viable detection to avoid over-scoping the sprint.
+
+### Sprint completion estimate
+
+- Current completion: ~75% of Sprint 01 scope.
+  - Determinism and audit scaffolding are in place and tested; API split complete; preflight facts enriched; default `OwnershipOracle` implemented.
+  - Remaining: golden fixtures harness, initial EXDEV run and notes, preservation probe placeholders (partially emitted), and wiring oracle in tests.
+
+I will continue implementing the remaining sprint items now (excluding final exit code mapping which we agreed to do at the end).
