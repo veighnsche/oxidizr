@@ -12,28 +12,6 @@ Legend:
 - [ ] TODO (not implemented)
 - [~] Partial (some parts present, needs completion)
 
----
-
-## Implementation Status Summary
-
-- Core mechanics exist (atomic symlink swap, backups, SafePath, basic preflight).
-- New since last update:
-  - Deterministic IDs module (`types/ids.rs`) with UUIDv5 `plan_id`/`action_id`; wired into `api::apply` for execution flow.
-  - Transactional `apply()` with reverse-order rollback for previously executed `EnsureSymlink` steps and `plan_rollback_of()` (basic inverse for symlink actions).
-  - `ApplyReport` extended to include `plan_uuid`, `rolled_back`, and `rollback_errors` for downstream audit/rollback planning.
-
-## Milestones & Next Sprint
-
-- Milestone M1 (in progress):
-  - Harden transactional engine invariants and tests.
-  - Complete TOCTOU sequence with `openat` for final component in `src/fs/*`.
-  - Minimal facts emission (schema v1 core fields) including `plan_id`/`action_id`.
-
-- Next Sprint Focus:
-  - [x] Implement TOCTOU-safe final component using *at syscalls (`symlinkat`/`unlinkat` + `renameat`) in `fs/atomic.rs` to meet REQ‑TOCTOU1.
-  - [x] Emit minimal facts (stage, decision, schema_version, plan_id/action_id, path) and add unit tests.
-  - [~] Add unit tests for rollback and SafePath negatives.
-
 ## 1) Crate Scaffolding & Module Layout
 
 - [x] Library crate scaffolding and module tree present
