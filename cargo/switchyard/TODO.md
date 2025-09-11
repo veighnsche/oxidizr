@@ -119,7 +119,8 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
   - Implemented bundle construction (JSON), `bundle_hash` (sha256), and `public_key_id`; signature included when `Attestor` provided.
 - [ ] Secret masking policy and implementation across all sinks (REQ‑O6)
 - [ ] Provenance completeness fields populated (origin/helper/uid/gid/pkg/env_sanitized) (REQ‑O7)
-- [ ] Golden JSONL fixtures for plan, preflight, apply, rollback facts; CI diff gate (SPEC §12)
+- [~] Golden fixtures for plan, preflight, apply, rollback facts; CI diff gate (SPEC §12)
+  - Implemented canonical (canon) arrays for selected stages with a blocking CI golden diff gate; raw JSONL optional and not part of strict diffing.
 
 ## 10) Conservatism & Modes (SPEC §2.8)
 
@@ -170,7 +171,11 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
   - Added unit tests for atomic swap and restore roundtrip; added minimal facts emission test in `api`.
 - [ ] BDD features wired up with `cargo/bdd-runner` and golden fixtures
 - [ ] Property tests for invariants: `AtomicReplace`, `IdempotentRollback`
-- [ ] CI gates: zero‑SKIP, schema validation, golden diffs, traceability report generation (`SPEC/tools/traceability.py`)
+- [~] CI gates: zero‑SKIP, schema validation, golden diffs, traceability report generation (`SPEC/tools/traceability.py`)
+  - Golden diffs: implemented (blocking job over all scenarios) ✅
+  - Schema validation: integrated in tests ✅
+  - Zero‑SKIP: enforcement policy documented; wired per-suite as next step ◻️
+  - Traceability artifact: planned; not yet implemented ◻️
 
 ## 18) Documentation
 
@@ -191,7 +196,7 @@ We follow a tight build–test–document cycle to avoid plan/spec drift:
 
 - [x] Migrate FS layer to `rustix` and eliminate `unsafe`/`libc` in crate.
 - [~] Record and emit fsync timing per mutation; WARN on >50ms with `severity=warn`.
-- [ ] Schema validation for facts and golden fixtures.
+- [x] Schema validation for facts integrated in tests; golden canon compared in CI.
 
 ---
 

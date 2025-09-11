@@ -87,7 +87,9 @@ Progress
   - Emitted Minimal Facts v1 across `plan`, `preflight`, `apply.attempt`, `apply.result`, and `rollback` with `schema_version=1`.
   - Added integrity scaffolding: optional `hash_alg=sha256`, `before_hash`, `after_hash` for symlink replacements.
   - Added provenance placeholders: `{uid, gid, env_sanitized, helper:""}` to `apply.result`.
-  - Validated facts against `SPEC/audit_event.schema.json` via unit tests.
+  - Validated facts against `SPEC/audit_event.schema.json` via unit tests (now integrated in acceptance-style tests too).
+  - Implemented golden fixtures (canon) and a blocking CI golden diff gate; runner supports `--golden <scenario|all>` and `--update`.
+  - Added a second deterministic scenario (`two-action-plan`) exercising policy gating (`allow_roots`) with `policy_ok=false` coverage in preflight.
 
 - __Locking & Concurrency__:
   - Verified `adapters/lock.rs` is the trait definition and added `adapters/lock_file.rs` as the concrete reference `FileLockManager` using `fs2` file locks.
@@ -111,7 +113,7 @@ Blockers / Risks
 
 - __Ownership & Preservation__: Strict `OwnershipOracle` integration is stubbed at the trait level; richer provenance (pkg origin) and preservation probes (mode/owner/timestamps/xattrs/ACLs/caps) are not yet implemented.
 - __Attestation bundle__: The final `apply.result` attestation includes a placeholder bundle hash and public key id; needs full bundle construction and hashing.
-- __Golden fixtures / CI gate__: JSONL golden generation and byte-for-byte gate not wired in CI yet; local tests validate schema and redaction only.
+- __Golden fixtures / CI gate__: Implemented. CI runs a blocking golden diff for all scenarios; diffs uploaded as artifacts on failure.
 - __Smoke tests__: `SmokeTestRunner` adapter exists but no default commands; auto-rollback path covered but test assets pending.
 - __EXDEV acceptance__: Cross-filesystem matrix not yet exercised from this crate; integration with `test-orch/` needed.
 
@@ -125,7 +127,7 @@ Next Steps (target before sprint end)
   - Build the attestation bundle (plan, facts digest) and compute `bundle_hash` (sha256). Wire an injected `Attestor` key id.
 
 - __Golden & CI__ (EPIC-8):
-  - Add a golden fixtures generator and byte-identical diff gate; ensure DryRun vs Commit equivalence post-redaction.
+  - Expand scenarios in the golden suite; maintain zero-SKIP policy and keep the CI diff gate blocking.
 
 - __API Module Refactor__:
   - Execute the split of `src/api.rs` into `src/api/` per `PLAN/12-api-module.md` (no behavior change) once tests remain green for two runs.
@@ -163,7 +165,7 @@ Risks / Gaps
 
 - Error taxonomy mapping is partial; additional sites need specific `ErrorId`s and `exit_code`s.
 - Structured preflight diff rows per `SPEC/preflight.yaml` not yet emitted.
-- Golden fixtures CI gate not wired; local schema validation exists only in unit tests.
+- __Golden fixtures CI gate wired; schema validation integrated into golden tests.
 - OwnershipOracle default adapter and preservation probes remain TODOs.
 
 Next Steps (before sprint end)
@@ -179,7 +181,7 @@ Next Steps (before sprint end)
   - Implement default `OwnershipOracle`; add preservation capability probes and facts; gate by policy flags.
 
 - __Determinism gate__:
-  - Add golden fixtures and a byte‑identical diff gate; integrate into CI with zero‑SKIP policy.
+  - Expand golden scenarios (beyond minimal and two-action) and maintain the CI byte-identical diff gate with zero‑SKIP policy.
 
 - __Acceptance__:
   - Exercise EXDEV matrix via `test-orch/` and document results.

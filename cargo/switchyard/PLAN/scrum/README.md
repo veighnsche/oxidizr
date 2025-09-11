@@ -8,6 +8,11 @@ Artifacts:
 - `sprints/` — Sprint-by-sprint plans with user stories, tasks, acceptance criteria, and deliverables.
 - Traceability — Each story references SPEC requirements (REQ-*), TODO checklist IDs, and code locations.
 
+## Sprints
+
+- Sprint 01 — Determinism, Observability, Policy Gating, Locking, and Acceptance Foundations: `sprints/sprint-0001.md`
+- Sprint 02 (Draft) — Preflight Diff, Error Mapping, Smoke Runner, Acceptance, Traceability: `sprints/sprint-0002.md`
+
 Cadence & Capacity:
 
 - 2-week sprints.
