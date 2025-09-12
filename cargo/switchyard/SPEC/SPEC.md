@@ -14,8 +14,10 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - SafePath everywhere for mutations; TOCTOU-safe sequence (open parent O_DIRECTORY|O_NOFOLLOW → openat → renameat → fsync(parent)).
 - Deterministic plans and outputs: UUIDv5 IDs over normalized inputs; dry-run facts byte-identical after timestamp redactions.
 - Locking required in production with bounded wait → E_LOCKING; facts include lock_wait_ms.
+- Lock fairness telemetry: apply.attempt facts include lock_attempts (approximate retry count inferred from lock_wait_ms and poll interval).
 - Rescue profile always available; at least one fallback toolset (GNU/BusyBox) present on PATH.
 - Auditable, tamper-evident facts (schema v1): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance.
+- Apply summary includes a perf object aggregating timing signals (hash_ms, backup_ms, swap_ms) for observability.
 - Conservative by default: dry-run mode; fail-closed on critical compatibility differences unless policy overrides.
 - Health verification required: minimal smoke suite runs post-apply; failure triggers auto-rollback (unless explicitly disabled).
 - Cross-filesystem safety: EXDEV fallback with degraded-mode policy and telemetry. When degraded fallback is disallowed and EXDEV occurs, apply fails with `exdev_fallback_failed` and facts include `degraded=false` with a stable reason marker.
@@ -43,6 +45,8 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-S3: Source files **MUST** be root-owned and not world-writable, unless policy override.
 - REQ-S4: If `strict_ownership=true`, targets **MUST** be package-owned (via adapter).
 - REQ-S5: Preservation gating: FS capabilities for ownership, mode, timestamps, xattrs/ACLs/caps **MUST** be probed during preflight; if required by policy but unsupported, preflight **MUST** STOP (fail-closed) unless explicitly overridden.
+- REQ-S6: Backup sidecars SHOULD record a payload_hash when a backup payload exists (sidecar v2). On restore, if policy requires sidecar integrity and a payload_hash is present, the engine MUST verify the backup payload hash and fail restore on mismatch.
+
 
 ### 2.4 Observability & Audit
 
@@ -53,12 +57,14 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-O5: For every mutated file, `before_hash` and `after_hash` **MUST** be recorded using SHA-256 (`hash_alg=sha256`).
 - REQ-O6: Secret masking **MUST** be enforced across all audit sinks; no free-form secrets are permitted.
 - REQ-O7: Provenance **MUST** include origin (repo/AUR/manual), helper, uid/gid, and confirmation of environment sanitization. Policy gating for external sources is out of scope of this core spec and MAY be enforced by adapters.
+- REQ-O8: Summary events (preflight, apply.result, and rollback.summary) **MUST** include a summary_error_ids array on failures that lists stable error identifiers, with a top-level classification (e.g., E_POLICY) and any specific causes (e.g., E_LOCKING, E_SMOKE) when determinable.
 
 ### 2.5 Locking
 
 - REQ-L1: Only one `apply()` **MUST** mutate at a time.
 - REQ-L2: If no lock manager, concurrent `apply()` is **UNSUPPORTED** (dev/test only) and a WARN fact **MUST** be emitted.
 - REQ-L3: Lock acquisition **MUST** use a bounded wait with timeout → `E_LOCKING`, and facts **MUST** record `lock_wait_ms`.
+- REQ-L5: For observability, apply.attempt facts **SHOULD** include an approximate `lock_attempts` count.
 - REQ-L4: In production deployments, a `LockManager` **MUST** be present. Omission is permitted only in development/testing.
 
 ### 2.6 Rescue
@@ -100,6 +106,7 @@ fn plan(input: PlanInput) -> Plan;
 fn preflight(plan: &Plan) -> PreflightReport;
 fn apply(plan: &Plan, mode: ApplyMode) -> ApplyReport;
 fn plan_rollback_of(report: &ApplyReport) -> Plan;
+fn prune_backups(target: &SafePath) -> PruneResult; // applies retention policy (count/age) and emits prune.result
 ```
 
 Adapters are configured on the host `Switchyard` object via builder methods (e.g., `with_lock_manager`, `with_ownership_oracle`) rather than passed per-call to `apply()`. This ensures deterministic behavior and clearer lifecycle management of adapters.
@@ -123,6 +130,13 @@ trait SmokeTestRunner { fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>; 
 - Opened with `O_NOFOLLOW` parent dir handles (TOCTOU defense).
 - All mutating public APIs **MUST** take `SafePath` (not `PathBuf`). Any non-mutating APIs that accept raw paths **MUST** immediately normalize to `SafePath`.
 - TOCTOU-safe syscall sequence is normative for every mutation: open parent with `O_DIRECTORY|O_NOFOLLOW` → `openat` on final component → `renameat` → `fsync(parent)`.
+
+### 3.4 Retention (Prune Backups)
+
+- The library provides `Switchyard::prune_backups(&SafePath) -> PruneResult` to prune backup artifacts under policy.
+- Policy knobs: `retention_count_limit: Option<usize>` and `retention_age_limit: Option<Duration>`.
+- Selection rules: backups are sorted by timestamp (newest first); the newest backup is never deleted. Count and age filters are applied to older backups. Deletions remove payload+sidecar pairs and fsync the parent directory.
+- A `prune.result` event is emitted with fields including `target_path`, `policy_used`, `pruned_count`, and `retained_count`.
 
 ---
 
@@ -223,9 +237,18 @@ Dry-run output must match real-run preflight rows byte-for-byte.
     "exit_code": {"type":["integer","null"]},
     "duration_ms": {"type":["integer","null"]},
     "lock_wait_ms": {"type":["integer","null"]},
+    "lock_attempts": {"type":["integer","null"]},
     "error_id": {"type": ["string", "null"]},
     "error_detail": {"type": ["string", "null"]},
-    "summary_error_ids": {"type": ["array", "null"], "items": {"type": "string"}}
+    "summary_error_ids": {"type": ["array", "null"], "items": {"type": "string"}},
+    "perf": {
+      "type":"object",
+      "properties": {
+        "hash_ms": {"type":["integer","null"]},
+        "backup_ms": {"type":["integer","null"]},
+        "swap_ms": {"type":["integer","null"]}
+      }
+    }
   }
 }
 ```
@@ -251,6 +274,8 @@ smoke_test_failed = 80
 ```
 
 Errors are emitted in facts as stable identifiers (e.g. `E_POLICY`, `E_LOCKING`). Preflight summary emits `error_id=E_POLICY` and `exit_code=10` when any STOP conditions are present.
+
+On summary failures, `summary_error_ids` provides a best-effort chain of identifiers for analytics and routing. For example, a smoke failure may populate `["E_SMOKE","E_POLICY"]` while a locking timeout would surface `["E_LOCKING","E_POLICY"]`.
 
 ---
 

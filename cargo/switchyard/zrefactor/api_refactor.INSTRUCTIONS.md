@@ -1,5 +1,7 @@
 # API DX/DW Overhaul — Actionable Steps (breaking)
 
+> STATUS: Not landed in src/ (as of 2025-09-12 23:16:50 +02:00). `src/api.rs` still uses `#[path]`; `ApiBuilder` not present; `StageLogger` facade not present. Keep PRs refactor-only.
+
 Redesign the top-level API for developer experience (DX) and developer workflow (DW). Keep it consistent, typed, and stage-agnostic. Prefer clarity over compatibility.
 
 ## 1) Make `src/api` an idiomatic module and central entrypoint

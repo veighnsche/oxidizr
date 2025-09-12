@@ -1,5 +1,7 @@
 # Logging/Audit Refactor — Actionable Steps (breaking)
 
+> STATUS: Not landed in src/ (as of 2025-09-12 23:16:50 +02:00). `src/logging/audit.rs` still exposes `emit_*` helpers and no `StageLogger` facade; API call sites use legacy helpers. Keep PRs refactor-only.
+
 Do the following changes. No shims; remove legacy helpers.
 
 1. Create/update modules under `src/logging/`

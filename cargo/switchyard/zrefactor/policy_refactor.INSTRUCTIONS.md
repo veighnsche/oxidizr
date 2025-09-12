@@ -1,5 +1,7 @@
 # Policy Refactor — Actionable Steps (breaking)
 
+> STATUS: Not landed in src/ (as of 2025-09-12 23:16:50 +02:00). `src/policy/config.rs` still uses flat fields; `src/policy/gating.rs` contains a plan-level `gating_errors(...)` helper, but no typed `evaluate_action(...)` consumed by API stages. Keep PRs refactor-only.
+
 Do these steps to replace the flat `Policy` with typed groups and central gating.
 
 1) Create new typed groups and enums

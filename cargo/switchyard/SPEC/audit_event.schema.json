@@ -53,7 +53,16 @@
     "exit_code": {"type":["integer","null"]},
     "duration_ms": {"type":["integer","null"]},
     "lock_wait_ms": {"type":["integer","null"]},
+    "lock_attempts": {"type":["integer","null"]},
     "error_detail": {"type": ["string", "null"]},
-    "summary_error_ids": {"type": ["array", "null"], "items": {"type": "string"}}
+    "summary_error_ids": {"type": ["array", "null"], "items": {"type": "string"}},
+    "perf": {
+      "type":"object",
+      "properties": {
+        "hash_ms": {"type":["integer","null"]},
+        "backup_ms": {"type":["integer","null"]},
+        "swap_ms": {"type":["integer","null"]}
+      }
+    }
   }
 }

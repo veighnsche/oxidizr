@@ -4,7 +4,7 @@ use log::Level;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
 
-use crate::logging::{AuditSink, FactsEmitter};
+use switchyard::logging::{AuditSink, FactsEmitter};
 
 /// A simple in-memory emitter to capture facts during tests.
 #[derive(Clone, Default)]
