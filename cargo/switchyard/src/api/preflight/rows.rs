@@ -21,6 +21,7 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     notes: Option<Vec<String>>,
     preservation: Option<Value>,
     preservation_supported: Option<bool>,
+    restore_ready: Option<bool>,
 ) {
     // Find the stable action_id position
     let idx = plan
@@ -61,6 +62,11 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     if let Some(ps) = preservation_supported {
         if let Some(o) = row.as_object_mut() {
             o.insert("preservation_supported".into(), json!(ps));
+        }
+    }
+    if let Some(rr) = restore_ready {
+        if let Some(o) = row.as_object_mut() {
+            o.insert("restore_ready".into(), json!(rr));
         }
     }
     rows.push(row);

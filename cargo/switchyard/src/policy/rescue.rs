@@ -112,8 +112,10 @@ fn is_executable(_path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn forced_ok_env_yields_ok() {
         std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
         let r = verify_rescue(false);
@@ -122,6 +124,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn forced_fail_env_yields_err() {
         std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");
         let r = verify_rescue(false);

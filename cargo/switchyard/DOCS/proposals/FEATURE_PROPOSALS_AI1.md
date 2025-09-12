@@ -1,8 +1,10 @@
 # Feature Proposals — AI 1
+
 Generated: 2025-09-12 16:26 +02:00
 Author: AI 1
 
 ## Feature 1: Emit summary_error_ids across summaries (Implement now)
+
 - Problem statement: Round 3 (OBSERVABILITY_FACTS_SCHEMA, S2) identified missing array of error IDs in summaries, limiting diagnostics and policy.
 - User story(s):
   - As an SRE, I want all error classes present in summaries so alerts and dashboards can key off both specific and general categories (e.g., E_EXDEV and E_ATOMIC_SWAP).
@@ -38,6 +40,7 @@ Author: AI 1
   - Analysis: `DOCS/analysis/OBSERVABILITY_FACTS_SCHEMA.md` Round 2/3.
 
 ## Feature 2: SafePath overloads and deprecation of raw Path (Implement now)
+
 - Problem statement: Round 3 (FS_SAFETY_AUDIT, S2) requires SafePath enforcement at mutating boundaries to uphold TOCTOU and traversal invariants; SPEC v1.1 mandates SafePath.
 - User story(s):
   - As a security reviewer, I want path traversal to be impossible through typed boundaries.
@@ -72,6 +75,7 @@ Author: AI 1
   - Analysis: `DOCS/analysis/FS_SAFETY_AUDIT.md`, `API_SURFACE_AUDIT.md`.
 
 ## Feature 3: Restrict low-level FS atoms and add public API stability tests
+
 - Problem statement: Round 3 (API_SURFACE_AUDIT, S2) notes public re-exports of internal atoms (`atomic_symlink_swap`, `open_dir_nofollow`, `fsync_parent_dir`) which are implementation details.
 - User story(s):
   - As a library consumer, I want a clean, stable surface without internals leaking into my namespace.
@@ -102,6 +106,7 @@ Author: AI 1
   - Analysis: `DOCS/analysis/API_SURFACE_AUDIT.md`.
 
 ## Feature 4: Error taxonomy chain + E_OWNERSHIP surfacing
+
 - Problem statement: Round 3 (ERROR_TAXONOMY, S2) requires multi-cause error chain exposure and normalized `E_OWNERSHIP` for classification.
 - User story(s):
   - As a policy author, I want alerts and mitigations to trigger on broad classes like E_OWNERSHIP without losing specifics.
@@ -132,6 +137,7 @@ Author: AI 1
   - Analysis: `DOCS/analysis/ERROR_TAXONOMY.md`.
 
 ## Feature 5: Deprecation program for public shims and re-exports
+
 - Problem statement: Round 3 (API_SURFACE_AUDIT + Back-compat) call for lifecycle policy distinguishing facades vs shims; missing deprecation attributes.
 - User story(s):
   - As a consumer, I want explicit deprecation notices and timelines.

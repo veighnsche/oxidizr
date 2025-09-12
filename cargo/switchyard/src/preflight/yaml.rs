@@ -16,6 +16,9 @@ pub fn to_yaml(report: &crate::types::report::PreflightReport) -> String {
             "policy_ok",
             "provenance",
             "notes",
+            // Added per SPEC §4 schema
+            "preservation",
+            "preservation_supported",
         ];
         for k in keys.iter() {
             let v = get(k);

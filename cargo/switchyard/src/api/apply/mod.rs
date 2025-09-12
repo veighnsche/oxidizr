@@ -27,6 +27,21 @@ use crate::policy::gating;
 mod audit_fields;
 mod handlers;
 
+fn lock_backend_label(mgr: Option<&Box<dyn crate::adapters::lock::LockManager>>) -> String {
+    if let Some(m) = mgr {
+        // Best-effort dynamic type name; map common implementations to concise labels
+        let tn = std::any::type_name_of_val(&**m);
+        if tn.ends_with("::file::FileLockManager") || tn.ends_with("FileLockManager") {
+            "file".to_string()
+        } else {
+            // Fallback: last segment lowercased
+            tn.rsplit("::").next().unwrap_or("custom").to_lowercase()
+        }
+    } else {
+        "none".to_string()
+    }
+}
+
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,
@@ -56,6 +71,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api.audit.log(Level::Info, "apply: starting");
     let mut lock_wait_ms: Option<u64> = None;
     let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
+    let lock_backend = lock_backend_label(api.lock.as_ref());
     if let Some(mgr) = &api.lock {
         let lt0 = Instant::now();
         match mgr.acquire_process_lock(api.lock_timeout_ms) {
@@ -69,6 +85,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     &tctx,
                     "failure",
                     json!({
+                        "lock_backend": lock_backend,
                         "lock_wait_ms": lock_wait_ms,
                         "error": e.to_string(),
                         "error_id": "E_LOCKING",
@@ -106,6 +123,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     &tctx,
                     "failure",
                     json!({
+                        "lock_backend": "none",
                         "error_id": "E_LOCKING",
                         "exit_code": 30,
                     }),
@@ -115,6 +133,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     &tctx,
                     "failure",
                     json!({
+                        "lock_backend": "none",
                         "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
                         "exit_code": exit_code_for(ErrorId::E_LOCKING),
                     }),
@@ -133,6 +152,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     &tctx,
                     "warn",
                     json!({
+                        "lock_backend": "none",
                         "no_lock_manager": true,
                     }),
                 );
@@ -142,6 +162,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 &tctx,
                 "warn",
                 json!({
+                    "lock_backend": "none",
                     "no_lock_manager": true,
                 }),
             );
@@ -153,6 +174,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         &tctx,
         "success",
         json!({
+            "lock_backend": lock_backend,
             "lock_wait_ms": lock_wait_ms,
         }),
     );
@@ -353,6 +375,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         "failure"
     };
     let mut fields = json!({
+        "lock_backend": lock_backend,
         "lock_wait_ms": lock_wait_ms,
     });
     // Optional attestation on success, non-dry-run

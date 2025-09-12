@@ -1,8 +1,10 @@
 # Feature Proposals — AI 4
+
 Generated: 2025-09-12 16:34 CET
 Author: AI 4
 
 ## Feature 1: Enforce SafePath in Core FS Paths with Deprecation Plan (Implement Now)
+
 - Problem statement: Core filesystem operations currently accept raw `&Path` inputs, risking path traversal and TOCTOU vulnerabilities by bypassing `SafePath` safety checks. Identified as S2 Priority 3 in EDGE_CASES_AND_BEHAVIOR.md and CLI_INTEGRATION_GUIDE.md Round 3 assessments.
 - User story(s):
   - As a security-conscious developer, I want all filesystem operations to enforce `SafePath` validation, so that my application is protected from path traversal attacks.
@@ -41,6 +43,7 @@ Author: AI 4
   - Analysis: DOCS/analysis/EDGE_CASES_AND_BEHAVIOR.md, DOCS/analysis/CLI_INTEGRATION_GUIDE.md Round 3 assessments.
 
 ## Feature 2: Implement SUID/SGID Check and Policy Knob with STOP Preflight Row (Implement Now)
+
 - Problem statement: Modifying SUID/SGID binaries without explicit checks risks privilege escalation, a significant security concern. Identified as S3 Priority 2 in CORE_FEATURES_FOR_EDGE_CASES.md Round 3 assessment.
 - User story(s):
   - As a system administrator, I want operations on SUID/SGID binaries to be blocked by default, so that accidental privilege escalation is prevented.
@@ -79,6 +82,7 @@ Author: AI 4
   - Analysis: DOCS/analysis/CORE_FEATURES_FOR_EDGE_CASES.md Round 3 assessment.
 
 ## Feature 3: Backup Sidecar Integrity with Payload Hash Verification
+
 - Problem statement: Lack of integrity checks for backup sidecars allows tampering, undermining restore reliability and security. Identified as S3 Priority 2 in EDGE_CASES_AND_BEHAVIOR.md Round 3 assessment.
 - User story(s):
   - As an operator, I want backup integrity verified during restore, so that tampered data is not applied to my system.
@@ -118,6 +122,7 @@ Author: AI 4
   - Analysis: DOCS/analysis/EDGE_CASES_AND_BEHAVIOR.md Round 3 assessment.
 
 ## Feature 4: Hardlink Breakage Preflight Check and Policy Control
+
 - Problem statement: Silent hardlink breakage during operations can cause data duplication and break backup systems, violating user expectations. Identified as S3 Priority 2 in EDGE_CASES_AND_BEHAVIOR.md Round 3 assessment.
 - User story(s):
   - As a system administrator, I want to be warned about hardlink breakage risks, so that I can prevent unintended data duplication or backup issues.

@@ -9,7 +9,7 @@
 ## Summary
 
 - Construct `Switchyard` with sinks and a hardened `Policy` preset; scope operations via `allow_roots` and forbid lists.
-- Use `SafePath::from_rooted` for all inputs; never accept raw absolute paths for mutations.
+- Prefer `SafePath::from_rooted` for all user-provided inputs and convert to raw paths at callsites that currently accept `&Path` (fs atoms). The high-level API uses `SafePath` extensively, but low-level fs helpers are still `&Path`-based today.
 - Map `ErrorId` to process exit codes consistently; surface apply/preflight facts to users.
 
 ## Integration Skeleton
@@ -25,7 +25,7 @@
 
 ## Retention
 
-- Expose a `prune` subcommand that calls the proposed `prune_backups(...)` hook (see RETENTION_STRATEGY.md).
+- Expose a `prune` subcommand in your CLI that implements a retention policy client-side for now (e.g., delete older `.bak` and `.meta.json` pairs beyond your max count or age). The library-level `prune_backups(...)` helper is proposed but not yet available; track RETENTION_STRATEGY.md for updates.
 
 ## Package Manager Interop
 
@@ -58,7 +58,7 @@ Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
 - Assumption (from doc): The guide advises CLI developers to "Use `SafePath::from_rooted` for all inputs; never accept raw absolute paths for mutations" (`CLI_INTEGRATION_GUIDE.md:12`).
 - Reality (evidence): The core mutating functions in `src/fs/` (e.g., `swap`, `restore`) do not accept a `SafePath` argument. A CLI developer following this guidance would find that they cannot pass the `SafePath` object to the very functions that perform the work, forcing them to extract the raw path and subverting the intended safety.
 - Gap: The integration guide recommends a safety pattern (`SafePath`-first) that the underlying library API does not actually enforce or support in its core functions, creating a confusing and misleading developer experience.
-- Mitigations: Update the guide to reflect the current reality: that `SafePath` should be used for initial validation, but the raw path must be passed to the fs layer. More importantly, prioritize the refactoring of fs-layer functions to accept `SafePath` directly, as proposed in `CORE_FEATURES_FOR_EDGE_CASES.md`.
+- Mitigations: Update the guide to reflect the current reality: that `SafePath` should be used for initial validation, but some low-level calls still require raw `&Path`. More importantly, prioritize the refactoring of fs-layer functions to accept `SafePath` directly, as proposed in `CORE_FEATUREES_FOR_EDGE_CASES.md`.
 - Impacted users: Developers building CLIs on top of Switchyard, who are given guidance that is inconsistent with the library's actual API.
 - Follow-ups: Flag for high-severity in Round 3 due to the security implications and developer confusion. Prioritize the `SafePath` refactoring in Round 4.
 

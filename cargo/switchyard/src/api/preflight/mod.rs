@@ -4,6 +4,9 @@
 //! - Emits one preflight fact per action with core fields and optional provenance/notes/preservation.
 //! - Emits a preflight summary with a `rescue_profile` status.
 //! - Returns a `PreflightReport` with stable row ordering suitable for YAML export via `preflight::to_yaml()`.
+//!
+//! This module is the stage orchestrator. Low-level helper checks and the YAML
+//! exporter live under `crate::preflight::{checks,yaml}`.
 
 use crate::logging::{FactsEmitter, TS_ZERO};
 use crate::types::ids::plan_id;
@@ -158,6 +161,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     if notes.is_empty() { None } else { Some(notes) },
                     Some(preservation),
                     Some(preservation_supported),
+                    None,
                 );
             }
             Action::RestoreFromBackup { target } => {
@@ -236,6 +240,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     if notes.is_empty() { None } else { Some(notes) },
                     Some(preservation),
                     Some(preservation_supported),
+                    Some(backup_present),
                 );
             }
         }

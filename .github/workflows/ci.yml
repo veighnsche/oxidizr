@@ -64,6 +64,29 @@ jobs:
 
           echo "Guardrails passed"
 
+      - name: Hermetic tests guard (no absolute system paths under switchyard tests)
+        run: |
+          set -euo pipefail
+          if grep -R --line-number -E '"/(bin|sbin|usr|etc|var|proc|sys|dev|run|tmp)(/|"|$)' cargo/switchyard/tests; then
+            echo "ERROR: Absolute system path literal found in cargo/switchyard/tests" >&2
+            exit 1
+          fi
+
+      - name: Changelog updated for switchyard crate changes
+        run: |
+          set -euo pipefail
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            changed=$(git diff --name-only HEAD^)
+            if echo "$changed" | grep -E '^(cargo/switchyard/src/|cargo/switchyard/Cargo.toml|cargo/switchyard/SPEC/|cargo/switchyard/DOCS/)'; then
+              if ! echo "$changed" | grep -q '^cargo/switchyard/CHANGELOG.md$'; then
+                echo "ERROR: Detected changes to switchyard crate without updating cargo/switchyard/CHANGELOG.md" >&2
+                echo "Changed files:" >&2
+                echo "$changed" >&2
+                exit 1
+              fi
+            fi
+          fi
+
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
