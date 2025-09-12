@@ -3,6 +3,10 @@
 - Title: <feature name>
 - Category: Safety | UX | DX | Infra
 - Maturity: Bronze | Silver | Gold | Platinum
+- Owner(s): <github handle(s)>
+- Last reviewed: <YYYY-MM-DD>
+- Next review due: <YYYY-MM-DD>
+- Related PR(s): <#NNNN, links>
 
 ## Summary
 
@@ -40,7 +44,31 @@ Brief description of the feature and its intent. Reference SPEC requirements if 
 - Concrete, small PR-sized tasks
 - Golden tests or CI gates to add
 
+## Maintenance Checklist
+
+- [ ] Code citations are accurate (paths and symbol names)
+- [ ] Policy knobs documented reflect current `policy::Policy`
+- [ ] Error mapping and `exit_code` coverage verified
+- [ ] Emitted facts fields listed and schema version up to date
+- [ ] Determinism parity (DryRun vs Commit) verified in tests
+- [ ] Goldens added/updated and CI gates green
+- [ ] Preflight YAML or JSON Schema validated (where applicable)
+- [ ] Cross-filesystem or degraded-mode notes reviewed (if applicable)
+- [ ] Security considerations reviewed; redaction masks adequate
+- [ ] Licensing impact considered (deps changed? update licensing inventory)
+- [ ] Maturity rating reassessed and justified if changed
+- [ ] Observations log updated with date/author if noteworthy
+
+## Observations log
+
+- <YYYY-MM-DD> — <author> — <short observation>
+
+## Change history
+
+- <YYYY-MM-DD> — <author> — <summary of change>; PR: <#NNNN>
+
 ## Related
 
 - SPEC sections, ADRs, and planning docs
 - Closely related inventory entries
+
