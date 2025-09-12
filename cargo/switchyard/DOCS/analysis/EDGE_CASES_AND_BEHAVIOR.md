@@ -119,6 +119,87 @@ This document enumerates notable user-behavior edge cases and how Switchyard beh
   - A `validate`/`doctor` command in the orchestrating CLI to scan for orphaned sidecars/payloads and offer remediation.
   - Metrics emission for restore durations (parity with apply’s FSYNC warn path).
 
+## Link drift detection and RELINK
+
+- Scenarios:
+  - `target` symlink is overwritten by a package manager or manual changes (becomes a regular file or different symlink).
+  - `source` moved or deleted leaving `target` a dangling symlink.
+- Current behavior:
+  - Idempotent checks in `src/fs/restore.rs::restore_file()` short-circuit when the on-disk state already matches `prior_kind` and `prior_dest` from the sidecar.
+  - There is no background integrity checker; drift is only corrected when `RestoreFromBackup` or `EnsureSymlink` is executed.
+- UX proposal:
+  - Add a CLI subcommand `doctor links` to scan a tree, using `src/fs/meta.rs::{kind_of, resolve_symlink_target}` to validate that "symlink → expected dest" still holds. Emit actionable JSON and human summaries.
+  - Add `relink` capability: when drift is detected and the desired topology is known (e.g., from an experiment plan or policy), execute `Action::EnsureSymlink` to re-point the link without touching historical backups; otherwise, fallback to `RestoreFromBackup` driven by the sidecar.
+  - Optional systemd timer (Link Guardian): run `doctor links --fix=relink|restore|warn` periodically on critical paths. Surface results to audit via `apply.result`-like facts.
+  - Policy idea (future): `link_health = Off|Warn|Fix(ReLink)|Restore` to choose behavior on drift.
+
+## Directory targets (unsupported)
+
+- Issue:
+  - `src/fs/backup.rs::create_snapshot()` assumes file-or-symlink. If `target` is a directory, the `openat(..., OFlags::RDONLY)` path will fail (`EISDIR`).
+- Behavior:
+  - Snapshot returns an error; replace/restore paths aren’t designed for directories.
+- Recommendation:
+  - Treat directory targets as invalid at planning/preflight time. Use `src/fs/meta.rs::kind_of()` and reject `kind == "dir"` for `Action::EnsureSymlink` and `Action::RestoreFromBackup` in `src/policy/gating.rs`.
+  - CLI: produce a clear error "directories are not supported targets" and suggest selecting a file within the directory.
+
+## Hardlink semantics are not preserved
+
+- Issue:
+  - When restoring a regular file, `src/fs/restore.rs` performs a `renameat` of the backup payload to the target, creating a new inode and breaking any prior hardlink relationships.
+- Recommendation:
+  - Preflight note: detect `nlink > 1` (via `std::os::unix::fs::MetadataExt::nlink`) and STOP unless `--force`. Emit a clear advisory that hardlinks will be broken.
+  - Document in CLI help and audit facts (preflight rows) when such a target is encountered.
+
+## Sticky bit or restricted parent directories
+
+- Issue:
+  - In sticky directories (e.g., `/tmp` with `+t`), `unlinkat`/`renameat` can fail with `EACCES` unless the caller owns the file or directory.
+- Behavior:
+  - `src/fs/swap.rs` and `src/fs/restore.rs` will surface the I/O error.
+- Recommendation:
+  - Add a preflight probe for parent dir writability/ownership. If sticky and not owned, STOP with guidance.
+  - Include this check in `policy::gating::gating_errors` alongside `check_immutable`.
+
+## Missing source at apply time
+
+- Behavior:
+  - `src/preflight/checks.rs::check_source_trust()` reads metadata of `source` and fails if missing or untrusted (unless `force_untrusted_source=true`). This prevents creating a symlink to a nonexistent binary by default.
+- Recommendation:
+  - Keep default strictness. If users need to stage links ahead of source arrival, allow via `force_untrusted_source`, but audit heavily: add a preflight row and `apply.result` field noting `source_missing=true`.
+
+## Symlink loops and very long paths
+
+- Behavior:
+  - Idempotence uses best-effort normalization: `canonicalize()` is attempted; on error (e.g., symlink loop or permission error), code compares unresolved paths.
+  - `symlinkat` and `renameat` will fail with `ENAMETOOLONG` for extremely long names.
+- Recommendation:
+  - `doctor links` should flag and refuse to auto-fix looped symlinks.
+  - Emit a targeted error when `ENAMETOOLONG` occurs, with a remediation hint to shorten path components.
+
+## Overlay/union filesystems and container layers
+
+- Behavior:
+  - Cross-layer/union mounts frequently surface as `EXDEV`. `src/fs/atomic.rs::atomic_symlink_swap()` already degrades (unlink+symlink) when `allow_degraded_fs=true`.
+- Recommendation:
+  - For critical system paths keep `allow_degraded_fs=false` and fail fast with `E_EXDEV`.
+  - For ephemeral environments (e.g., containers), allow degraded mode but run smoke tests post-apply and log `degraded_reason="exdev_fallback"` (already emitted by handlers).
+
+## Backup timestamp collisions and clock skew
+
+- Behavior:
+  - Backup filenames use `SystemTime::now().as_millis()` in `backup_path_with_tag()`. On very fast successive operations or skewed clocks, collisions are unlikely but possible.
+- Recommendation:
+  - If collisions are observed in practice, consider adding a tie-breaker (PID or a monotonic counter) into the filename. Today, callers remove any preexisting backup of the same name before re-creating.
+
+## Sidecar tampering/corruption
+
+- Behavior:
+  - Sidecar JSON is trusted when present; parse errors are treated as "no sidecar" and we fall back to legacy rename when a payload exists.
+- Recommendation:
+  - Strengthen provenance by embedding a hash of the payload (and recording it in the sidecar). On restore, verify the hash before trusting fields like `prior_kind` and `prior_dest`.
+  - Optionally sign sidecars as part of an attestation flow; store verification results in audit facts.
+
 ## Quick references (files)
 
 - `src/policy/config.rs` — Policy fields (rescue, lock, preservation, degraded fs, backups, preflight override, roots/forbid, etc.)
