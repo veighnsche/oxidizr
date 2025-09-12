@@ -99,6 +99,8 @@ fn apply_fail_closed_on_policy_violation() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
+    // Ensure Commit mode reaches policy gating (bypass LockManager requirement in tests)
+    policy.allow_unlocked_commit = true;
     // Fail-closed default; allow only usr/bin so usr/sbin target violates policy
     let td = tempfile::tempdir().unwrap();
     let root = td.path();

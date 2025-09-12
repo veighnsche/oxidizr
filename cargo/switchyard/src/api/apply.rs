@@ -77,6 +77,15 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         "exit_code": 30
                     }),
                 );
+                // Stage parity: also emit a summary apply.result failure for locking errors
+                emit_apply_result(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
+                        "exit_code": exit_code_for(ErrorId::E_LOCKING),
+                    }),
+                );
                 let duration_ms = t0.elapsed().as_millis() as u64;
                 api.audit
                     .log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
@@ -101,6 +110,15 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     json!({
                         "error_id": "E_LOCKING",
                         "exit_code": 30,
+                    }),
+                );
+                // Stage parity: also emit a summary apply.result failure for locking errors
+                emit_apply_result(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
+                        "exit_code": exit_code_for(ErrorId::E_LOCKING),
                     }),
                 );
                 let duration_ms = t0.elapsed().as_millis() as u64;
