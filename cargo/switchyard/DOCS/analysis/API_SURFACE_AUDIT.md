@@ -123,3 +123,23 @@ Legend: Stability = Stable | Provisional | Internal (consider private)
   - Added precise code citations to substantiate API exposure and stability classifications. Confirmed that low-level FS atoms are re-exported today and recommended treating them as Internal in docs. Noted the preflight naming duplication for future cleanup.
 
 Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
+
+## Round 2 Gap Analysis (AI 4, 2025-09-12 15:38 CET)
+
+- **Invariant: Public API ensures safe usage by preventing misuse of low-level filesystem operations.**
+  - **Assumption (from doc):** The document assumes that low-level filesystem atoms like `open_dir_nofollow`, `atomic_symlink_swap`, and `fsync_parent_dir` should be considered internal and not part of the stable public API to prevent misuse by integrators (`API_SURFACE_AUDIT.md:12`, `API_SURFACE_AUDIT.md:65-66`).
+  - **Reality (evidence):** These low-level functions are currently publicly re-exported from `fs/mod.rs` (`src/fs/mod.rs:9-15`), making them accessible to external users despite being classified as 'Internal' in the audit (`API_SURFACE_AUDIT.md:47-48`).
+  - **Gap:** Exposing low-level filesystem operations publicly allows CLI consumers to bypass higher-level safe abstractions like `replace_file_with_symlink`, potentially leading to unsafe operations or TOCTOU vulnerabilities. This violates the consumer expectation that the API surface protects against misuse.
+  - **Mitigations:** Restrict the visibility of low-level FS atoms by marking them as `pub(crate)` in `fs/mod.rs` and removing their re-export. Provide clear documentation in `lib.rs` and SPEC §3.1/§3.2 that only high-level operations are part of the stable API. Consider a deprecation period with warnings for existing users.
+  - **Impacted users:** CLI developers who may inadvertently use these low-level functions, risking unsafe filesystem operations without the safety guarantees of higher-level abstractions.
+  - **Follow-ups:** Flag this as a medium-severity usability and safety issue for Round 3. Plan to restrict API surface in Round 4 implementation.
+
+- **Invariant: Public API stability is clearly communicated to ensure reliable integration.**
+  - **Assumption (from doc):** The document assumes that stability classifications (Stable, Provisional, Internal) are clearly communicated to integrators, allowing them to rely on stable components and anticipate changes in provisional ones (`API_SURFACE_AUDIT.md:18-19`, `API_SURFACE_AUDIT.md:89-92`).
+  - **Reality (evidence):** While the audit classifies items in the document, there is no evidence in the codebase (e.g., `src/lib.rs`, `src/fs/mod.rs`, `src/logging/mod.rs`) that stability levels are documented in Rustdoc or other user-facing materials. For instance, `FactsEmitter` and `AuditSink` are marked Provisional in the audit (`API_SURFACE_AUDIT.md:14`, `API_SURFACE_AUDIT.md:55`), but this is not reflected in the code comments or documentation.
+  - **Gap:** The lack of explicit stability documentation in the codebase means CLI consumers may assume all public items are stable by default, leading to integration breakage when provisional items evolve. This violates the expectation of transparent API evolution.
+  - **Mitigations:** Add stability annotations (e.g., `#[stability::provisional]` or explicit Rustdoc comments) to public items in the codebase, reflecting the classifications in this audit. Update SPEC §3 to include a stability policy section. Include a note in release documentation about provisional components.
+  - **Impacted users:** CLI integrators who build on provisional APIs without awareness of potential changes, risking future compatibility issues.
+  - **Follow-ups:** Flag this as a medium-severity documentation gap for Round 3. Plan to implement stability annotations and documentation updates in Round 4.
+
+Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET

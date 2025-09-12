@@ -160,3 +160,47 @@ This document enumerates the observable behaviors of the Switchyard library acro
 - `SWITCHYARD_FORCE_RESCUE_OK=1|0` (force rescue availability).
 - `FSYNC_WARN_MS` threshold for severity=warn annotation (see `apply/audit_fields.rs`).
 
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Deterministic behavior across runs
+- **Assumption (from doc):** Consumers expect same `PlanInput` to always produce identical `plan_id` and `action_id` values for reproducible operations
+- **Reality (evidence):** UUIDv5 deterministic IDs implemented in `src/types/ids.rs` ensure stability, verified by SPEC §7 requirements
+- **Gap:** No consumer documentation explains this guarantee; consumers may not rely on determinism for automation or testing
+- **Mitigations:** Document determinism guarantee in public API docs; add examples showing plan ID stability across runs
+- **Impacted users:** CLI automation scripts and integration testing workflows that need reproducible plan tracking
+- **Follow-ups:** Add determinism examples to CLI reference implementation; document in migration guide
+
+- **Invariant:** Complete audit trail for all operations
+- **Assumption (from doc):** Every operation emits corresponding audit facts that consumers can rely on for compliance and debugging
+- **Reality (evidence):** Comprehensive fact emission at `src/logging/audit.rs` with `plan`, `preflight`, `apply.attempt`, `apply.result`, `rollback` events; however, redaction in dry-run mode zeros timestamps and removes timing data at `src/logging/redact.rs:L75-L76`
+- **Gap:** Dry-run audit trails have limited forensic value; consumers expecting timing data for performance analysis will find gaps
+- **Mitigations:** Document dry-run limitations; provide policy knob to preserve timing data in dry-run for performance analysis
+- **Impacted users:** Operations teams analyzing performance and compliance auditors requiring complete trails
+- **Follow-ups:** Add timing preservation policy option; clarify audit completeness in documentation
+
+- **Invariant:** Automatic rollback on apply failures
+- **Assumption (from doc):** Failed operations automatically rollback already-executed actions unless disabled
+- **Reality (evidence):** Rollback implementation at `src/api/apply.rs` attempts reverse-order restoration on first failure; however, `disable_auto_rollback` policy can disable this, and smoke test failures trigger rollback that could mask the original failure cause
+- **Gap:** Consumers may not understand rollback behavior differences between failure types; smoke test rollback could hide apply-stage issues
+- **Mitigations:** Document rollback behavior per error type; emit clear facts distinguishing original failure from rollback-triggered operations
+- **Impacted users:** Operations teams debugging complex failures and automation that depends on predictable rollback behavior
+- **Follow-ups:** Enhance rollback documentation with failure scenario matrix; improve fact emission for rollback triggers
+
+- **Invariant:** Policy enforcement consistency between stages
+- **Assumption (from doc):** Policy checks in preflight stage match those enforced during apply stage
+- **Reality (evidence):** Gating engine at `src/policy/gating.rs` mirrors preflight checks for apply-stage enforcement; however, `override_preflight` policy allows skipping preflight while still enforcing gating in apply
+- **Gap:** Consumers may be surprised by apply-stage policy failures when preflight was overridden; inconsistent enforcement reduces preflight value
+- **Mitigations:** Document override behavior clearly; add warning when `override_preflight` is used; consider separate policy for apply-stage gating bypass
+- **Impacted users:** CI/CD systems and automation that rely on preflight checks to predict apply success
+- **Follow-ups:** Add policy consistency validation; document override patterns and risks
+
+- **Invariant:** Environment variable behavior stability
+- **Assumption (from doc):** Test environment variables like `SWITCHYARD_FORCE_EXDEV` and `SWITCHYARD_FORCE_RESCUE_OK` provide stable testing interfaces
+- **Reality (evidence):** Environment knobs implemented for testing at `src/fs/atomic.rs` and `src/policy/rescue.rs`; however, no documentation warns against production use or version stability
+- **Gap:** Consumers might use test knobs in production or expect them to remain stable across versions
+- **Mitigations:** Document test-only nature of environment variables; add runtime warnings when test knobs are detected in production mode
+- **Impacted users:** Testing frameworks and developers who might misuse test hooks in production environments
+- **Follow-ups:** Add production environment detection; document testing vs production environment variable policies
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+

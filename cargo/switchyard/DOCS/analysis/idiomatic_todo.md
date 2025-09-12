@@ -124,3 +124,39 @@ This document tracks the remaining idiomatic Rust module/layout cleanups and a f
 **Summary of Edits:** Most claimed refactoring is complete, but the high-priority item "Make `src/api.rs` a module directory" remains pending. Updated status to reflect current state.
 
 Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+- Invariant: Stable, idiomatic module paths for consumers and docs
+  - Assumption (from doc): API modules follow directory-module conventions and avoid `#[path]` shims.
+  - Reality (evidence): `src/api.rs` still exists as a single file delegator with `#[path]` attributes to `api/*` (see file presence and size in repo, 9002 bytes). This creates drift from the recommended structure and complicates navigation and Rustdocs.
+  - Gap: Documentation and contributor expectations assume `src/api/mod.rs`; references can go stale and IDE tooling loses some affordances.
+  - Mitigations: Perform the planned move of `src/api.rs` → `src/api/mod.rs` and replace `#[path]` with `mod ...;` declarations. Update imports and docs.
+  - Impacted users: Contributors and downstream readers relying on conventional module layout and docs.
+  - Follow-ups: Execute High-priority item in this doc; add a CI grep check to detect lingering `#[path]` usage under `src/api/`.
+
+- Invariant: Legacy shims are removed before the next minor release
+  - Assumption (from doc): `policy::checks` shim is gone; remaining shims will be cleaned up.
+  - Reality (evidence): `src/policy/checks.rs` is absent as expected; however, `adapters::lock_file::*` shim still exists (`src/adapters/mod.rs` lines 6–9) to preserve an older import path.
+  - Gap: Public shim risks prolonging duplicate import paths and documentation confusion.
+  - Mitigations: Deprecate `adapters::lock_file::*` in Rustdoc now, and remove after one minor version; add a linter/grep gate in CI to prevent new usages; update samples.
+  - Impacted users: Integrators importing legacy path; internal docs/refs.
+  - Follow-ups: Track deprecation window in RELEASE_AND_CHANGELOG_POLICY.md; remove shim when window expires.
+
+- Invariant: Public surface is minimal; low-level FS atoms are not consumer-facing
+  - Assumption (from analysis): Low-level FS atoms are Internal-only.
+  - Reality (evidence): `src/fs/mod.rs` publicly re-exports `open_dir_nofollow`, `atomic_symlink_swap`, and `fsync_parent_dir` (lines 9–15). These are footguns for consumers and bypass `SafePath` type.
+  - Gap: External callers could misuse low-level atoms and violate TOCTOU invariants.
+  - Mitigations: Mark these re-exports as `pub(crate)` and provide high-level `replace_file_with_symlink`/`restore_file` only; if removal is breaking, first deprecate with clear Rustdocs and changelog.
+  - Impacted users: Power users calling low-level APIs directly.
+  - Follow-ups: Coordinate with RELEASE_AND_CHANGELOG_POLICY.md to outline deprecation timeline; add a compile-fail doc test demonstrating intended usage.
+
+- Invariant: Deterministic backup naming in tests
+  - Assumption (from doc): Tests can rely on stable backup names.
+  - Reality (evidence): `backup_path_with_tag()` uses `SystemTime::now()` (`src/fs/backup.rs` lines 18–23), producing non-deterministic names; tests scan directory to find latest.
+  - Gap: Flaky assertions/golden fixtures possible around timestamp ordering.
+  - Mitigations: Introduce a `Clock` trait with a default `SystemClock`; allow tests to inject a fixed clock for deterministic names.
+  - Impacted users: Test authors and CI stability.
+  - Follow-ups: Implement the proposed trait and refactor callers; update tests and docs accordingly.
+
+Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00

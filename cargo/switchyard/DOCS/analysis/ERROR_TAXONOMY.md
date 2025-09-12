@@ -96,3 +96,23 @@
   - Added precise code/spec citations confirming mappings and emission sites; clarified default summary mapping behavior. Recommendations retained (consider `summary_error_ids`).
 
 Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
+
+## Round 2 Gap Analysis (AI 4, 2025-09-12 15:38 CET)
+
+- **Invariant: Error reporting provides detailed and actionable information for all failure scenarios.**
+  - **Assumption (from doc):** The document assumes that error reporting, especially in summaries, should reflect the specific causes of failures to aid CLI consumers in diagnosing issues, recommending the addition of `summary_error_ids` to capture multiple error causes (`ERROR_TAXONOMY.md:45`, `ERROR_TAXONOMY.md:50-52`).
+  - **Reality (evidence):** In the current implementation, apply and preflight summaries often default to a single generic `error_id` like `E_POLICY` even when multiple or specific errors occur (`src/api/apply/mod.rs:401-406`, `src/api/preflight/mod.rs:255-270`). There is no mechanism like `summary_error_ids` to list all contributing error IDs.
+  - **Gap:** Collapsing multiple error conditions into a single generic `error_id` in summaries limits the diagnostic information available to CLI consumers, violating the expectation of detailed and actionable error reporting for complex failure scenarios.
+  - **Mitigations:** Implement the recommended `summary_error_ids` array in apply and preflight summaries to capture all unique error IDs encountered (`src/api/apply/mod.rs`, `src/api/preflight/mod.rs`). Alternatively, prioritize the most severe or specific `error_id` for the summary while logging details in per-action facts. Update `SPEC/error_codes.toml` and `SPEC §6` to document this behavior.
+  - **Impacted users:** CLI integrators and end-users who need precise error information to troubleshoot and resolve issues, especially in multi-step operations with multiple failure points.
+  - **Follow-ups:** Flag this as a medium-severity usability gap for Round 3. Plan to enhance summary error reporting with detailed error arrays in Round 4.
+
+- **Invariant: Error handling for ownership issues is distinctly identified for user action.**
+  - **Assumption (from doc):** The document assumes that strict ownership failures should be distinctly reported as `E_OWNERSHIP` with a specific exit code to guide users on permission-related issues (`ERROR_TAXONOMY.md:19`, `ERROR_TAXONOMY.md:49-50`).
+  - **Reality (evidence):** While `E_OWNERSHIP` is defined with exit code 20 in `src/api/errors.rs:61-73`, the current preflight implementation often reports ownership issues as generic human-readable strings in `notes` without setting `error_id` to `E_OWNERSHIP` (`src/api/preflight/mod.rs`, `src/policy/gating.rs`). These are then summarized under `E_POLICY`.
+  - **Gap:** Ownership-related errors are not consistently tagged with `E_OWNERSHIP`, reducing the clarity for CLI consumers who expect a specific error code to automate or guide permission fixes. This violates the expectation of distinct error categorization for actionable response.
+  - **Mitigations:** Update preflight and gating logic to emit `error_id=E_OWNERSHIP` for ownership-specific failures in per-action rows and ensure this is reflected in summaries when it is the primary cause (`src/api/preflight/mod.rs`, `src/policy/gating.rs`). Add test cases to verify consistent error ID usage for ownership issues.
+  - **Impacted users:** System administrators and CLI users who encounter permission or ownership issues and need clear, specific error codes to address them efficiently.
+  - **Follow-ups:** Flag this as a low-to-medium severity usability gap for Round 3. Plan to implement distinct ownership error tagging in Round 4.
+
+Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET

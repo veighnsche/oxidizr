@@ -82,3 +82,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 - SPEC: §9 Operational Bounds
 - PLAN: 55-operational-bounds.md
 - CODE: `src/fs/backup.rs`, `src/fs/restore.rs`
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Backup availability for rollback operations
+- **Assumption (from doc):** Consumers expect backups to remain available for rollback indefinitely until explicitly pruned
+- **Reality (evidence):** No retention enforcement exists at `src/fs/backup.rs`; backups accumulate until manual cleanup; discovery helpers at `src/fs/backup.rs:L25-L316` find latest/previous backups by timestamp but don't manage lifecycle
+- **Gap:** Unmanaged backup accumulation could fill filesystems; consumers have no predictable retention behavior or automated cleanup
+- **Mitigations:** Implement proposed `prune_backups` function with policy knobs; add default retention warnings when backup count exceeds thresholds
+- **Impacted users:** Long-running services and automation that perform frequent switching operations
+- **Follow-ups:** Implement retention policy fields in Policy struct; add filesystem usage monitoring
+
+- **Invariant:** Consistent backup discovery across operations
+- **Assumption (from doc):** Latest and previous backup discovery provides reliable restore targets
+- **Reality (evidence):** Discovery helpers `find_latest_backup_and_sidecar` and `find_previous_backup_and_sidecar` implemented with timestamp-based ordering; however, no validation ensures sidecar-payload pairs remain intact during retention operations
+- **Gap:** Retention operations could orphan sidecars or payloads if not implemented atomically; consumers may encounter inconsistent backup state
+- **Mitigations:** Implement atomic pair cleanup in retention operations; add integrity validation before backup operations
+- **Impacted users:** Operations teams relying on backup integrity for disaster recovery
+- **Follow-ups:** Add backup integrity validation; implement atomic pair operations in prune_backups
+
+- **Invariant:** Safe retention operations respect filesystem boundaries
+- **Assumption (from doc):** Proposed retention uses `open_dir_nofollow` and validates candidates before deletion
+- **Reality (evidence):** Safety approach documented using `open_dir_nofollow(parent)` and pattern validation; however, no implementation exists yet to validate these safety claims
+- **Gap:** Without implementation, safety claims remain unverified; consumers may encounter race conditions or path traversal issues
+- **Mitigations:** Implement retention with documented safety patterns; add comprehensive testing for edge cases and concurrent operations
+- **Impacted users:** Security-conscious environments requiring verified path safety
+- **Follow-ups:** Implement prune_backups with safety patterns; add security-focused testing
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST

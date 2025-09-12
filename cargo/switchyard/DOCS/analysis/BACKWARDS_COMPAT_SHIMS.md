@@ -108,3 +108,23 @@ This document lists all compatibility shims and re-exports found in the Switchya
   - `lib.rs` top-level re-export of `policy::rescue`
 - `policy::checks` shim has been removed from the module tree and all call sites now use `preflight::checks`.
 - Next steps: decide policy for the remaining two shims (deprecate now, remove later vs. keep indefinitely for ergonomics).
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Import path stability across package upgrades
+- **Assumption (from doc):** Consumers rely on stable import paths like `switchyard::adapters::lock_file::FileLockManager` and `switchyard::rescue` to remain available indefinitely
+- **Reality (evidence):** Active compatibility shims at `src/adapters/mod.rs:L6-L9` and `src/lib.rs:L21` maintain these paths; however, no deprecation timeline or major version policy is documented; external consumers may build dependencies on these legacy paths without awareness of planned removal
+- **Gap:** No consumer notification mechanism for pending breaking changes; removal could break downstream integrations silently
+- **Mitigations:** Implement deprecation attributes (`#[deprecated]`) with migration guidance; document breaking change policy in CHANGELOG template; add CI lint to detect usage of deprecated paths in tests
+- **Impacted users:** External library consumers and CLI integrations that import legacy paths
+- **Follow-ups:** Add deprecation policy to RELEASE_AND_CHANGELOG_POLICY.md; implement staged deprecation warnings
+
+- **Invariant:** Module path consistency during refactoring
+- **Assumption (from doc):** Internal refactoring (like preflight checks migration) should not affect external consumers
+- **Reality (evidence):** The `policy::checks` to `preflight::checks` migration successfully avoided external breakage by updating internal imports at `src/policy/gating.rs` and `src/api/preflight.rs`, but no automated testing validates external API stability
+- **Gap:** No integration tests verify that public API surface remains stable during internal refactoring
+- **Mitigations:** Add API surface stability tests that import public paths and verify availability; document public vs internal API boundaries clearly
+- **Impacted users:** Library integrators who depend on stable public API
+- **Follow-ups:** Implement API stability CI checks; clarify public API surface documentation
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST

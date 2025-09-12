@@ -103,3 +103,31 @@ Generated on: 2025-09-12
 ## Notes
 
 - If we want to avoid even façade re-exports for preflight, we can drop the `pub use` from `preflight.rs` and have direct imports from `preflight::checks`/`preflight::yaml`. Current setup keeps a single public entrypoint, which is often preferred for discoverability.
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Stable public API surface across refactoring
+- **Assumption (from doc):** Facade re-exports provide stable public API while allowing internal reorganization
+- **Reality (evidence):** Current facades at `src/fs/mod.rs:L9-L15`, `src/types/mod.rs:L7-L11`, and others maintain stable paths; however, no API stability testing validates that refactoring preserves consumer imports
+- **Gap:** Internal module restructuring could accidentally break public facades without detection
+- **Mitigations:** Add API surface integration tests that import all public paths; implement CI checks for API stability across changes
+- **Impacted users:** External library consumers who rely on facade paths for ergonomic imports
+- **Follow-ups:** Implement automated API surface validation; document facade stability guarantees
+
+- **Invariant:** Clear distinction between facades and compatibility shims
+- **Assumption (from doc):** Ergonomic facades should be permanent while compatibility shims are temporary
+- **Reality (evidence):** Document clearly identifies `adapters::lock_file` shim at `src/adapters/mod.rs:L88` and `policy::rescue` re-export at `src/lib.rs` as temporary compatibility layers; however, no systematic approach prevents facades from accumulating shim-like behavior over time
+- **Gap:** Facade vs shim boundaries may blur without governance; future API evolution could create inconsistent deprecation policies
+- **Mitigations:** Establish explicit lifecycle policies for facades vs shims; add documentation tags to distinguish permanent API from compatibility layers
+- **Impacted users:** API consumers who need to understand long-term stability of different import paths
+- **Follow-ups:** Document facade lifecycle policy; implement architectural decision records for API surface changes
+
+- **Invariant:** Re-export granularity matches consumer usage patterns
+- **Assumption (from doc):** Current re-export granularity (e.g., `types::*` vs specific items) reflects actual consumer needs
+- **Reality (evidence):** Mixed granularity with `types/mod.rs` using glob re-exports (`pub use errors::*;`) while `fs/mod.rs` uses selective re-exports; no usage analysis validates that granularity matches consumer import patterns
+- **Gap:** Over-broad or under-specific re-exports may not align with actual consumer needs; glob exports can lead to namespace pollution
+- **Mitigations:** Analyze consumer usage patterns to optimize re-export granularity; consider selective re-exports to avoid namespace pollution
+- **Impacted users:** Library consumers who may encounter naming conflicts or missing convenience imports
+- **Follow-ups:** Conduct usage analysis of public API imports; refine re-export granularity based on findings
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST

@@ -57,3 +57,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 
 ## References
 - See corresponding analysis docs for details.
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:29 CEST)
+
+- **Invariant:** Roadmap priorities align with consumer deployment needs
+- **Assumption (from doc):** High-priority milestones (backup durability, retention, facts validation) address critical consumer requirements
+- **Reality (evidence):** Milestones target technical implementation improvements; however, no consumer usage analysis validates that these priorities address actual deployment pain points
+- **Gap:** Roadmap may not reflect real-world consumer needs; technical priorities might not align with operational requirements
+- **Mitigations:** Conduct consumer usage surveys to validate roadmap priorities; add user-facing milestones like CLI tools and documentation improvements
+- **Impacted users:** Production deployments and operators who may have different priorities than technical implementation concerns
+- **Follow-ups:** Add consumer feedback collection; adjust roadmap based on operational priorities
+
+- **Invariant:** Milestone acceptance criteria enable consumer validation
+- **Assumption (from doc):** Acceptance criteria provide clear validation points for milestone completion
+- **Reality (evidence):** Criteria focus on technical validation (unit tests, integration tests); however, no end-to-end consumer workflow validation exists
+- **Gap:** Technical completion may not guarantee consumer-facing functionality works correctly in realistic scenarios
+- **Mitigations:** Add consumer workflow acceptance criteria; implement end-to-end integration tests that simulate real deployment patterns
+- **Impacted users:** Consumers who adopt new features and may encounter integration issues not covered by unit testing
+- **Follow-ups:** Expand acceptance criteria to include consumer workflow validation; add realistic integration testing
+
+- **Invariant:** Feature delivery timeline supports consumer planning
+- **Assumption (from doc):** Milestone ordering provides predictable feature delivery for consumer adoption planning
+- **Reality (evidence):** Roadmap lists priorities (High/Medium) but no timeline or version targeting; consumers cannot plan integration schedules
+- **Gap:** Lack of delivery timeline makes it difficult for consumers to plan feature adoption and integration work
+- **Mitigations:** Add target versions or timeline estimates to milestones; implement regular progress reporting for consumer visibility
+- **Impacted users:** Organizations planning Switchyard integration who need predictable feature delivery schedules
+- **Follow-ups:** Add milestone timeline estimates; implement progress tracking and reporting
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST

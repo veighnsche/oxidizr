@@ -86,3 +86,39 @@
 **Summary of Edits:** All technical claims about locking implementation are accurately supported. The document correctly describes the adapter interface, file-based implementation, timing constants, and error handling.
 
 Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+- Invariant: Lock telemetry sufficient for consumers
+  - Assumption (from doc): `lock_wait_ms` in `apply.attempt` provides enough visibility.
+  - Reality (evidence): Final apply summary also includes `lock_wait_ms` (`src/api/apply/mod.rs` lines 355–357). However, there is no field indicating the lock backend in use.
+  - Gap: Consumers cannot distinguish file-based vs other lock backends for fleet-wide analysis.
+  - Mitigations: Add `lock_backend` (e.g., "file") to `apply.attempt` and optionally to summary; document in SPEC §2.5 as additive.
+  - Impacted users: Ops teams correlating lock contention to backend choice.
+  - Follow-ups: Extend emission sites in `apply/mod.rs` and update JSON fixtures.
+
+- Invariant: Lock acquisition fairness/robustness under contention
+  - Assumption (from doc): File-backed lock with polling is adequate.
+  - Reality (evidence): `FileLockManager` uses fixed-interval sleep (`LOCK_POLL_MS`) without backoff/jitter (`src/adapters/lock/file.rs` lines 50–56).
+  - Gap: Herding and periodic contention spikes possible.
+  - Mitigations: Add exponential backoff or jitter to the polling loop; surface total attempts in telemetry for diagnostics.
+  - Impacted users: Highly concurrent environments.
+  - Follow-ups: Prototype backoff; add a stress test that simulates N contenders.
+
+- Invariant: Standardized lock file path prevents collisions
+  - Assumption (from doc): Integrators will choose a good lock path.
+  - Reality (evidence): No helper or convention exists; path is free-form (`FileLockManager::new(PathBuf)` in `src/adapters/lock/file.rs` lines 17–19).
+  - Gap: Risk of path collisions across roots or processes.
+  - Mitigations: Provide `Policy::default_lock_path(root)` to standardize `<root>/.switchyard/lock`; document per-root locking guidance.
+  - Impacted users: Multi-tenant systems and CI pipelines.
+  - Follow-ups: Add helper; update docs and examples.
+
+- Invariant: Dev ergonomics allow Commit without LockManager by default
+  - Assumption (from docs): `allow_unlocked_commit` defaults to true for development.
+  - Reality (evidence): `Policy::default()` sets `allow_unlocked_commit=false` (`src/policy/config.rs` line 106). Enforcement in `apply/mod.rs` uses `require_lock_manager || !allow_unlocked_commit` (lines 101–131), so default will fail Commit without a manager.
+  - Gap: Doc/code divergence may surprise developers.
+  - Mitigations: Align docs/code or add compile-time examples showing explicit enablement in dev; ensure preset docs are explicit.
+  - Impacted users: Developers testing Commit locally.
+  - Follow-ups: Track resolution in policy doc; add a test asserting intended default.
+
+Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00

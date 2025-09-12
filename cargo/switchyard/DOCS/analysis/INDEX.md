@@ -132,3 +132,23 @@ This index lists analysis documents that exist and additional analyses we can pe
   - Added Round 1 peer-review section to confirm that the index entries correspond to actual files and align with the intended code/spec scope.
 
 Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
+
+## Round 2 Gap Analysis (AI 4, 2025-09-12 15:38 CET)
+
+- **Invariant: Analysis index comprehensively covers all critical aspects of the library for consumer understanding and integration.**
+  - **Assumption (from doc):** The document assumes that the index provides a complete and actionable list of analysis documents that cover all essential areas of the Switchyard library, aiding CLI consumers and integrators in understanding the library's features, limitations, and best practices (`INDEX.md:5-6`, `INDEX.md:9-111`).
+  - **Reality (evidence):** The index lists a broad range of analysis documents covering API surface, filesystem safety, observability, error handling, and more (`INDEX.md:9-111`). However, it does not explicitly address or propose analysis for package manager interoperability beyond a brief mention in `CLI_INTEGRATION_GUIDE.md` (`INDEX.md:83-86`). There is no dedicated analysis for how Switchyard activations persist or interact with package manager upgrades, a critical consumer concern.
+  - **Gap:** The absence of a dedicated analysis for package manager interoperability and activation persistence means that CLI consumers lack comprehensive guidance on ensuring Switchyard modifications survive system updates or handle concurrent package manager operations. This violates the expectation of full coverage of integration challenges.
+  - **Mitigations:** Add a proposed analysis item to `INDEX.md` titled 'Package Manager Interoperability and Activation Persistence' focusing on strategies for maintaining Switchyard activations post-upgrade, lock ordering with package managers, and post-upgrade verification. Create this document to detail current behavior, gaps, and recommendations.
+  - **Impacted users:** CLI integrators and system administrators who rely on Switchyard for system modifications and expect guidance on maintaining state across package manager operations.
+  - **Follow-ups:** Flag this as a medium-severity documentation gap for Round 3. Plan to draft the package manager interoperability analysis in Round 4.
+
+- **Invariant: Analysis index is up-to-date and reflects the current state of library analysis efforts.**
+  - **Assumption (from doc):** The document assumes that the index accurately reflects the current state of completed and proposed analyses, providing a reliable roadmap for contributors and consumers (`INDEX.md:5-6`, `INDEX.md:113-116`).
+  - **Reality (evidence):** The index marks all listed analyses as completed (`INDEX.md:9-111`), and Round 1 peer review confirms the existence of these files (`INDEX.md:118-134`). However, it does not account for the ongoing multi-round analysis process (Rounds 1-4) or indicate which documents have been updated with peer reviews or gap analyses, potentially leading to outdated perceptions of analysis depth.
+  - **Gap:** The index does not dynamically reflect the evolving state of analysis documents through multiple review rounds, missing updates on peer reviews or identified gaps. This violates the consumer expectation of a current and transparent overview of library polishing efforts.
+  - **Mitigations:** Update `INDEX.md` to include a section or table summarizing the status of each analysis document with respect to review rounds (e.g., 'Round 1 Reviewed', 'Round 2 Gap Analysis Added'). Add a note on how to check individual documents for the latest review status. Consider automating status updates as part of the review process.
+  - **Impacted users:** Contributors and CLI integrators who use the index as a starting point for understanding the library's analysis status and contributing to its development.
+  - **Follow-ups:** Flag this as a low-severity documentation gap for Round 3. Plan to implement a status tracking mechanism for the index in Round 4.
+
+Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET

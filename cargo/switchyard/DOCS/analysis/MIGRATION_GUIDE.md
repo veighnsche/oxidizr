@@ -50,3 +50,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 
 ## References
 - API_SURFACE_AUDIT.md; CODE: `src/fs/mod.rs`
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:29 CEST)
+
+- **Invariant:** Migration guidance prevents consumer breakage during API changes
+- **Assumption (from doc):** Deprecation timeline provides sufficient notice for consumers to adapt to API changes
+- **Reality (evidence):** Timeline proposes v0.x doc hiding, v0.(x+1) deprecation attributes, v1.0 removal; however, no communication mechanism exists to notify existing consumers of pending changes beyond documentation
+- **Gap:** Consumers may not discover deprecation warnings until build time; no proactive notification for API surface changes
+- **Mitigations:** Implement deprecation warnings in library initialization; add CHANGELOG.md notifications; consider semantic versioning with minor version bumps for deprecations
+- **Impacted users:** Existing library consumers who may encounter sudden API breakage without advance notice
+- **Follow-ups:** Add proactive deprecation notification system; document consumer communication strategy
+
+- **Invariant:** High-level helper stability across internalization changes
+- **Assumption (from doc):** Consumers can safely migrate from low-level atoms to high-level helpers without functionality loss
+- **Reality (evidence):** Document recommends using `fs::replace_file_with_symlink`, `fs::restore_file` instead of internal atoms; these high-level helpers exist at `src/fs/mod.rs:L11` and `src/fs/mod.rs:L12`; however, no compatibility testing validates equivalent functionality
+- **Gap:** Consumers migrating to high-level helpers may encounter behavioral differences not covered by current testing
+- **Mitigations:** Add migration compatibility tests; document any behavioral differences between low-level and high-level APIs
+- **Impacted users:** Library consumers currently using low-level filesystem atoms directly
+- **Follow-ups:** Implement compatibility validation tests; document migration behavior differences
+
+- **Invariant:** Clear API boundary documentation guides consumer choices
+- **Assumption (from doc):** Documentation clearly distinguishes public stable API from internal implementation details
+- **Reality (evidence):** Document mentions `#[doc(hidden)]` for internal re-exports and deprecation attributes; however, no comprehensive API stability documentation exists to guide consumer API selection
+- **Gap:** Consumers may inadvertently depend on internal APIs without understanding stability guarantees
+- **Mitigations:** Implement comprehensive API stability documentation; add examples of recommended vs deprecated usage patterns
+- **Impacted users:** New library adopters who need guidance on which APIs to depend on for long-term stability
+- **Follow-ups:** Create API stability guide with usage examples; implement architectural decision records for API boundaries
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST

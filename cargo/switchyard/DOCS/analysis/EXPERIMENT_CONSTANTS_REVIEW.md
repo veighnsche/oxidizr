@@ -99,3 +99,31 @@ Suggested implementation sketch
 Traceability and next steps
 
 - If desired, add this item to `idiomatic_todo.md` under a new section (Policy surfacing) to track the field introduction and migration of any call sites relying on a hard-coded list.
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Checksum binary preservation across environments
+- **Assumption (from doc):** The `CHECKSUM_BINS` list represents universal utilities that should be preserved in all deployment environments
+- **Reality (evidence):** Hardcoded list at `cargo/oxidizr-arch/src/experiments/constants.rs:L1-L9` includes standard Unix utilities (b2sum, md5sum, sha*sum); however, availability varies by distribution (Alpine Linux may lack some, embedded systems may have different toolsets)
+- **Gap:** One-size-fits-all preservation list doesn't account for environment-specific toolchain differences; consumers may encounter missing binaries or need different preservation policies
+- **Mitigations:** Make preservation list configurable via Policy fields; provide environment detection to adjust default lists; document per-distro considerations
+- **Impacted users:** CLI tools targeting multiple distributions and embedded system integrators
+- **Follow-ups:** Implement configurable preserve_bins policy field; add distribution-aware defaults
+
+- **Invariant:** Configuration-vs-constant classification consistency
+- **Assumption (from doc):** Clear distinction between true constants and policy defaults guides implementers on what should be configurable
+- **Reality (evidence):** Document correctly identifies `CHECKSUM_BINS` as policy default rather than true constant; however, no enforcement mechanism prevents hardcoding of operational choices in Switchyard core
+- **Gap:** Without architectural boundaries, future constants might inappropriately hardcode environment-specific choices
+- **Mitigations:** Establish coding standards that require policy parameters for environment-dependent values; add linting rules to detect hardcoded operational lists
+- **Impacted users:** Library maintainers and contributors who need clear guidance on constant vs configuration boundaries
+- **Follow-ups:** Add architectural decision record (ADR) for constant vs policy classification; implement lint rules
+
+- **Invariant:** Experiment-specific constants remain in experiments crate
+- **Assumption (from doc):** Experiment-specific defaults should not leak into Switchyard core library
+- **Reality (evidence):** `CHECKSUM_BINS` correctly lives in `oxidizr-arch` experiments crate at `src/experiments/constants.rs`; Switchyard accepts policy input from caller
+- **Gap:** No formal interface contract prevents experiments from bypassing policy system; dependency boundaries could be violated in future
+- **Mitigations:** Define clear API contract for experiment-to-library communication; use type system to enforce policy-based configuration
+- **Impacted users:** Experiment developers and library integrators maintaining clean separation of concerns
+- **Follow-ups:** Document experiment-library interface contract; add integration tests verifying boundary enforcement
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST

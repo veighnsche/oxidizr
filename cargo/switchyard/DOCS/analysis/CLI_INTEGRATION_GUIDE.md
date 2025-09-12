@@ -51,3 +51,23 @@
   - No major content changes were necessary as the guidance aligns well with the current codebase.
 
 Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
+
+## Round 2 Gap Analysis (AI 3, 2025-09-12 15:33+02:00)
+
+- Invariant: API guidance is accurate and actionable.
+- Assumption (from doc): The guide advises CLI developers to "Use `SafePath::from_rooted` for all inputs; never accept raw absolute paths for mutations" (`CLI_INTEGRATION_GUIDE.md:12`).
+- Reality (evidence): The core mutating functions in `src/fs/` (e.g., `swap`, `restore`) do not accept a `SafePath` argument. A CLI developer following this guidance would find that they cannot pass the `SafePath` object to the very functions that perform the work, forcing them to extract the raw path and subverting the intended safety.
+- Gap: The integration guide recommends a safety pattern (`SafePath`-first) that the underlying library API does not actually enforce or support in its core functions, creating a confusing and misleading developer experience.
+- Mitigations: Update the guide to reflect the current reality: that `SafePath` should be used for initial validation, but the raw path must be passed to the fs layer. More importantly, prioritize the refactoring of fs-layer functions to accept `SafePath` directly, as proposed in `CORE_FEATURES_FOR_EDGE_CASES.md`.
+- Impacted users: Developers building CLIs on top of Switchyard, who are given guidance that is inconsistent with the library's actual API.
+- Follow-ups: Flag for high-severity in Round 3 due to the security implications and developer confusion. Prioritize the `SafePath` refactoring in Round 4.
+
+- Invariant: Documented library features are implemented.
+- Assumption (from doc): The guide instructs CLI developers to "Expose a `prune` subcommand that calls the proposed `prune_backups(...)` hook" (`CLI_INTEGRATION_GUIDE.md:28-29`).
+- Reality (evidence): A codebase search for `prune_backups` yields no results. The function does not exist. The related document, `RETENTION_STRATEGY.md`, may propose it, but it has not been implemented in the library.
+- Gap: The guide directs developers to use a non-existent function. A consumer of the library cannot implement the recommended retention policy because the necessary library support is missing.
+- Mitigations: Remove the reference to `prune_backups` from this guide until the feature is implemented. Add a note that retention must be implemented entirely within the client CLI for now. Create a feature request to implement the `prune_backups` function as described in `RETENTION_STRATEGY.md`.
+- Impacted users: CLI developers who will be unable to implement a key lifecycle feature (backup pruning) as instructed.
+- Follow-ups: Flag for implementation in Round 4. The absence of a core lifecycle function is a significant feature gap.
+
+Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00

@@ -83,3 +83,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 - SPEC: §9 Operational Bounds
 - PLAN: 55-operational-bounds.md
 - CODE: `src/fs/atomic.rs`, `src/fs/backup.rs`, `src/fs/restore.rs`, `src/fs/meta.rs`, `src/logging/audit.rs`
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Predictable performance characteristics for CI/CD integration
+- **Assumption (from doc):** Performance baselines and targets provide predictable timing for automation scheduling
+- **Reality (evidence):** Document proposes `atomic_symlink_swap` p95 ≤ 10ms and `fsync_parent_dir` ≤ 50ms targets; however, no implementation exists for performance monitoring or enforcement; SPEC §9 operational bounds exist but no runtime validation
+- **Gap:** Without performance monitoring, consumers cannot rely on timing guarantees for scheduling or SLA compliance
+- **Mitigations:** Implement performance telemetry in audit facts; add policy knobs for performance thresholds with warnings/failures
+- **Impacted users:** CI/CD systems with strict timing requirements and automation that schedules based on expected operation duration
+- **Follow-ups:** Add performance fact fields to audit schema; implement runtime performance validation
+
+- **Invariant:** Hash computation scalability with large files
+- **Assumption (from doc):** SHA256 hashing performance scales predictably for large binaries up to 50MiB
+- **Reality (evidence):** `sha256_hex_of` implementation at `src/fs/meta.rs:L20-L26` reads entire files; large binary hashing could dominate operation time; no size-based throttling or policy controls exist
+- **Gap:** Large file operations may have unpredictable performance impact; consumers may encounter timeout issues with oversized files
+- **Mitigations:** Add file size policy limits; implement chunked hashing with progress reporting; add hashing bypass for very large files
+- **Impacted users:** Users managing large binary files and systems with strict operation timeouts
+- **Follow-ups:** Implement size-aware hashing policy; add progress reporting for long-running hash operations
+
+- **Invariant:** Directory scan performance with backup accumulation
+- **Assumption (from doc):** Backup discovery performance scales reasonably with artifact count
+- **Reality (evidence):** Directory scanning in `find_latest_backup_and_sidecar` at `src/fs/backup.rs:L277-L316` iterates all entries; performance degrades linearly with backup count; no optimization for high-backup-count scenarios
+- **Gap:** Long-running systems with many backups may experience degraded discovery performance; no early-exit optimization for timestamp-based queries
+- **Mitigations:** Implement indexed backup discovery; add retention policies to limit backup accumulation; optimize directory scanning with early exit
+- **Impacted users:** Long-running services performing frequent operations and systems with accumulated backup history
+- **Follow-ups:** Implement backup indexing optimization; integrate with retention strategy for performance management
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST

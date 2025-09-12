@@ -49,3 +49,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 ## Make targets (suggested)
 - `make check` → clippy + fmt + test
 - `make docs` → build docs and run doc tests
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:29 CEST)
+
+- **Invariant:** Development setup works consistently across environments
+- **Assumption (from doc):** Standard Rust toolchain setup provides consistent development experience for contributors
+- **Reality (evidence):** Requirements specify Rust stable, `rustfmt`, `clippy` at `src/lib.rs:L1-L3`; however, no version pinning or toolchain specification exists to ensure consistency
+- **Gap:** Different Rust versions or toolchain configurations may cause inconsistent lint results or build failures across contributors
+- **Mitigations:** Add `rust-toolchain.toml` file to pin toolchain version; document specific clippy version requirements; add CI matrix testing
+- **Impacted users:** External contributors who may encounter inconsistent development experience or CI failures
+- **Follow-ups:** Implement toolchain version pinning; add development environment validation scripts
+
+- **Invariant:** Testing practices prevent system interference
+- **Assumption (from doc):** Using `tempfile` and avoiding system paths ensures tests don't interfere with host systems
+- **Reality (evidence):** Tests use `tempfile` at `src/fs/swap.rs:L140-L147` and `src/fs/restore.rs:L232-L233`; however, no automated validation ensures all tests follow this pattern
+- **Gap:** New tests might inadvertently use system paths, causing test failures or system interference on different environments
+- **Mitigations:** Add linting rules to detect system path usage in tests; provide test template with proper tempfile usage
+- **Impacted users:** Contributors running tests and CI systems that may encounter path-related test failures
+- **Follow-ups:** Implement test path validation linting; add test writing guidelines with examples
+
+- **Invariant:** Feature flags support diverse development workflows
+- **Assumption (from doc):** Feature flags like `file-logging` enable flexible development and debugging workflows
+- **Reality (evidence):** `file-logging` feature mentioned for JSONL sink inspection; however, no comprehensive feature flag documentation exists for contributors
+- **Gap:** Contributors may not discover useful development features or may misuse feature flags in unexpected ways
+- **Mitigations:** Document all development-oriented feature flags; add examples of common development workflows using features
+- **Impacted users:** Contributors who could benefit from development features but lack discovery mechanisms
+- **Follow-ups:** Create comprehensive feature flag documentation; add development workflow examples
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST

@@ -107,3 +107,34 @@
 **Summary of Edits:** No corrections needed - all technical claims are accurately supported by the codebase. The document correctly describes current preservation support (mode only), capability probing, and proposed tiered approach.
 
 Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+- Invariant: Extended preservation beyond mode (owner, timestamps, xattrs)
+  - Assumption (from doc): Tiered preservation (Extended/Full) can be offered; current behavior is Basic (mode only).
+  - Reality (evidence):
+    - Capture: `src/fs/backup.rs::create_snapshot()` records only `mode` for files and `prior_dest` for symlinks; no owner/timestamps/xattrs (lines 194–205, 140–151).
+    - Apply: `src/fs/restore.rs::restore_file()` restores mode via `fchmod` (lines 129–137) and does not apply owner/timestamps/xattrs.
+    - Capability probe exists but is informational: `src/fs/meta.rs::detect_preservation_capabilities()` reports booleans (lines 75–106) and feeds preflight (e.g., `src/api/preflight/mod.rs` lines 140–161).
+  - Gap: Consumers expecting owner/mtime/xattrs preservation will not get it even when probes say “supported”.
+  - Mitigations: Add policy `preservation_tier` and extend sidecar fields (`uid/gid`, `mtime_*`, `xattrs`) with dual-read v1/v2; in apply, conditionally execute `fchownat`, `utimensat`, and xattr writes when tier and probes allow. Emit `preservation_applied{...}` in `apply.result` for transparency.
+  - Impacted users: System integrators and packaging tools relying on precise metadata retention.
+  - Follow-ups: SPEC §5 add optional `preservation_applied`; implement tiered restoration and unit tests for mtime/xattrs round-trip.
+
+- Invariant: Backup/sidecar durability
+  - Assumption (from doc): Backups are durable and survive crashes.
+  - Reality (evidence): `write_sidecar()` uses path-based `File::create` with no `fsync(parent)`; symlink backups use `std::os::unix::fs::symlink` (path-based) (backup.rs lines 137–151, 262–270). Parent directory fsync is not performed after creating backup or sidecar.
+  - Gap: Crash after creating backup/sidecar may lose artifacts (directory entry not durable), violating consumer expectations of rollback availability.
+  - Mitigations: Use `open_dir_nofollow(parent)` + `symlinkat`/`openat` and call `fsync_parent_dir(backup)` after creating payload and sidecar. Add crash-sim tests (spawn child process that exits after backup) to assert artifact presence.
+  - Impacted users: Operators relying on reliable rollback, especially during power loss or abrupt termination.
+  - Follow-ups: Implement capability wrappers (`fs/cap.rs`) and refactor `backup.rs` accordingly; update docs to claim durability post-PR.
+
+- Invariant: Restore remains possible after manual pruning
+  - Assumption (from doc): Tombstones and sidecars guide restore even with partial artifacts.
+  - Reality (evidence): `restore_file()` errors with `E_BACKUP_MISSING` when payload absent and `force_best_effort=false` (restore.rs lines 96–107). Sidecar alone does not reconstruct bytes for prior regular files.
+  - Gap: If retention policies prune payloads but keep sidecars, restore of files becomes impossible.
+  - Mitigations: Document that retention must keep at least one payload per target; add telemetry field `restore_ready=true|false` in preflight rows based on `has_backup_artifacts()` (`src/fs/backup.rs` lines 234–242) and teach CLI pruning to maintain readiness.
+  - Impacted users: Environments with aggressive cleanup/retention jobs.
+  - Follow-ups: Add `restore_ready` to preflight rows; author retention guidance in docs/CLI.
+
+Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00

@@ -44,3 +44,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 ## Acceptance Criteria
 
 - New PRs adhere to conventions; reviewers point to this doc when deviations occur.
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:29 CEST)
+
+- **Invariant:** Consistent coding standards across external contributors
+- **Assumption (from doc):** Documented standards ensure consistent code quality from all contributors including external integrators
+- **Reality (evidence):** Standards exist for modules, errors, logging at `src/lib.rs:L1-L3`, `src/types/errors.rs`, `src/logging/audit.rs`; however, no automated enforcement beyond clippy lints exists to validate compliance
+- **Gap:** External contributors may not follow standards without automated checking; review burden increases without enforcement tooling
+- **Mitigations:** Implement pre-commit hooks or CI checks for coding standards; add rustfmt configuration to enforce formatting consistency
+- **Impacted users:** External contributors and library maintainers dealing with inconsistent code quality
+- **Follow-ups:** Add automated code style enforcement; implement CI gates for coding standards compliance
+
+- **Invariant:** Error handling patterns provide consistent consumer experience
+- **Assumption (from doc):** Domain enums with `thiserror` provide stable error handling for consumers
+- **Reality (evidence):** Error patterns implemented at `src/types/errors.rs` using `thiserror`; stable `ErrorId` mapping exists; however, no guidelines prevent ad-hoc error handling in new modules
+- **Gap:** Without enforcement, new modules might introduce inconsistent error patterns that complicate consumer error handling
+- **Mitigations:** Add linting rules to detect non-standard error patterns; provide error handling templates for new modules
+- **Impacted users:** Library consumers who need predictable error handling across all Switchyard operations
+- **Follow-ups:** Implement error pattern linting; add error handling guidelines to contributor documentation
+
+- **Invariant:** Module organization supports consumer understanding and navigation
+- **Assumption (from doc):** Directory modules with domain-specific organization help consumers find and use appropriate functionality
+- **Reality (evidence):** Current organization follows `mod.rs` pattern at `src/fs/mod.rs`, `src/preflight.rs`; however, no architectural decision records document the reasoning or guidelines for future module organization
+- **Gap:** Without documented module organization principles, future additions might not follow consistent patterns, confusing consumers
+- **Mitigations:** Document module organization principles; add architectural decision records for significant structural changes
+- **Impacted users:** New contributors and library consumers who need to understand code organization for effective usage
+- **Follow-ups:** Create architectural documentation; establish module organization guidelines for future development
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST

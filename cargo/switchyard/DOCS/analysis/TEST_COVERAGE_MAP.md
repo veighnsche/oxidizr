@@ -84,3 +84,31 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 - SPEC: §8 Acceptance Tests; `SPEC/audit_event.schema.json`
 - PLAN: 80-testing-mapping.md
 - CODE: tests listed above
+
+## Round 2 Gap Analysis (AI 2, 2025-09-12 15:23 CEST)
+
+- **Invariant:** Comprehensive test coverage validates consumer expectations
+- **Assumption (from doc):** Existing tests cover the critical paths consumers depend on for reliable operation
+- **Reality (evidence):** Unit tests exist for core operations at `src/fs/swap.rs:L149-L200`, `src/fs/restore.rs:L234-L277`, and others; however, gaps exist for EXDEV degraded paths, sidecar corruption, and schema validation
+- **Gap:** Missing test coverage for edge cases consumers may encounter in production; no integration tests validate end-to-end consumer workflows
+- **Mitigations:** Implement gap tests listed in document; add integration tests that simulate typical consumer usage patterns
+- **Impacted users:** Consumer applications that may encounter untested edge cases in production
+- **Follow-ups:** Prioritize EXDEV and sidecar corruption tests; add consumer workflow integration tests
+
+- **Invariant:** Facts schema compliance ensures audit trail reliability
+- **Assumption (from doc):** Emitted facts conform to documented schema for consumer parsing and compliance
+- **Reality (evidence):** Document identifies need for facts schema validation against `SPEC/audit_event.schema.json`; no current tests validate fact conformance
+- **Gap:** Schema violations could break consumer audit processing and compliance workflows
+- **Mitigations:** Implement JSON Schema validation tests for all fact types; add CI validation of schema compliance
+- **Impacted users:** Compliance systems and audit processors that parse Switchyard facts
+- **Follow-ups:** Add schema validation to test suite; implement CI gate for fact schema compliance
+
+- **Invariant:** Environment variable behavior consistency across test scenarios
+- **Assumption (from doc):** Test environment variables like `SWITCHYARD_FORCE_EXDEV` provide reliable test interfaces
+- **Reality (evidence):** Document mentions using `SWITCHYARD_FORCE_EXDEV=1` for degraded path testing; environment variable testing framework exists but coverage incomplete
+- **Gap:** Incomplete environment variable testing may hide behavioral inconsistencies that affect consumer testing frameworks
+- **Mitigations:** Add comprehensive environment variable tests; document expected behavior for all test knobs
+- **Impacted users:** Testing frameworks and CI systems that rely on environment variable controls
+- **Follow-ups:** Complete environment variable test coverage; document test knob behavior guarantees
+
+Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST

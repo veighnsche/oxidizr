@@ -268,3 +268,23 @@ Scope: Propose concrete core features to address edge cases identified across Sw
   - No major content changes were necessary as the document is a proposal draft, but updated to reflect current implementation status.
 
 Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
+
+## Round 2 Gap Analysis (AI 3, 2025-09-12 15:33+02:00)
+
+- Invariant: Filesystem mutations are restricted to intended, safe paths.
+- Assumption (from doc): The document proposes that all mutating filesystem functions should use a `SafePath` type to prevent path traversal vulnerabilities (`CORE_FEATURES_FOR_EDGE_CASES.md:35-51`). The Round 1 review noted this was "partially implemented."
+- Reality (evidence): A search confirms that while `SafePath` exists in `src/types/safepath.rs`, it is not used in the signatures of the core mutating functions within the `src/fs/` module (e.g., `swap.rs`, `restore.rs`, `backup.rs`). These functions still accept raw `&Path` arguments, bypassing the proposed safety layer.
+- Gap: The core library functions that perform mutations are not protected against path traversal attacks, as the `SafePath` wrapper is not enforced at the point of execution. This contradicts a fundamental consumer expectation of operational safety.
+- Mitigations: Refactor the internal `*_sp` helpers as proposed, and ensure all public-facing fs functions in the `api` module perform the `Path` -> `SafePath` conversion immediately, failing closed if the path is outside the allowed root. This aligns with `SPEC.md#safepath`.
+- Impacted users: All users, as the lack of path safety at the library's core creates a potential security vulnerability.
+- Follow-ups: This is a high-severity security gap. It should be prioritized for implementation in Round 4.
+
+- Invariant: The tool will not perform high-risk operations without explicit user consent.
+- Assumption (from doc): The document proposes a preflight gate to detect and stop operations on SUID/SGID binaries unless explicitly allowed by a policy knob (`CORE_FEATURES_FOR_EDGE_CASES.md:229-242`).
+- Reality (evidence): A search for `S_ISUID` or `S_ISGID` within `src/preflight/checks.rs` confirms that no such check is implemented. The library will operate on SUID/SGID binaries without any warning or special gating.
+- Gap: A critical security gate is missing. Consumers, especially system administrators, would expect a tool modifying system files to be aware of and cautious with privileged binaries. The current implementation violates the principle of least surprise.
+- Mitigations: Implement the proposed preflight check (`check_suid_sgid_risk`) in `preflight/checks.rs` and integrate it into the policy gating logic in `policy/gating.rs`. Add a corresponding policy knob like `allow_suid_sgid_mutation`.
+- Impacted users: Administrators and security-conscious users. Unwittingly modifying an SUID binary could have significant security implications.
+- Follow-ups: This is a high-severity security gap. It should be prioritized for implementation in Round 4.
+
+Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00

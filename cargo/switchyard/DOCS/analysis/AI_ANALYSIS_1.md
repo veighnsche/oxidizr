@@ -198,3 +198,82 @@ Changes Made: Appended round summary confirming index alignment with repository 
 
 - Findings:
 - Suggested diffs:
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+### Per-doc checklist
+
+- [x] PRESERVATION_FIDELITY.md — Gap Analysis appended with invariants, evidence, gaps, mitigations, users, follow-ups
+- [x] PREFLIGHT_MODULE_CONCERNS.md — Gap Analysis appended
+- [x] POLICY_PRESETS_RATIONALE.md — Gap Analysis appended
+- [x] LOCKING_STRATEGY.md — Gap Analysis appended
+- [x] idiomatic_todo.md — Gap Analysis appended
+- [x] SECURITY_REVIEW.md — Gap Analysis appended
+- [x] RELEASE_AND_CHANGELOG_POLICY.md — Gap Analysis appended
+
+### Consolidated findings and proposed mitigations
+
+- PRESERVATION_FIDELITY.md
+  - Gaps
+    - Extended preservation (owner, mtime, xattrs) not implemented despite capability probe signals.
+    - Backup/sidecar durability missing parent `fsync`; path-based `symlink` and `File::create` usage.
+    - Restore impossible when payload pruned but sidecar remains.
+  - Mitigations
+    - Introduce `preservation_tier` policy; extend sidecar v2 with `uid/gid`, `mtime`, `xattrs`; apply via `fchownat`, `utimensat`, xattr writes.
+    - Use `open_dir_nofollow` + `*at` and `fsync_parent_dir(backup)`; add crash-sim durability tests.
+    - Emit `restore_ready` in preflight; document retention rules.
+
+- PREFLIGHT_MODULE_CONCERNS.md
+  - Gaps
+    - `lsattr`-based immutable check fails open when tool missing; YAML omits preservation fields.
+    - Naming overlap (`preflight` helpers vs stage) still confusing.
+  - Mitigations
+    - Prefer `FS_IOC_GETFLAGS` ioctl when available; add fact `immutable_check=unknown` and STOP unless overridden.
+    - Add `preservation` and `preservation_supported` to YAML or clearly document minimal scope; update SPEC §4 and fixtures.
+    - Add module-level docs to clarify ownership of helpers vs stage.
+
+- POLICY_PRESETS_RATIONALE.md
+  - Gaps
+    - Doc/code divergence: `allow_unlocked_commit` default documented as true; code default is false.
+    - `coreutils_switch_preset()` relies on caller to set `allow_roots`, risking broad scope.
+    - Rescue profile summary lacks counts/names for readiness.
+  - Mitigations
+    - Reconcile default (flip to true for dev or update docs to false); add test.
+    - Add STOP when preset active and `allow_roots` empty; document sample.
+    - Emit `rescue_found_count` and `rescue_missing` in preflight summary.
+
+- LOCKING_STRATEGY.md
+  - Gaps
+    - No `lock_backend` fact; fixed polling without backoff; no standard lock path helper; default for unlocked Commit unclear to devs.
+  - Mitigations
+    - Emit `lock_backend`; add backoff/jitter; provide `Policy::default_lock_path(root)`; align docs/code for `allow_unlocked_commit`.
+
+- idiomatic_todo.md
+  - Gaps
+    - `src/api.rs` not yet moved to `src/api/mod.rs`.
+    - Legacy shim `adapters::lock_file::*` still public; low-level FS atoms re-exported publicly.
+    - Non-deterministic backup names hinder tests.
+  - Mitigations
+    - Complete API module move; deprecate and remove shim after window; restrict low-level FS atoms to `pub(crate)`; introduce `Clock` trait for deterministic backups.
+
+- SECURITY_REVIEW.md
+  - Gaps
+    - Sidecar durability/integrity; low-level atom exports; incomplete redaction for `notes`; optimistic `env_sanitized` flag.
+  - Mitigations
+    - Make backups durable and sign sidecars (v2); restrict low-level exports; extend redaction; implement real env sanitizer and truthfully emit flags.
+
+- RELEASE_AND_CHANGELOG_POLICY.md
+  - Gaps
+    - No `#[deprecated]` on shims; no dual-emit scaffolding for schema bumps; repo-local CI checks for SKIP/deprecations missing; no crate-local CHANGELOG.
+  - Mitigations
+    - Annotate deprecations and gate new use; add feature-gated dual-emit with fixtures; add CI checks; create and enforce `CHANGELOG.md`.
+
+### Next actions (for Round 3 prioritization)
+
+- Durability of backups/sidecars (crash safety) — high impact, medium effort.
+- Preservation tiers (mtime + xattrs) — medium impact/effort.
+- Policy/docs alignment for `allow_unlocked_commit` default — quick fix.
+- Add preservation fields to YAML exporter — low effort, clarity win.
+- Deprecate and restrict low-level FS atoms — medium effort, safety win.
+
+Recorded in Round 2 by AI 1 on 2025-09-12 15:22 +02:00

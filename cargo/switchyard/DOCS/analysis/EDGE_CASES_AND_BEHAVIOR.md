@@ -228,3 +228,23 @@ This document enumerates notable user-behavior edge cases and how Switchyard beh
   - No major content changes were necessary as the claims aligned well with the codebase.
 
 Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
+
+## Round 2 Gap Analysis (AI 3, 2025-09-12 15:33+02:00)
+
+- Invariant: Hardlink relationships are not broken without warning.
+- Assumption (from doc): The document recommends a preflight check to detect hardlinks (`nlink > 1`) and stop the operation unless forced, warning the user that the link will be broken (`EDGE_CASES_AND_BEHAVIOR.md:146-153`).
+- Reality (evidence): A search for `nlink` usage within `cargo/switchyard/src/preflight/checks.rs` shows no such check is implemented. The current implementation will break hardlinks silently when restoring a file, as `src/fs/restore.rs` uses a `renameat` operation which creates a new inode.
+- Gap: The recommended preflight check to prevent silent breaking of hardlinks is missing from the codebase.
+- Mitigations: Implement the proposed preflight check in `src/preflight/checks.rs` to detect `nlink > 1` on a target file. Add a policy flag (e.g., `allow_hardlink_break`) to control the behavior and ensure the check is logged as a preflight row.
+- Impacted users: System administrators and users who rely on hardlinks for space efficiency or file management, as their file relationships can be broken without their knowledge.
+- Follow-ups: This gap should be flagged for severity scoring in Round 3 and an implementation plan should be created in Round 4.
+
+- Invariant: Backup artifacts are tamper-resistant.
+- Assumption (from doc): The document recommends strengthening sidecar provenance by embedding a hash of the backup payload and verifying it on restore to prevent tampering (`EDGE_CASES_AND_BEHAVIOR.md:196-202`).
+- Reality (evidence): The `BackupSidecar` struct defined in `cargo/switchyard/src/fs/backup.rs:245` does not contain a field for a payload hash. The `read_sidecar` and `restore_file` functions in `cargo/switchyard/src/fs/restore.rs` trust the sidecar content if the file is present and parses correctly, with no integrity verification.
+- Gap: The sidecar and its associated backup payload are not cryptographically verified, making them vulnerable to tampering. An attacker could modify the `prior_kind` or `prior_dest` in the sidecar to alter restore behavior.
+- Mitigations: Add a `payload_hash` field (e.g., SHA256) to the `BackupSidecar` struct. Update `create_snapshot` in `backup.rs` to compute and store the hash of the payload. Update `restore_file` in `restore.rs` to verify the hash before trusting the sidecar's contents, failing with a new error type (e.g., `E_INTEGRITY`) if the hash mismatches.
+- Impacted users: Users in security-sensitive environments where the integrity of system file backups and restore operations is critical.
+- Follow-ups: Flag for severity scoring in Round 3. This is a security enhancement that should be prioritized in the implementation plan for Round 4.
+
+Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00

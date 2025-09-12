@@ -99,3 +99,23 @@
   - Added explicit code/spec citations proving envelope enforcement, emission coverage across stages, determinism/redaction rules, and attestation/provenance handling. Recommendations stand; consider adding `summary_error_ids` array as noted.
 
 Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
+
+## Round 2 Gap Analysis (AI 4, 2025-09-12 15:38 CET)
+
+- **Invariant: Observability facts provide comprehensive error information for debugging and recovery.**
+  - **Assumption (from doc):** The document assumes that observability facts, especially in preflight and apply summaries, provide detailed error information to help consumers understand failures and take corrective actions (`OBSERVABILITY_FACTS_SCHEMA.md:19-24`, recommendation for `summary_error_ids` at line 54).
+  - **Reality (evidence):** Current implementation in `src/api/preflight/mod.rs` and `src/api/apply/mod.rs` emits summaries with a single `error_id` field (e.g., `E_POLICY` with `exit_code=10` in preflight summary at `src/api/preflight/mod.rs:270`). There is no array or detailed breakdown of multiple error causes as suggested by the recommendation for `summary_error_ids` (`OBSERVABILITY_FACTS_SCHEMA.md:54`).
+  - **Gap:** When multiple error conditions contribute to a failure, the current facts schema collapses them into a single `error_id`, often a generic `E_POLICY`. This limits the ability of CLI consumers to pinpoint specific issues, violating the expectation of actionable observability for debugging and recovery.
+  - **Mitigations:** Implement the recommended `summary_error_ids` array in preflight and apply summaries to list all contributing error IDs (`src/api/preflight/mod.rs`, `src/api/apply/mod.rs`). Update `SPEC/audit_event.schema.json` to include this optional field for backward compatibility. Ensure error details are logged in per-action facts for granular debugging.
+  - **Impacted users:** CLI integrators and end-users who rely on observability data to diagnose and resolve complex failures, especially during preflight or apply stages.
+  - **Follow-ups:** Flag this as a medium-severity usability gap for Round 3. Plan to implement `summary_error_ids` in Round 4 to enhance debugging capabilities.
+
+- **Invariant: Observability facts are validated against a schema to ensure consistency and reliability.**
+  - **Assumption (from doc):** The document assumes that all emitted facts are validated against the defined JSON schema (`SPEC/audit_event.schema.json`) to ensure they conform to the expected structure and content (`OBSERVABILITY_FACTS_SCHEMA.md:50`, acceptance criteria at line 68).
+  - **Reality (evidence):** While the schema is defined in `SPEC/audit_event.schema.json` and emission helpers in `src/logging/audit.rs` enforce a minimal envelope, there is no evidence of automated validation or unit tests in the codebase that check emitted facts against the schema during build or test phases. The recommendation for a unit test using `jsonschema` crate (`OBSERVABILITY_FACTS_SCHEMA.md:50`) is not yet implemented.
+  - **Gap:** Without automated validation, there is a risk that emitted facts may deviate from the schema over time due to code changes, violating the consumer expectation of consistent and reliable observability data for parsing and analysis.
+  - **Mitigations:** Implement a unit test suite in `src/logging/tests.rs` or a dedicated test module that validates facts emitted from test harnesses (plan, preflight, apply, rollback) against `SPEC/audit_event.schema.json` using a JSON schema validation library like `jsonschema`. Run this as part of the CI pipeline to catch schema violations early.
+  - **Impacted users:** CLI developers and downstream tools that parse observability facts, expecting them to conform to the published schema for automated processing or monitoring.
+  - **Follow-ups:** Flag this as a medium-severity reliability gap for Round 3. Plan to add schema validation tests in Round 4 to ensure long-term consistency.
+
+Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET

@@ -126,3 +126,23 @@
   - Added precise code citations for each claim and confirmed behavior against current implementation. Highlighted backup/sidecar durability gap and kept recommendations aligned with findings.
 
 Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:09 +02:00
+
+## Round 2 Gap Analysis (AI 4, 2025-09-12 15:38 CET)
+
+- **Invariant: Filesystem operations are durable and consistent across crashes.**
+  - **Assumption (from doc):** The document assumes that all filesystem operations, including backup and sidecar creation, are durable and will persist even in the event of a crash, as it recommends `fsync` operations on parent directories after mutations (`FS_SAFETY_AUDIT.md:49-54`).
+  - **Reality (evidence):** While core swap and restore operations use `fsync_parent_dir()` after mutations (`src/fs/swap.rs:136`, `src/fs/restore.rs:139`), the backup and sidecar creation paths in `src/fs/backup.rs` do not explicitly call `fsync_parent_dir()` after creating backups or writing sidecars (`src/fs/backup.rs:137-152`, `src/fs/backup.rs:262-270`).
+  - **Gap:** Backup and sidecar creation are not guaranteed to be durable in the event of a crash because the parent directory is not synced after these operations. This could lead to incomplete or missing backups, violating the expectation of consistent state recovery.
+  - **Mitigations:** Add `fsync_parent_dir(backup)` calls after creating backup payloads and writing sidecars in `src/fs/backup.rs`. Consider using temporary files with `renameat` for atomic sidecar updates, followed by a parent directory sync.
+  - **Impacted users:** CLI consumers who rely on backups for rollback or recovery, especially in environments with high crash risk or power instability.
+  - **Follow-ups:** Flag this for severity scoring in Round 3 due to potential data loss. Prioritize implementation of durability fixes in Round 4.
+
+- **Invariant: Filesystem operations are safe from path traversal attacks.**
+  - **Assumption (from doc):** The document states that inputs are normalized to `SafePath` and validated with `is_safe_path()` prior to mutation (`FS_SAFETY_AUDIT.md:69-75`).
+  - **Reality (evidence):** While `is_safe_path()` is called in `src/fs/swap.rs:24-28` to validate inputs, the core mutating functions in `src/fs/` (e.g., `swap.rs`, `restore.rs`, `backup.rs`) accept raw `&Path` arguments rather than `SafePath` objects. `SafePath` validation exists in `src/types/safepath.rs` but is not enforced at the point of execution for all operations.
+  - **Gap:** The lack of enforced `SafePath` usage in all mutating functions means there is a risk of path traversal if a caller bypasses initial validation or if validation is incomplete. This violates the consumer expectation of inherent safety against path-based attacks.
+  - **Mitigations:** Refactor all mutating filesystem functions to accept `SafePath` instead of raw `&Path`, ensuring validation is enforced at the API level. Add internal helpers to convert `Path` to `SafePath` early in the call chain, failing closed on escape attempts.
+  - **Impacted users:** All CLI consumers, as this is a fundamental security concern that could lead to unauthorized file access or modification.
+  - **Follow-ups:** Flag this as a high-severity security gap for Round 3. Prioritize refactoring for `SafePath` enforcement in Round 4.
+
+Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET

@@ -57,3 +57,39 @@
 **Summary of Edits:** All security claims are supported by the codebase. The threat model and mitigations accurately reflect the implemented security measures.
 
 Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+- Invariant: Sidecar integrity and rollback trust
+  - Assumption (from doc): Backups/sidecars are reliable for recovery.
+  - Reality (evidence): `src/fs/backup.rs::write_sidecar()` uses path-based `File::create` and does not `fsync` the parent directory; symlink backups use `std::os::unix::fs::symlink` (path-based) (backup.rs lines 137–151, 262–270). No signature or cryptographic binding between payload and sidecar. Apply facts include attestation for plan bundles (not sidecars) in `src/api/apply/mod.rs` (lines 359–384).
+  - Gap: Crash after write may lose sidecar or payload; integrity not verifiable. Operators cannot detect tampering or partial writes.
+  - Mitigations: Move to `open_dir_nofollow(parent)` + `openat`/`symlinkat` and `fsync_parent_dir(backup)` for durability; add optional sidecar signing (e.g., include `bundle_hash` of payload in sidecar and sign with Attestor). Emit `backup_durable=true|false` and `sidecar_signed=true|false` facts during apply/restore.
+  - Impacted users: Operators relying on trustworthy rollback under crash/power-loss scenarios.
+  - Follow-ups: Implement durability changes in `backup.rs`; design a `backup_meta.v2` sidecar with integrity fields and dual-read.
+
+- Invariant: Public API minimizes footguns that bypass `SafePath`
+  - Assumption (from doc): Consumers use safe, high-level APIs only.
+  - Reality (evidence): `src/fs/mod.rs` publicly re-exports low-level atoms: `open_dir_nofollow`, `atomic_symlink_swap`, `fsync_parent_dir` (lines 9–15), enabling external misuse that bypasses `SafePath`.
+  - Gap: External callers may compromise TOCTOU safety by directly invoking low-level atoms.
+  - Mitigations: Restrict re-exports to `pub(crate)` and document high-level entry points (`replace_file_with_symlink`, `restore_file`). Deprecate low-level exports first if needed.
+  - Impacted users: Power users integrating at lower layers.
+  - Follow-ups: Coordinate API surface change with changelog policy; add compile-fail examples in docs.
+
+- Invariant: Secret redaction covers all volatile or sensitive fields
+  - Assumption (from doc): Facts are safe to share externally.
+  - Reality (evidence): `src/logging/redact.rs::redact_event()` masks helper/attestation secrets and removes timings/hashes, but does not sanitize `notes` contents from preflight rows (free-form strings) nor command-line fragments that may appear in provenance extensions.
+  - Gap: Potential leakage of environment paths or args via `notes`.
+  - Mitigations: Extend redaction to mask known-sensitive substrings in `notes`; add hooks for caller-provided masks. Add unit tests asserting no path-like strings leak when policy requires.
+  - Impacted users: Security-conscious consumers exporting facts to external systems.
+  - Follow-ups: Implement extended redaction; update SPEC §13 secret-masking policy.
+
+- Invariant: Environment is sanitized for rescue and subprocesses
+  - Assumption (from doc): Facts reflect sanitized environment.
+  - Reality (evidence): `logging/audit.rs::ensure_provenance()` unconditionally inserts `provenance.env_sanitized=true` (lines 210–219) without enforcing sanitization.
+  - Gap: The flag may be optimistic; consumers could misinterpret the guarantee.
+  - Mitigations: Either actually sanitize PATH/locale before checks or set `env_sanitized` based on a real sanitizer result. Emit `env_vars_checked=true|false` in facts for transparency.
+  - Impacted users: Environments where PATH/locale manipulation is a risk.
+  - Follow-ups: Add a small sanitizer helper and thread it through preflight/apply setup.
+
+Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00

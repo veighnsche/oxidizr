@@ -378,7 +378,20 @@ Scope: Verify claims, provide proofs, and patch gaps in the assigned documents o
 - Risks and mitigations
 - Dependencies
 
-## Round 2 Review (placeholder)
+## Round 2 Gap Analysis
 
-- Findings:
-- Suggested diffs:
+- [x] **EDGE_CASES_AND_BEHAVIOR.md**
+  - **Gap 1: Hardlink Preservation.** The document recommends a preflight check to warn users before breaking hardlinks, but this check is not implemented. The current library breaks hardlinks silently.
+  - **Gap 2: Sidecar Integrity.** The document recommends hashing backup payloads to ensure sidecar integrity, but this is not implemented. Sidecars are trusted without verification.
+  - **Mitigations:** Implement the hardlink preflight check and the sidecar payload hash verification as proposed.
+
+- [x] **CORE_FEATURES_FOR_EDGE_CASES.md**
+  - **Gap 1: `SafePath` Not Enforced.** The document proposes using a `SafePath` type for all mutating APIs to prevent path traversal, but core `fs` functions still accept raw `&Path` arguments, bypassing this safety mechanism.
+  - **Gap 2: Missing SUID/SGID Gate.** The document proposes a critical security gate to prevent accidental modification of SUID/SGID binaries, but this check is not implemented.
+  - **Mitigations:** Refactor the `fs` layer to enforce `SafePath` usage. Implement the SUID/SGID preflight check.
+
+- [x] **CLI_INTEGRATION_GUIDE.md**
+  - **Gap 1: Misleading `SafePath` Guidance.** The guide instructs developers to use `SafePath`, but the underlying library functions do not support it, creating a confusing developer experience.
+  - **Gap 2: Non-Existent Pruning Function.** The guide directs developers to implement a `prune` subcommand using a `prune_backups` function that does not exist in the library.
+  - **Mitigations:** Correct the guide to reflect the current API limitations. Remove the reference to the non-existent pruning function until it is implemented. Prioritize implementing the features to close these gaps.
+

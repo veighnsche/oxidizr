@@ -119,3 +119,31 @@ Relevant paths:
 **Summary of Edits:** Verified that the "triple preflight" concern is accurate but the migration appears partially complete - the policy/checks.rs shim has been removed. The document correctly identifies the naming overlap and layering concerns.
 
 Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+- Invariant: Immutable-bit detection is reliable across environments
+  - Assumption (from doc): Preflight checks provide dependable gating for immutability.
+  - Reality (evidence): `src/preflight/checks.rs::check_immutable()` shells out to `lsattr -d` (lines 20–41). If `lsattr` is missing or errors, the function returns `Ok(())` (lines 23–41), silently skipping detection. Minimal containers often lack `lsattr`, so immutability may not be detected.
+  - Gap: Consumers may assume immutability is enforced when it is not detectable, leading to unexpected apply failures later.
+  - Mitigations: Attempt `ioctl(FS_IOC_GETFLAGS)` via a small optional crate when available; otherwise emit a preflight note and fact field `immutable_check=unknown` and treat as STOP unless policy overrides. Document the limitation.
+  - Impacted users: CI containers and stripped-down images without e2fsprogs; distro variants where `lsattr` is absent.
+  - Follow-ups: Add a unit/integration test simulating missing `lsattr` and verify a WARN/STOP path based on policy.
+
+- Invariant: Preflight YAML contains all fields consumers rely on
+  - Assumption (from doc): YAML exported rows are a faithful subset of preflight facts.
+  - Reality (evidence): Facts rows include `preservation` and `preservation_supported` (see `src/api/preflight/mod.rs` lines 140–161), but `preflight::to_yaml()` only exports keys `[action_id, path, current_kind, planned_kind, policy_ok, provenance, notes]` (`src/preflight/yaml.rs` lines 11–25). Preservation details are omitted from YAML.
+  - Gap: Consumers reading only YAML cannot gate on preservation readiness.
+  - Mitigations: Extend YAML exporter to include `preservation` and `preservation_supported`, or explicitly document YAML as “minimal” and require JSON facts for full signals. Add fixture tests to cover presence when enabled.
+  - Impacted users: CLI/reporting tools that rely on YAML outputs for gating or display.
+  - Follow-ups: Update SPEC §4 YAML schema to optionally include preservation fields; add golden fixtures.
+
+- Invariant: Single, unambiguous import path for checks
+  - Assumption (from doc): There is a canonical path for preflight checks and no ambiguity for consumers.
+  - Reality (evidence): `src/preflight.rs` re-exports checks; `src/api/preflight/mod.rs` uses them directly. The older `policy::checks` shim is gone (no `src/policy/checks.rs` present). Naming overlap remains (`preflight` helper vs `api/preflight` stage).
+  - Gap: While functional duplication is gone, naming overlap can still mislead consumers and internal contributors.
+  - Mitigations: Add module-level docs clarifying ownership as recommended; consider renaming helper module or consolidating under `preflight::checks` exclusively in docs/samples.
+  - Impacted users: New integrators and contributors navigating the code/docs.
+  - Follow-ups: Add short module docs in `src/api/preflight/mod.rs` and `src/preflight.rs` as per Recommendations.
+
+Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00

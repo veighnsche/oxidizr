@@ -215,6 +215,48 @@ Scope: Verify claims, provide proofs, and patch gaps in the assigned documents o
 - **Open Questions:**
   - None at this time.
 
+## Round 2 Gap Analysis
+
+### FS_SAFETY_AUDIT.md
+- **Checklist:**
+  - Reviewed document for consumer invariants related to filesystem operations safety.
+  - Identified gaps in durability and path traversal safety.
+- **Gaps and Mitigations:**
+  - **Durability Across Crashes:** Backup and sidecar creation lack `fsync_parent_dir()` calls, risking data loss in crashes. Mitigation: Add `fsync_parent_dir(backup)` after backup and sidecar operations in `src/fs/backup.rs`.
+  - **Path Traversal Safety:** Core mutating functions accept raw `&Path` instead of `SafePath`, risking traversal attacks. Mitigation: Refactor to enforce `SafePath` usage in all mutating functions.
+
+### API_SURFACE_AUDIT.md
+- **Checklist:**
+  - Reviewed document for consumer invariants related to API safety and stability communication.
+  - Identified gaps in API misuse prevention and stability documentation.
+- **Gaps and Mitigations:**
+  - **API Misuse Prevention:** Low-level FS atoms are publicly exposed, risking unsafe usage. Mitigation: Restrict visibility to `pub(crate)` and document stable API boundaries.
+  - **Stability Communication:** Lack of stability annotations in codebase. Mitigation: Add Rustdoc comments or attributes indicating stability levels.
+
+### OBSERVABILITY_FACTS_SCHEMA.md
+- **Checklist:**
+  - Reviewed document for consumer invariants related to observability data reliability and detail.
+  - Identified gaps in error detail and schema validation.
+- **Gaps and Mitigations:**
+  - **Comprehensive Error Information:** Summaries collapse errors into a single `error_id`, lacking detail. Mitigation: Implement `summary_error_ids` array in summaries.
+  - **Schema Validation:** No automated validation of facts against schema. Mitigation: Add unit tests for schema validation using `jsonschema` crate.
+
+### ERROR_TAXONOMY.md
+- **Checklist:**
+  - Reviewed document for consumer invariants related to error reporting detail and categorization.
+  - Identified gaps in detailed error reporting and ownership error identification.
+- **Gaps and Mitigations:**
+  - **Detailed Error Reporting:** Summaries use a single generic `error_id`, missing multiple causes. Mitigation: Add `summary_error_ids` array to capture all error IDs.
+  - **Ownership Error Identification:** Ownership issues not consistently tagged as `E_OWNERSHIP`. Mitigation: Update preflight and gating to use `E_OWNERSHIP` for ownership failures.
+
+### INDEX.md
+- **Checklist:**
+  - Reviewed document for consumer invariants related to comprehensive coverage and current status of analysis.
+  - Identified gaps in package manager interoperability coverage and status updates.
+- **Gaps and Mitigations:**
+  - **Comprehensive Coverage:** Missing analysis for package manager interoperability. Mitigation: Add a proposed analysis for activation persistence and PM interaction.
+  - **Current Status Updates:** Index does not reflect review round updates. Mitigation: Add a status section for each document indicating review progress.
+
 ## Round 2 Meta Review Targets
 
 - FS_SAFETY_AUDIT.md

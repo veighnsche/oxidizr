@@ -89,3 +89,39 @@
 **Summary of Edits:** All claims about preset configurations are accurately verified against the codebase. The document correctly describes the policy flags enabled by each preset and their rationale.
 
 Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
+
+## Round 2 Gap Analysis (AI 1, 2025-09-12 15:22 +02:00)
+
+- Invariant: Production hardening when using `production_preset()`
+  - Assumption (from doc): Enabling the preset sufficiently enforces rescue, locking with bounded wait, and smoke in Commit.
+  - Reality (evidence): `Policy::production_preset()` sets `require_rescue=true`, `rescue_exec_check=true`, `require_lock_manager=true`, `require_smoke_in_commit=true` (`src/policy/config.rs` lines 135–141). `apply/mod.rs` enforces E_LOCKING on missing lock (lines 101–131) and E_SMOKE on missing/failing smoke (lines 314–346). Preflight summary records rescue profile status (lines 251–270 in `api/preflight/mod.rs`).
+  - Gap: None for preset behavior itself; however, consumers must still configure adapters (LockManager, SmokeTestRunner). Missing adapters produce WARN/fail paths but this dependency may be implicit to users.
+  - Mitigations: Document minimal adapter configuration snippets under the preset section; add compile-time examples in Rustdoc.
+  - Impacted users: New integrators assuming presets auto-wire adapters.
+  - Follow-ups: Add a code example block in `policy/config.rs` docs demonstrating adapter setup.
+
+- Invariant: Dev-friendly default allows unlocked Commit
+  - Assumption (from doc comment): `allow_unlocked_commit` defaults to true for development ergonomics (`src/policy/config.rs` lines 62–66 docstring).
+  - Reality (evidence): `impl Default for Policy` sets `allow_unlocked_commit = false` (line 106). This mismatch can surprise consumers relying on the documented default.
+  - Gap: Spec/doc vs implementation divergence for default behavior.
+  - Mitigations: Align either the code or the docs. Prefer setting default to true for dev ergonomics, while ensuring `production_preset()` overrides to hardened settings; or update docs to state default=false and recommend explicit enabling in dev.
+  - Impacted users: Developers running quick Commit-mode trials without a LockManager.
+  - Follow-ups: Open an issue to reconcile default; add a test asserting intended default; update Rustdoc accordingly.
+
+- Invariant: Coreutils preset fully scopes mutations
+  - Assumption (from doc): Using `coreutils_switch_preset()` plus `allow_roots` ensures changes are confined.
+  - Reality (evidence): `coreutils_switch_preset()` sets forbids and extra mount checks (lines 193–208) but does not auto-populate `allow_roots`; callers must set it. Gating checks enforced in `src/policy/gating.rs` for `allow_roots`/`forbid_paths` (lines 71–90, 112–131).
+  - Gap: Consumers may omit `allow_roots` and unintentionally operate broadly if other gates pass.
+  - Mitigations: In `coreutils_switch_preset()`, consider refusing Commit unless `allow_roots` is non-empty (policy flag or runtime check); alternatively, emit a preflight STOP `target outside allowed roots` when `allow_roots` is empty by design.
+  - Impacted users: Operators switching critical toolchains who forget to restrict scope.
+  - Follow-ups: Add a preflight rule: when preset detected and `allow_roots.is_empty()`, add STOP with actionable message; document in preset Rustdoc.
+
+- Invariant: Rescue profile adequacy is transparent to consumers
+  - Assumption (from doc): Rescue availability is binary (available/none).
+  - Reality (evidence): Preflight summary includes `rescue_profile: Some("available"|"none")` (lines 251–270) but does not expose the count of found tools or names.
+  - Gap: Consumers cannot assess margin (e.g., exactly how many required tools are present) which is useful for readiness and drift detection.
+  - Mitigations: Emit `rescue_found_count` and optionally `rescue_missing: [..]` in preflight summary (additive fields) when feasible; keep redaction policy in mind.
+  - Impacted users: Site-reliability teams tracking rescue readiness over time.
+  - Follow-ups: Extend `policy::rescue` to surface counts and names; add to facts summary.
+
+Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
