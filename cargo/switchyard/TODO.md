@@ -43,43 +43,43 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Dependencies: SPEC doc update for SafePath-only requirement.
 
   - Action Plan (no backcompat required)
-    - [ ] Change mutator signatures to `&SafePath` only
-      - [ ] `src/fs/swap.rs::replace_file_with_symlink(&SafePath, &SafePath, ...)`
-      - [ ] `src/fs/restore.rs::restore_file(&SafePath, ...)`
-      - [ ] `src/fs/restore.rs::restore_file_prev(&SafePath, ...)`
-      - [ ] `src/fs/mod.rs` re-exports compile after signature changes
-    - [ ] Update all call sites to pass `SafePath`
-      - [ ] `src/api/apply/handlers.rs` (EnsureSymlink handler)
-        - [ ] Add field to attempt extra: `"safepath_validation": "success"` at the emit where we already set `action_id` and `path`.
-        - [ ] Change call to `crate::fs::replace_file_with_symlink(source, target, dry, api.policy.allow_degraded_fs, &api.policy.backup_tag)` (drop `.as_path()` calls).
-        - [ ] Keep hashing with `sha256_hex_of(&source.as_path())` and `resolve_symlink_target(&target.as_path())` (unchanged).
-      - [ ] `src/api/apply/handlers.rs` (RestoreFromBackup handler)
-        - [ ] Add field to attempt extra: `"safepath_validation": "success"`.
-        - [ ] If `capture_restore_snapshot` remains a path-based helper, keep `create_snapshot(&target.as_path(), ...)` for now.
-        - [ ] Change calls to `crate::fs::restore_file_prev(target, ...)` or `crate::fs::restore_file(target, ...)` (drop `.as_path()`).
-      - [ ] `src/api/apply/mod.rs` (rollback loops + smoke failure rollback)
-        - [ ] In rollback on failure: change `fs::restore_file(&target.as_path(), …)` to `fs::restore_file(&target, …)` in both loops (initial failure and smoke rollback).
-        - [ ] Ensure `lock_backend` telemetry remains intact (recently added).
-      - [ ] Grep checklist (update all SafePath call sites)
-        - [ ] `grep -R "restore_file\(&" src | grep -v safe` and convert to pass `&SafePath`.
-        - [ ] `grep -R "replace_file_with_symlink\(&" src` and ensure `&SafePath` is passed.
-    - [ ] Emit safepath telemetry
-      - [ ] Add `"safepath_validation": "success"` to `emit_apply_attempt(...)` in both handlers
-    - [ ] Tests
-      - [ ] Update unit tests in `src/fs/swap.rs` to construct `SafePath` (partially done: `atomic_swap_creates_symlink_pointing_to_source`, `replace_and_restore_roundtrip`)
-      - [ ] Update any direct `restore_file(...)` calls in tests to pass `SafePath`
-      - [ ] Add negative tests for `SafePath::from_rooted` rejecting escaping paths
-        - [ ] Add test in `src/types/safepath.rs` module tests or new `tests/safepath_negative.rs` with cases: `../etc`, absolute outside root.
-      - [ ] Grep and convert tests referencing old signatures
-        - [ ] `grep -R "replace_file_with_symlink(\s*&[a-zA-Z].*Path" cargo/switchyard/tests src | sed -n 'p'`
-        - [ ] `grep -R "restore_file(\s*&[a-zA-Z].*Path" cargo/switchyard/tests src | sed -n 'p'`
+    - [x] Change mutator signatures to `&SafePath` only
+      - [x] `src/fs/swap.rs::replace_file_with_symlink(&SafePath, &SafePath, ...)`
+      - [x] `src/fs/restore.rs::restore_file(&SafePath, ...)`
+      - [x] `src/fs/restore.rs::restore_file_prev(&SafePath, ...)`
+      - [x] `src/fs/mod.rs` re-exports compile after signature changes
+    - [x] Update all call sites to pass `SafePath`
+      - [x] `src/api/apply/handlers.rs` (EnsureSymlink handler)
+        - [x] Add field to attempt extra: `"safepath_validation": "success"` at the emit where we already set `action_id` and `path`.
+        - [x] Change call to `crate::fs::replace_file_with_symlink(source, target, dry, api.policy.allow_degraded_fs, &api.policy.backup_tag)` (drop `.as_path()` calls).
+        - [x] Keep hashing with `sha256_hex_of(&source.as_path())` and `resolve_symlink_target(&target.as_path())` (unchanged).
+      - [x] `src/api/apply/handlers.rs` (RestoreFromBackup handler)
+        - [x] Add field to attempt extra: `"safepath_validation": "success"`.
+        - [x] If `capture_restore_snapshot` remains a path-based helper, keep `create_snapshot(&target.as_path(), ...)` for now.
+        - [x] Change calls to `crate::fs::restore_file_prev(target, ...)` or `crate::fs::restore_file(target, ...)` (drop `.as_path()`).
+      - [x] `src/api/apply/mod.rs` (rollback loops + smoke failure rollback)
+        - [x] In rollback on failure: change `fs::restore_file(&target.as_path(), …)` to `fs::restore_file(&target, …)` in both loops (initial failure and smoke rollback).
+        - [x] Ensure `lock_backend` telemetry remains intact (recently added).
+      - [x] Grep checklist (update all SafePath call sites)
+        - [x] `grep -R "restore_file\(&" src | grep -v safe` and convert to pass `&SafePath`.
+        - [x] `grep -R "replace_file_with_symlink\(&" src` and ensure `&SafePath` is passed.
+    - [x] Emit safepath telemetry
+      - [x] Add `"safepath_validation": "success"` to `emit_apply_attempt(...)` in both handlers
+    - [x] Tests
+      - [x] Update unit tests in `src/fs/swap.rs` to construct `SafePath` (partially done: `atomic_swap_creates_symlink_pointing_to_source`, `replace_and_restore_roundtrip`)
+      - [x] Update any direct `restore_file(...)` calls in tests to pass `SafePath`
+      - [x] Add negative tests for `SafePath::from_rooted` rejecting escaping paths
+        - [x] Add test in `src/types/safepath.rs` module tests or new `tests/safepath_negative.rs` with cases: `../etc`, absolute outside root.
+      - [x] Grep and convert tests referencing old signatures
+        - [x] `grep -R "replace_file_with_symlink(\s*&[a-zA-Z].*Path" cargo/switchyard/tests src | sed -n 'p'`
+        - [x] `grep -R "restore_file(\s*&[a-zA-Z].*Path" cargo/switchyard/tests src | sed -n 'p'`
     - [ ] Docs
       - [ ] Add SafePath code examples to `DOCS/analysis/CLI_INTEGRATION_GUIDE.md`
       - [ ] Note SafePath-only mutators in public API section; no deprecation window needed
-    - [ ] Acceptance
-      - [ ] All public mutators accept only `&SafePath`
-      - [ ] All call sites compile; unit/integration tests pass
-      - [ ] apply.attempt facts include `safepath_validation`
+    - [x] Acceptance
+      - [x] All public mutators accept only `&SafePath`
+      - [x] All call sites compile; unit/integration tests pass
+      - [x] apply.attempt facts include `safepath_validation`
 
 - SUID/SGID preflight gate
   - Priority: P0

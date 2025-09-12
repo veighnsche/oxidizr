@@ -7,6 +7,7 @@ Inputs: `DOCS/proposals/SPEC_CHANGES_AI{1,2,3,4}.md`, `SPEC/SPEC.md`, `SPEC/audi
 ## Overview
 
 This document consolidates the strongest SPEC changes proposed by AI 1–4. Each change includes:
+
 - What changes (normative requirements)
 - Why (rationale)
 - Affected SPEC sections/files
@@ -180,6 +181,7 @@ This consolidation intentionally does not prescribe back-compat/deprecation wind
 ## Schema delta (summary)
 
 Proposed additive changes to `SPEC/audit_event.schema.json`:
+
 - Add `summary_error_ids: array[string]` (summaries)
 - Add optional `perf: object { total_fsync_ms, total_hash_ms, total_backup_ms, total_restore_ms }` (apply/rollback summaries)
 - Add `lock_backend: string` (apply.attempt/apply.result)
