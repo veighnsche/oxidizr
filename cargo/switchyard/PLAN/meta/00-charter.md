@@ -37,7 +37,7 @@ Out of scope (MVP):
 
 - Rust channel: `stable` (per `rust-toolchain.toml`).
 - Minimum supported Rust version (MSRV): pinned to current `stable` in CI during implementation (document exact version when code lands).
-- License: GPL-3.0-only (per `LICENSE`). All dependencies must be license-compatible.
+- License: Apache-2.0 OR MIT (dual-licensed; see `LICENSE` and `LICENSE-MIT`). All dependencies must be license-compatible.
 
 ## Success Metrics (planning-level targets)
 

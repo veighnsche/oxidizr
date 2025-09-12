@@ -6,7 +6,7 @@
 
 ## Context
 
-The crate must minimize external dependencies, ensure license compatibility (GPL-3.0-only), respect MSRV, and provide provenance/SBOM signals in CI. SPEC calls for provenance and signed attestations.
+The crate must minimize external dependencies, ensure license compatibility (Apache-2.0 OR MIT; dual-licensed), respect MSRV, and provide provenance/SBOM signals in CI. SPEC calls for provenance and signed attestations.
 
 ## Decision
 

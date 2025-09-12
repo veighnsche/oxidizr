@@ -286,4 +286,7 @@ When introducing normative behavior changes:
 
 ## License
 
-GPL-3.0-or-later. See the repository root `LICENSE` file.
+This crate is dual-licensed under either:
+- Apache License, Version 2.0 — see repository root `LICENSE`
+- MIT License — see repository root `LICENSE-MIT`
+at your option.

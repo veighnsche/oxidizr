@@ -3,7 +3,7 @@ name = "switchyard"
 version = "0.1.0"
 edition = "2021"
 description = "Switchyard library crate (monorepo skeleton)"
-license = "GPL-3.0-or-later"
+license = "Apache-2.0 OR MIT"
 
 [lib]
 name = "switchyard"

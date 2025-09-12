@@ -373,8 +373,7 @@ Notes for Docker-based tests (`test-orch/`):
 
 ## License
 
-This project is licensed under the GNU General Public License, version 3 or (at your option) any later version.
-
-Copyright (C) 2025 veighnsche
-
-See the `LICENSE` file for the full text of the GPL-3.0-or-later license.
+This project is dual-licensed under either:
+- Apache License, Version 2.0 — see `LICENSE`
+- MIT License — see `LICENSE-MIT`
+at your option.
