@@ -1,0 +1,162 @@
+# Feature Proposals — AI 1
+Generated: 2025-09-12 16:26 +02:00
+Author: AI 1
+
+## Feature 1: Emit summary_error_ids across summaries (Implement now)
+- Problem statement: Round 3 (OBSERVABILITY_FACTS_SCHEMA, S2) identified missing array of error IDs in summaries, limiting diagnostics and policy.
+- User story(s):
+  - As an SRE, I want all error classes present in summaries so alerts and dashboards can key off both specific and general categories (e.g., E_EXDEV and E_ATOMIC_SWAP).
+  - As a platform integrator, I want schema-validated fixtures to prevent drift.
+- Design overview:
+  - APIs: no public API change; internal emitters add a `summary_error_ids: Vec<&'static str>` to summary objects.
+  - Behavior: on failure, set `error_id` to the most specific cause; always include the full chain in `summary_error_ids`.
+  - Telemetry/facts: Add optional `summary_error_ids` to `apply.result.summary`, `preflight.summary`, rollback summaries.
+  - Policy flags/defaults: none.
+  - Docs changes: SPEC §13; docstring in emitters describing stable order semantics.
+- Scope (files/functions):
+  - `cargo/switchyard/SPEC/audit_event.schema.json`
+  - `cargo/switchyard/src/api/apply/handlers.rs`
+  - `cargo/switchyard/src/api/apply/audit_fields.rs` (helper import wiring)
+  - `cargo/switchyard/src/api/errors.rs`, `cargo/switchyard/src/types/errors.rs` (implement `collect_error_ids()`)
+  - `cargo/switchyard/src/logging/redact.rs` (ensure field is preserved)
+- Tests:
+  - Unit: create chained errors and assert `summary_error_ids` contents.
+  - Schema validation: fixtures for Apply/Preflight/Rollback; CI jsonschema check passes.
+- Feasibility: High
+- Complexity: 3
+- Effort: M
+- Risks and mitigations:
+  - Risk: Consumers unaware of new field. Mitigation: additive optional field; CHANGELOG callout.
+- Dependencies:
+  - SPEC change (SPEC Proposal 1) to define field.
+- Rollout plan:
+  - Single PR updating schema, emitters, tests.
+- Acceptance criteria:
+  - Summaries include `summary_error_ids` on failures; JSON schema validates; redaction preserves the field.
+- Evidence:
+  - Code: `src/api/apply/handlers.rs:L61-L77, L191-L208` (error_id mapping today), `src/logging/redact.rs:L64-L80` (fields redaction), `SPEC/audit_event.schema.json` (schema).
+  - Analysis: `DOCS/analysis/OBSERVABILITY_FACTS_SCHEMA.md` Round 2/3.
+
+## Feature 2: SafePath overloads and deprecation of raw Path (Implement now)
+- Problem statement: Round 3 (FS_SAFETY_AUDIT, S2) requires SafePath enforcement at mutating boundaries to uphold TOCTOU and traversal invariants; SPEC v1.1 mandates SafePath.
+- User story(s):
+  - As a security reviewer, I want path traversal to be impossible through typed boundaries.
+  - As a developer, I want a clear migration path and compile-time hints.
+- Design overview:
+  - APIs: add `&SafePath` overloads for mutating functions; keep `&Path` variants temporarily with `#[deprecated]` and early validation via `is_safe_path()` returning `E_TRAVERSAL`.
+  - Behavior: validation failure returns typed error; normal behavior unchanged.
+  - Telemetry/facts: On `E_TRAVERSAL`, facts show `error_id: E_TRAVERSAL`.
+  - Policy flags/defaults: none.
+  - Docs changes: MIGRATION_GUIDE examples; SPEC §3 clarification.
+- Scope (files/functions):
+  - `cargo/switchyard/src/fs/swap.rs::replace_file_with_symlink`
+  - `cargo/switchyard/src/fs/restore.rs::{restore_file, restore_file_prev}`
+  - `cargo/switchyard/src/fs/paths.rs::is_safe_path`
+  - `cargo/switchyard/src/api/**` call sites
+- Tests:
+  - Unit: reject `../..` traversal and unsafe absolute paths with `E_TRAVERSAL`.
+  - Integration: convert existing tests to `SafePath` builders.
+- Feasibility: Medium
+- Complexity: 3
+- Effort: M
+- Risks and mitigations:
+  - Risk: Downstream breakage if removed too soon. Mitigation: deprecation window and clear examples.
+- Dependencies:
+  - SPEC change (SPEC Proposal 2) clarifying deprecation window.
+- Rollout plan:
+  - Phase 1: add overloads and deprecations. Phase 2 (next minor): remove raw `&Path`.
+- Acceptance criteria:
+  - All mutating public APIs accept `SafePath` or validate; deprecation warnings appear; tests cover negative cases.
+- Evidence:
+  - Code: `src/fs/mod.rs:L9-L15` (public surface), `src/fs/paths.rs` (validation), `src/api/apply/handlers.rs:L49-L55` (mutating call path).
+  - Analysis: `DOCS/analysis/FS_SAFETY_AUDIT.md`, `API_SURFACE_AUDIT.md`.
+
+## Feature 3: Restrict low-level FS atoms and add public API stability tests
+- Problem statement: Round 3 (API_SURFACE_AUDIT, S2) notes public re-exports of internal atoms (`atomic_symlink_swap`, `open_dir_nofollow`, `fsync_parent_dir`) which are implementation details.
+- User story(s):
+  - As a library consumer, I want a clean, stable surface without internals leaking into my namespace.
+- Design overview:
+  - APIs: stop re-exporting `atomic` internals from `fs/mod.rs`; mark doc-hidden if needed.
+  - Behavior: consumers rely on high-level helpers only (`replace_file_with_symlink`, `restore_file`, etc.).
+  - Telemetry/facts: n/a.
+  - Policy flags/defaults: n/a.
+  - Docs changes: MIGRATION_GUIDE; API docs showing intended imports.
+- Scope (files/functions):
+  - `cargo/switchyard/src/fs/mod.rs` (remove/privatize re-exports)
+  - `cargo/switchyard/src/lib.rs` (ensure not re-exported at crate root)
+  - `tests/public_api.rs` (new)
+- Tests:
+  - Positive compile test: `tests/public_api.rs` imports only documented items and builds.
+  - Optional compile-fail (trybuild) for forbidden atoms.
+- Feasibility: High
+- Complexity: 2
+- Effort: S
+- Risks and mitigations:
+  - Risk: hidden downstream reliance. Mitigation: deprecate first for one minor; add MIGRATION notes.
+- Dependencies: none.
+- Rollout plan: deprecate now; remove next minor.
+- Acceptance criteria:
+  - Internals not publicly re-exported; `tests/public_api.rs` green.
+- Evidence:
+  - Code: `src/fs/mod.rs:L9-L15` (re-exports), `src/lib.rs`.
+  - Analysis: `DOCS/analysis/API_SURFACE_AUDIT.md`.
+
+## Feature 4: Error taxonomy chain + E_OWNERSHIP surfacing
+- Problem statement: Round 3 (ERROR_TAXONOMY, S2) requires multi-cause error chain exposure and normalized `E_OWNERSHIP` for classification.
+- User story(s):
+  - As a policy author, I want alerts and mitigations to trigger on broad classes like E_OWNERSHIP without losing specifics.
+- Design overview:
+  - APIs: add `ErrorId` enum and helpers `error_id()`, `error_ids_chain()`.
+  - Behavior: ownership-related errors co-emit `E_OWNERSHIP` and specific IDs.
+  - Telemetry/facts: emitters include `summary_error_ids` with chain (Feature 1 linkage).
+  - Policy flags/defaults: none.
+  - Docs changes: SPEC §6 mapping table updates.
+- Scope (files/functions):
+  - `cargo/switchyard/src/types/errors.rs`, `cargo/switchyard/src/api/errors.rs`
+  - Call sites: `src/api/apply/handlers.rs` (map to IDs), `src/fs/**` constructors
+- Tests:
+  - Unit: chain construction; presence of `E_OWNERSHIP`.
+  - Integration: path that triggers ownership failure gets both IDs in facts.
+- Feasibility: Medium
+- Complexity: 3
+- Effort: M
+- Risks and mitigations:
+  - Risk: enum plumbing churn. Mitigation: helper-centric design and limited surface exposure.
+- Dependencies:
+  - SPEC change (SPEC Proposal 3) defining co-emission semantics and chain.
+- Rollout plan: single PR with helpers and tests.
+- Acceptance criteria:
+  - Chain helpers exist and are used; facts show both specific and `E_OWNERSHIP`.
+- Evidence:
+  - Code: `src/api/apply/handlers.rs:L61-L77, L191-L208` (id mapping), `src/api/errors.rs` (ids), `src/types/errors.rs`.
+  - Analysis: `DOCS/analysis/ERROR_TAXONOMY.md`.
+
+## Feature 5: Deprecation program for public shims and re-exports
+- Problem statement: Round 3 (API_SURFACE_AUDIT + Back-compat) call for lifecycle policy distinguishing facades vs shims; missing deprecation attributes.
+- User story(s):
+  - As a consumer, I want explicit deprecation notices and timelines.
+- Design overview:
+  - APIs: add `#[deprecated(note = "use ...")]` on compatibility re-exports (e.g., `policy::rescue` at crate root if present; `adapters::lock_file::*`).
+  - Behavior: warnings during build; provide documented alternatives.
+  - Telemetry/facts: n/a.
+  - Policy flags/defaults: n/a.
+  - Docs changes: MIGRATION_GUIDE, CHANGELOG with deprecation window.
+- Scope (files/functions):
+  - `cargo/switchyard/src/lib.rs` (root re-exports)
+  - `cargo/switchyard/src/adapters/mod.rs` (legacy shims)
+- Tests:
+  - None beyond compile-time warnings; add docs build check.
+- Feasibility: High
+- Complexity: 1
+- Effort: S
+- Risks and mitigations:
+  - Risk: minor noise in builds. Mitigation: clear migration examples.
+- Dependencies: none.
+- Rollout plan: deprecate now; removal next minor.
+- Acceptance criteria:
+  - Shims carry deprecation attributes; docs point to replacements.
+- Evidence:
+  - Code: `src/lib.rs:L20-L21` re-exports; `src/adapters/` module exists.
+  - Analysis: `DOCS/analysis/API_SURFACE_AUDIT.md`, `BACKWARDS_COMPAT_SHIMS.md`.
+
+Proposals authored by AI 1 on 2025-09-12 16:26 +02:00
