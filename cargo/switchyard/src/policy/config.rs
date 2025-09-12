@@ -1,6 +1,6 @@
+use std::path::PathBuf;
 use crate::constants::DEFAULT_BACKUP_TAG;
 use crate::constants::RESCUE_MIN_COUNT as DEFAULT_RESCUE_MIN_COUNT;
-use std::path::PathBuf;
 
 /// Policy governs preflight gates, apply behavior, and production hardening for Switchyard.
 ///
@@ -109,28 +109,27 @@ impl Default for Policy {
         }
     }
 }
-
 impl Policy {
-    /// Construct a Policy configured with recommended production defaults.
+    /// Construct a Policy configured with recommended **production defaults**.
     ///
-    /// Enables:
-    /// - `require_rescue = true` (with `rescue_exec_check = true`)
+    /// Enables (hardened-by-default):
+    /// - `require_rescue = true` (+ `rescue_exec_check = true`)
     /// - `require_lock_manager = true`
     /// - `require_smoke_in_commit = true`
     ///
     /// Notes:
-    /// - Other flags like `allow_degraded_fs` remain at their defaults and should be set
-    ///   explicitly based on your environment.
+    /// - Other flags (e.g., `allow_degraded_fs`) remain at their defaults and should be set
+    ///   explicitly per environment.
     /// - In Commit mode, absence of a LockManager yields an early `apply.attempt` failure
-    ///   with `error_id=E_LOCKING` and `exit_code=30`.
-    /// - Missing smoke runner when `require_smoke_in_commit=true` yields `E_SMOKE` and
-    ///   triggers auto-rollback unless disabled by policy.
+    ///   with `error_id=E_LOCKING` (`exit_code=30`).
+    /// - Missing smoke runner when `require_smoke_in_commit=true` yields `E_SMOKE`
+    ///   and triggers auto-rollback unless disabled by policy.
     ///
     /// # Example
     /// ```rust
     /// use switchyard::policy::Policy;
     /// let policy = Policy::production_preset();
-    /// // Optionally customize
+    /// // Optionally customize for your env:
     /// // policy.allow_degraded_fs = true;
     /// ```
     pub fn production_preset() -> Self {
@@ -142,7 +141,7 @@ impl Policy {
         p
     }
 
-    /// Mutate this Policy to apply the recommended production defaults.
+    /// Mutate this Policy to apply the recommended **production defaults**.
     pub fn apply_production_preset(&mut self) -> &mut Self {
         self.require_rescue = true;
         self.rescue_exec_check = true;
@@ -151,7 +150,7 @@ impl Policy {
         self
     }
 
-    /// Construct a Policy tailored for switching system coreutils to uutils-coreutils.
+    /// Construct a Policy tailored for **switching system coreutils to uutils-coreutils**.
     ///
     /// Builds on [`production_preset`](#method.production_preset) and tightens gates:
     /// - `allow_degraded_fs = false` (fail on EXDEV; no degraded fallback)
@@ -159,20 +158,29 @@ impl Policy {
     /// - `require_preservation = true` (STOP if basic preservation not supported)
     /// - `override_preflight = false` (fail-closed)
     /// - `force_untrusted_source = false`
-    /// - `force_restore_best_effort = false` (missing backup -> error)
+    /// - `force_restore_best_effort = false` (missing backup → error)
     /// - `backup_tag = "coreutils"`
     ///
-    /// You should still scope changes via `allow_roots` (e.g., `<root>/usr/bin`).
+    /// Additionally, for safer toolchain swaps:
+    /// - `extra_mount_checks` defaults to common tool mount points (`/usr`, `/bin`, etc.)
+    /// - `forbid_paths` blocks virtual/volatile filesystems (`/proc`, `/sys`, `/dev`, `/run`, `/tmp`)
+    ///
+    /// **Caller must still scope the operation** by setting `allow_roots` to the exact tree
+    /// being switched (e.g., `<root>/usr/bin`). Everything else remains blocked.
     ///
     /// # Example
     /// ```rust
     /// use switchyard::policy::Policy;
     /// # let root = std::path::PathBuf::from("/tmp/fakeroot");
     /// let mut policy = Policy::coreutils_switch_preset();
-    /// policy.allow_roots.push(root.join("usr/bin"));
+    /// policy.allow_roots.push(root.join("usr/bin")); // narrow the blast radius
+    /// // Optionally tighten expectations on rescue tool count:
+    /// // policy.rescue_min_count = policy.rescue_min_count.max(6);
     /// ```
     pub fn coreutils_switch_preset() -> Self {
         let mut p = Self::production_preset();
+
+        // Tighten core behaviors for a critical switch
         p.allow_degraded_fs = false;
         p.strict_ownership = true;
         p.require_preservation = true;
@@ -180,12 +188,33 @@ impl Policy {
         p.force_untrusted_source = false;
         p.force_restore_best_effort = false;
         p.backup_tag = "coreutils".to_string();
+
+        // Extra safety: ensure typical tool mount points are rw+exec
+        p.extra_mount_checks = vec![
+            PathBuf::from("/usr"),
+            PathBuf::from("/bin"),
+            PathBuf::from("/sbin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/usr/sbin"),
+        ];
+
+        // Conservative forbids to avoid accidents during the switch
+        p.forbid_paths = vec![
+            PathBuf::from("/proc"),
+            PathBuf::from("/sys"),
+            PathBuf::from("/dev"),
+            PathBuf::from("/run"),
+            PathBuf::from("/tmp"),
+        ];
+
+        // Note: caller MUST still populate `allow_roots` precisely.
         p
     }
 
-    /// Mutate this Policy to apply the coreutils switch preset; see `coreutils_switch_preset()`.
+    /// Mutate this Policy to apply the **coreutils switch** preset; see `coreutils_switch_preset()`.
     pub fn apply_coreutils_switch_preset(&mut self) -> &mut Self {
         self.apply_production_preset();
+
         self.allow_degraded_fs = false;
         self.strict_ownership = true;
         self.require_preservation = true;
@@ -193,6 +222,24 @@ impl Policy {
         self.force_untrusted_source = false;
         self.force_restore_best_effort = false;
         self.backup_tag = "coreutils".to_string();
+
+        // Apply the same conservative guardrails
+        self.extra_mount_checks = vec![
+            PathBuf::from("/usr"),
+            PathBuf::from("/bin"),
+            PathBuf::from("/sbin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/usr/sbin"),
+        ];
+        self.forbid_paths = vec![
+            PathBuf::from("/proc"),
+            PathBuf::from("/sys"),
+            PathBuf::from("/dev"),
+            PathBuf::from("/run"),
+            PathBuf::from("/tmp"),
+        ];
+
+        // Caller still needs to set allow_roots explicitly.
         self
     }
 }

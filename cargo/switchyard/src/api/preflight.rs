@@ -49,12 +49,12 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let mut notes: Vec<String> = Vec::new();
                 let stops_before = stops.len();
                 for p in &api.policy.extra_mount_checks {
-                    if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(p.as_path()) {
+                    if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                         stops.push(format!("{} not rw+exec: {}", p.display(), e));
                         notes.push(format!("{} not rw+exec", p.display()));
                     }
                 }
-                if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
                     stops.push(format!(
                         "target not rw+exec: {} (target={})",
                         e,
@@ -62,7 +62,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     ));
                     notes.push("target not rw+exec".to_string());
                 }
-                if let Err(e) = crate::policy::checks::check_immutable(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
                     stops.push(format!(
                         "immutable target: {} (target={})",
                         e,
@@ -70,7 +70,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     ));
                     notes.push("immutable target".to_string());
                 }
-                match crate::policy::checks::check_source_trust(
+                match crate::preflight::checks::check_source_trust(
                     &source.as_path(),
                     api.policy.force_untrusted_source,
                 ) {
@@ -164,12 +164,12 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
             Action::RestoreFromBackup { target } => {
                 let mut notes: Vec<String> = Vec::new();
                 let stops_before = stops.len();
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(std::path::Path::new("/usr"))
+                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(std::path::Path::new("/usr"))
                 {
                     stops.push(format!("/usr not rw+exec: {}", e));
                     notes.push("/usr not rw+exec".to_string());
                 }
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
                     stops.push(format!(
                         "target not rw+exec: {} (target={})",
                         e,
@@ -177,7 +177,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     ));
                     notes.push("target not rw+exec".to_string());
                 }
-                if let Err(e) = crate::preflight::check_immutable(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
                     stops.push(format!(
                         "immutable target: {} (target={})",
                         e,

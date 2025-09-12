@@ -26,25 +26,25 @@ pub(crate) fn gating_errors(
             Action::EnsureSymlink { source, target } => {
                 // Policy-driven extra mount checks (replaces hard-coded "/usr").
                 for p in &policy.extra_mount_checks {
-                    if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(p.as_path()) {
+                    if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                         gating_errors.push(format!("{} not rw+exec: {}", p.display(), e));
                     }
                 }
-                if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
                     gating_errors.push(format!(
                         "target not rw+exec: {} (target={})",
                         e,
                         target.as_path().display()
                     ));
                 }
-                if let Err(e) = crate::policy::checks::check_immutable(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
                     gating_errors.push(format!(
                         "immutable target: {} (target={})",
                         e,
                         target.as_path().display()
                     ));
                 }
-                if let Err(e) = crate::policy::checks::check_source_trust(
+                if let Err(e) = crate::preflight::checks::check_source_trust(
                     &source.as_path(),
                     policy.force_untrusted_source,
                 ) {
@@ -91,18 +91,18 @@ pub(crate) fn gating_errors(
             }
             Action::RestoreFromBackup { target } => {
                 for p in &policy.extra_mount_checks {
-                    if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(p.as_path()) {
+                    if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                         gating_errors.push(format!("{} not rw+exec: {}", p.display(), e));
                     }
                 }
-                if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
                     gating_errors.push(format!(
                         "target not rw+exec: {} (target={})",
                         e,
                         target.as_path().display()
                     ));
                 }
-                if let Err(e) = crate::policy::checks::check_immutable(&target.as_path()) {
+                if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
                     gating_errors.push(format!(
                         "immutable target: {} (target={})",
                         e,
