@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use crate::constants::DEFAULT_BACKUP_TAG;
 use crate::constants::RESCUE_MIN_COUNT as DEFAULT_RESCUE_MIN_COUNT;
+use std::path::PathBuf;
 
 /// Policy governs preflight gates, apply behavior, and production hardening for Switchyard.
 ///
@@ -52,6 +52,14 @@ pub struct Policy {
     /// When true and unavailable, preflight/apply MUST STOP (unless override_preflight).
     /// Verified via `rescue::verify_rescue_tools_with_exec()` in `src/api/preflight.rs` and gated in apply.
     pub require_rescue: bool,
+    /// Allow mutating targets that have the SUID or SGID bit set. When false (default),
+    /// preflight/apply MUST STOP when a target is detected with SUID/SGID set (unless
+    /// override_preflight). When true, the risk is downgraded to a warning in preflight
+    /// and allowed to proceed in apply.
+    pub allow_suid_sgid_mutation: bool,
+    /// Allow proceeding when a target has multiple hardlinks (nlink>1). When false (default),
+    /// preflight/apply MUST STOP on hardlink hazard unless explicitly allowed.
+    pub allow_hardlink_breakage: bool,
     /// Minimum number of GNU rescue tools required when BusyBox is not present.
     /// Default is `RESCUE_MIN_COUNT` from `constants.rs`.
     pub rescue_min_count: usize,
@@ -99,6 +107,8 @@ impl Default for Policy {
             override_preflight: false,
             require_preservation: false,
             require_rescue: false,
+            allow_suid_sgid_mutation: false,
+            allow_hardlink_breakage: false,
             rescue_min_count: DEFAULT_RESCUE_MIN_COUNT,
             require_lock_manager: false,
             require_smoke_in_commit: false,

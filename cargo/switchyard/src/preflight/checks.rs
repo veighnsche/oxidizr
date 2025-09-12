@@ -15,25 +15,74 @@ pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Check immutability (best-effort via `lsattr -d`). Returns Err(String) when immutable.
+/// Detect hardlink hazard: returns Ok(true) when the target node has more than one
+/// hardlink (nlink > 1). Uses symlink_metadata to avoid following symlinks; callers
+/// may optionally resolve and re-check as needed.
+pub fn check_hardlink_hazard(path: &Path) -> std::io::Result<bool> {
+    if let Ok(md) = std::fs::symlink_metadata(path) {
+        // Only consider regular files for this hazard; symlinks/dirs are ignored.
+        let ft = md.file_type();
+        if ft.is_file() {
+            let n = md.nlink();
+            return Ok(n > 1);
+        }
+    }
+    Ok(false)
+}
+
+/// Best-effort check for SUID/SGID risk on a target path.
+/// Returns Ok(true) when either SUID (04000) or SGID (02000) bit is set on the
+/// resolved file; Ok(false) otherwise. On errors reading metadata, returns Ok(false)
+/// to avoid spurious stops; callers may add an informational note if desired.
+pub fn check_suid_sgid_risk(path: &Path) -> std::io::Result<bool> {
+    // If path is a symlink, resolve to the destination for inspection.
+    let inspect_path = if let Ok(md) = std::fs::symlink_metadata(path) {
+        if md.file_type().is_symlink() {
+            if let Some(p) = crate::fs::meta::resolve_symlink_target(path) {
+                p
+            } else {
+                path.to_path_buf()
+            }
+        } else {
+            path.to_path_buf()
+        }
+    } else {
+        path.to_path_buf()
+    };
+    if let Ok(meta) = std::fs::metadata(&inspect_path) {
+        let mode = meta.mode();
+        let risk = (mode & 0o6000) != 0; // SUID (04000) or SGID (02000)
+        return Ok(risk);
+    }
+    Ok(false)
+}
+
+/// Best-effort check for the immutable attribute via `lsattr -d`.
+/// Returns `Err(String)` only when the target itself is immutable.
+/// If `lsattr` is missing or fails, this returns `Ok(())` (best-effort).
 pub fn check_immutable(path: &Path) -> Result<(), String> {
-    let out = std::process::Command::new("lsattr")
-        .args(["-d", path.as_os_str().to_string_lossy().as_ref()])
-        .output();
-    if let Ok(o) = out {
-        if o.status.success() {
-            let stdout = String::from_utf8_lossy(&o.stdout);
-            for line in stdout.lines() {
-                let mut fields = line.split_whitespace();
-                if let Some(attrs) = fields.next() {
-                    if attrs.contains('i') {
-                        return Err(format!(
-                            "Target '{}' is immutable (chattr +i). Run 'chattr -i {}' to clear before proceeding.",
-                            path.display(),
-                            path.display()
-                        ));
-                    }
-                }
+    let output = match std::process::Command::new("lsattr")
+        .arg("-d")
+        .arg(path) // avoid lossy UTF-8 conversion
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return Ok(()), // tool not found or couldn't run -> best-effort: assume not immutable
+    };
+
+    if !output.status.success() {
+        return Ok(()); // non-zero exit from lsattr -> treat as inconclusive
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        if let Some(attrs) = line.split_whitespace().next() {
+            if attrs.contains('i') {
+                return Err(format!(
+                    "Target '{}' is immutable (chattr +i). Run: chattr -i -- {}",
+                    path.display(),
+                    path.display()
+                ));
             }
         }
     }

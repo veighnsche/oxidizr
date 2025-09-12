@@ -4,7 +4,9 @@ pub mod ownership; // contains mod.rs and fs.rs
 pub mod path;
 pub mod smoke;
 // Compatibility shim for old path switchyard::adapters::lock_file::FileLockManager
-#[deprecated(note = "Deprecated shim: use `switchyard::adapters::lock::file::*` instead. This `lock_file` module will be removed in 0.2.")]
+#[deprecated(
+    note = "Deprecated shim: use `switchyard::adapters::lock::file::*` instead. This `lock_file` module will be removed in 0.2."
+)]
 pub mod lock_file {
     pub use super::lock::file::*;
 }

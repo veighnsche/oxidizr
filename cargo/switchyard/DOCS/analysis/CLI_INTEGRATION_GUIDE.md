@@ -9,7 +9,7 @@
 ## Summary
 
 - Construct `Switchyard` with sinks and a hardened `Policy` preset; scope operations via `allow_roots` and forbid lists.
-- Prefer `SafePath::from_rooted` for all user-provided inputs and convert to raw paths at callsites that currently accept `&Path` (fs atoms). The high-level API uses `SafePath` extensively, but low-level fs helpers are still `&Path`-based today.
+- Use `SafePath::from_rooted` for all user-provided inputs and pass `&SafePath` directly to mutating APIs. All low-level filesystem mutators in `src/fs/` now accept `&SafePath` to enforce TOCTOU safety per SPEC v1.1; no conversion to raw `&Path` is required.
 - Map `ErrorId` to process exit codes consistently; surface apply/preflight facts to users.
 
 ## Integration Skeleton

@@ -61,7 +61,10 @@ fn attestation_fields_present_on_success_and_masked_after_redaction() {
     let src = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
     let plan = api.plan(PlanInput {
-        link: vec![LinkRequest { source: src, target: tgt }],
+        link: vec![LinkRequest {
+            source: src,
+            target: tgt,
+        }],
         restore: vec![],
     });
 
@@ -84,7 +87,10 @@ fn attestation_fields_present_on_success_and_masked_after_redaction() {
             }
         }
     }
-    assert!(saw_raw_attest, "expected attestation fields in raw apply.result success");
+    assert!(
+        saw_raw_attest,
+        "expected attestation fields in raw apply.result success"
+    );
 
     // Verify redaction masks attestation fields
     let redacted: Vec<Value> = evs
@@ -99,11 +105,17 @@ fn attestation_fields_present_on_success_and_masked_after_redaction() {
             if let Some(att) = f.get("attestation").and_then(|v| v.as_object()) {
                 assert_eq!(att.get("signature").and_then(|v| v.as_str()), Some("***"));
                 assert_eq!(att.get("bundle_hash").and_then(|v| v.as_str()), Some("***"));
-                assert_eq!(att.get("public_key_id").and_then(|v| v.as_str()), Some("***"));
+                assert_eq!(
+                    att.get("public_key_id").and_then(|v| v.as_str()),
+                    Some("***")
+                );
                 saw_masked = true;
                 break;
             }
         }
     }
-    assert!(saw_masked, "expected masked attestation fields in redacted apply.result success");
+    assert!(
+        saw_masked,
+        "expected masked attestation fields in redacted apply.result success"
+    );
 }

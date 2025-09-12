@@ -1,12 +1,12 @@
 //! Compile-only public API surface smoke test.
 //! Ensures typical consumer imports compile and simple flows run.
 
-use switchyard::logging::{AuditSink, FactsEmitter, JsonlSink};
+use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
-use switchyard::{adapters::FileLockManager, adapters::DefaultSmokeRunner, Switchyard};
+use switchyard::{adapters::DefaultSmokeRunner, adapters::FileLockManager, Switchyard};
 
 #[test]
 fn public_api_compiles_and_runs_dry() {

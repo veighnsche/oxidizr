@@ -346,8 +346,8 @@ mod tests {
         std::fs::write(&tgt, b"old").unwrap();
         let sp_src = SafePath::from_rooted(root, &src).unwrap();
         let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
-        let _ = replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG)
-            .unwrap();
+        let _ =
+            replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         // Second restore should be a no-op
         restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();

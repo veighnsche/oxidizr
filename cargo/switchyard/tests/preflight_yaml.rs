@@ -24,10 +24,21 @@ fn yaml_export_includes_preservation_fields_when_present() {
     let source = SafePath::from_rooted(root, &src).unwrap();
     let target = SafePath::from_rooted(root, &tgt).unwrap();
 
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source, target }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest { source, target }],
+        restore: vec![],
+    });
     let report = api.preflight(&plan).unwrap();
 
     let out = to_yaml(&report);
-    assert!(out.contains("preservation:"), "YAML should include preservation section: {}", out);
-    assert!(out.contains("preservation_supported"), "YAML should include preservation_supported flag: {}", out);
+    assert!(
+        out.contains("preservation:"),
+        "YAML should include preservation section: {}",
+        out
+    );
+    assert!(
+        out.contains("preservation_supported"),
+        "YAML should include preservation_supported flag: {}",
+        out
+    );
 }

@@ -41,7 +41,10 @@ fn facts_conform_to_json_schema() {
 
     let source = SafePath::from_rooted(root, &src).unwrap();
     let target = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source, target }], restore: vec![] };
+    let input = PlanInput {
+        link: vec![LinkRequest { source, target }],
+        restore: vec![],
+    };
 
     let plan = api.plan(input);
     let _ = api.preflight(&plan).unwrap();
@@ -57,7 +60,10 @@ fn facts_conform_to_json_schema() {
     assert!(!events.is_empty(), "no events captured");
     for (_subsystem, _event, _decision, fields) in events.iter() {
         if let Err(errors) = compiled.validate(fields) {
-            eprintln!("Invalid event: {}", serde_json::to_string_pretty(fields).unwrap());
+            eprintln!(
+                "Invalid event: {}",
+                serde_json::to_string_pretty(fields).unwrap()
+            );
             for err in errors {
                 eprintln!("  -> {}", err);
             }

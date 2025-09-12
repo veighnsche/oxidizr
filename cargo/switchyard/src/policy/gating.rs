@@ -44,6 +44,18 @@ pub(crate) fn gating_errors(
                         target.as_path().display()
                     ));
                 }
+                if let Ok(hard) = crate::preflight::checks::check_hardlink_hazard(&target.as_path())
+                {
+                    if hard && !policy.allow_hardlink_breakage {
+                        gating_errors.push("hardlink risk".to_string());
+                    }
+                }
+                if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path())
+                {
+                    if risk && !policy.allow_suid_sgid_mutation {
+                        gating_errors.push("suid/sgid risk".to_string());
+                    }
+                }
                 if let Err(e) = crate::preflight::checks::check_source_trust(
                     &source.as_path(),
                     policy.force_untrusted_source,
@@ -108,6 +120,12 @@ pub(crate) fn gating_errors(
                         e,
                         target.as_path().display()
                     ));
+                }
+                if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path())
+                {
+                    if risk && !policy.allow_suid_sgid_mutation {
+                        gating_errors.push("suid/sgid risk".to_string());
+                    }
                 }
                 if !policy.allow_roots.is_empty() {
                     let target_abs = target.as_path();

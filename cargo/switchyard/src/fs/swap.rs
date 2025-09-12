@@ -1,7 +1,6 @@
 //! Symlink swap orchestration that coordinates backup/snapshot and atomic swap.
 
 use std::fs;
-use std::path::Path;
 
 use rustix::fs::{unlinkat, AtFlags};
 
@@ -159,7 +158,8 @@ mod tests {
         let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
 
         // Perform atomic swap: create symlink at target -> source
-        let _ = replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let _ =
+            replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
 
         // Verify target is a symlink pointing to source
         let md = std::fs::symlink_metadata(&tgt).unwrap();
@@ -187,7 +187,8 @@ mod tests {
         let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
 
         // Replace target with symlink to source; backup should be created
-        let _ = replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let _ =
+            replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         let md = std::fs::symlink_metadata(&tgt).unwrap();
         assert!(
             md.file_type().is_symlink(),

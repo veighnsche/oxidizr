@@ -35,7 +35,10 @@ fn preflight_stops_when_preservation_required_and_unsupported() {
     let api = switchyard::Switchyard::new(TestEmitter::default(), JsonlSink::default(), pol);
 
     let plan = api.plan(PlanInput {
-        link: vec![LinkRequest { source: src, target: tgt }],
+        link: vec![LinkRequest {
+            source: src,
+            target: tgt,
+        }],
         restore: vec![],
     });
 

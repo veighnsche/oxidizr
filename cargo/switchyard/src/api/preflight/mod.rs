@@ -72,6 +72,42 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     ));
                     notes.push("immutable target".to_string());
                 }
+                if let Ok(hard) = crate::preflight::checks::check_hardlink_hazard(&target.as_path())
+                {
+                    if hard {
+                        if api.policy.allow_hardlink_breakage {
+                            warnings.push("hardlink risk allowed by policy".to_string());
+                            notes.push("hardlink risk allowed by policy".to_string());
+                        } else {
+                            stops.push("hardlink risk".to_string());
+                            notes.push("hardlink risk".to_string());
+                        }
+                    }
+                }
+                if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path())
+                {
+                    if risk {
+                        if api.policy.allow_suid_sgid_mutation {
+                            warnings.push("suid/sgid risk allowed by policy".to_string());
+                            notes.push("suid/sgid risk allowed by policy".to_string());
+                        } else {
+                            stops.push(format!("suid/sgid risk: {}", target.as_path().display()));
+                            notes.push("suid/sgid risk".to_string());
+                        }
+                    }
+                }
+                if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path())
+                {
+                    if risk {
+                        if api.policy.allow_suid_sgid_mutation {
+                            warnings.push("suid/sgid risk allowed by policy".to_string());
+                            notes.push("suid/sgid risk allowed by policy".to_string());
+                        } else {
+                            stops.push(format!("suid/sgid risk: {}", target.as_path().display()));
+                            notes.push("suid/sgid risk".to_string());
+                        }
+                    }
+                }
                 match crate::preflight::checks::check_source_trust(
                     &source.as_path(),
                     api.policy.force_untrusted_source,
@@ -167,7 +203,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
             Action::RestoreFromBackup { target } => {
                 let mut notes: Vec<String> = Vec::new();
                 let stops_before = stops.len();
-                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(std::path::Path::new("/usr"))
+                if let Err(e) =
+                    crate::preflight::checks::ensure_mount_rw_exec(std::path::Path::new("/usr"))
                 {
                     stops.push(format!("/usr not rw+exec: {}", e));
                     notes.push("/usr not rw+exec".to_string());
@@ -254,7 +291,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         "failure"
     };
     // Emit preflight summary with rescue_profile and error mapping when failure
-    let prof = if rescue_ok { Some("available") } else { Some("none") };
+    let prof = if rescue_ok {
+        Some("available")
+    } else {
+        Some("none")
+    };
     let mut extra = json!({ "rescue_profile": prof });
     if !stops.is_empty() {
         if let Some(obj) = extra.as_object_mut() {

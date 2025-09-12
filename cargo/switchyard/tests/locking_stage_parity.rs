@@ -34,7 +34,10 @@ fn apply_emits_apply_result_on_lock_failure_when_require_lock_manager() {
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
     let plan = api.plan(PlanInput {
-        link: vec![LinkRequest { source: s, target: t }],
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
         restore: vec![],
     });
 
@@ -102,7 +105,10 @@ fn apply_emits_apply_result_on_lock_failure() {
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
     let plan = api.plan(PlanInput {
-        link: vec![LinkRequest { source: s, target: t }],
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
         restore: vec![],
     });
 
