@@ -9,6 +9,7 @@ Do these changes. Update call sites; remove legacy files at the end.
   - `src/fs/backup/snapshot.rs` (create_snapshot, backup_path_with_tag, has_backup_artifacts)
   - `src/fs/backup/sidecar.rs` (BackupSidecar, read/write, sidecar_path_for_backup)
   - `src/fs/backup/index.rs` (find_latest_backup_and_sidecar, find_previous_backup_and_sidecar)
+  - `src/fs/backup/prune.rs` (prune_backups implementation and helpers)
 - Extract functions from `src/fs/backup.rs` into the above files.
 - Update `src/fs/mod.rs` to `pub mod backup;` and re-export the public functions.
 - Acceptance: `cargo check` passes; unit tests compile in their new locations.
@@ -60,6 +61,13 @@ Do these changes. Update call sites; remove legacy files at the end.
 
 - Remove internal re-export lines for low-level atoms in `src/fs/mod.rs` (e.g., `pub(crate) use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};`). Call these via `fs::atomic` from inside the crate instead of re-exporting at the module root.
 - Acceptance: `rg -n "^\s*pub\(crate\)\s+use\s+atomic::\{" cargo/switchyard/src/fs/mod.rs -S` returns 0.
+
+7) API delegation for prune
+
+- Ensure `Switchyard::prune_backups` delegates to `fs::backup::prune::prune_backups` and carries the same safety rules (never delete newest).
+- Acceptance:
+  - `rg -n "fn prune_backups\(" cargo/switchyard/src/api.rs -S` shows delegate to `backup::prune`.
+  - Emitted fields for `prune.result` remain the same (see logging refactor doc for builder parity).
 
 ---
 

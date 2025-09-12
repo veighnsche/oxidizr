@@ -152,7 +152,7 @@ Acceptance
 
 ## 7) Planned Moves (examples)
 
-Record in `zrefactor/removals_registry.md` and execute as PRs:
+Record in `zrefactor/removals_registry.md` and execute as part of batched changes:
 
 - move: cargo/switchyard/tests/locking_timeout.rs -> cargo/switchyard/tests/locking/locking_timeout.rs
 - move: cargo/switchyard/tests/lock_wait_fact.rs -> cargo/switchyard/tests/locking/lock_wait_fact.rs

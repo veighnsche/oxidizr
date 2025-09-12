@@ -1,15 +1,15 @@
 # Switchyard Refactor Workspace (pre-1.0; breaking allowed)
 
-This folder contains focused refactor plans, audits, and rulebooks. The goal is to land a clean, cohesive codebase with pristine file/folder organization. Breaking changes are allowed pre-1.0; mark removals per the rulebook and sweep in a final PR.
+This folder contains focused refactor plans, audits, and rulebooks. The goal is to land a clean, cohesive codebase with pristine file/folder organization. Breaking changes are allowed pre-1.0; mark removals per the rulebook and sweep in a final cleanup.
 
 ## How to use this folder
 
 1) Read the Rulebook and add markers to files you plan to remove/move/replace.
-2) Execute domain-specific INSTRUCTIONS in small PRs (see PR plans inside each doc).
+2) Execute domain-specific INSTRUCTIONS as you batch changes (see plans inside each doc).
 3) Keep `removals_registry.md` up to date for files that can’t be annotated inline.
 4) Cross-check the Cohesion Report for structure and guardrail greps.
 
-Refactor-only scope reminder: files ending with `.PROPOSAL.md` or marked "additive" describe new features — do not implement them while landing refactors.
+Scope note: files ending with `.PROPOSAL.md` or marked "additive" describe new features; pre-1.0 you may interleave refactors and additive features as needed.
 
 ## Table of Contents
 
@@ -66,12 +66,3 @@ Refactor-only scope reminder: files ending with `.PROPOSAL.md` or marked "additi
 
 - The consolidated checklist is [CODE_SMELL_AND_CLEAN_CODE_AUDIT.md](./CODE_SMELL_AND_CLEAN_CODE_AUDIT.md). The older duplicate at `documantation/code_smell.md` is superseded and marked for removal.
 - Each INSTRUCTIONS doc now includes a Meta section with Scope, Breaking/Status, and Related links to reduce drift.
-
-## Suggested global PR order
-
-1) Logging facade + API module reshaping (low risk)
-2) Policy evaluator centralization (medium)
-3) Preflight/apply wiring to evaluator (medium)
-4) FS backup/restore split (medium)
-5) Consumer DX (additive)
-6) Final sweep of removals and CI grep guardrails

@@ -1,8 +1,6 @@
 # Switchyard Types Utilization Audit
 
-Date: 2025-09-12
-
-This report analyzes whether `cargo/switchyard/src/types/` is underutilized and whether public types are "dangling" around the codebase instead of being centralized. It also proposes adjustments aligned with the layered architecture plan (types → fs → policy → adapters → api → logging) documented in `ARCH-REORG.md`.
+This report analyzes whether `cargo/switchyard/src/types/` is underutilized and whether public types are "dangling" around the codebase instead of being centralized. It also proposes adjustments aligned with the layered architecture plan (types → fs → policy → adapters → api → logging) documented in `zrefactor/responsibility_cohesion_report.md`.
 
 ## Scope and method
 

@@ -42,7 +42,7 @@ Do the following changes. No shims; remove legacy helpers.
 
 6. Cleanups
    - /// remove this file if present: `src/api/telemetry.rs` (renamed/obsolete; all audit via `src/logging/`).
-   - Delete legacy `emit_*` in `src/logging/audit.rs` after migrations in this PR.
+   - Delete legacy `emit_*` in `src/logging/audit.rs` after the migration lands.
 
 ---
 
