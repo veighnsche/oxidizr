@@ -34,14 +34,14 @@ Redesign the top-level API for developer experience (DX) and developer workflow 
 - Build one `StageLogger` per stage orchestrator:
   - `plan::run()` (or `build()`), `preflight::run()`, `apply::run()`.
 - Replace all direct emissions with the logging facade (see `zrefactor/logging_audit_refactor.INSTRUCTIONS.md`).
-- Acceptance: `grep -R "FactsEmitter::emit\(" src/api` returns 0; only logging facade is used.
+- Acceptance: `rg -n "FactsEmitter::emit\(" cargo/switchyard/src/api -S` returns 0; only logging facade is used.
 
 ## 4) Policy-owned gating usage everywhere
 
 - Preflight: for each `Action`, call `policy::gating::evaluate_action(&self.policy, self.owner.as_deref(), action)`.
 - Apply: call the same evaluator before mutating; if `policy.apply.override_preflight == false` and evaluator returns `stops`, abort.
 - Remove any gating logic from API files.
-- Acceptance: `grep -R "evaluate_action\(" src/api` shows calls only; no duplicated gating helpers in API.
+- Acceptance: `rg -n "evaluate_action\(" cargo/switchyard/src/api -S` shows calls only; no duplicated gating helpers in API.
 
 ## 5) Tighten API input/output types
 

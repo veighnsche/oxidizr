@@ -73,7 +73,8 @@ Acceptance checks (API)
   - Recommendation:
     - Remove public re-exports; keep atoms internal (`pub(crate)`); expose high-level helpers only.
   - Acceptance:
-    - `grep -R "open_dir_nofollow\|atomic_symlink_swap\|fsync_parent_dir" src/ | grep -v "src/fs/atomic"` returns 0.
+    - `rg -n "open_dir_nofollow|atomic_symlink_swap|fsync_parent_dir" cargo/switchyard/src | rg -v "cargo/switchyard/src/fs/"` returns 0.
+    - No re-exports of low-level atoms at the fs module root (public or crate-visible).
 
 ---
 

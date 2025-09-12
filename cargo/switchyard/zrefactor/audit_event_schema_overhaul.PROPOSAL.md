@@ -32,7 +32,7 @@ Goal: Make the audit envelope precise, stage-aware, and forward-compatible. Intr
   - `apply.result` per-action: `path`, optional `error_id`/`exit_code`; summary: no `path`, allow `perf`, `attestation`, `error_id`, `exit_code`, `summary_error_ids`
   - `rollback` step: optional `path`
   - `rollback.summary`: `summary_error_ids` optional, `exit_code` optional
-  - `prune.result`: `target_path`, `policy_used`, `pruned_count`, `retained_count`
+  - `prune.result`: required `path`, `pruned_count`, `retained_count`; optional `backup_tag`, `retention_count_limit`, `retention_age_limit_ms`
 
 ## Tightened formats ($defs)
 
@@ -79,6 +79,9 @@ Goal: Make the audit envelope precise, stage-aware, and forward-compatible. Intr
     "lock_wait_ms": {"type":["integer","null"]},
     "lock_attempts": {"type":"integer"},
     "perf": {"$ref": "#/$defs/perf"},
+    "backup_tag": {"type":"string"},
+    "retention_count_limit": {"type":["integer","null"]},
+    "retention_age_limit_ms": {"type":["integer","null"]},
     "error_id": {"type":["string","null"]},
     "error_detail": {"type":["string","null"]},
     "summary_error_ids": {"type":["array","null"],"items":{"type":"string"}}
@@ -94,7 +97,7 @@ Goal: Make the audit envelope precise, stage-aware, and forward-compatible. Intr
     {"if": {"properties": {"stage": {"const": "apply.result"}}},
      "then": {"properties": {"path": {"type": ["string","null"]}}}},
     {"if": {"properties": {"stage": {"const": "prune.result"}}},
-     "then": {"required": ["target_path","pruned_count","retained_count"]}}
+     "then": {"required": ["path","pruned_count","retained_count"]}}
   ],
   "$defs": {
     "uuid": {"type": "string", "format": "uuid"},
@@ -145,10 +148,10 @@ Notes:
 ## Acceptance checks
 
 - `cargo test` includes a suite validating representative events against `audit_event.v2.schema.json`.
-- `grep -R '"path"'` usage confirms no summary events rely on globally required `path`.
 - `apply.result` summary includes `perf` and optional `attestation`; enforced by schema.
 - `preflight` rows must specify `current_kind` and `planned_kind`.
 - `apply.attempt` must specify `lock_backend` and `lock_attempts`.
+- `prune.result` includes `path`, `pruned_count`, `retained_count` and may include `backup_tag`, `retention_count_limit`, `retention_age_limit_ms`.
 
 ## Backwards compatibility
 

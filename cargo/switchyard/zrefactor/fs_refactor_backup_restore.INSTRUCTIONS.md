@@ -1,7 +1,5 @@
 # FS Backup/Restore Refactor — Actionable Steps (breaking)
 
-> STATUS: Not landed in src/. `src/fs/backup.rs` (~17k) and `src/fs/restore.rs` (~30k) remain monoliths; no split modules exist yet. Keep PRs refactor-only.
-
 Do these changes. Update call sites; remove legacy files at the end.
 
 1) Create modules under `src/fs/backup/`

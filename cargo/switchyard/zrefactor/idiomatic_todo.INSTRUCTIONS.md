@@ -12,7 +12,7 @@ Perform these refactors to make the module graph idiomatic and remove legacy shi
   - `mod preflight;`
   - `mod rollback;`
 - Remove all `#[path = "api/..."]` attributes.
-- Acceptance: `cargo check` and `cargo test` pass; no `#[path]` in `src/api/mod.rs`.
+- Acceptance: `cargo check` and `cargo test` pass; `rg -n "#\[path\]" cargo/switchyard/src/api -S` returns 0.
 
 2) Remove unused compatibility file
 
@@ -29,7 +29,7 @@ Perform these refactors to make the module graph idiomatic and remove legacy shi
   pub mod lock_file { pub use super::lock::file::*; }
   ```
 
-- Acceptance: `grep -R "adapters::lock_file::FileLockManager"` returns 0; `cargo test` passes.
+- Acceptance: `rg -n "adapters::lock_file::FileLockManager" cargo/switchyard/src cargo/switchyard/tests -S` returns 0; `cargo test` passes.
 
 4) Convert API leaf modules to directory modules (optional but recommended)
 

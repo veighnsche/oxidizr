@@ -16,6 +16,7 @@ Do the following changes. No shims; remove legacy helpers.
      - Field parity with existing code:
        - Per-row: `action_id`, `path`, `current_kind`, `planned_kind`.
        - Extended: `policy_ok`, `provenance`, `notes[]`, `preservation`, `preservation_supported`.
+       - Row-only (RestoreFromBackup): `restore_ready` boolean when backup artifacts are present.
    - In `src/api/apply/{mod.rs,handlers.rs}`:
      - `.apply_attempt().decision(..).lock_backend(..).lock_wait_ms(..).lock_attempts(..).emit()`.
      - `.apply_result().decision(..).lock_backend(..).lock_wait_ms(..).perf(..).attestation(..).error_id(..).exit_code(..).summary_error_ids(..).emit()`.

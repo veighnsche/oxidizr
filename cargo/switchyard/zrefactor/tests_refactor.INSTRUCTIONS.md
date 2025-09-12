@@ -84,7 +84,7 @@ cargo/switchyard/tests/
 Notes
 
 - Convert existing flat files into the above subdirectories by domain.
-- Add `mod common;` at the top of each test file to import helpers.
+- Add `mod common;` at the top of each test file to import helpers. A shared `tests/common.rs` already exists with `TestEmitter`, `TestAudit`, and `with_temp_root()`.
 
 ---
 
@@ -104,15 +104,20 @@ Acceptance
 ## 4) Repo root E2E scenarios (tests/)
 
 - Keep numbered scenarios under `tests/NN-name/` (already present) with a schema’d `task.yaml`.
-- Create `tests/README.md`:
-  - Explain how to run the orchestrator and any matrix toggles.
-  - State infra requirements (locales, privileges) and known skips.
+- Ensure `tests/README.md` documents orchestration usage:
+  - How to run the orchestrator and any matrix toggles.
+  - Infra requirements (locales, privileges) and known skips.
 - Create `tests/INDEX.md` listing all scenarios with a one-line description and tags.
 
 Acceptance
 
 - Every `tests/NN-name/` contains `task.yaml` with keys: `name`, `description`, `tags: [..]`, `steps: [...]`.
 - `rg -n "^name:|^description:|^tags:|^steps:" tests/**/task.yaml` finds all four keys.
+
+Additional acceptance greps (crate tests):
+
+- All crate integration tests import helpers: `rg -n "^mod common;" cargo/switchyard/tests/*.rs | wc -l` matches the count of non-helper test files (exclude `common.rs`, `trybuild.rs`).
+- Domain grouping complete: no top-level test files remain outside `cargo/switchyard/tests/{locking,preflight,apply,fs,audit}/` apart from `common.rs`, `trybuild.rs`, `README.md`, and golden fixtures.
 
 ---
 

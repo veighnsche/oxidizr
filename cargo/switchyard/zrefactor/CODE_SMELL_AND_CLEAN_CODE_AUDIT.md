@@ -1,6 +1,5 @@
 # Switchyard Code Smell and Clean Code Audit
 
-Date: 2025-09-12
 Scope: cargo/switchyard/ (library code and embedded tests)
 Sources: zrefactor/documantation/code_smell.md, docs/CLEAN_CODE.md
 
@@ -66,11 +65,11 @@ Gaps and nits:
 
 Search evidence (representative):
 
-- `unsafe`: 0 hits in `src/` (policy enforced by `src/lib.rs`).
-- `unwrap(`/`expect(`: found only in tests and `#[cfg(test)]` blocks inside modules (e.g., `src/api.rs` tests, `src/fs/*` tests).
+- `unsafe`: `rg -n "\bunsafe\b" cargo/switchyard/src -S` → 0 hits (policy enforced by `src/lib.rs`).
+- `unwrap(`/`expect(` in production: confined to tests/`#[cfg(test)]` blocks; verify with `rg -n "\.(unwrap|expect)\(" cargo/switchyard/src -S | rg -v "#\[cfg\(test\)\]|tests"`.
 - `println!`, `dbg!`, `todo!`: none in library code.
 - `RefCell`, `Mutex<`: none in library code; `Mutex` used in tests to collect events.
-- `tracing::`: none in `src/`.
+- `tracing::`: none in `cargo/switchyard/src`.
 
 ---
 

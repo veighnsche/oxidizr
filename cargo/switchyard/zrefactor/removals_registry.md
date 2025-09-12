@@ -3,21 +3,25 @@
 Use this file to track removals/moves/replacements for files that cannot be annotated inline (e.g., JSON schemas), or when you prefer a central checklist. Each line should follow one of the formats below.
 
 Formats
+
 - remove: <repo-relative-path> — <reason or successor>
 - move: <old-path> -> <new-path> — <reason>
 - replace: <old-path> -> <new-path> — <reason>
 
 Examples
+
 - remove: cargo/switchyard/SPEC/audit_event.schema.json — field superseded; see SPEC.md
 - move: cargo/switchyard/src/api.rs -> cargo/switchyard/src/api/mod.rs — idiomatic module layout
 - replace: cargo/switchyard/src/logging/audit.rs -> cargo/switchyard/src/logging/audit.rs — StageLogger facade replaces emit_* helpers
 
 Checklist generation
+
 ```bash
 rg -n "^remove:|^move:|^replace:" cargo/switchyard/zrefactor/removals_registry.md -S
 ```
 
 Planned entries
+
 - move: cargo/switchyard/src/api.rs -> cargo/switchyard/src/api/mod.rs — idiomatic module layout; drop #[path] includes
 - replace: cargo/switchyard/src/fs/backup.rs -> cargo/switchyard/src/fs/backup/{mod.rs,snapshot.rs,sidecar.rs,index.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
 - replace: cargo/switchyard/src/fs/restore.rs -> cargo/switchyard/src/fs/restore/{mod.rs,types.rs,selector.rs,idempotence.rs,integrity.rs,steps.rs,engine.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
@@ -27,6 +31,7 @@ Planned entries
 - remove: cargo/switchyard/zrefactor/documantation/code_smell.md — BREAKING: superseded by zrefactor/CODE_SMELL_AND_CLEAN_CODE_AUDIT.md
 
 ## Planned test moves (crate integration tests)
+
 - move: cargo/switchyard/tests/locking_timeout.rs -> cargo/switchyard/tests/locking/locking_timeout.rs — domain grouping
 - move: cargo/switchyard/tests/lock_wait_fact.rs -> cargo/switchyard/tests/locking/lock_wait_fact.rs — domain grouping
 - move: cargo/switchyard/tests/lock_attempts.rs -> cargo/switchyard/tests/locking/lock_attempts.rs — domain grouping
@@ -53,4 +58,5 @@ Planned entries
 - move: cargo/switchyard/tests/summary_error_ids_ownership.rs -> cargo/switchyard/tests/audit/summary_error_ids_ownership.rs — domain grouping
 
 ## Planned inline test moves
+
 - move: cargo/switchyard/src/api.rs (test `rollback_reverts_first_action_on_second_failure`) -> cargo/switchyard/tests/apply/rollback_reverts_first_action.rs — move heavy flow out of inline tests

@@ -32,7 +32,7 @@ This document catalogs all backward-compatibility shims and deprecated or legacy
   - Update all imports to `switchyard::adapters::FileLockManager` (or `switchyard::adapters::lock::file::*`).
   - Remove the `lock_file` module.
 - Acceptance:
-  - `grep -R "adapters::lock_file::" src/ tests/` returns 0.
+  - `rg -n "adapters::lock_file::" cargo/switchyard/src cargo/switchyard/tests -S` returns 0.
   - `cargo test` passes.
 
 /// remove this shim: `src/adapters/mod.rs::lock_file`
@@ -51,7 +51,7 @@ This document catalogs all backward-compatibility shims and deprecated or legacy
   - Update in-tree imports to `switchyard::policy::rescue`.
   - Remove the top-level `pub use`.
 - Acceptance:
-  - `grep -R "use switchyard::rescue" src/ tests/` returns 0.
+  - `rg -n "use switchyard::rescue" cargo/switchyard/src cargo/switchyard/tests -S` returns 0.
   - `cargo check` passes.
 
 /// remove this re-export: `src/lib.rs` top-level `pub use policy::rescue`
@@ -97,7 +97,7 @@ This document catalogs all backward-compatibility shims and deprecated or legacy
   - Move to directory module: `src/api.rs` → `src/api/mod.rs`, declare submodules via `mod ...;`.
   - Update imports accordingly.
 - Acceptance:
-  - `grep -R "#\[path\]" src/api` returns 0.
+  - `rg -n "#\[path\]" cargo/switchyard/src/api -S` returns 0.
   - `cargo check && cargo test` pass.
 
 /// remove this file after migration: `src/api.rs`
