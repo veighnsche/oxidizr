@@ -13,11 +13,9 @@ pub mod paths;
 pub mod restore;
 pub mod swap;
 
-/// BEGIN REMOVE BLOCK — deprecated re-export of low-level atoms; prefer internal-only usage
-#[deprecated(
-    note = "Low-level FS atoms are internal: prefer high-level API. This re-export will be removed in 0.2."
-)]
-// Intentionally no re-export to avoid public exposure and unused warnings.
+/// BEGIN REMOVE BLOCK — deprecated public re-exports of low-level atoms
+/// Internal-only visibility preserved for crate tests and diagnostics
+pub(crate) use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
 /// END REMOVE BLOCK
 
 pub use backup::{backup_path_with_tag, create_snapshot, has_backup_artifacts};

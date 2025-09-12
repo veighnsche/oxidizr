@@ -26,6 +26,7 @@ fn rollback_summary_emitted_when_action_failure_triggers_rollback() {
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
     policy.allow_unlocked_commit = true; // no lock required
+    policy.force_untrusted_source = true; // allow non-root-owned sources in test
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
 

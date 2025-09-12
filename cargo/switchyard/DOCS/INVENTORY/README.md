@@ -71,11 +71,18 @@ Document and maintain licensing information as a dedicated inventory entry to en
   - [Determinism and redaction](SAFETY_Determinism_and_Redaction.md) — Silver
   - [Audit and logging](SAFETY_Audit_and_Logging.md) — Silver
   - [Exit codes taxonomy](SAFETY_Exit_Codes.md) — Silver
+  - [Ownership and provenance](SAFETY_Ownership_and_Provenance.md) — Silver
+  - [Attestation](SAFETY_Attestation.md) — Bronze
+  - [Facts schema validation](SAFETY_Facts_Schema_Validation.md) — Bronze
+  - [Node hazards: SUID/SGID and hardlinks](SAFETY_Node_Hazards_SUID_SGID_and_Hardlinks.md) — Silver
+  - [Preservation capabilities probe](SAFETY_Preservation_Capabilities_Probe.md) — Silver
 
 - UX / DX
   - [Preflight YAML exporter](UX_Preflight_YAML.md) — Bronze
   - [Adapters and extensibility](DX_Adapters_and_Extensibility.md) — Bronze
   - [Developer ergonomics](DX_Dev_Ergonomics.md) — Silver
+  - [Traceability tools](DX_Traceability_Tools.md) — Bronze
+  - [Best-effort conventions and catalog](DX_Best_Effort_Conventions.md) — Bronze
 
 - Infra / Ops
   - [Rescue profile verification](INFRA_Rescue_Profile_Verification.md) — Silver
@@ -83,6 +90,8 @@ Document and maintain licensing information as a dedicated inventory entry to en
   - [Backup retention and prune](INFRA_Backup_Retention_Prune.md) — Bronze
   - [JSONL file logging sink](INFRA_JSONL_File_Logging.md) — Bronze
   - [Smoke tests and auto-rollback](INFRA_Smoke_Tests_Auto_Rollback.md) — Silver
+  - [Operational bounds](INFRA_Operational_Bounds.md) — Bronze
+  - [Golden fixtures and CI gates](INFRA_Golden_Fixtures_and_CI_Gates.md) — Bronze
 
 Conventions:
 

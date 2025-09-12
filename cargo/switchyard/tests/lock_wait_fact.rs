@@ -1,5 +1,5 @@
 use serde_json::Value;
-use switchyard::adapters::lock_file::FileLockManager;
+use switchyard::adapters::FileLockManager;
 use switchyard::logging::FactsEmitter;
 use switchyard::policy::Policy;
 use switchyard::types::plan::LinkRequest;

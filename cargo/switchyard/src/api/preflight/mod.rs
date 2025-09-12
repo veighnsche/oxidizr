@@ -15,6 +15,7 @@ use serde_json::json;
 
 use crate::fs::meta::{detect_preservation_capabilities, kind_of};
 use crate::logging::audit::{AuditCtx, AuditMode};
+use crate::policy::gating;
 mod rows;
 
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
@@ -47,131 +48,24 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
 
     for act in &plan.actions {
         match act {
-            Action::EnsureSymlink { source, target } => {
-                let mut notes: Vec<String> = Vec::new();
-                let stops_before = stops.len();
-                for p in &api.policy.extra_mount_checks {
-                    if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
-                        stops.push(format!("{} not rw+exec: {}", p.display(), e));
-                        notes.push(format!("{} not rw+exec", p.display()));
-                    }
+            Action::EnsureSymlink { target, .. } => {
+                let eval = gating::evaluate_action(&api.policy, api.owner.as_deref(), act);
+                // Aggregate stops for summary
+                if !eval.stops.is_empty() {
+                    stops.extend(eval.stops.clone());
                 }
-                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
-                    stops.push(format!(
-                        "target not rw+exec: {} (target={})",
-                        e,
-                        target.as_path().display()
-                    ));
-                    notes.push("target not rw+exec".to_string());
-                }
-                if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
-                    stops.push(format!(
-                        "immutable target: {} (target={})",
-                        e,
-                        target.as_path().display()
-                    ));
-                    notes.push("immutable target".to_string());
-                }
-                if let Ok(hard) = crate::preflight::checks::check_hardlink_hazard(&target.as_path())
-                {
-                    if hard {
-                        if api.policy.allow_hardlink_breakage {
-                            warnings.push("hardlink risk allowed by policy".to_string());
-                            notes.push("hardlink risk allowed by policy".to_string());
-                        } else {
-                            stops.push("hardlink risk".to_string());
-                            notes.push("hardlink risk".to_string());
-                        }
-                    }
-                }
-                if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path())
-                {
-                    if risk {
-                        if api.policy.allow_suid_sgid_mutation {
-                            warnings.push("suid/sgid risk allowed by policy".to_string());
-                            notes.push("suid/sgid risk allowed by policy".to_string());
-                        } else {
-                            stops.push(format!("suid/sgid risk: {}", target.as_path().display()));
-                            notes.push("suid/sgid risk".to_string());
-                        }
-                    }
-                }
-                if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path())
-                {
-                    if risk {
-                        if api.policy.allow_suid_sgid_mutation {
-                            warnings.push("suid/sgid risk allowed by policy".to_string());
-                            notes.push("suid/sgid risk allowed by policy".to_string());
-                        } else {
-                            stops.push(format!("suid/sgid risk: {}", target.as_path().display()));
-                            notes.push("suid/sgid risk".to_string());
-                        }
-                    }
-                }
-                match crate::preflight::checks::check_source_trust(
-                    &source.as_path(),
-                    api.policy.force_untrusted_source,
-                ) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        if api.policy.force_untrusted_source {
-                            warnings.push(format!("untrusted source allowed by policy: {}", e));
-                            notes.push("untrusted source allowed by policy".to_string());
-                        } else {
-                            stops.push(format!("untrusted source: {}", e));
-                            notes.push("untrusted source".to_string());
-                        }
-                    }
-                }
-                if api.policy.strict_ownership {
-                    match &api.owner {
-                        Some(oracle) => {
-                            if let Err(e) = oracle.owner_of(target) {
-                                stops.push(format!("strict ownership check failed: {}", e));
-                                notes.push("strict ownership check failed".to_string());
-                            }
-                        }
-                        None => {
-                            stops.push(
-                                "strict ownership policy requires OwnershipOracle".to_string(),
-                            );
-                            notes.push("missing OwnershipOracle for strict ownership".to_string());
-                        }
-                    }
-                }
-                if !api.policy.allow_roots.is_empty() {
-                    let target_abs = target.as_path();
-                    let in_allowed = api
-                        .policy
-                        .allow_roots
+                // Warnings: promote policy-allowed notes as warnings
+                warnings.extend(
+                    eval
+                        .notes
                         .iter()
-                        .any(|r| target_abs.starts_with(r));
-                    if !in_allowed {
-                        stops.push(format!(
-                            "target outside allowed roots: {}",
-                            target_abs.display()
-                        ));
-                        notes.push("target outside allowed roots".to_string());
-                    }
-                }
-                if api
-                    .policy
-                    .forbid_paths
-                    .iter()
-                    .any(|f| target.as_path().starts_with(f))
-                {
-                    stops.push(format!(
-                        "target in forbidden path: {}",
-                        target.as_path().display()
-                    ));
-                    notes.push("target in forbidden path".to_string());
-                }
-
+                        .filter(|n| n.contains("allowed by policy"))
+                        .cloned(),
+                );
+                // Provenance best-effort
                 let prov = match &api.owner {
                     Some(oracle) => match oracle.owner_of(target) {
-                        Ok(info) => {
-                            Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg}))
-                        }
+                        Ok(info) => Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg})),
                         Err(_) => None,
                     },
                     None => None,
@@ -181,7 +75,6 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 if api.policy.require_preservation && !preservation_supported {
                     stops.push("preservation unsupported for target".to_string());
                 }
-                let policy_ok = stops.len() == stops_before;
                 let current_kind = kind_of(&target.as_path());
                 rows::push_row_emit(
                     api,
@@ -192,68 +85,26 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     target.as_path().display().to_string(),
                     current_kind,
                     "symlink",
-                    Some(policy_ok),
+                    Some(eval.policy_ok),
                     prov,
-                    if notes.is_empty() { None } else { Some(notes) },
+                    if eval.notes.is_empty() { None } else { Some(eval.notes) },
                     Some(preservation),
                     Some(preservation_supported),
                     None,
                 );
             }
             Action::RestoreFromBackup { target } => {
-                let mut notes: Vec<String> = Vec::new();
-                let stops_before = stops.len();
-                if let Err(e) =
-                    crate::preflight::checks::ensure_mount_rw_exec(std::path::Path::new("/usr"))
-                {
-                    stops.push(format!("/usr not rw+exec: {}", e));
-                    notes.push("/usr not rw+exec".to_string());
+                let eval = gating::evaluate_action(&api.policy, api.owner.as_deref(), act);
+                if !eval.stops.is_empty() {
+                    stops.extend(eval.stops.clone());
                 }
-                if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
-                    stops.push(format!(
-                        "target not rw+exec: {} (target={})",
-                        e,
-                        target.as_path().display()
-                    ));
-                    notes.push("target not rw+exec".to_string());
-                }
-                if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
-                    stops.push(format!(
-                        "immutable target: {} (target={})",
-                        e,
-                        target.as_path().display()
-                    ));
-                    notes.push("immutable target".to_string());
-                }
-                if !api.policy.allow_roots.is_empty() {
-                    let target_abs = target.as_path();
-                    let in_allowed = api
-                        .policy
-                        .allow_roots
+                warnings.extend(
+                    eval
+                        .notes
                         .iter()
-                        .any(|r| target_abs.starts_with(r));
-                    if !in_allowed {
-                        stops.push(format!(
-                            "target outside allowed roots: {}",
-                            target_abs.display()
-                        ));
-                        notes.push("target outside allowed roots".to_string());
-                    }
-                }
-                if api
-                    .policy
-                    .forbid_paths
-                    .iter()
-                    .any(|f| target.as_path().starts_with(f))
-                {
-                    stops.push(format!(
-                        "target in forbidden path: {}",
-                        target.as_path().display()
-                    ));
-                    notes.push("target in forbidden path".to_string());
-                }
-
-                let policy_ok = stops.len() == stops_before;
+                        .filter(|n| n.contains("allowed by policy"))
+                        .cloned(),
+                );
                 let (preservation, preservation_supported) =
                     detect_preservation_capabilities(&target.as_path());
                 // Annotate whether backup artifacts are present (payload and/or sidecar)
@@ -261,7 +112,6 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     crate::fs::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
                 if api.policy.require_rescue && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
-                    notes.push("no backup artifacts present".to_string());
                 }
                 rows::push_row_emit(
                     api,
@@ -272,9 +122,9 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     target.as_path().display().to_string(),
                     "unknown".to_string(),
                     "restore_from_backup",
-                    Some(policy_ok),
+                    Some(eval.policy_ok),
                     None,
-                    if notes.is_empty() { None } else { Some(notes) },
+                    if eval.notes.is_empty() { None } else { Some(eval.notes) },
                     Some(preservation),
                     Some(preservation_supported),
                     Some(backup_present),

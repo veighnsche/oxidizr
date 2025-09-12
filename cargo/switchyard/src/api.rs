@@ -9,16 +9,11 @@ use uuid::Uuid;
 use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 
-// Internal API submodules (planned split)
-#[path = "api/apply/mod.rs"]
-mod apply_impl;
-#[path = "api/errors.rs"]
+// Internal API submodules (idiomatic; directory module)
+mod apply;
 pub mod errors;
-#[path = "api/plan.rs"]
-mod plan_impl;
-#[path = "api/preflight/mod.rs"]
-mod preflight_impl;
-#[path = "api/rollback.rs"]
+mod plan;
+mod preflight;
 mod rollback;
 
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
@@ -72,15 +67,15 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     }
 
     pub fn plan(&self, input: PlanInput) -> Plan {
-        plan_impl::build(self, input)
+        plan::build(self, input)
     }
 
     pub fn preflight(&self, plan: &Plan) -> Result<PreflightReport, errors::ApiError> {
-        Ok(preflight_impl::run(self, plan))
+        Ok(preflight::run(self, plan))
     }
 
     pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> Result<ApplyReport, errors::ApiError> {
-        Ok(apply_impl::run(self, plan, mode))
+        Ok(apply::run(self, plan, mode))
     }
 
     pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
