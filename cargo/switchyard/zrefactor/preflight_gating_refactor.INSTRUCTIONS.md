@@ -61,3 +61,19 @@ Do these changes to centralize gating in policy and keep preflight thin.
 
 - /// remove this file: `src/policy/gating.rs` (legacy duplicate, if separate copy exists) and keep only the new evaluator.
 - Ensure `src/api/preflight/mod.rs` contains no business rules, only orchestration + logging.
+
+---
+
+## Meta
+
+- Scope: Centralize gating in policy; thin preflight orchestration consuming evaluator
+- Status: Breaking allowed (pre-1.0)
+- Index: See `zrefactor/README.md`
+
+## Related
+
+- Policy types and evaluator spec: `zrefactor/policy_refactor.INSTRUCTIONS.md`
+- API usage of evaluator (preflight/apply): `zrefactor/api_refactor.INSTRUCTIONS.md`
+- Logging facade for emission: `zrefactor/logging_audit_refactor.INSTRUCTIONS.md`
+- Cohesion/guardrails: `zrefactor/responsibility_cohesion_report.md`
+- Removals and registry: `zrefactor/backwards_compat_removals.md`, `zrefactor/removals_registry.md`

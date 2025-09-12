@@ -57,3 +57,18 @@ Do these changes. Update call sites; remove legacy files at the end.
 - /// remove this file: `src/fs/backup.rs` (after full extraction and re-exports in place)
 - /// remove this file: `src/fs/restore.rs` (after full extraction and re-exports in place)
 - Acceptance: `grep -R "src/fs/backup.rs"` returns 0 in code references; same for `restore.rs`.
+
+---
+
+## Meta
+
+- Scope: Split monolithic FS backup/restore into cohesive submodules; update public facade
+- Status: Breaking allowed (pre-1.0)
+- Index: See `zrefactor/README.md`
+
+## Related
+
+- Cohesion targets and FS layout: `zrefactor/responsibility_cohesion_report.md`
+- API call sites touching FS: `zrefactor/api_refactor.INSTRUCTIONS.md`
+- Logging facade used by stages: `zrefactor/logging_audit_refactor.INSTRUCTIONS.md`
+- Removal planning and registry: `zrefactor/backwards_compat_removals.md`, `zrefactor/removals_registry.md`

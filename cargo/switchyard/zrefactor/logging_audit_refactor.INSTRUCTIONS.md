@@ -33,3 +33,19 @@ Do the following changes. No shims; remove legacy helpers.
 6. Cleanups
    - /// remove this file if present: `src/api/telemetry.rs` (renamed/obsolete; all audit via `src/logging/`).
    - Delete legacy `emit_*` in `src/logging/audit.rs` after migrations in this PR.
+
+---
+
+## Meta
+
+- Scope: Centralize audit/logging behind a typed facade; migrate call sites
+- Status: Breaking allowed (pre-1.0)
+- Index: See `zrefactor/README.md`
+
+## Related
+
+- API migration away from direct emissions: `zrefactor/api_refactor.INSTRUCTIONS.md`
+- Preflight/apply usage of facade: `zrefactor/preflight_gating_refactor.INSTRUCTIONS.md`
+- Policy-owned gating (drives fields added to events): `zrefactor/policy_refactor.INSTRUCTIONS.md`
+- Cohesion/guardrails: `zrefactor/responsibility_cohesion_report.md`
+- Removal plan and registry: `zrefactor/backwards_compat_removals.md`, `zrefactor/removals_registry.md`

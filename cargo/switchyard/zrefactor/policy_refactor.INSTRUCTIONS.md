@@ -87,3 +87,19 @@ Do these steps to replace the flat `Policy` with typed groups and central gating
 - Add module docs and rustdoc to new types.
 - /// remove this file: `src/policy/checks.rs` (if it is a legacy compat shim)
 - /// remove legacy presets if duplicated by `profiles.rs`.
+
+---
+
+## Meta
+
+- Scope: Replace flat Policy with grouped types/enums; centralize gating decisions
+- Status: Breaking allowed (pre-1.0)
+- Index: See `zrefactor/README.md`
+
+## Related
+
+- API usage and wiring: `zrefactor/api_refactor.INSTRUCTIONS.md`
+- Preflight/apply orchestrators consuming evaluator: `zrefactor/preflight_gating_refactor.INSTRUCTIONS.md`
+- Logging facade integration (fields/envelope): `zrefactor/logging_audit_refactor.INSTRUCTIONS.md`
+- Cohesion/guardrails: `zrefactor/responsibility_cohesion_report.md`
+- Removals and registry: `zrefactor/backwards_compat_removals.md`, `zrefactor/removals_registry.md`
