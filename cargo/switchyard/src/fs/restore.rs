@@ -9,16 +9,18 @@ use super::atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
 use super::backup::{
     find_latest_backup_and_sidecar, find_previous_backup_and_sidecar, read_sidecar,
 };
+use crate::types::safepath::SafePath;
 
 /// Restore a file from its backup. When no backup exists, return an error unless force_best_effort is true.
 pub fn restore_file(
-    target: &Path,
+    target: &SafePath,
     dry_run: bool,
     force_best_effort: bool,
     backup_tag: &str,
 ) -> std::io::Result<()> {
+    let target_path = target.as_path();
     // Locate latest backup payload and sidecar
-    let pair = find_latest_backup_and_sidecar(target, backup_tag);
+    let pair = find_latest_backup_and_sidecar(&target_path, backup_tag);
     let (backup_opt, sidecar_path) = match pair {
         Some(p) => p,
         None => {
@@ -39,7 +41,7 @@ pub fn restore_file(
 
     // Idempotent short-circuit when sidecar exists and current state matches prior_kind
     if let Some(ref side) = sc {
-        let kind_now = match std::fs::symlink_metadata(target) {
+        let kind_now = match std::fs::symlink_metadata(&target_path) {
             Ok(md) => {
                 let ft = md.file_type();
                 if ft.is_symlink() {
@@ -55,19 +57,19 @@ pub fn restore_file(
         match side.prior_kind.as_str() {
             "file" if kind_now == "file" => return Ok(()),
             "symlink" if kind_now == "symlink" => {
-                if let Ok(cur) = std::fs::read_link(target) {
+                if let Ok(cur) = std::fs::read_link(&target_path) {
                     let want = side.prior_dest.as_ref().map(|s| PathBuf::from(s));
                     if let Some(w) = want {
                         // Compare resolved forms for robustness
                         let mut cur_res = cur.clone();
                         if cur_res.is_relative() {
-                            if let Some(parent) = target.parent() {
+                            if let Some(parent) = target_path.parent() {
                                 cur_res = parent.join(cur_res);
                             }
                         }
                         let mut want_res = w.clone();
                         if want_res.is_relative() {
-                            if let Some(parent) = target.parent() {
+                            if let Some(parent) = target_path.parent() {
                                 want_res = parent.join(want_res);
                             }
                         }
@@ -106,8 +108,8 @@ pub fn restore_file(
                         ));
                     }
                 };
-                let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                let fname = target
+                let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+                let fname = target_path
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("target");
@@ -116,7 +118,7 @@ pub fn restore_file(
                     .and_then(|s| s.to_str())
                     .unwrap_or("backup");
                 let dirfd = open_dir_nofollow(parent)?;
-                let _ = fs::remove_file(target);
+                let _ = fs::remove_file(&target_path);
                 let old_c = std::ffi::CString::new(bname).map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                 })?;
@@ -136,14 +138,14 @@ pub fn restore_file(
                         let _ = fchmod(&tfd, Mode::from_bits_truncate(m));
                     }
                 }
-                let _ = fsync_parent_dir(target);
+                let _ = fsync_parent_dir(&target_path);
             }
             "symlink" => {
                 // Restore symlink to prior_dest
                 if let Some(dest) = side.prior_dest.as_ref() {
                     let src = Path::new(dest);
-                    let _ = atomic_symlink_swap(src, target, true)?;
-                    let _ = fsync_parent_dir(target);
+                    let _ = atomic_symlink_swap(src, &target_path, true)?;
+                    let _ = fsync_parent_dir(&target_path);
                     // Remove backup payload if present (sidecar remains)
                     if let Some(b) = backup_opt.as_ref() {
                         let _ = std::fs::remove_file(b);
@@ -151,8 +153,8 @@ pub fn restore_file(
                 } else {
                     // Malformed sidecar; fallback to backup payload rename if available
                     if let Some(backup) = backup_opt {
-                        let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                        let fname = target
+                        let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+                        let fname = target_path
                             .file_name()
                             .and_then(|s| s.to_str())
                             .unwrap_or("target");
@@ -161,7 +163,7 @@ pub fn restore_file(
                             .and_then(|s| s.to_str())
                             .unwrap_or("backup");
                         let dirfd = open_dir_nofollow(parent)?;
-                        let _ = fs::remove_file(target);
+                        let _ = fs::remove_file(&target_path);
                         let old_c = std::ffi::CString::new(bname).map_err(|_| {
                             std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                         })?;
@@ -170,7 +172,7 @@ pub fn restore_file(
                         })?;
                         renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-                        let _ = fsync_parent_dir(target);
+                        let _ = fsync_parent_dir(&target_path);
                     } else if !force_best_effort {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::NotFound,
@@ -181,9 +183,9 @@ pub fn restore_file(
             }
             "none" => {
                 // Ensure path is absent
-                if let Some(parent) = target.parent() {
+                if let Some(parent) = target_path.parent() {
                     let dirfd = open_dir_nofollow(parent)?;
-                    let fname = target
+                    let fname = target_path
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("target");
@@ -192,9 +194,9 @@ pub fn restore_file(
                     })?;
                     let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
                 } else {
-                    let _ = std::fs::remove_file(target);
+                    let _ = std::fs::remove_file(&target_path);
                 }
-                let _ = fsync_parent_dir(target);
+                let _ = fsync_parent_dir(&target_path);
                 // Remove backup payload if present
                 if let Some(b) = backup_opt.as_ref() {
                     let _ = std::fs::remove_file(b);
@@ -203,8 +205,8 @@ pub fn restore_file(
             _ => {
                 // Unknown kind; fall back to legacy behavior when payload present
                 if let Some(backup) = backup_opt {
-                    let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                    let fname = target
+                    let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+                    let fname = target_path
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("target");
@@ -213,7 +215,7 @@ pub fn restore_file(
                         .and_then(|s| s.to_str())
                         .unwrap_or("backup");
                     let dirfd = open_dir_nofollow(parent)?;
-                    let _ = fs::remove_file(target);
+                    let _ = fs::remove_file(&target_path);
                     let old_c = std::ffi::CString::new(bname).map_err(|_| {
                         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                     })?;
@@ -222,7 +224,7 @@ pub fn restore_file(
                     })?;
                     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-                    let _ = fsync_parent_dir(target);
+                    let _ = fsync_parent_dir(&target_path);
                 } else if !force_best_effort {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::NotFound,
@@ -239,8 +241,8 @@ pub fn restore_file(
         if dry_run {
             return Ok(());
         }
-        let parent = target.parent().unwrap_or_else(|| Path::new("."));
-        let fname = target
+        let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+        let fname = target_path
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("target");
@@ -248,7 +250,7 @@ pub fn restore_file(
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("backup");
-        let _ = fs::remove_file(target);
+        let _ = fs::remove_file(&target_path);
         let dirfd = open_dir_nofollow(parent)?;
         let old_c = std::ffi::CString::new(bname).map_err(|_| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
@@ -258,7 +260,7 @@ pub fn restore_file(
         })?;
         renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-        let _ = fsync_parent_dir(target);
+        let _ = fsync_parent_dir(&target_path);
         Ok(())
     } else if force_best_effort {
         Ok(())
@@ -275,6 +277,7 @@ mod tests {
     use super::*;
     use crate::constants::DEFAULT_BACKUP_TAG;
     use crate::fs::swap::replace_file_with_symlink;
+    use crate::types::safepath::SafePath;
 
     fn td() -> tempfile::TempDir {
         tempfile::tempdir().unwrap()
@@ -292,11 +295,15 @@ mod tests {
         // Start with target being a symlink to old (relative link)
         let _ = std::os::unix::fs::symlink("old", &tgt);
 
+        // SafePaths
+        let sp_src_new = SafePath::from_rooted(root, &src_new).unwrap();
+        let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
+
         // Replace target to point to new; backup should capture prior symlink target
-        let _ =
-            replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let _ = replace_file_with_symlink(&sp_src_new, &sp_tgt, false, false, DEFAULT_BACKUP_TAG)
+            .unwrap();
         // Now restore
-        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         let md2 = std::fs::symlink_metadata(&tgt).unwrap();
         assert!(
             md2.file_type().is_symlink(),
@@ -315,11 +322,14 @@ mod tests {
         std::fs::write(&src_new, b"new").unwrap();
         // Target does not exist initially
         assert!(!tgt.exists());
-        let _ =
-            replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        // SafePaths
+        let sp_src_new = SafePath::from_rooted(root, &src_new).unwrap();
+        let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
+        let _ = replace_file_with_symlink(&sp_src_new, &sp_tgt, false, false, DEFAULT_BACKUP_TAG)
+            .unwrap();
         assert!(tgt.exists());
         // Restore should remove target (prior_kind=none)
-        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         assert!(
             !tgt.exists(),
             "target should be absent after restore of prior_kind=none"
@@ -334,10 +344,13 @@ mod tests {
         let tgt = root.join("tgt");
         std::fs::write(&src, b"new").unwrap();
         std::fs::write(&tgt, b"old").unwrap();
-        let _ = replace_file_with_symlink(&src, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
-        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let sp_src = SafePath::from_rooted(root, &src).unwrap();
+        let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
+        let _ = replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG)
+            .unwrap();
+        restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         // Second restore should be a no-op
-        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         let md = std::fs::symlink_metadata(&tgt).unwrap();
         assert!(md.file_type().is_file());
         let content = std::fs::read_to_string(&tgt).unwrap();
@@ -348,13 +361,14 @@ mod tests {
 /// Restore from the previous (second newest) backup pair. Used when a fresh snapshot
 /// was just captured pre-restore and we want to restore to the state before snapshot.
 pub fn restore_file_prev(
-    target: &Path,
+    target: &SafePath,
     dry_run: bool,
     force_best_effort: bool,
     backup_tag: &str,
 ) -> std::io::Result<()> {
+    let target_path = target.as_path();
     // Locate previous backup payload and sidecar
-    let pair = find_previous_backup_and_sidecar(target, backup_tag);
+    let pair = find_previous_backup_and_sidecar(&target_path, backup_tag);
     let (backup_opt, sidecar_path) = match pair {
         Some(p) => p,
         None => {
@@ -375,7 +389,7 @@ pub fn restore_file_prev(
 
     // Idempotent short-circuit when sidecar exists and current state matches prior_kind
     if let Some(ref side) = sc {
-        let kind_now = match std::fs::symlink_metadata(target) {
+        let kind_now = match std::fs::symlink_metadata(&target_path) {
             Ok(md) => {
                 let ft = md.file_type();
                 if ft.is_symlink() {
@@ -391,19 +405,19 @@ pub fn restore_file_prev(
         match side.prior_kind.as_str() {
             "file" if kind_now == "file" => return Ok(()),
             "symlink" if kind_now == "symlink" => {
-                if let Ok(cur) = std::fs::read_link(target) {
+                if let Ok(cur) = std::fs::read_link(&target_path) {
                     let want = side.prior_dest.as_ref().map(|s| PathBuf::from(s));
                     if let Some(w) = want {
                         // Compare resolved forms for robustness
                         let mut cur_res = cur.clone();
                         if cur_res.is_relative() {
-                            if let Some(parent) = target.parent() {
+                            if let Some(parent) = target_path.parent() {
                                 cur_res = parent.join(cur_res);
                             }
                         }
                         let mut want_res = w.clone();
                         if want_res.is_relative() {
-                            if let Some(parent) = target.parent() {
+                            if let Some(parent) = target_path.parent() {
                                 want_res = parent.join(want_res);
                             }
                         }
@@ -441,8 +455,8 @@ pub fn restore_file_prev(
                         ));
                     }
                 };
-                let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                let fname = target
+                let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+                let fname = target_path
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("target");
@@ -451,7 +465,7 @@ pub fn restore_file_prev(
                     .and_then(|s| s.to_str())
                     .unwrap_or("backup");
                 let dirfd = open_dir_nofollow(parent)?;
-                let _ = fs::remove_file(target);
+                let _ = fs::remove_file(&target_path);
                 let old_c = std::ffi::CString::new(bname).map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                 })?;
@@ -471,14 +485,14 @@ pub fn restore_file_prev(
                         let _ = fchmod(&tfd, Mode::from_bits_truncate(m));
                     }
                 }
-                let _ = fsync_parent_dir(target);
+                let _ = fsync_parent_dir(&target_path);
             }
             "symlink" => {
                 // Restore symlink to prior_dest
                 if let Some(dest) = side.prior_dest.as_ref() {
                     let src = Path::new(dest);
-                    let _ = atomic_symlink_swap(src, target, true)?;
-                    let _ = fsync_parent_dir(target);
+                    let _ = atomic_symlink_swap(src, &target_path, true)?;
+                    let _ = fsync_parent_dir(&target_path);
                     // Remove backup payload if present (sidecar remains)
                     if let Some(b) = backup_opt.as_ref() {
                         let _ = std::fs::remove_file(b);
@@ -486,8 +500,8 @@ pub fn restore_file_prev(
                 } else {
                     // Malformed sidecar; fallback to backup payload rename if available
                     if let Some(backup) = backup_opt {
-                        let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                        let fname = target
+                        let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+                        let fname = target_path
                             .file_name()
                             .and_then(|s| s.to_str())
                             .unwrap_or("target");
@@ -496,7 +510,7 @@ pub fn restore_file_prev(
                             .and_then(|s| s.to_str())
                             .unwrap_or("backup");
                         let dirfd = open_dir_nofollow(parent)?;
-                        let _ = fs::remove_file(target);
+                        let _ = fs::remove_file(&target_path);
                         let old_c = std::ffi::CString::new(bname).map_err(|_| {
                             std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                         })?;
@@ -505,7 +519,7 @@ pub fn restore_file_prev(
                         })?;
                         renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-                        let _ = fsync_parent_dir(target);
+                        let _ = fsync_parent_dir(&target_path);
                     } else if !force_best_effort {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::NotFound,
@@ -516,9 +530,9 @@ pub fn restore_file_prev(
             }
             "none" => {
                 // Ensure path is absent
-                if let Some(parent) = target.parent() {
+                if let Some(parent) = target_path.parent() {
                     let dirfd = open_dir_nofollow(parent)?;
-                    let fname = target
+                    let fname = target_path
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("target");
@@ -527,9 +541,9 @@ pub fn restore_file_prev(
                     })?;
                     let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
                 } else {
-                    let _ = std::fs::remove_file(target);
+                    let _ = std::fs::remove_file(&target_path);
                 }
-                let _ = fsync_parent_dir(target);
+                let _ = fsync_parent_dir(&target_path);
                 // Remove backup payload if present
                 if let Some(b) = backup_opt.as_ref() {
                     let _ = std::fs::remove_file(b);
@@ -538,8 +552,8 @@ pub fn restore_file_prev(
             _ => {
                 // Unknown kind; fall back to legacy behavior when payload present
                 if let Some(backup) = backup_opt {
-                    let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                    let fname = target
+                    let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+                    let fname = target_path
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("target");
@@ -548,7 +562,7 @@ pub fn restore_file_prev(
                         .and_then(|s| s.to_str())
                         .unwrap_or("backup");
                     let dirfd = open_dir_nofollow(parent)?;
-                    let _ = fs::remove_file(target);
+                    let _ = fs::remove_file(&target_path);
                     let old_c = std::ffi::CString::new(bname).map_err(|_| {
                         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                     })?;
@@ -557,7 +571,7 @@ pub fn restore_file_prev(
                     })?;
                     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-                    let _ = fsync_parent_dir(target);
+                    let _ = fsync_parent_dir(&target_path);
                 } else if !force_best_effort {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::NotFound,
@@ -574,8 +588,8 @@ pub fn restore_file_prev(
         if dry_run {
             return Ok(());
         }
-        let parent = target.parent().unwrap_or_else(|| Path::new("."));
-        let fname = target
+        let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
+        let fname = target_path
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("target");
@@ -583,7 +597,7 @@ pub fn restore_file_prev(
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("backup");
-        let _ = fs::remove_file(target);
+        let _ = fs::remove_file(&target_path);
         let dirfd = open_dir_nofollow(parent)?;
         let old_c = std::ffi::CString::new(bname).map_err(|_| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
@@ -593,7 +607,7 @@ pub fn restore_file_prev(
         })?;
         renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-        let _ = fsync_parent_dir(target);
+        let _ = fsync_parent_dir(&target_path);
         Ok(())
     } else if force_best_effort {
         Ok(())

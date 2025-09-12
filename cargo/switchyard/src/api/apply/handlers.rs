@@ -34,6 +34,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         json!({
             "action_id": _aid.to_string(),
             "path": target.as_path().display().to_string(),
+            "safepath_validation": "success",
         }),
     );
 
@@ -47,8 +48,8 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     };
     let after_hash = sha256_hex_of(&source.as_path());
     match crate::fs::replace_file_with_symlink(
-        &source.as_path(),
-        &target.as_path(),
+        &source,
+        &target,
         dry,
         api.policy.allow_degraded_fs,
         &api.policy.backup_tag,
@@ -147,14 +148,14 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     }
     let restore_res = if used_prev {
         crate::fs::restore_file_prev(
-            &target.as_path(),
+            &target,
             dry,
             api.policy.force_restore_best_effort,
             &api.policy.backup_tag,
         )
     } else {
         crate::fs::restore_file(
-            &target.as_path(),
+            &target,
             dry,
             api.policy.force_restore_best_effort,
             &api.policy.backup_tag,
@@ -168,7 +169,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             // If we tried previous and it was NotFound (no previous), fall back to latest
             if used_prev && e.kind() == std::io::ErrorKind::NotFound {
                 if let Err(e2) = crate::fs::restore_file(
-                    &target.as_path(),
+                    &target,
                     dry,
                     api.policy.force_restore_best_effort,
                     &api.policy.backup_tag,

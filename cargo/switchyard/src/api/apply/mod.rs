@@ -257,7 +257,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                             target,
                         } => {
                             match fs::restore_file(
-                                &target.as_path(),
+                                &target,
                                 dry,
                                 api.policy.force_restore_best_effort,
                                 &api.policy.backup_tag,
@@ -309,7 +309,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         match prev {
                             Action::EnsureSymlink { source: _s, target } => {
                                 let _ = fs::restore_file(
-                                    &target.as_path(),
+                                    &target,
                                     dry,
                                     api.policy.force_restore_best_effort,
                                     &api.policy.backup_tag,
@@ -342,7 +342,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         match prev {
                             Action::EnsureSymlink { source: _s, target } => {
                                 let _ = fs::restore_file(
-                                    &target.as_path(),
+                                    &target,
                                     dry,
                                     api.policy.force_restore_best_effort,
                                     &api.policy.backup_tag,
