@@ -108,6 +108,21 @@ pub fn restore_file(
                         ));
                     }
                 };
+                // If sidecar includes a payload hash, verify integrity before restore.
+                if let Some(ref expected) = side.payload_hash {
+                    if let Some(actual) = crate::fs::meta::sha256_hex_of(&backup) {
+                        if actual != *expected {
+                            if force_best_effort {
+                                // Best-effort: skip integrity-enforced restore
+                                return Ok(());
+                            }
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::NotFound,
+                                "backup payload hash mismatch",
+                            ));
+                        }
+                    }
+                }
                 let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
                 let fname = target_path
                     .file_name()
@@ -270,12 +285,14 @@ pub fn restore_file(
             "backup missing",
         ))
     }
+
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::constants::DEFAULT_BACKUP_TAG;
+    use crate::fs::backup::find_latest_backup_and_sidecar;
     use crate::fs::swap::replace_file_with_symlink;
     use crate::types::safepath::SafePath;
 
@@ -355,6 +372,30 @@ mod tests {
         assert!(md.file_type().is_file());
         let content = std::fs::read_to_string(&tgt).unwrap();
         assert!(content.starts_with("old"));
+    }
+
+    #[test]
+    fn integrity_mismatch_fails_restore() {
+        let t = td();
+        let root = t.path();
+        let src = root.join("src.bin");
+        let tgt = root.join("tgt.bin");
+        std::fs::write(&src, b"new").unwrap();
+        std::fs::write(&tgt, b"old").unwrap();
+        let sp_src = SafePath::from_rooted(root, &src).unwrap();
+        let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
+        // Perform swap to create snapshot and sidecar
+        let _ = replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        // Corrupt backup payload
+        if let Some((Some(backup), _sc)) = find_latest_backup_and_sidecar(&tgt, DEFAULT_BACKUP_TAG) {
+            // Overwrite payload bytes to mismatch hash
+            let _ = std::fs::write(&backup, b"corrupt");
+        }
+        // Restore should now fail with NotFound (mapped to E_BACKUP_MISSING)
+        let e = super::restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).err().expect("should fail");
+        assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
+        // Best-effort restore should succeed (no-op)
+        assert!(super::restore_file(&sp_tgt, false, true, DEFAULT_BACKUP_TAG).is_ok());
     }
 }
 
@@ -455,6 +496,20 @@ pub fn restore_file_prev(
                         ));
                     }
                 };
+                // If sidecar includes a payload hash, verify integrity before restore.
+                if let Some(ref expected) = side.payload_hash {
+                    if let Some(actual) = crate::fs::meta::sha256_hex_of(&backup) {
+                        if actual != *expected {
+                            if force_best_effort {
+                                return Ok(());
+                            }
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::NotFound,
+                                "backup payload hash mismatch",
+                            ));
+                        }
+                    }
+                }
                 let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
                 let fname = target_path
                     .file_name()

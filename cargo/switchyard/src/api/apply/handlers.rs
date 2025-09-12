@@ -35,6 +35,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             "action_id": _aid.to_string(),
             "path": target.as_path().display().to_string(),
             "safepath_validation": "success",
+            "backup_durable": api.policy.require_backup_durability,
         }),
     );
 
@@ -106,6 +107,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         "duration_ms": fsync_ms,
         "before_kind": before_kind,
         "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
+        "backup_durable": api.policy.require_backup_durability,
     });
     ensure_provenance(&mut extra);
     insert_hashes(&mut extra, &before_hash, &after_hash);
@@ -137,6 +139,8 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         json!({
             "action_id": _aid.to_string(),
             "path": target.as_path().display().to_string(),
+            "safepath_validation": "success",
+            "backup_durable": api.policy.require_backup_durability,
         }),
     );
 
@@ -146,20 +150,28 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         let _ = crate::fs::create_snapshot(&target.as_path(), &api.policy.backup_tag);
         used_prev = true;
     }
+    let force = api.policy.force_restore_best_effort || !api.policy.require_sidecar_integrity;
+    // Pre-compute sidecar integrity verification (best-effort) before restore
+    let integrity_verified = (|| {
+        let pair = if used_prev {
+            crate::fs::backup::find_previous_backup_and_sidecar(&target.as_path(), &api.policy.backup_tag)
+        } else {
+            crate::fs::backup::find_latest_backup_and_sidecar(&target.as_path(), &api.policy.backup_tag)
+        }?;
+        let (backup_opt, sc_path) = pair;
+        let sc = crate::fs::backup::read_sidecar(&sc_path).ok()?;
+        if let (Some(backup), Some(hash)) = (backup_opt, sc.payload_hash) {
+            let actual = crate::fs::meta::sha256_hex_of(&backup)?;
+            Some(actual == hash)
+        } else {
+            None
+        }
+    })();
+
     let restore_res = if used_prev {
-        crate::fs::restore_file_prev(
-            &target,
-            dry,
-            api.policy.force_restore_best_effort,
-            &api.policy.backup_tag,
-        )
+        crate::fs::restore_file_prev(&target, dry, force, &api.policy.backup_tag)
     } else {
-        crate::fs::restore_file(
-            &target,
-            dry,
-            api.policy.force_restore_best_effort,
-            &api.policy.backup_tag,
-        )
+        crate::fs::restore_file(&target, dry, force, &api.policy.backup_tag)
     };
     match restore_res {
         Ok(()) => {
@@ -168,12 +180,9 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         Err(mut e) => {
             // If we tried previous and it was NotFound (no previous), fall back to latest
             if used_prev && e.kind() == std::io::ErrorKind::NotFound {
-                if let Err(e2) = crate::fs::restore_file(
-                    &target,
-                    dry,
-                    api.policy.force_restore_best_effort,
-                    &api.policy.backup_tag,
-                ) {
+                if let Err(e2) =
+                    crate::fs::restore_file(&target, dry, force, &api.policy.backup_tag)
+                {
                     e = e2;
                 } else {
                     // success on fallback
@@ -184,6 +193,9 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                         "before_kind": before_kind,
                         "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
                     });
+                    if let Some(iv) = integrity_verified {
+                        if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
+                    }
                     ensure_provenance(&mut extra);
                     emit_apply_result(tctx, decision, extra);
                     return (Some(act.clone()), None);
@@ -202,6 +214,9 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                 "before_kind": before_kind,
                 "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
             });
+            if let Some(iv) = integrity_verified {
+                if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
+            }
             ensure_provenance(&mut extra);
             let obj = extra.as_object_mut().unwrap();
             obj.insert("error_id".to_string(), json!(id_str(id)));
@@ -218,7 +233,11 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         "path": target.as_path().display().to_string(),
         "before_kind": before_kind,
         "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
+        "backup_durable": api.policy.require_backup_durability,
     });
+    if let Some(iv) = integrity_verified {
+        if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
+    }
     ensure_provenance(&mut extra);
     emit_apply_result(tctx, decision, extra);
 

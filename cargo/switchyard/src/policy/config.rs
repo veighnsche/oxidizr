@@ -60,6 +60,20 @@ pub struct Policy {
     /// Allow proceeding when a target has multiple hardlinks (nlink>1). When false (default),
     /// preflight/apply MUST STOP on hardlink hazard unless explicitly allowed.
     pub allow_hardlink_breakage: bool,
+    /// When true (default), snapshot paths perform durability syncs (fsync) to parent
+    /// directories to ensure on-disk persistence. When false, durability fsyncs may be
+    /// skipped; facts should record `backup_durable=false` for analytics.
+    pub require_backup_durability: bool,
+    /// When true (default), restore verifies payload hashes recorded in sidecar v2 and
+    /// stops on mismatch. When false, integrity verification may be skipped and is treated
+    /// as best-effort.
+    pub require_sidecar_integrity: bool,
+    /// Retention policy: keep at most this many backup generations (newest retained).
+    /// When None, count-based retention is disabled.
+    pub retention_count_limit: Option<usize>,
+    /// Retention policy: delete backups older than this duration. When None, age-based
+    /// retention is disabled.
+    pub retention_age_limit: Option<std::time::Duration>,
     /// Minimum number of GNU rescue tools required when BusyBox is not present.
     /// Default is `RESCUE_MIN_COUNT` from `constants.rs`.
     pub rescue_min_count: usize,
@@ -109,6 +123,10 @@ impl Default for Policy {
             require_rescue: false,
             allow_suid_sgid_mutation: false,
             allow_hardlink_breakage: false,
+            require_backup_durability: true,
+            require_sidecar_integrity: true,
+            retention_count_limit: None,
+            retention_age_limit: None,
             rescue_min_count: DEFAULT_RESCUE_MIN_COUNT,
             require_lock_manager: false,
             require_smoke_in_commit: false,

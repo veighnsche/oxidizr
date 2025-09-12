@@ -20,3 +20,10 @@ pub struct ApplyReport {
     pub rolled_back: bool,
     pub rollback_errors: Vec<String>,
 }
+
+#[must_use]
+#[derive(Clone, Debug, Default)]
+pub struct PruneResult {
+    pub pruned_count: usize,
+    pub retained_count: usize,
+}

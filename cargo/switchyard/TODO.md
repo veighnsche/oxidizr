@@ -92,19 +92,19 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Dependencies: SPEC proposal for SUID/SGID preflight gate.
 
   - Implementation Steps
-    - [ ] Implement `check_suid_sgid_risk(path: &Path) -> std::io::Result<bool>`
-      - [ ] On Unix, use `std::fs::symlink_metadata(path)` and `std::os::unix::fs::MetadataExt::mode()`; risk if `(mode & 0o6000) != 0`.
-      - [ ] For symlinks, consider target metadata (best-effort) or record note `"suid_sgid unresolved for symlink"`.
-    - [ ] Integrate into preflight
-      - [ ] In `src/api/preflight/mod.rs`, for both actions, call `check_suid_sgid_risk(target)`.
-      - [ ] If risk and `!policy.allow_suid_sgid_mutation`, push STOP `"suid/sgid risk"` and add note.
-      - [ ] If risk and allowed, push WARN note `"suid/sgid risk allowed by policy"`.
-    - [ ] Policy wiring
-      - [ ] Add `allow_suid_sgid_mutation: bool` to `Policy` (default false; true only when explicitly set); include in `production_preset()` defaults.
-      - [ ] Ensure apply gating parity via `policy::gating`.
-    - [ ] Tests
-      - [ ] Unit: mark a file SUID in tmpdir and assert STOP vs WARN based on policy.
-      - [ ] Integration: preflight summary includes STOP on risk with `error_id=E_POLICY`.
+    - [x] Implement `check_suid_sgid_risk(path: &Path) -> std::io::Result<bool>`
+      - [x] On Unix, use `std::fs::symlink_metadata(path)` and `std::os::unix::fs::MetadataExt::mode()`; risk if `(mode & 0o6000) != 0`.
+      - [x] For symlinks, consider target metadata (best-effort) or record note `"suid_sgid unresolved for symlink"`.
+    - [x] Integrate into preflight
+      - [x] In `src/api/preflight/mod.rs`, for both actions, call `check_suid_sgid_risk(target)`.
+      - [x] If risk and `!policy.allow_suid_sgid_mutation`, push STOP `"suid/sgid risk"` and add note.
+      - [x] If risk and allowed, push WARN note `"suid/sgid risk allowed by policy"`.
+    - [x] Policy wiring
+      - [x] Add `allow_suid_sgid_mutation: bool` to `Policy` (default false; true only when explicitly set); include in defaults.
+      - [x] Ensure apply gating parity via `policy::gating`.
+    - [x] Tests
+      - [x] Unit: mark a file SUID in tmpdir and assert STOP vs WARN based on policy.
+      - [x] Integration: preflight summary includes STOP on risk with `error_id=E_POLICY`.
 
 - Hardlink breakage preflight check
   - Priority: P0
@@ -115,19 +115,19 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Complexity: 2
   - Scope: Add `check_hardlink_hazard()` in `src/preflight/checks.rs`, integrate in `src/api/preflight/mod.rs`, and add policy `allow_hardlink_breakage` (default false) in `src/policy/config.rs`.
   - Implementation Steps
-    - [ ] Implement `check_hardlink_hazard(path: &Path) -> std::io::Result<bool>`
-      - [ ] Use `std::fs::symlink_metadata(path)` and on Unix get `nlink` via `std::os::unix::fs::MetadataExt::nlink()`; hazard = `nlink > 1`.
-      - [ ] If metadata read fails, return `Ok(false)` and let caller add a note.
-    - [ ] Integrate into preflight
-      - [ ] In `src/api/preflight/mod.rs`, for both `EnsureSymlink` and `RestoreFromBackup`, call `check_hardlink_hazard(target)`.
-      - [ ] If hazard and `!policy.allow_hardlink_breakage`, push STOP reason and add note `"hardlink risk"`.
-      - [ ] If hazard and allowed, push WARN note `"hardlink risk allowed by policy"`.
-    - [ ] Policy wiring
-      - [ ] Add `allow_hardlink_breakage: bool` to `Policy` (default false; true only if explicitly set).
-      - [ ] Ensure gating mirrors preflight behavior when `override_preflight=false`.
-    - [ ] Tests
-      - [ ] Unit: create two hardlinks to the same inode in a tmpdir and assert detection.
-      - [ ] Integration: preflight on a hardlinked target STOPs by default and WARNs when policy allows.
+    - [x] Implement `check_hardlink_hazard(path: &Path) -> std::io::Result<bool>`
+      - [x] Use `std::fs::symlink_metadata(path)` and on Unix get `nlink` via `std::os::unix::fs::MetadataExt::nlink()`; hazard = `nlink > 1`.
+      - [x] If metadata read fails, return `Ok(false)` and let caller add a note.
+    - [x] Integrate into preflight
+      - [x] In `src/api/preflight/mod.rs`, for both `EnsureSymlink` and `RestoreFromBackup`, call `check_hardlink_hazard(target)`.
+      - [x] If hazard and `!policy.allow_hardlink_breakage`, push STOP reason and add note `"hardlink risk"`.
+      - [x] If hazard and allowed, push WARN note `"hardlink risk allowed by policy"`.
+    - [x] Policy wiring
+      - [x] Add `allow_hardlink_breakage: bool` to `Policy` (default false; true only if explicitly set).
+      - [x] Ensure gating mirrors preflight behavior when `override_preflight=false`.
+    - [x] Tests
+      - [x] Unit: create two hardlinks to the same inode in a tmpdir and assert detection.
+      - [x] Integration: preflight on a hardlinked target STOPs by default and WARNs when policy allows.
 
 - Backup/sidecar durability (fsync + *at)
   - Priority: P0
