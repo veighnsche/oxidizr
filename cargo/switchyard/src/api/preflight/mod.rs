@@ -12,7 +12,6 @@ use serde_json::json;
 
 use crate::fs::meta::{detect_preservation_capabilities, kind_of};
 use crate::logging::audit::{AuditCtx, AuditMode};
-#[path = "preflight/rows.rs"]
 mod rows;
 
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
@@ -250,11 +249,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         "failure"
     };
     // Emit preflight summary with rescue_profile and error mapping when failure
-    let prof = if rescue_ok {
-        Some("available")
-    } else {
-        Some("none")
-    };
+    let prof = if rescue_ok { Some("available") } else { Some("none") };
     let mut extra = json!({ "rescue_profile": prof });
     if !stops.is_empty() {
         if let Some(obj) = extra.as_object_mut() {

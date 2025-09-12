@@ -12,11 +12,13 @@ Generated on: 2025-09-12
 ## Inventory
 
 1) Crate root (`src/lib.rs`)
+
 - Re-exports:
   - `pub use api::*;` — Facade (top-level routing to API surface)
   - `pub use policy::rescue;` — Shim (compatibility re-export of `switchyard::policy::rescue`)
 
 2) Filesystem facade (`src/fs/mod.rs`)
+
 - Re-exports:
   - `pub use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};` — Facade
   - `pub use backup::{backup_path_with_tag, create_snapshot, has_backup_artifacts};` — Facade
@@ -27,11 +29,13 @@ Generated on: 2025-09-12
   - `pub use swap::replace_file_with_symlink;` — Facade
 
 3) Logging facade (`src/logging/mod.rs`)
+
 - Re-exports:
   - `pub use facts::{AuditSink, FactsEmitter, JsonlSink};` — Facade
   - `pub use redact::{redact_event, ts_for_mode, TS_ZERO};` — Facade
 
 4) Types facade (`src/types/mod.rs`)
+
 - Re-exports:
   - `pub use errors::*;` — Facade
   - `pub use ids::*;` — Facade
@@ -40,17 +44,20 @@ Generated on: 2025-09-12
   - `pub use safepath::*;` — Facade
 
 5) Policy module (`src/policy/mod.rs`)
+
 - Re-exports:
   - `pub use config::Policy;` — Facade
 - Note: `policy::checks` shim removed from module graph as part of refactor; file remains but is unused.
 
 6) Preflight façade (`src/preflight.rs`)
+
 - Re-exports:
   - `pub use checks::{check_immutable, check_source_trust, ensure_mount_rw_exec};` — Facade
   - `pub use yaml::to_yaml;` — Facade
 - Intent: `preflight.rs` is the public entrypoint; code lives in `preflight/checks.rs` and `preflight/yaml.rs`.
 
 7) Adapters module (`src/adapters/mod.rs`)
+
 - Re-exports:
   - `pub use attest::*;` — Facade
   - `pub use lock::file::FileLockManager;` — Facade

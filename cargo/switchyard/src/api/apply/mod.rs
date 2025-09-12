@@ -24,9 +24,7 @@ use crate::logging::audit::{
     emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode,
 };
 use crate::policy::gating;
-#[path = "apply/audit_fields.rs"]
 mod audit_fields;
-#[path = "apply/handlers.rs"]
 mod handlers;
 
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(

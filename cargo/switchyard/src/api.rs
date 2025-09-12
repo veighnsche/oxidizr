@@ -7,13 +7,13 @@ use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 
 // Internal API submodules (planned split)
-#[path = "api/apply.rs"]
+#[path = "api/apply/mod.rs"]
 mod apply_impl;
 #[path = "api/errors.rs"]
 pub mod errors;
 #[path = "api/plan.rs"]
 mod plan_impl;
-#[path = "api/preflight.rs"]
+#[path = "api/preflight/mod.rs"]
 mod preflight_impl;
 #[path = "api/rollback.rs"]
 mod rollback;
