@@ -1,7 +1,5 @@
 # Logging/Audit Refactor — Actionable Steps (breaking)
 
-> STATUS: Not landed in src/ (as of 2025-09-12 23:16:50 +02:00). `src/logging/audit.rs` still exposes `emit_*` helpers and no `StageLogger` facade; API call sites use legacy helpers. Keep PRs refactor-only.
-
 Do the following changes. No shims; remove legacy helpers.
 
 1. Create/update modules under `src/logging/`
@@ -14,10 +12,19 @@ Do the following changes. No shims; remove legacy helpers.
 
 2. Replace all audit emissions at call sites
    - In `src/api/preflight/{mod.rs,rows.rs}`: replace ad-hoc JSON + `emit_*` with the builder facade:
-     - `slog.preflight().action(..).path(..).current_kind(..).planned_kind(..).policy_ok(..).provenance(..).notes(..).preservation(..).emit()`.
+     - `slog.preflight().action(..).path(..).current_kind(..).planned_kind(..).policy_ok(..).provenance(..).notes(..).preservation(..).preservation_supported(..).emit()`.
+     - Field parity with existing code:
+       - Per-row: `action_id`, `path`, `current_kind`, `planned_kind`.
+       - Extended: `policy_ok`, `provenance`, `notes[]`, `preservation`, `preservation_supported`.
    - In `src/api/apply/{mod.rs,handlers.rs}`:
-     - `.apply_attempt().decision(..).extra(..).emit()` and `.apply_result().decision(..).extra(..).emit()`.
+     - `.apply_attempt().decision(..).lock_backend(..).lock_wait_ms(..).lock_attempts(..).emit()`.
+     - `.apply_result().decision(..).lock_backend(..).lock_wait_ms(..).perf(..).attestation(..).error_id(..).exit_code(..).summary_error_ids(..).emit()`.
+     - Field parity with existing code:
+       - `apply.attempt`: `lock_backend`, `lock_wait_ms` (nullable), `lock_attempts`.
+       - `apply.result` per-action: include `action_id`, `path` when mapping gating failures.
+       - `apply.result` summary: `lock_backend`, `lock_wait_ms`, `perf{hash_ms,backup_ms,swap_ms}`, optional `attestation{sig_alg,signature,bundle_hash,public_key_id}`; on failure include `error_id`, `exit_code`, and `summary_error_ids`.
    - In `src/api/plan.rs`: `.plan().action(..).path(..).emit()` where applicable.
+   - In `src/api.rs::prune_backups`: `.prune_result().path(..).backup_tag(..).retention_count_limit(..).retention_age_limit_ms(..).pruned_count(..).retained_count(..).error_id(..).exit_code(..).emit()`.
 
 3. Centralize and restrict emission
    - Only code under `src/logging/` may call `FactsEmitter::emit(..)` or construct audit JSON payloads.

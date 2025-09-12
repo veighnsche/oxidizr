@@ -1,6 +1,6 @@
 # FS Backup/Restore Refactor — Actionable Steps (breaking)
 
-> STATUS: Not landed in src/ (as of 2025-09-12 23:16:50 +02:00). `src/fs/backup.rs` (~17k) and `src/fs/restore.rs` (~30k) remain monoliths; no split modules exist yet. Keep PRs refactor-only.
+> STATUS: Not landed in src/. `src/fs/backup.rs` (~17k) and `src/fs/restore.rs` (~30k) remain monoliths; no split modules exist yet. Keep PRs refactor-only.
 
 Do these changes. Update call sites; remove legacy files at the end.
 
@@ -59,6 +59,9 @@ Do these changes. Update call sites; remove legacy files at the end.
 - /// remove this file: `src/fs/backup.rs` (after full extraction and re-exports in place)
 - /// remove this file: `src/fs/restore.rs` (after full extraction and re-exports in place)
 - Acceptance: `grep -R "src/fs/backup.rs"` returns 0 in code references; same for `restore.rs`.
+
+- Remove internal re-export lines for low-level atoms in `src/fs/mod.rs` (e.g., `pub(crate) use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};`). Call these via `fs::atomic` from inside the crate instead of re-exporting at the module root.
+- Acceptance: `rg -n "^\s*pub\(crate\)\s+use\s+atomic::\{" cargo/switchyard/src/fs/mod.rs -S` returns 0.
 
 ---
 

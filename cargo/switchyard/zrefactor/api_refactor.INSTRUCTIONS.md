@@ -1,7 +1,5 @@
 # API DX/DW Overhaul — Actionable Steps (breaking)
 
-> STATUS: Not landed in src/ (as of 2025-09-12 23:16:50 +02:00). `src/api.rs` still uses `#[path]`; `ApiBuilder` not present; `StageLogger` facade not present. Keep PRs refactor-only.
-
 Redesign the top-level API for developer experience (DX) and developer workflow (DW). Keep it consistent, typed, and stage-agnostic. Prefer clarity over compatibility.
 
 ## 1) Make `src/api` an idiomatic module and central entrypoint
@@ -14,22 +12,22 @@ Redesign the top-level API for developer experience (DX) and developer workflow 
   - `mod preflight;`
   - `mod rollback;`
 - Update all imports accordingly.
-- Acceptance: `cargo check && cargo test` pass; `grep -R "#\[path\]" src/api` returns 0.
+- Acceptance: `cargo check && cargo test` pass; `grep -R "#\[path\]" cargo/switchyard/src` returns 0.
 
 /// remove this file after migration: `src/api.rs`
 
 ## 2) Introduce an `ApiBuilder` for ergonomic construction
 
 - File: `src/api/mod.rs`
-  - Add `pub struct ApiBuilder<E: FactsEmitter, A: AuditSink>` with setters for:
+  - Add `pub struct ApiBuilder<E: FactsEmitter, A: AuditSink>` with setters mirroring the existing `Switchyard` fluent methods:
     - `with_lock_manager(Box<dyn LockManager>)`
     - `with_ownership_oracle(Box<dyn OwnershipOracle>)`
     - `with_attestor(Box<dyn Attestor>)`
     - `with_smoke_runner(Box<dyn SmokeTestRunner>)`
     - `with_lock_timeout_ms(u64)`
   - Add `impl ApiBuilder { pub fn build(self, facts: E, audit: A, policy: Policy) -> Switchyard<E, A> }`.
-  - Keep `Switchyard::new(facts, audit, policy)` for convenience; implement it by delegating to the builder defaults.
-- Acceptance: Existing callers keep working; new builder is available and covered by docs.
+  - Coexist with current API: keep `Switchyard::new(facts, audit, policy)` and the existing fluent `.with_*` methods intact. Implement `Switchyard::new` via builder defaults to reduce duplication.
+- Acceptance: Existing callers using `.with_*` keep working; new builder is available and covered by docs.
 
 ## 3) StageLogger integration (centralized audit)
 

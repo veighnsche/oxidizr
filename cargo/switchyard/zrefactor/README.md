@@ -9,16 +9,6 @@ This folder contains focused refactor plans, audits, and rulebooks. The goal is 
 3) Keep `removals_registry.md` up to date for files that can’t be annotated inline.
 4) Cross-check the Cohesion Report for structure and guardrail greps.
 
-## Status snapshot (last synced: 2025-09-12 23:16:50 +02:00)
-
-- API module shape: NOT LANDED — `src/api.rs` still uses `#[path]` includes; planned move to `src/api/mod.rs` remains.
-- Logging facade (StageLogger/EventBuilder): NOT LANDED — `src/logging/audit.rs` still uses `emit_*` helpers; facade not present.
-- Policy-owned gating: PARTIAL — `src/policy/gating.rs` has `gating_errors(...)`, but `src/api/preflight/mod.rs` duplicates checks (including a duplicate SUID/SGID block) and still hard-codes "/usr" for one branch. No typed `evaluate_action(...)` in use across stages yet.
-- FS split (backup/restore into cohesive submodules): NOT LANDED — monoliths `src/fs/backup.rs` and `src/fs/restore.rs` remain.
-- FS atoms re-export tightening: LANDED (INTERNALIZED) — `src/fs/mod.rs` re-exports atoms as `pub(crate)`, so no public atoms leak; final removal optional.
-- Deprecated shims: PRESENT — `src/adapters/mod.rs` still exposes `adapters::lock_file::*` (deprecated); `src/lib.rs` still has the top-level `pub use policy::rescue` alias (deprecated).
-- Determinism and dry-run envelope: PRESENT — Minimal Facts v1 in `src/logging/audit.rs` includes `schema_version=1`, `plan_id`, and `dry_run` fields.
-
 Refactor-only scope reminder: files ending with `.PROPOSAL.md` or marked "additive" describe new features — do not implement them while landing refactors.
 
 ## Table of Contents

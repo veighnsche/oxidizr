@@ -1,5 +1,7 @@
 # Library Consumer DX Overhaul — Actionable Instructions (additive, non-breaking)
 
+> STATUS: Proposal (additive/new features). These are not landed in src/. Keep separate from structural refactors.
+
 Scope: Only improvements visible to external consumers of the `switchyard` crate. No internal reorganizations required to adopt. All steps are additive and should be SemVer-minor changes.
 
 ## Deliverables (consumer-facing)

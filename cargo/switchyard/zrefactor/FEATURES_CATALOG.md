@@ -31,7 +31,7 @@ Scope: Library crate `cargo/switchyard/` (public API and implemented behaviors).
 
 - Backup pruning API
   - Public API: `Switchyard::prune_backups(&SafePath)` prunes by count/age with safety rules (never delete newest).
-  - Emits `prune.result` facts with counts and policy used.
+  - Emits `prune.result` facts. Emitted fields include: `path`, `backup_tag`, `retention_count_limit`, `retention_age_limit_ms`, `pruned_count`, `retained_count`. On failure includes `error`, `error_id`, and `exit_code`.
   - Source: `src/api.rs::prune_backups`, `src/fs/backup.rs`.
   - Tests: `tests/prune_backups.rs`.
 

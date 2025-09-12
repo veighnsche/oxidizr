@@ -70,7 +70,8 @@ This document catalogs all backward-compatibility shims and deprecated or legacy
   - Stop re-exporting the atoms publicly; restrict visibility to `pub(crate)` inside `fs::atomic`.
   - Update consumers to use high-level safe APIs: `replace_file_with_symlink`, `restore_file`, etc.
 - Acceptance:
-  - `grep -R "open_dir_nofollow\|atomic_symlink_swap\|fsync_parent_dir" -n src/ | grep -v "src/fs/atomic"` returns 0.
+  - Low-level atoms are referenced only within the filesystem module tree: `rg -n "open_dir_nofollow|atomic_symlink_swap|fsync_parent_dir" cargo/switchyard/src | rg -v "cargo/switchyard/src/fs/"` returns 0.
+  - No public re-exports at the fs module root: `rg -n "^\s*pub\s+use\s+atomic::|^\s*pub\(crate\)\s+use\s+atomic::" cargo/switchyard/src/fs/mod.rs -S` returns 0 after cleanup.
   - `cargo test` passes.
 
 /// remove public re-exports: `src/fs/mod.rs` for low-level atoms

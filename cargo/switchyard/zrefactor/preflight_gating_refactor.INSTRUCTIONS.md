@@ -34,7 +34,7 @@ Do these changes to centralize gating in policy and keep preflight thin.
   - For each `Action` in the `Plan`, call `policy::gating::evaluate_action(..)`.
   - Emit rows via logging facade (`StageLogger`) only; do not build JSON directly.
   - Remove duplicate SUID/SGID check.
-  - Replace hard-coded "/usr" with iteration over `policy.apply.extra_mount_checks`.
+  - Replace hard-coded "/usr" with iteration over `policy.extra_mount_checks`.
 
 3) Apply-time gating uses the same evaluator
 

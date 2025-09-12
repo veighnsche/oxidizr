@@ -1,7 +1,5 @@
 # Features UX Refactor — Proposal
 
-> STATUS: Proposal (new features). Do not implement during refactor PRs.
-> Last synced with src/: 2025-09-12 23:16:50 +02:00
 > Scope: Additive UX/features; keep separate from structural refactors.
 
 Goal: Make Switchyard’s capabilities easy to understand, adopt, and configure. Organize features into coherent families, provide ergonomic builders/profiles, and gate optional pieces via Cargo features. Minimize cognitive load while keeping expert control.
