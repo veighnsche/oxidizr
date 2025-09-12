@@ -13,19 +13,21 @@ use base64::Engine;
 use serde_json::json;
 
 use crate::fs;
-use log::Level;
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
-use crate::types::ids::{plan_id, action_id};
+use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
+use log::Level;
 
-use crate::logging::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode};
-use super::errors::{ErrorId, exit_code_for};
+use super::errors::{exit_code_for, ErrorId};
+use crate::logging::audit::{
+    emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode,
+};
 use crate::policy::gating;
-#[path = "apply/handlers.rs"]
-mod handlers;
 #[path = "apply/audit_fields.rs"]
 mod audit_fields;
+#[path = "apply/handlers.rs"]
+mod handlers;
 
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
@@ -46,7 +48,10 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         &api.facts as &dyn FactsEmitter,
         pid.to_string(),
         ts_now.clone(),
-        AuditMode { dry_run: dry, redact: dry },
+        AuditMode {
+            dry_run: dry,
+            redact: dry,
+        },
     );
 
     // Locking (required by default in Commit): acquire process lock with bounded wait; emit telemetry via apply.attempt
@@ -62,14 +67,19 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
             Err(e) => {
                 lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
-                emit_apply_attempt(&tctx, "failure", json!({
-                    "lock_wait_ms": lock_wait_ms,
-                    "error": e.to_string(),
-                    "error_id": "E_LOCKING",
-                    "exit_code": 30
-                }));
+                emit_apply_attempt(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "lock_wait_ms": lock_wait_ms,
+                        "error": e.to_string(),
+                        "error_id": "E_LOCKING",
+                        "exit_code": 30
+                    }),
+                );
                 let duration_ms = t0.elapsed().as_millis() as u64;
-                api.audit.log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
+                api.audit
+                    .log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
                 return ApplyReport {
                     executed,
                     duration_ms,
@@ -85,10 +95,14 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             // Enforce by default unless explicitly allowed through policy, or when require_lock_manager is set.
             let must_fail = api.policy.require_lock_manager || !api.policy.allow_unlocked_commit;
             if must_fail {
-                emit_apply_attempt(&tctx, "failure", json!({
-                    "error_id": "E_LOCKING",
-                    "exit_code": 30,
-                }));
+                emit_apply_attempt(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "error_id": "E_LOCKING",
+                        "exit_code": 30,
+                    }),
+                );
                 let duration_ms = t0.elapsed().as_millis() as u64;
                 return ApplyReport {
                     executed,
@@ -99,43 +113,67 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     rollback_errors,
                 };
             } else {
-                emit_apply_attempt(&tctx, "warn", json!({
-                    "no_lock_manager": true,
-                }));
+                emit_apply_attempt(
+                    &tctx,
+                    "warn",
+                    json!({
+                        "no_lock_manager": true,
+                    }),
+                );
             }
         } else {
-            emit_apply_attempt(&tctx, "warn", json!({
-                "no_lock_manager": true,
-            }));
+            emit_apply_attempt(
+                &tctx,
+                "warn",
+                json!({
+                    "no_lock_manager": true,
+                }),
+            );
         }
     }
 
     // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
-    emit_apply_attempt(&tctx, "success", json!({
-        "lock_wait_ms": lock_wait_ms,
-    }));
+    emit_apply_attempt(
+        &tctx,
+        "success",
+        json!({
+            "lock_wait_ms": lock_wait_ms,
+        }),
+    );
 
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
     if !api.policy.override_preflight && !dry {
         let gating_errors = gating::gating_errors(&api.policy, api.owner.as_deref(), plan);
         if !gating_errors.is_empty() {
-            api.audit.log(Level::Warn, "apply: policy gating rejected plan (E_POLICY)");
+            api.audit
+                .log(Level::Warn, "apply: policy gating rejected plan (E_POLICY)");
             let ec = exit_code_for(ErrorId::E_POLICY);
             // Emit per-action failures with action_id for visibility
             for (idx, act) in plan.actions.iter().enumerate() {
                 let aid = action_id(&pid, act, idx).to_string();
-                let path = match act { Action::EnsureSymlink { target, .. } => target.as_path().display().to_string(), Action::RestoreFromBackup { target } => target.as_path().display().to_string(), };
-                emit_apply_result(&tctx, "failure", json!({
-                    "action_id": aid,
-                    "path": path,
+                let path = match act {
+                    Action::EnsureSymlink { target, .. } => target.as_path().display().to_string(),
+                    Action::RestoreFromBackup { target } => target.as_path().display().to_string(),
+                };
+                emit_apply_result(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "action_id": aid,
+                        "path": path,
+                        "error_id": "E_POLICY",
+                        "exit_code": ec,
+                    }),
+                );
+            }
+            emit_apply_result(
+                &tctx,
+                "failure",
+                json!({
                     "error_id": "E_POLICY",
                     "exit_code": ec,
-                }));
-            }
-            emit_apply_result(&tctx, "failure", json!({
-                "error_id": "E_POLICY",
-                "exit_code": ec,
-            }));
+                }),
+            );
             let duration_ms = t0.elapsed().as_millis() as u64;
             return ApplyReport {
                 executed,
@@ -152,13 +190,21 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         match act {
             Action::EnsureSymlink { .. } => {
                 let (exec, err) = handlers::handle_ensure_symlink(api, &tctx, &pid, act, idx, dry);
-                if let Some(e) = err { errors.push(e); }
-                if let Some(a) = exec { executed.push(a); }
+                if let Some(e) = err {
+                    errors.push(e);
+                }
+                if let Some(a) = exec {
+                    executed.push(a);
+                }
             }
             Action::RestoreFromBackup { .. } => {
                 let (exec, err) = handlers::handle_restore(api, &tctx, &pid, act, idx, dry);
-                if let Some(e) = err { errors.push(e); }
-                if let Some(a) = exec { executed.push(a); }
+                if let Some(e) = err {
+                    errors.push(e);
+                }
+                if let Some(a) = exec {
+                    executed.push(a);
+                }
             }
         }
 
@@ -168,7 +214,10 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 rolled_back = true;
                 for prev in executed.iter().rev() {
                     match prev {
-                        Action::EnsureSymlink { source: _source, target } => {
+                        Action::EnsureSymlink {
+                            source: _source,
+                            target,
+                        } => {
                             match fs::restore_file(
                                 &target.as_path(),
                                 dry,
@@ -176,7 +225,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                 &api.policy.backup_tag,
                             ) {
                                 Ok(()) => {
-                                    emit_rollback_step(&tctx, "success", &target.as_path().display().to_string());
+                                    emit_rollback_step(
+                                        &tctx,
+                                        "success",
+                                        &target.as_path().display().to_string(),
+                                    );
                                 }
                                 Err(e) => {
                                     rollback_errors.push(format!(
@@ -184,14 +237,19 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                         target.as_path().display(),
                                         e
                                     ));
-                                    emit_rollback_step(&tctx, "failure", &target.as_path().display().to_string());
+                                    emit_rollback_step(
+                                        &tctx,
+                                        "failure",
+                                        &target.as_path().display().to_string(),
+                                    );
                                 }
                             }
                         }
                         Action::RestoreFromBackup { .. } => {
                             // No reliable inverse without prior state capture; record informational error.
                             rollback_errors.push(
-                                "rollback of RestoreFromBackup not supported (no prior state)".to_string(),
+                                "rollback of RestoreFromBackup not supported (no prior state)"
+                                    .to_string(),
                             );
                             emit_rollback_step(&tctx, "failure", "");
                         }
@@ -227,7 +285,10 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                 });
                             }
                             Action::RestoreFromBackup { .. } => {
-                                rollback_errors.push("rollback of RestoreFromBackup not supported (no prior state)".to_string());
+                                rollback_errors.push(
+                                    "rollback of RestoreFromBackup not supported (no prior state)"
+                                        .to_string(),
+                                );
                             }
                         }
                     }
@@ -257,7 +318,10 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                 });
                             }
                             Action::RestoreFromBackup { .. } => {
-                                rollback_errors.push("rollback of RestoreFromBackup not supported (no prior state)".to_string());
+                                rollback_errors.push(
+                                    "rollback of RestoreFromBackup not supported (no prior state)"
+                                        .to_string(),
+                                );
                             }
                         }
                     }
@@ -267,7 +331,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     }
 
     // Final apply.result summary (after smoke tests/rollback)
-    let decision = if errors.is_empty() { "success" } else { "failure" };
+    let decision = if errors.is_empty() {
+        "success"
+    } else {
+        "failure"
+    };
     let mut fields = json!({
         "lock_wait_ms": lock_wait_ms,
     });
@@ -305,12 +373,20 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     if decision == "failure" {
         if let Some(obj) = fields.as_object_mut() {
             if errors.iter().any(|e| e.contains("smoke")) {
-                obj.insert("error_id".to_string(), json!(crate::api::errors::id_str(ErrorId::E_SMOKE)));
-                obj.insert("exit_code".to_string(), json!(exit_code_for(ErrorId::E_SMOKE)));
+                obj.insert(
+                    "error_id".to_string(),
+                    json!(crate::api::errors::id_str(ErrorId::E_SMOKE)),
+                );
+                obj.insert(
+                    "exit_code".to_string(),
+                    json!(exit_code_for(ErrorId::E_SMOKE)),
+                );
             } else {
                 // Default summary mapping for non-smoke failures
-                obj.entry("error_id").or_insert(json!(crate::api::errors::id_str(ErrorId::E_POLICY)));
-                obj.entry("exit_code").or_insert(json!(exit_code_for(ErrorId::E_POLICY)));
+                obj.entry("error_id")
+                    .or_insert(json!(crate::api::errors::id_str(ErrorId::E_POLICY)));
+                obj.entry("exit_code")
+                    .or_insert(json!(exit_code_for(ErrorId::E_POLICY)));
             }
         }
     }

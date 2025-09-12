@@ -8,8 +8,8 @@
 //! Test override knobs:
 //! - `SWITCHYARD_FORCE_RESCUE_OK=1|0` forces the result for testing.
 //!
+use crate::constants::{RESCUE_MIN_COUNT, RESCUE_MUST_HAVE};
 use std::env;
-use crate::constants::{RESCUE_MUST_HAVE, RESCUE_MIN_COUNT};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RescueStatus {
@@ -24,37 +24,63 @@ pub enum RescueError {
 
 /// Verify that at least one rescue toolset is available on PATH (BusyBox or GNU core utilities).
 /// Wrapper that does not enforce executability checks.
-pub fn verify_rescue_tools() -> bool { verify_rescue(false) .is_ok() }
+pub fn verify_rescue_tools() -> bool {
+    verify_rescue(false).is_ok()
+}
 
 /// Verify rescue tooling with optional executability check.
 /// When `exec_check` is true, the discovered binaries must have at least one execute bit set.
-pub fn verify_rescue_tools_with_exec(exec_check: bool) -> bool { verify_rescue(exec_check).is_ok() }
+pub fn verify_rescue_tools_with_exec(exec_check: bool) -> bool {
+    verify_rescue(exec_check).is_ok()
+}
 
 /// Verify rescue tooling with an explicit minimum count for the GNU subset when BusyBox is absent.
-pub fn verify_rescue_tools_with_exec_min(exec_check: bool, min_count: usize) -> bool { verify_rescue_min(exec_check, min_count).is_ok() }
+pub fn verify_rescue_tools_with_exec_min(exec_check: bool, min_count: usize) -> bool {
+    verify_rescue_min(exec_check, min_count).is_ok()
+}
 
-pub fn verify_rescue(exec_check: bool) -> Result<RescueStatus, RescueError> { verify_rescue_min(exec_check, RESCUE_MIN_COUNT) }
+pub fn verify_rescue(exec_check: bool) -> Result<RescueStatus, RescueError> {
+    verify_rescue_min(exec_check, RESCUE_MIN_COUNT)
+}
 
 fn verify_rescue_min(exec_check: bool, min_count: usize) -> Result<RescueStatus, RescueError> {
     // Test override knobs:
     if let Ok(v) = env::var("SWITCHYARD_FORCE_RESCUE_OK") {
         let v = v.trim();
-        if v == "1" { return Ok(RescueStatus::GNU { found: min_count, min: min_count }); }
-        if v == "0" { return Err(RescueError::Unavailable); }
+        if v == "1" {
+            return Ok(RescueStatus::GNU {
+                found: min_count,
+                min: min_count,
+            });
+        }
+        if v == "0" {
+            return Err(RescueError::Unavailable);
+        }
     }
     // Prefer BusyBox (single binary) as a compact rescue profile
     if let Some(p) = which_on_path("busybox") {
-        if !exec_check || is_executable(&p) { return Ok(RescueStatus::BusyBox { path: p }); }
+        if !exec_check || is_executable(&p) {
+            return Ok(RescueStatus::BusyBox { path: p });
+        }
     }
     // Fallback: require a tiny subset of GNU core tools to be present
     let must_have = RESCUE_MUST_HAVE;
     let mut found = 0usize;
     for bin in must_have.iter() {
         if let Some(p) = which_on_path(bin) {
-            if !exec_check || is_executable(&p) { found += 1; }
+            if !exec_check || is_executable(&p) {
+                found += 1;
+            }
         }
     }
-    if found >= min_count { Ok(RescueStatus::GNU { found, min: min_count }) } else { Err(RescueError::Unavailable) }
+    if found >= min_count {
+        Ok(RescueStatus::GNU {
+            found,
+            min: min_count,
+        })
+    } else {
+        Err(RescueError::Unavailable)
+    }
 }
 
 fn which_on_path(bin: &str) -> Option<String> {

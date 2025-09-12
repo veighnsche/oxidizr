@@ -30,7 +30,10 @@ fn commit_requires_lock_manager_when_policy_enforced() {
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
 
     // Empty plan is fine; lock check happens before any action
-    let plan = api.plan(PlanInput { link: vec![], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: vec![],
+    });
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     assert!(
@@ -47,10 +50,13 @@ fn commit_requires_lock_manager_when_policy_enforced() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.attempt"))
-            && e.get("decision") == Some(&Value::from("failure"))
-            && e.get("error_id") == Some(&Value::from("E_LOCKING"))
-            && e.get("exit_code") == Some(&Value::from(30))
-    }), "expected E_LOCKING failure with exit_code=30 in apply.attempt");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.attempt"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_LOCKING"))
+                && e.get("exit_code") == Some(&Value::from(30))
+        }),
+        "expected E_LOCKING failure with exit_code=30 in apply.attempt"
+    );
 }

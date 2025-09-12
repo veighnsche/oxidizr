@@ -38,7 +38,10 @@ fn restore_emits_e_backup_missing_when_no_backup_exists() {
     std::fs::write(root.join("usr/bin/app"), b"o").unwrap();
 
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![], restore: vec![RestoreRequest { target: tgt }] });
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: vec![RestoreRequest { target: tgt }],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
@@ -50,10 +53,13 @@ fn restore_emits_e_backup_missing_when_no_backup_exists() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_BACKUP_MISSING")) &&
-        e.get("exit_code") == Some(&Value::from(60))
-    }), "expected E_BACKUP_MISSING failure with exit_code=60 in apply.result");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_BACKUP_MISSING"))
+                && e.get("exit_code") == Some(&Value::from(60))
+        }),
+        "expected E_BACKUP_MISSING failure with exit_code=60 in apply.result"
+    );
 }

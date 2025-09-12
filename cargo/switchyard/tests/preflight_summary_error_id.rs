@@ -1,5 +1,5 @@
 use serde_json::Value;
-use switchyard::logging::{FactsEmitter, JsonlSink, redact_event};
+use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
@@ -39,7 +39,13 @@ fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     // Force rescue verification failure
     std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");
@@ -54,10 +60,13 @@ fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("preflight")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_POLICY")) &&
-        e.get("exit_code") == Some(&Value::from(10))
-    }), "expected preflight summary failure to include E_POLICY/10");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("preflight"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_POLICY"))
+                && e.get("exit_code") == Some(&Value::from(10))
+        }),
+        "expected preflight summary failure to include E_POLICY/10"
+    );
 }

@@ -28,6 +28,15 @@ pub const NS_TAG: &str = "https://oxidizr-arch/switchyard";
 /// Heuristic for rescue tool availability when BusyBox is not present.
 /// At least `RESCUE_MIN_COUNT` of the `RESCUE_MUST_HAVE` tools must be found on PATH.
 pub const RESCUE_MUST_HAVE: &[&str] = &[
-    "cp", "mv", "rm", "ln", "stat", "readlink", "sha256sum", "sort", "date", "ls",
+    "cp",
+    "mv",
+    "rm",
+    "ln",
+    "stat",
+    "readlink",
+    "sha256sum",
+    "sort",
+    "date",
+    "ls",
 ];
 pub const RESCUE_MIN_COUNT: usize = 6;

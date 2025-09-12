@@ -1,12 +1,14 @@
 //! Restore logic extracted from symlink.rs, using backup sidecar schema.
 
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use rustix::fs::{fchmod, openat, renameat, unlinkat, AtFlags, Mode, OFlags};
 
-use super::atomic::{fsync_parent_dir, open_dir_nofollow, atomic_symlink_swap};
-use super::backup::{find_latest_backup_and_sidecar, find_previous_backup_and_sidecar, read_sidecar};
+use super::atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
+use super::backup::{
+    find_latest_backup_and_sidecar, find_previous_backup_and_sidecar, read_sidecar,
+};
 
 /// Restore a file from its backup. When no backup exists, return an error unless force_best_effort is true.
 pub fn restore_file(
@@ -22,7 +24,10 @@ pub fn restore_file(
         None => {
             // No artifacts at all
             if !force_best_effort {
-                return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "backup missing",
+                ));
             } else {
                 return Ok(());
             }
@@ -37,7 +42,13 @@ pub fn restore_file(
         let kind_now = match std::fs::symlink_metadata(target) {
             Ok(md) => {
                 let ft = md.file_type();
-                if ft.is_symlink() { "symlink" } else if ft.is_file() { "file" } else { "other" }
+                if ft.is_symlink() {
+                    "symlink"
+                } else if ft.is_file() {
+                    "file"
+                } else {
+                    "other"
+                }
             }
             Err(_) => "none",
         };
@@ -50,15 +61,21 @@ pub fn restore_file(
                         // Compare resolved forms for robustness
                         let mut cur_res = cur.clone();
                         if cur_res.is_relative() {
-                            if let Some(parent) = target.parent() { cur_res = parent.join(cur_res); }
+                            if let Some(parent) = target.parent() {
+                                cur_res = parent.join(cur_res);
+                            }
                         }
                         let mut want_res = w.clone();
                         if want_res.is_relative() {
-                            if let Some(parent) = target.parent() { want_res = parent.join(want_res); }
+                            if let Some(parent) = target.parent() {
+                                want_res = parent.join(want_res);
+                            }
                         }
                         let cur_res = std::fs::canonicalize(&cur_res).unwrap_or(cur_res);
                         let want_res = std::fs::canonicalize(&want_res).unwrap_or(want_res);
-                        if cur_res == want_res { return Ok(()); }
+                        if cur_res == want_res {
+                            return Ok(());
+                        }
                     }
                 }
             }
@@ -67,7 +84,9 @@ pub fn restore_file(
         }
     }
 
-    if dry_run { return Ok(()); }
+    if dry_run {
+        return Ok(());
+    }
 
     // Perform restore per prior_kind when sidecar is present
     if let Some(side) = sc {
@@ -78,26 +97,40 @@ pub fn restore_file(
                     Some(p) => p,
                     None => {
                         // Without payload, either best-effort noop or error
-                        if force_best_effort { return Ok(()); }
-                        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                        if force_best_effort {
+                            return Ok(());
+                        }
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload missing",
+                        ));
                     }
                 };
                 let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+                let fname = target
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("target");
+                let bname = backup
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("backup");
                 let dirfd = open_dir_nofollow(parent)?;
                 let _ = fs::remove_file(target);
-                let old_c = std::ffi::CString::new(bname)
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                let new_c = std::ffi::CString::new(fname)
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                let old_c = std::ffi::CString::new(bname).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?;
+                let new_c = std::ffi::CString::new(fname).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?;
                 renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                     .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                 // Restore mode when present
                 if let Some(ms) = side.mode.as_ref() {
                     if let Ok(m) = u32::from_str_radix(ms, 8) {
-                        let fname_c = std::ffi::CString::new(fname)
-                            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                        let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                        })?;
                         let tfd = openat(&dirfd, fname_c.as_c_str(), OFlags::RDONLY, Mode::empty())
                             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                         let _ = fchmod(&tfd, Mode::from_bits_truncate(m));
@@ -112,24 +145,37 @@ pub fn restore_file(
                     let _ = atomic_symlink_swap(src, target, true)?;
                     let _ = fsync_parent_dir(target);
                     // Remove backup payload if present (sidecar remains)
-                    if let Some(b) = backup_opt.as_ref() { let _ = std::fs::remove_file(b); }
+                    if let Some(b) = backup_opt.as_ref() {
+                        let _ = std::fs::remove_file(b);
+                    }
                 } else {
                     // Malformed sidecar; fallback to backup payload rename if available
                     if let Some(backup) = backup_opt {
                         let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                        let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                        let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+                        let fname = target
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("target");
+                        let bname = backup
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("backup");
                         let dirfd = open_dir_nofollow(parent)?;
                         let _ = fs::remove_file(target);
-                        let old_c = std::ffi::CString::new(bname)
-                            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                        let new_c = std::ffi::CString::new(fname)
-                            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                        let old_c = std::ffi::CString::new(bname).map_err(|_| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                        })?;
+                        let new_c = std::ffi::CString::new(fname).map_err(|_| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                        })?;
                         renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                         let _ = fsync_parent_dir(target);
                     } else if !force_best_effort {
-                        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload missing",
+                        ));
                     }
                 }
             }
@@ -137,34 +183,51 @@ pub fn restore_file(
                 // Ensure path is absent
                 if let Some(parent) = target.parent() {
                     let dirfd = open_dir_nofollow(parent)?;
-                    let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                    let fname_c = std::ffi::CString::new(fname)
-                        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                    let fname = target
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("target");
+                    let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?;
                     let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
                 } else {
                     let _ = std::fs::remove_file(target);
                 }
                 let _ = fsync_parent_dir(target);
                 // Remove backup payload if present
-                if let Some(b) = backup_opt.as_ref() { let _ = std::fs::remove_file(b); }
+                if let Some(b) = backup_opt.as_ref() {
+                    let _ = std::fs::remove_file(b);
+                }
             }
             _ => {
                 // Unknown kind; fall back to legacy behavior when payload present
                 if let Some(backup) = backup_opt {
                     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                    let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                    let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+                    let fname = target
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("target");
+                    let bname = backup
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("backup");
                     let dirfd = open_dir_nofollow(parent)?;
                     let _ = fs::remove_file(target);
-                    let old_c = std::ffi::CString::new(bname)
-                        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                    let new_c = std::ffi::CString::new(fname)
-                        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                    let old_c = std::ffi::CString::new(bname).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?;
+                    let new_c = std::ffi::CString::new(fname).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?;
                     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
                         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                     let _ = fsync_parent_dir(target);
                 } else if !force_best_effort {
-                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "backup payload missing",
+                    ));
                 }
             }
         }
@@ -173,16 +236,26 @@ pub fn restore_file(
 
     // No sidecar: legacy rename if backup payload exists
     if let Some(backup) = backup_opt {
-        if dry_run { return Ok(()); }
+        if dry_run {
+            return Ok(());
+        }
         let parent = target.parent().unwrap_or_else(|| Path::new("."));
-        let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-        let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+        let fname = target
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("target");
+        let bname = backup
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("backup");
         let _ = fs::remove_file(target);
         let dirfd = open_dir_nofollow(parent)?;
-        let old_c = std::ffi::CString::new(bname)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-        let new_c = std::ffi::CString::new(fname)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+        let old_c = std::ffi::CString::new(bname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
+        let new_c = std::ffi::CString::new(fname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
         renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
         let _ = fsync_parent_dir(target);
@@ -190,10 +263,12 @@ pub fn restore_file(
     } else if force_best_effort {
         Ok(())
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "backup missing",
+        ))
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -201,7 +276,9 @@ mod tests {
     use crate::constants::DEFAULT_BACKUP_TAG;
     use crate::fs::swap::replace_file_with_symlink;
 
-    fn td() -> tempfile::TempDir { tempfile::tempdir().unwrap() }
+    fn td() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
 
     #[test]
     fn symlink_topology_restore_roundtrip() {
@@ -216,11 +293,15 @@ mod tests {
         let _ = std::os::unix::fs::symlink("old", &tgt);
 
         // Replace target to point to new; backup should capture prior symlink target
-        let _ = replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let _ =
+            replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         // Now restore
         restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         let md2 = std::fs::symlink_metadata(&tgt).unwrap();
-        assert!(md2.file_type().is_symlink(), "target should be symlink after restore");
+        assert!(
+            md2.file_type().is_symlink(),
+            "target should be symlink after restore"
+        );
         let link = std::fs::read_link(&tgt).unwrap();
         assert_eq!(link, PathBuf::from("old"));
     }
@@ -234,11 +315,15 @@ mod tests {
         std::fs::write(&src_new, b"new").unwrap();
         // Target does not exist initially
         assert!(!tgt.exists());
-        let _ = replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let _ =
+            replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         assert!(tgt.exists());
         // Restore should remove target (prior_kind=none)
         restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
-        assert!(!tgt.exists(), "target should be absent after restore of prior_kind=none");
+        assert!(
+            !tgt.exists(),
+            "target should be absent after restore of prior_kind=none"
+        );
     }
 
     #[test]
@@ -275,7 +360,10 @@ pub fn restore_file_prev(
         None => {
             // No previous artifacts
             if !force_best_effort {
-                return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "backup missing",
+                ));
             } else {
                 return Ok(());
             }
@@ -290,7 +378,13 @@ pub fn restore_file_prev(
         let kind_now = match std::fs::symlink_metadata(target) {
             Ok(md) => {
                 let ft = md.file_type();
-                if ft.is_symlink() { "symlink" } else if ft.is_file() { "file" } else { "other" }
+                if ft.is_symlink() {
+                    "symlink"
+                } else if ft.is_file() {
+                    "file"
+                } else {
+                    "other"
+                }
             }
             Err(_) => "none",
         };
@@ -302,12 +396,22 @@ pub fn restore_file_prev(
                     if let Some(w) = want {
                         // Compare resolved forms for robustness
                         let mut cur_res = cur.clone();
-                        if cur_res.is_relative() { if let Some(parent) = target.parent() { cur_res = parent.join(cur_res); } }
+                        if cur_res.is_relative() {
+                            if let Some(parent) = target.parent() {
+                                cur_res = parent.join(cur_res);
+                            }
+                        }
                         let mut want_res = w.clone();
-                        if want_res.is_relative() { if let Some(parent) = target.parent() { want_res = parent.join(want_res); } }
+                        if want_res.is_relative() {
+                            if let Some(parent) = target.parent() {
+                                want_res = parent.join(want_res);
+                            }
+                        }
                         let cur_res = std::fs::canonicalize(&cur_res).unwrap_or(cur_res);
                         let want_res = std::fs::canonicalize(&want_res).unwrap_or(want_res);
-                        if cur_res == want_res { return Ok(()); }
+                        if cur_res == want_res {
+                            return Ok(());
+                        }
                     }
                 }
             }
@@ -316,27 +420,54 @@ pub fn restore_file_prev(
         }
     }
 
-    if dry_run { return Ok(()); }
+    if dry_run {
+        return Ok(());
+    }
 
     // Perform restore per prior_kind when sidecar is present
     if let Some(side) = sc {
         match side.prior_kind.as_str() {
             "file" => {
                 // Need backup payload to restore bytes
-                let backup = match backup_opt { Some(p) => p, None => { if force_best_effort { return Ok(()); } return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing")); } };
+                let backup = match backup_opt {
+                    Some(p) => p,
+                    None => {
+                        if force_best_effort {
+                            return Ok(());
+                        }
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload missing",
+                        ));
+                    }
+                };
                 let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+                let fname = target
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("target");
+                let bname = backup
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("backup");
                 let dirfd = open_dir_nofollow(parent)?;
                 let _ = fs::remove_file(target);
-                let old_c = std::ffi::CString::new(bname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                let new_c = std::ffi::CString::new(fname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
+                let old_c = std::ffi::CString::new(bname).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?;
+                let new_c = std::ffi::CString::new(fname).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?;
+                renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
+                    .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                 // Restore mode when present
                 if let Some(ms) = side.mode.as_ref() {
                     if let Ok(m) = u32::from_str_radix(ms, 8) {
-                        let fname_c = std::ffi::CString::new(fname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                        let tfd = openat(&dirfd, fname_c.as_c_str(), OFlags::RDONLY, Mode::empty()).map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
+                        let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                        })?;
+                        let tfd = openat(&dirfd, fname_c.as_c_str(), OFlags::RDONLY, Mode::empty())
+                            .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                         let _ = fchmod(&tfd, Mode::from_bits_truncate(m));
                     }
                 }
@@ -349,21 +480,37 @@ pub fn restore_file_prev(
                     let _ = atomic_symlink_swap(src, target, true)?;
                     let _ = fsync_parent_dir(target);
                     // Remove backup payload if present (sidecar remains)
-                    if let Some(b) = backup_opt.as_ref() { let _ = std::fs::remove_file(b); }
+                    if let Some(b) = backup_opt.as_ref() {
+                        let _ = std::fs::remove_file(b);
+                    }
                 } else {
                     // Malformed sidecar; fallback to backup payload rename if available
                     if let Some(backup) = backup_opt {
                         let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                        let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                        let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+                        let fname = target
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("target");
+                        let bname = backup
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("backup");
                         let dirfd = open_dir_nofollow(parent)?;
                         let _ = fs::remove_file(target);
-                        let old_c = std::ffi::CString::new(bname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                        let new_c = std::ffi::CString::new(fname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                        renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
+                        let old_c = std::ffi::CString::new(bname).map_err(|_| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                        })?;
+                        let new_c = std::ffi::CString::new(fname).map_err(|_| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                        })?;
+                        renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
+                            .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                         let _ = fsync_parent_dir(target);
                     } else if !force_best_effort {
-                        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload missing",
+                        ));
                     }
                 }
             }
@@ -371,30 +518,51 @@ pub fn restore_file_prev(
                 // Ensure path is absent
                 if let Some(parent) = target.parent() {
                     let dirfd = open_dir_nofollow(parent)?;
-                    let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                    let fname_c = std::ffi::CString::new(fname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                    let fname = target
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("target");
+                    let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?;
                     let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
                 } else {
                     let _ = std::fs::remove_file(target);
                 }
                 let _ = fsync_parent_dir(target);
                 // Remove backup payload if present
-                if let Some(b) = backup_opt.as_ref() { let _ = std::fs::remove_file(b); }
+                if let Some(b) = backup_opt.as_ref() {
+                    let _ = std::fs::remove_file(b);
+                }
             }
             _ => {
                 // Unknown kind; fall back to legacy behavior when payload present
                 if let Some(backup) = backup_opt {
                     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-                    let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-                    let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+                    let fname = target
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("target");
+                    let bname = backup
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("backup");
                     let dirfd = open_dir_nofollow(parent)?;
                     let _ = fs::remove_file(target);
-                    let old_c = std::ffi::CString::new(bname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                    let new_c = std::ffi::CString::new(fname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-                    renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
+                    let old_c = std::ffi::CString::new(bname).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?;
+                    let new_c = std::ffi::CString::new(fname).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?;
+                    renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
+                        .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
                     let _ = fsync_parent_dir(target);
                 } else if !force_best_effort {
-                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "backup payload missing",
+                    ));
                 }
             }
         }
@@ -403,20 +571,36 @@ pub fn restore_file_prev(
 
     // No sidecar: legacy rename if backup payload exists
     if let Some(backup) = backup_opt {
-        if dry_run { return Ok(()); }
+        if dry_run {
+            return Ok(());
+        }
         let parent = target.parent().unwrap_or_else(|| Path::new("."));
-        let fname = target.file_name().and_then(|s| s.to_str()).unwrap_or("target");
-        let bname = backup.file_name().and_then(|s| s.to_str()).unwrap_or("backup");
+        let fname = target
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("target");
+        let bname = backup
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("backup");
         let _ = fs::remove_file(target);
         let dirfd = open_dir_nofollow(parent)?;
-        let old_c = std::ffi::CString::new(bname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-        let new_c = std::ffi::CString::new(fname).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-        renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
+        let old_c = std::ffi::CString::new(bname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
+        let new_c = std::ffi::CString::new(fname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
+        renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
+            .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
         let _ = fsync_parent_dir(target);
         Ok(())
     } else if force_best_effort {
         Ok(())
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "backup missing",
+        ))
     }
 }

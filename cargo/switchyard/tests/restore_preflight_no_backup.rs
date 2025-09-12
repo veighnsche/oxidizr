@@ -25,10 +25,20 @@ fn preflight_stops_for_restore_when_no_backup_present_and_rescue_required() {
     std::fs::write(root.join("usr/bin/app"), b"o").unwrap();
 
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![], restore: vec![RestoreRequest { target: tgt }] });
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: vec![RestoreRequest { target: tgt }],
+    });
 
     let pf = api.preflight(&plan).unwrap();
-    assert!(!pf.ok, "preflight should STOP when restore requested but no backup artifacts present");
+    assert!(
+        !pf.ok,
+        "preflight should STOP when restore requested but no backup artifacts present"
+    );
     let joined = pf.stops.join("\n");
-    assert!(joined.contains("no backup artifacts"), "stops should mention missing backup artifacts, got: {}", joined);
+    assert!(
+        joined.contains("no backup artifacts"),
+        "stops should mention missing backup artifacts, got: {}",
+        joined
+    );
 }

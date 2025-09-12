@@ -34,7 +34,19 @@ fn preflight_yaml_export_matches_shape_and_writes_golden_when_requested() {
     let t1 = SafePath::from_rooted(root, &root.join("usr/bin/app1")).unwrap();
     let s2 = SafePath::from_rooted(root, &root.join("bin/new2")).unwrap();
     let t2 = SafePath::from_rooted(root, &root.join("usr/sbin/app2")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s1, target: t1 }, LinkRequest { source: s2, target: t2 }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![
+            LinkRequest {
+                source: s1,
+                target: t1,
+            },
+            LinkRequest {
+                source: s2,
+                target: t2,
+            },
+        ],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
     let yaml = switchyard::preflight::to_yaml(&pf);

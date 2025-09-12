@@ -38,7 +38,11 @@ fn restore_emits_e_restore_failed_on_rename_error() {
     // Create a target file and a synthetic backup file that matches the naming convention
     let target = dir.join("app");
     std::fs::write(&target, b"orig").unwrap();
-    let backup_name = format!(".{}.switchyard.{}.bak", target.file_name().unwrap().to_string_lossy(), 123456789u128);
+    let backup_name = format!(
+        ".{}.switchyard.{}.bak",
+        target.file_name().unwrap().to_string_lossy(),
+        123456789u128
+    );
     let backup_path = dir.join(backup_name);
     std::fs::write(&backup_path, b"bak").unwrap();
 
@@ -49,7 +53,10 @@ fn restore_emits_e_restore_failed_on_rename_error() {
     std::fs::set_permissions(&dir, p).unwrap();
 
     let tgt = SafePath::from_rooted(root, &target).unwrap();
-    let plan = api.plan(PlanInput { link: vec![], restore: vec![RestoreRequest { target: tgt }] });
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: vec![RestoreRequest { target: tgt }],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
@@ -61,10 +68,13 @@ fn restore_emits_e_restore_failed_on_rename_error() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_RESTORE_FAILED")) &&
-        e.get("exit_code") == Some(&Value::from(70))
-    }), "expected E_RESTORE_FAILED failure with exit_code=70 in apply.result");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_RESTORE_FAILED"))
+                && e.get("exit_code") == Some(&Value::from(70))
+        }),
+        "expected E_RESTORE_FAILED failure with exit_code=70 in apply.result"
+    );
 }

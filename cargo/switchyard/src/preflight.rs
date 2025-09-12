@@ -5,7 +5,7 @@
 //! into a SPEC-aligned YAML sequence for fixtures and artifacts.
 use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path};
+use std::path::Path;
 
 /// Ensure the filesystem backing `path` is read-write and not mounted with noexec.
 /// Returns Ok(()) if suitable; Err(String) with a human message otherwise.

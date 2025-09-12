@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use crate::constants::DEFAULT_BACKUP_TAG;
 use crate::constants::RESCUE_MIN_COUNT as DEFAULT_RESCUE_MIN_COUNT;
+use std::path::PathBuf;
 
 /// Policy governs preflight gates, apply behavior, and production hardening for Switchyard.
 ///

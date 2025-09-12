@@ -44,7 +44,13 @@ fn apply_refuses_with_e_policy_when_preflight_gates_fail_and_override_is_false()
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
@@ -59,10 +65,13 @@ fn apply_refuses_with_e_policy_when_preflight_gates_fail_and_override_is_false()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_POLICY")) &&
-        e.get("exit_code") == Some(&Value::from(10))
-    }), "expected E_POLICY failure with exit_code=10 in apply.result");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_POLICY"))
+                && e.get("exit_code") == Some(&Value::from(10))
+        }),
+        "expected E_POLICY failure with exit_code=10 in apply.result"
+    );
 }

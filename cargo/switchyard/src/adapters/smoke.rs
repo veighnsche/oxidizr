@@ -51,7 +51,8 @@ impl SmokeTestRunner for DefaultSmokeRunner {
                     link
                 };
                 // Compare canonicalized paths where possible
-                let want = std::fs::canonicalize(source.as_path()).unwrap_or_else(|_| source.as_path().to_path_buf());
+                let want = std::fs::canonicalize(source.as_path())
+                    .unwrap_or_else(|_| source.as_path().to_path_buf());
                 let got = std::fs::canonicalize(&resolved).unwrap_or(resolved);
                 if want != got {
                     return Err(SmokeFailure);

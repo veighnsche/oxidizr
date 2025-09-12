@@ -55,7 +55,19 @@ fn provenance_present_and_env_sanitized_across_stages_including_rollback() {
     let t1 = SafePath::from_rooted(root, &root.join("usr/bin/app1")).unwrap();
     let s2 = SafePath::from_rooted(root, &root.join("bin/new2")).unwrap();
     let t2 = SafePath::from_rooted(root, &root.join("usr/sbin/app2")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s1, target: t1 }, LinkRequest { source: s2, target: t2 }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![
+            LinkRequest {
+                source: s1,
+                target: t1,
+            },
+            LinkRequest {
+                source: s2,
+                target: t2,
+            },
+        ],
+        restore: vec![],
+    });
 
     let _ = api.preflight(&plan).unwrap();
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
@@ -69,13 +81,27 @@ fn provenance_present_and_env_sanitized_across_stages_including_rollback() {
         .collect();
 
     // Stages of interest
-    let stages = ["plan", "preflight", "apply.attempt", "apply.result", "rollback"];
+    let stages = [
+        "plan",
+        "preflight",
+        "apply.attempt",
+        "apply.result",
+        "rollback",
+    ];
 
     for v in &redacted {
         if let Some(stage) = v.get("stage").and_then(|s| s.as_str()) {
             if stages.contains(&stage) {
-                let prov = v.get("provenance").and_then(|p| p.as_object()).expect("provenance object");
-                assert_eq!(prov.get("env_sanitized").and_then(|b| b.as_bool()), Some(true), "env_sanitized should be true on stage {}", stage);
+                let prov = v
+                    .get("provenance")
+                    .and_then(|p| p.as_object())
+                    .expect("provenance object");
+                assert_eq!(
+                    prov.get("env_sanitized").and_then(|b| b.as_bool()),
+                    Some(true),
+                    "env_sanitized should be true on stage {}",
+                    stage
+                );
             }
         }
     }

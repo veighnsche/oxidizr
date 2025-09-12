@@ -10,7 +10,7 @@ use crate::types::ids::plan_id;
 use crate::types::{Action, Plan, PreflightReport};
 use serde_json::json;
 
-use crate::fs::meta::{kind_of, detect_preservation_capabilities};
+use crate::fs::meta::{detect_preservation_capabilities, kind_of};
 use crate::logging::audit::{AuditCtx, AuditMode};
 #[path = "preflight/rows.rs"]
 mod rows;
@@ -28,7 +28,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         &api.facts as &dyn FactsEmitter,
         pid.to_string(),
         TS_ZERO.to_string(),
-        AuditMode { dry_run: true, redact: true },
+        AuditMode {
+            dry_run: true,
+            redact: true,
+        },
     );
 
     // Global rescue verification: if required by policy, STOP when unavailable.
@@ -128,12 +131,15 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
 
                 let prov = match &api.owner {
                     Some(oracle) => match oracle.owner_of(target) {
-                        Ok(info) => Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg})),
+                        Ok(info) => {
+                            Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg}))
+                        }
                         Err(_) => None,
                     },
                     None => None,
                 };
-                let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
+                let (preservation, preservation_supported) =
+                    detect_preservation_capabilities(&target.as_path());
                 if api.policy.require_preservation && !preservation_supported {
                     stops.push("preservation unsupported for target".to_string());
                 }
@@ -158,7 +164,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
             Action::RestoreFromBackup { target } => {
                 let mut notes: Vec<String> = Vec::new();
                 let stops_before = stops.len();
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(std::path::Path::new("/usr")) {
+                if let Err(e) = crate::preflight::ensure_mount_rw_exec(std::path::Path::new("/usr"))
+                {
                     stops.push(format!("/usr not rw+exec: {}", e));
                     notes.push("/usr not rw+exec".to_string());
                 }
@@ -207,9 +214,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 }
 
                 let policy_ok = stops.len() == stops_before;
-                let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
+                let (preservation, preservation_supported) =
+                    detect_preservation_capabilities(&target.as_path());
                 // Annotate whether backup artifacts are present (payload and/or sidecar)
-                let backup_present = crate::fs::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
+                let backup_present =
+                    crate::fs::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
                 if api.policy.require_rescue && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
                     notes.push("no backup artifacts present".to_string());
@@ -235,14 +244,32 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
 
     // Per-action preflight facts are emitted above with extended fields.
     // Minimal Facts v1: preflight summary
-    let decision = if stops.is_empty() { "success" } else { "failure" };
+    let decision = if stops.is_empty() {
+        "success"
+    } else {
+        "failure"
+    };
     // Emit preflight summary with rescue_profile and error mapping when failure
-    let prof = if rescue_ok { Some("available") } else { Some("none") };
+    let prof = if rescue_ok {
+        Some("available")
+    } else {
+        Some("none")
+    };
     let mut extra = json!({ "rescue_profile": prof });
     if !stops.is_empty() {
         if let Some(obj) = extra.as_object_mut() {
-            obj.insert("error_id".to_string(), json!(crate::api::errors::id_str(crate::api::errors::ErrorId::E_POLICY)));
-            obj.insert("exit_code".to_string(), json!(crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_POLICY)));
+            obj.insert(
+                "error_id".to_string(),
+                json!(crate::api::errors::id_str(
+                    crate::api::errors::ErrorId::E_POLICY
+                )),
+            );
+            obj.insert(
+                "exit_code".to_string(),
+                json!(crate::api::errors::exit_code_for(
+                    crate::api::errors::ErrorId::E_POLICY
+                )),
+            );
         }
     }
     crate::logging::audit::emit_summary_extra(&ctx, "preflight", decision, extra);
@@ -261,7 +288,12 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         }
     });
 
-    PreflightReport { ok: stops.is_empty(), warnings, stops, rows }
+    PreflightReport {
+        ok: stops.is_empty(),
+        warnings,
+        stops,
+        rows,
+    }
 }
 
 // YAML exporter intentionally lives in crate::preflight to avoid duplication.

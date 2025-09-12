@@ -25,11 +25,14 @@ impl ProcStatfsInspector {
     fn parse_proc_mounts(path: &Path) -> Result<MountFlags, MountError> {
         // Canonicalize best-effort; if it fails, still proceed with the raw path
         let p = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        let content = std::fs::read_to_string("/proc/self/mounts").map_err(|_| MountError::Unknown)?;
+        let content =
+            std::fs::read_to_string("/proc/self/mounts").map_err(|_| MountError::Unknown)?;
         let mut best: Option<(PathBuf, String)> = None;
         for line in content.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() < 4 { continue; }
+            if parts.len() < 4 {
+                continue;
+            }
             let mnt = PathBuf::from(parts[1]);
             if p.starts_with(&mnt) {
                 let opts = parts[3].to_ascii_lowercase();
@@ -46,7 +49,10 @@ impl ProcStatfsInspector {
         if let Some((_mnt, opts)) = best {
             let has_rw = opts.split(',').any(|o| o == "rw");
             let noexec = opts.split(',').any(|o| o == "noexec");
-            Ok(MountFlags { read_only: !has_rw, no_exec: noexec })
+            Ok(MountFlags {
+                read_only: !has_rw,
+                no_exec: noexec,
+            })
         } else {
             Err(MountError::Unknown)
         }
@@ -77,28 +83,49 @@ pub fn ensure_rw_exec(inspector: &impl MountInspector, path: &Path) -> Result<()
 mod tests {
     use super::*;
 
-    struct MockInspector { flags: Result<MountFlags, MountError> }
+    struct MockInspector {
+        flags: Result<MountFlags, MountError>,
+    }
     impl MountInspector for MockInspector {
-        fn flags_for(&self, _path: &Path) -> Result<MountFlags, MountError> { self.flags.clone() }
+        fn flags_for(&self, _path: &Path) -> Result<MountFlags, MountError> {
+            self.flags.clone()
+        }
     }
 
     #[test]
     fn ensure_rw_exec_passes_on_rw_exec() {
-        let ins = MockInspector { flags: Ok(MountFlags { read_only: false, no_exec: false }) };
+        let ins = MockInspector {
+            flags: Ok(MountFlags {
+                read_only: false,
+                no_exec: false,
+            }),
+        };
         assert!(ensure_rw_exec(&ins, Path::new("/tmp")).is_ok());
     }
 
     #[test]
     fn ensure_rw_exec_fails_on_ro_or_noexec() {
-        let ins1 = MockInspector { flags: Ok(MountFlags { read_only: true, no_exec: false }) };
+        let ins1 = MockInspector {
+            flags: Ok(MountFlags {
+                read_only: true,
+                no_exec: false,
+            }),
+        };
         assert!(ensure_rw_exec(&ins1, Path::new("/tmp")).is_err());
-        let ins2 = MockInspector { flags: Ok(MountFlags { read_only: false, no_exec: true }) };
+        let ins2 = MockInspector {
+            flags: Ok(MountFlags {
+                read_only: false,
+                no_exec: true,
+            }),
+        };
         assert!(ensure_rw_exec(&ins2, Path::new("/tmp")).is_err());
     }
 
     #[test]
     fn ensure_rw_exec_fails_on_ambiguous() {
-        let ins = MockInspector { flags: Err(MountError::Unknown) };
+        let ins = MockInspector {
+            flags: Err(MountError::Unknown),
+        };
         assert!(ensure_rw_exec(&ins, Path::new("/tmp")).is_err());
     }
 }

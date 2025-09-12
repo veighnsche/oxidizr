@@ -1,5 +1,5 @@
-use switchyard::logging::{FactsEmitter, JsonlSink};
 use serial_test::serial;
+use switchyard::logging::{FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
@@ -35,12 +35,25 @@ fn preflight_stops_when_rescue_required_and_unavailable() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/ls")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
-    assert!(!pf.ok, "preflight should fail-closed when rescue required and unavailable");
+    assert!(
+        !pf.ok,
+        "preflight should fail-closed when rescue required and unavailable"
+    );
     let msg = pf.stops.join("\n");
-    assert!(msg.contains("rescue profile unavailable"), "expected rescue stop in preflight stops: {}", msg);
+    assert!(
+        msg.contains("rescue profile unavailable"),
+        "expected rescue stop in preflight stops: {}",
+        msg
+    );
 }
 
 #[test]
@@ -76,7 +89,13 @@ fn preflight_succeeds_when_rescue_required_and_available() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/ls")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
     assert!(pf.ok, "preflight should succeed when rescue available");

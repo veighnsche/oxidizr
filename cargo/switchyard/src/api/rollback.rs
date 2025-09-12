@@ -1,5 +1,5 @@
-use crate::types::{Action, Plan};
 use crate::types::report::ApplyReport;
+use crate::types::{Action, Plan};
 
 /// Derive an inverse plan from an ApplyReport by reversing executed actions.
 ///
@@ -11,12 +11,16 @@ pub(crate) fn inverse_with_policy(policy: &crate::policy::Policy, report: &Apply
     for act in report.executed.iter().rev() {
         match act {
             Action::EnsureSymlink { target, .. } => {
-                actions.push(Action::RestoreFromBackup { target: target.clone() });
+                actions.push(Action::RestoreFromBackup {
+                    target: target.clone(),
+                });
             }
             Action::RestoreFromBackup { target } => {
                 if policy.capture_restore_snapshot {
                     // Invert restore to restore, leveraging the latest pre-restore snapshot
-                    actions.push(Action::RestoreFromBackup { target: target.clone() });
+                    actions.push(Action::RestoreFromBackup {
+                        target: target.clone(),
+                    });
                 } else {
                     // Unknown prior state without snapshot; skip.
                 }

@@ -24,13 +24,17 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     // Stable ordering: sort actions by deterministic key (target rel path), then by kind
     actions.sort_by(|a, b| {
         let ka = match a {
-            Action::EnsureSymlink { target, .. } => (0u8, target.rel().to_string_lossy().to_string()),
+            Action::EnsureSymlink { target, .. } => {
+                (0u8, target.rel().to_string_lossy().to_string())
+            }
             Action::RestoreFromBackup { target } => {
                 (1u8, target.rel().to_string_lossy().to_string())
             }
         };
         let kb = match b {
-            Action::EnsureSymlink { target, .. } => (0u8, target.rel().to_string_lossy().to_string()),
+            Action::EnsureSymlink { target, .. } => {
+                (0u8, target.rel().to_string_lossy().to_string())
+            }
             Action::RestoreFromBackup { target } => {
                 (1u8, target.rel().to_string_lossy().to_string())
             }

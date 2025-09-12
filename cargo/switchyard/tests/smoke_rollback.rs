@@ -26,7 +26,10 @@ impl FactsEmitter for TestEmitter {
 struct FailingSmoke;
 
 impl SmokeTestRunner for FailingSmoke {
-    fn run(&self, _plan: &switchyard::types::plan::Plan) -> std::result::Result<(), switchyard::adapters::SmokeFailure> {
+    fn run(
+        &self,
+        _plan: &switchyard::types::plan::Plan,
+    ) -> std::result::Result<(), switchyard::adapters::SmokeFailure> {
         Err(switchyard::adapters::SmokeFailure)
     }
 }
@@ -56,12 +59,24 @@ fn smoke_failure_triggers_auto_rollback_and_emits_e_smoke() {
     // Build plan
     let src = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/ls")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: src, target: tgt.clone() }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: src,
+            target: tgt.clone(),
+        }],
+        restore: vec![],
+    });
 
     // Commit mode so smoke runs
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
-    assert!(report.rolled_back, "smoke failure should trigger auto-rollback");
-    assert!(!report.errors.is_empty(), "apply should report errors on smoke failure");
+    assert!(
+        report.rolled_back,
+        "smoke failure should trigger auto-rollback"
+    );
+    assert!(
+        !report.errors.is_empty(),
+        "apply should report errors on smoke failure"
+    );
 
     // Redacted events should include an apply.result failure with E_SMOKE and exit_code 80
     let redacted: Vec<Value> = facts
@@ -71,10 +86,13 @@ fn smoke_failure_triggers_auto_rollback_and_emits_e_smoke() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_SMOKE")) &&
-        e.get("exit_code") == Some(&Value::from(80))
-    }), "expected E_SMOKE failure with exit_code=80 in apply.result");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_SMOKE"))
+                && e.get("exit_code") == Some(&Value::from(80))
+        }),
+        "expected E_SMOKE failure with exit_code=80 in apply.result"
+    );
 }

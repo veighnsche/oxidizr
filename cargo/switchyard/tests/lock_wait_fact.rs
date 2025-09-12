@@ -47,7 +47,13 @@ fn apply_summary_includes_lock_wait_ms() {
     // Build SafePaths
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 

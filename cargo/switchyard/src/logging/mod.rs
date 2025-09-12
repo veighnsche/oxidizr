@@ -1,6 +1,6 @@
+pub mod audit;
 pub mod facts;
 pub mod redact;
-pub mod audit;
 
 pub use facts::{AuditSink, FactsEmitter, JsonlSink};
 pub use redact::{redact_event, ts_for_mode, TS_ZERO};

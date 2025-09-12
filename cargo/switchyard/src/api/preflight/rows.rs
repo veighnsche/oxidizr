@@ -39,12 +39,30 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
         "planned_kind": planned_kind,
     });
     if let Some(ok) = policy_ok {
-        if let Some(o) = row.as_object_mut() { o.insert("policy_ok".into(), json!(ok)); }
+        if let Some(o) = row.as_object_mut() {
+            o.insert("policy_ok".into(), json!(ok));
+        }
     }
-    if let Some(p) = provenance.as_ref() { if let Some(o) = row.as_object_mut() { o.insert("provenance".into(), p.clone()); } }
-    if let Some(ns) = notes.as_ref() { if let Some(o) = row.as_object_mut() { o.insert("notes".into(), json!(ns)); } }
-    if let Some(p) = preservation.as_ref() { if let Some(o) = row.as_object_mut() { o.insert("preservation".into(), p.clone()); } }
-    if let Some(ps) = preservation_supported { if let Some(o) = row.as_object_mut() { o.insert("preservation_supported".into(), json!(ps)); } }
+    if let Some(p) = provenance.as_ref() {
+        if let Some(o) = row.as_object_mut() {
+            o.insert("provenance".into(), p.clone());
+        }
+    }
+    if let Some(ns) = notes.as_ref() {
+        if let Some(o) = row.as_object_mut() {
+            o.insert("notes".into(), json!(ns));
+        }
+    }
+    if let Some(p) = preservation.as_ref() {
+        if let Some(o) = row.as_object_mut() {
+            o.insert("preservation".into(), p.clone());
+        }
+    }
+    if let Some(ps) = preservation_supported {
+        if let Some(o) = row.as_object_mut() {
+            o.insert("preservation_supported".into(), json!(ps));
+        }
+    }
     rows.push(row);
 
     // Emit fact

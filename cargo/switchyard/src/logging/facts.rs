@@ -37,7 +37,11 @@ impl FileJsonlSink {
         if let Some(parent) = self.path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&self.path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+        {
             use std::io::Write as _;
             let _ = f.write_all(line.as_bytes());
             let _ = f.write_all(b"\n");
@@ -51,7 +55,8 @@ impl FactsEmitter for FileJsonlSink {
         // Merge subsystem/event/decision into the JSON object if it's an object; otherwise, wrap.
         let out = match fields {
             Value::Object(mut m) => {
-                m.entry("subsystem".into()).or_insert(Value::from(subsystem));
+                m.entry("subsystem".into())
+                    .or_insert(Value::from(subsystem));
                 m.entry("event".into()).or_insert(Value::from(event));
                 m.entry("decision".into()).or_insert(Value::from(decision));
                 Value::Object(m)

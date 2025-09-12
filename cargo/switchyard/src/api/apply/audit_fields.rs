@@ -1,7 +1,11 @@
 use serde_json::{json, Value};
 
 /// Insert optional before/after hashes into a per-action extra fields object.
-pub(crate) fn insert_hashes(extra: &mut Value, before_hash: &Option<String>, after_hash: &Option<String>) {
+pub(crate) fn insert_hashes(
+    extra: &mut Value,
+    before_hash: &Option<String>,
+    after_hash: &Option<String>,
+) {
     if let Some(bh) = before_hash.as_ref() {
         if let Some(obj) = extra.as_object_mut() {
             obj.insert("hash_alg".to_string(), json!("sha256"));

@@ -45,12 +45,21 @@ fn commit_requires_smoke_runner_when_policy_enforced() {
     // Build plan: single link action
     let src = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/ls")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: src, target: tgt }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: src,
+            target: tgt,
+        }],
+        restore: vec![],
+    });
 
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     // Expect failure and (optional) rollback
-    assert!(!report.errors.is_empty(), "apply should fail when smoke runner missing under policy");
+    assert!(
+        !report.errors.is_empty(),
+        "apply should fail when smoke runner missing under policy"
+    );
 
     // Redacted events should include an apply.result failure with E_SMOKE and exit_code 80
     let redacted: Vec<Value> = facts
@@ -60,10 +69,13 @@ fn commit_requires_smoke_runner_when_policy_enforced() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_SMOKE")) &&
-        e.get("exit_code") == Some(&Value::from(80))
-    }), "expected E_SMOKE failure with exit_code=80 in apply.result");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_SMOKE"))
+                && e.get("exit_code") == Some(&Value::from(80))
+        }),
+        "expected E_SMOKE failure with exit_code=80 in apply.result"
+    );
 }

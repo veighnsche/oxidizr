@@ -41,7 +41,13 @@ fn ensure_symlink_emits_e_exdev_when_fallback_disallowed() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     // Simulate EXDEV during atomic rename
     std::env::set_var("SWITCHYARD_FORCE_EXDEV", "1");
@@ -56,10 +62,13 @@ fn ensure_symlink_emits_e_exdev_when_fallback_disallowed() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result")) &&
-        e.get("decision") == Some(&Value::from("failure")) &&
-        e.get("error_id") == Some(&Value::from("E_EXDEV")) &&
-        e.get("exit_code") == Some(&Value::from(50))
-    }), "expected E_EXDEV failure with exit_code=50 in apply.result");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_EXDEV"))
+                && e.get("exit_code") == Some(&Value::from(50))
+        }),
+        "expected E_EXDEV failure with exit_code=50 in apply.result"
+    );
 }

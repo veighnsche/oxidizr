@@ -26,8 +26,14 @@ impl switchyard::adapters::LockGuard for TimeoutGuard {}
 
 struct TimeoutLock;
 impl switchyard::adapters::LockManager for TimeoutLock {
-    fn acquire_process_lock(&self, _timeout_ms: u64) -> switchyard::types::errors::Result<Box<dyn switchyard::adapters::LockGuard>> {
-        Err(switchyard::types::errors::Error { kind: switchyard::types::errors::ErrorKind::Io, msg: "timeout".to_string() })
+    fn acquire_process_lock(
+        &self,
+        _timeout_ms: u64,
+    ) -> switchyard::types::errors::Result<Box<dyn switchyard::adapters::LockGuard>> {
+        Err(switchyard::types::errors::Error {
+            kind: switchyard::types::errors::ErrorKind::Io,
+            msg: "timeout".to_string(),
+        })
     }
 }
 
@@ -41,7 +47,10 @@ fn locking_timeout_emits_e_locking_exit_code_and_lock_wait_ms() {
         .with_lock_timeout_ms(10);
 
     // Empty plan is fine; lock timeout happens before any action
-    let plan = api.plan(PlanInput { link: vec![], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: vec![],
+    });
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     let evs = facts.events.lock().unwrap();
@@ -87,5 +96,9 @@ fn locking_timeout_emits_e_locking_exit_code_and_lock_wait_ms() {
         std::fs::write(&path, serde_json::to_string_pretty(&canon).unwrap()).unwrap();
     }
 
-    assert_eq!(canon, expected.as_array().unwrap().clone(), "locking timeout canon mismatch");
+    assert_eq!(
+        canon,
+        expected.as_array().unwrap().clone(),
+        "locking timeout canon mismatch"
+    );
 }

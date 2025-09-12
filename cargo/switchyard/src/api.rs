@@ -1,22 +1,22 @@
 // Facade for API module; delegates to submodules under src/api/
 
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
+use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
-use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 
 // Internal API submodules (planned split)
+#[path = "api/apply.rs"]
+mod apply_impl;
 #[path = "api/errors.rs"]
 pub mod errors;
-#[path = "api/rollback.rs"]
-mod rollback;
 #[path = "api/plan.rs"]
 mod plan_impl;
 #[path = "api/preflight.rs"]
 mod preflight_impl;
-#[path = "api/apply.rs"]
-mod apply_impl;
+#[path = "api/rollback.rs"]
+mod rollback;
 
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
@@ -76,11 +76,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         Ok(preflight_impl::run(self, plan))
     }
 
-    pub fn apply(
-        &self,
-        plan: &Plan,
-        mode: ApplyMode,
-    ) -> Result<ApplyReport, errors::ApiError> {
+    pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> Result<ApplyReport, errors::ApiError> {
         Ok(apply_impl::run(self, plan, mode))
     }
 

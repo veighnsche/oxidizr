@@ -32,11 +32,22 @@ impl<'a> AuditCtx<'a> {
         ts: String,
         mode: AuditMode,
     ) -> Self {
-        Self { facts, plan_id, ts, mode }
+        Self {
+            facts,
+            plan_id,
+            ts,
+            mode,
+        }
     }
 }
 
-fn redact_and_emit(ctx: &AuditCtx, subsystem: &str, event: &str, decision: &str, mut fields: Value) {
+fn redact_and_emit(
+    ctx: &AuditCtx,
+    subsystem: &str,
+    event: &str,
+    decision: &str,
+    mut fields: Value,
+) {
     // Ensure minimal envelope fields
     if let Some(obj) = fields.as_object_mut() {
         obj.entry("schema_version").or_insert(json!(SCHEMA_VERSION));
@@ -46,7 +57,11 @@ fn redact_and_emit(ctx: &AuditCtx, subsystem: &str, event: &str, decision: &str,
         obj.entry("dry_run").or_insert(json!(ctx.mode.dry_run));
     }
     // Apply redaction policy in dry-run or when requested
-    let out = if ctx.mode.redact { redact_event(fields) } else { fields };
+    let out = if ctx.mode.redact {
+        redact_event(fields)
+    } else {
+        fields
+    };
     ctx.facts.emit(subsystem, event, decision, out);
 }
 
@@ -94,7 +109,7 @@ pub(crate) fn emit_preflight_fact_ext(
     notes: Option<Vec<String>>,
     preservation: Option<Value>,
     preservation_supported: Option<bool>,
-){
+) {
     let mut fields = json!({
         "ts": TS_ZERO,
         "stage": "preflight",
@@ -105,11 +120,21 @@ pub(crate) fn emit_preflight_fact_ext(
         "planned_kind": planned_kind,
     });
     if let Some(obj) = fields.as_object_mut() {
-        if let Some(ok) = policy_ok { obj.insert("policy_ok".into(), json!(ok)); }
-        if let Some(p) = provenance { obj.insert("provenance".into(), p); }
-        if let Some(n) = notes { obj.insert("notes".into(), json!(n)); }
-        if let Some(p) = preservation { obj.insert("preservation".into(), p); }
-        if let Some(s) = preservation_supported { obj.insert("preservation_supported".into(), json!(s)); }
+        if let Some(ok) = policy_ok {
+            obj.insert("policy_ok".into(), json!(ok));
+        }
+        if let Some(p) = provenance {
+            obj.insert("provenance".into(), p);
+        }
+        if let Some(n) = notes {
+            obj.insert("notes".into(), json!(n));
+        }
+        if let Some(p) = preservation {
+            obj.insert("preservation".into(), p);
+        }
+        if let Some(s) = preservation_supported {
+            obj.insert("preservation_supported".into(), json!(s));
+        }
     }
     ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "preflight", "success", fields);

@@ -70,10 +70,7 @@ pub(crate) fn gating_errors(
                 }
                 if !policy.allow_roots.is_empty() {
                     let target_abs = target.as_path();
-                    let in_allowed = policy
-                        .allow_roots
-                        .iter()
-                        .any(|r| target_abs.starts_with(r));
+                    let in_allowed = policy.allow_roots.iter().any(|r| target_abs.starts_with(r));
                     if !in_allowed {
                         gating_errors.push(format!(
                             "target outside allowed roots: {}",
@@ -114,10 +111,7 @@ pub(crate) fn gating_errors(
                 }
                 if !policy.allow_roots.is_empty() {
                     let target_abs = target.as_path();
-                    let in_allowed = policy
-                        .allow_roots
-                        .iter()
-                        .any(|r| target_abs.starts_with(r));
+                    let in_allowed = policy.allow_roots.iter().any(|r| target_abs.starts_with(r));
                     if !in_allowed {
                         gating_errors.push(format!(
                             "target outside allowed roots: {}",

@@ -6,8 +6,8 @@ use std::path::Path;
 use rustix::fs::{unlinkat, AtFlags};
 
 use super::atomic::{atomic_symlink_swap, open_dir_nofollow};
-use super::paths::is_safe_path;
 use super::backup::create_snapshot;
+use super::paths::is_safe_path;
 
 /// Atomically replace a file with a symlink, creating a backup. Emits no logs; pure mechanism.
 /// Returns Ok(true) when degraded EXDEV fallback was used (non-atomic), Ok(false) otherwise.
@@ -74,8 +74,9 @@ pub fn replace_file_with_symlink(
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("target");
-            let fname_c = std::ffi::CString::new(fname)
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+            let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+            })?;
             let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
         }
         let res = atomic_symlink_swap(source, target, allow_degraded)?;
@@ -87,7 +88,9 @@ pub fn replace_file_with_symlink(
         if let Ok(_meta) = metadata {
             // Snapshot current file state before mutation
             if let Err(e) = create_snapshot(target, backup_tag) {
-                if !dry_run { return Err(e); }
+                if !dry_run {
+                    return Err(e);
+                }
             }
             // Remove original target (will be replaced by atomic swap below)
             if let Some(parent) = target.parent() {
@@ -96,8 +99,9 @@ pub fn replace_file_with_symlink(
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("target");
-                let fname_c = std::ffi::CString::new(fname)
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+                let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?;
                 unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty())
                     .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
             } else {
@@ -107,7 +111,9 @@ pub fn replace_file_with_symlink(
     } else {
         // Create tombstone snapshot
         if let Err(e) = create_snapshot(target, backup_tag) {
-            if !dry_run { return Err(e); }
+            if !dry_run {
+                return Err(e);
+            }
         }
     }
 
@@ -121,8 +127,9 @@ pub fn replace_file_with_symlink(
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("target");
-        let fname_c = std::ffi::CString::new(fname)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+        let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
         let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
     }
     let res = atomic_symlink_swap(source, target, allow_degraded)?;
@@ -132,8 +139,8 @@ pub fn replace_file_with_symlink(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::restore_file;
     use crate::constants::DEFAULT_BACKUP_TAG;
+    use crate::fs::restore_file;
 
     fn tmpdir() -> tempfile::TempDir {
         tempfile::tempdir().expect("tempdir")
@@ -177,12 +184,18 @@ mod tests {
         // Replace target with symlink to source; backup should be created
         let _ = replace_file_with_symlink(&src, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         let md = std::fs::symlink_metadata(&tgt).unwrap();
-        assert!(md.file_type().is_symlink(), "target should be a symlink after replace");
+        assert!(
+            md.file_type().is_symlink(),
+            "target should be a symlink after replace"
+        );
 
         // Restore from backup; target should be a regular file again with prior content prefix
         restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
         let md2 = std::fs::symlink_metadata(&tgt).unwrap();
-        assert!(md2.file_type().is_file(), "target should be a regular file after restore");
+        assert!(
+            md2.file_type().is_file(),
+            "target should be a regular file after restore"
+        );
         let content = std::fs::read_to_string(&tgt).unwrap();
         assert!(content.starts_with("old"));
     }

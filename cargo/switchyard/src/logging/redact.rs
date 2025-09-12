@@ -6,7 +6,9 @@ use time::OffsetDateTime;
 pub const TS_ZERO: &str = "1970-01-01T00:00:00Z";
 
 pub fn now_iso() -> String {
-    OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_else(|_| TS_ZERO.to_string())
+    OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .unwrap_or_else(|_| TS_ZERO.to_string())
 }
 
 #[cfg(test)]
@@ -42,7 +44,10 @@ mod tests {
         let att = out.get("attestation").and_then(|v| v.as_object()).unwrap();
         assert_eq!(att.get("signature").and_then(|v| v.as_str()), Some("***"));
         assert_eq!(att.get("bundle_hash").and_then(|v| v.as_str()), Some("***"));
-        assert_eq!(att.get("public_key_id").and_then(|v| v.as_str()), Some("***"));
+        assert_eq!(
+            att.get("public_key_id").and_then(|v| v.as_str()),
+            Some("***")
+        );
     }
 }
 

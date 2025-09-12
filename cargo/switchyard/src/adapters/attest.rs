@@ -8,5 +8,7 @@ pub trait Attestor: Send + Sync {
     /// Return a stable identifier for the public key used to sign (e.g., fingerprint or KID).
     fn key_id(&self) -> String;
     /// Return the signature algorithm label for attestations. Defaults to "ed25519".
-    fn algorithm(&self) -> &'static str { "ed25519" }
+    fn algorithm(&self) -> &'static str {
+        "ed25519"
+    }
 }

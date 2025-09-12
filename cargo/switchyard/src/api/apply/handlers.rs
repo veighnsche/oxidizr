@@ -6,10 +6,10 @@ use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::action_id;
 use crate::types::Action;
 
-use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
-use crate::logging::audit::{emit_apply_attempt, emit_apply_result, ensure_provenance, AuditCtx};
 use super::audit_fields::{insert_hashes, maybe_warn_fsync};
 use crate::api::errors::{exit_code_for, id_str, ErrorId};
+use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
+use crate::logging::audit::{emit_apply_attempt, emit_apply_result, ensure_provenance, AuditCtx};
 
 /// Handle an EnsureSymlink action: perform the operation and emit per-action facts.
 /// Returns (executed_action_if_success, error_message_if_failure).
@@ -53,11 +53,21 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         api.policy.allow_degraded_fs,
         &api.policy.backup_tag,
     ) {
-        Ok((d, ms)) => { degraded_used = d; fsync_ms = ms; }
+        Ok((d, ms)) => {
+            degraded_used = d;
+            fsync_ms = ms;
+        }
         Err(e) => {
             // Map to Silver-tier error ids for atomic swap/exdev
             let emsg = e.to_string();
-            let id = if emsg.contains("sidecar write failed") { ErrorId::E_POLICY } else { match e.raw_os_error() { Some(code) if code == libc::EXDEV => ErrorId::E_EXDEV, _ => ErrorId::E_ATOMIC_SWAP, } };
+            let id = if emsg.contains("sidecar write failed") {
+                ErrorId::E_POLICY
+            } else {
+                match e.raw_os_error() {
+                    Some(code) if code == libc::EXDEV => ErrorId::E_EXDEV,
+                    _ => ErrorId::E_ATOMIC_SWAP,
+                }
+            };
             let msg = format!(
                 "symlink {} -> {} failed: {}",
                 source.as_path().display(),
@@ -144,11 +154,11 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         )
     } else {
         crate::fs::restore_file(
-        &target.as_path(),
-        dry,
-        api.policy.force_restore_best_effort,
-        &api.policy.backup_tag,
-    )
+            &target.as_path(),
+            dry,
+            api.policy.force_restore_best_effort,
+            &api.policy.backup_tag,
+        )
     };
     match restore_res {
         Ok(()) => {
@@ -179,7 +189,10 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                 }
             }
             use std::io::ErrorKind;
-            let id = match e.kind() { ErrorKind::NotFound => ErrorId::E_BACKUP_MISSING, _ => ErrorId::E_RESTORE_FAILED };
+            let id = match e.kind() {
+                ErrorKind::NotFound => ErrorId::E_BACKUP_MISSING,
+                _ => ErrorId::E_RESTORE_FAILED,
+            };
             let msg = format!("restore {} failed: {}", target.as_path().display(), e);
             let decision = "failure";
             let mut extra = json!({

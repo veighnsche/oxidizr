@@ -9,11 +9,11 @@
 use std::fs;
 use std::path::Path;
 
+use crate::constants::TMP_SUFFIX;
 use rustix::fd::OwnedFd;
 use rustix::fs::{openat, renameat, symlinkat, unlinkat, AtFlags, Mode, OFlags, CWD};
 use rustix::io::Errno;
 use std::time::Instant;
-use crate::constants::TMP_SUFFIX;
 
 fn errno_to_io(e: Errno) -> std::io::Error {
     std::io::Error::from_raw_os_error(e.raw_os_error())

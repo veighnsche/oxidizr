@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::constants::LOCK_POLL_MS;
 use crate::types::errors::{Error, ErrorKind, Result};
 use fs2::FileExt;
-use crate::constants::LOCK_POLL_MS;
 
 use super::{LockGuard, LockManager};
 
@@ -39,13 +39,19 @@ impl LockManager for FileLockManager {
             .read(true)
             .write(true)
             .open(&self.path)
-            .map_err(|e| Error { kind: ErrorKind::Io, msg: e.to_string() })?;
+            .map_err(|e| Error {
+                kind: ErrorKind::Io,
+                msg: e.to_string(),
+            })?;
         loop {
             match file.try_lock_exclusive() {
                 Ok(()) => return Ok(Box::new(FileGuard { file })),
                 Err(_e) => {
                     if t0.elapsed() >= Duration::from_millis(timeout_ms) {
-                        return Err(Error { kind: ErrorKind::Policy, msg: "E_LOCKING: timeout acquiring process lock".to_string() });
+                        return Err(Error {
+                            kind: ErrorKind::Policy,
+                            msg: "E_LOCKING: timeout acquiring process lock".to_string(),
+                        });
                     }
                     thread::sleep(Duration::from_millis(LOCK_POLL_MS));
                 }
