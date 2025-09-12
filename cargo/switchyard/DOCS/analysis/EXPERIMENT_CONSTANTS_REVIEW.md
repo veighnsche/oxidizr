@@ -22,10 +22,23 @@ Contents found
   ];
   ```
 
+**Verified Claims:**
+- The `CHECKSUM_BINS` constant is indeed located in `cargo/oxidizr-arch/src/experiments/constants.rs`.
+- This constant is used as an allowlist of checksum utilities that should generally be preserved during experiments.
+- The list includes all common checksum utilities: b2sum, md5sum, sha1sum, sha224sum, sha256sum, sha384sum, sha512sum.
+
+**Verified Implementation:**
+- The constant is correctly defined as a slice of strings containing checksum binary names.
+- The purpose aligns with the documented intent to preserve these binaries during swaps.
+- The classification as a policy default rather than a true constant is appropriate since different environments may require different checksum utilities.
+
+**Citations:**
+- `cargo/oxidizr-arch/src/experiments/constants.rs:L1-L9` - CHECKSUM_BINS definition
+
 Interpretation and classification
 
 - Purpose: This is an allowlist of checksum utilities. In the context of experiments (e.g., coreutils/uutils swaps), these binaries should generally be preserved (not replaced) to avoid breaking package build tools and integrity checks during operations.
-- Classification: Policy default, not a “true constant”.
+- Classification: Policy default, not a "true constant".
   - True constants should be values that do not depend on deployment, distro, or user goals (e.g., schema version strings, stable names of sidecar keys, file suffixes).
   - This allowlist is an operational choice (policy) and may vary by environment, distro, or user preference. It should be configurable.
 

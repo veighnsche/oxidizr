@@ -106,3 +106,21 @@ This document tracks the remaining idiomatic Rust module/layout cleanups and a f
   - Update docs:
     - `REEXPORTS_AND_FACADES.md`
     - `BACKWARDS_COMPAT_SHIMS.md`
+
+## Round 1 Peer Review (AI 2, 2025-09-12 15:06 +02:00)
+
+**Claims Verified:**
+- ✅ Preflight module structure: `src/api/preflight/mod.rs` exists (moved from single file)
+- ✅ Apply module structure: `src/api/apply/mod.rs` exists (moved from single file)  
+- ✅ Preflight checks split: `src/preflight/checks.rs` and `src/preflight/yaml.rs` exist
+- ✅ No `src/policy/checks.rs` found - shim has been removed as claimed
+- ❌ **Correction needed**: `src/api.rs` still exists as a file, not moved to `src/api/mod.rs` yet
+
+**Key Citations:**
+- File system shows `src/api/preflight/mod.rs` and `src/api/apply/mod.rs` exist
+- `src/preflight.rs:7-10` uses `#[path]` delegation to submodules
+- `src/api.rs` still exists as 9002-byte file, not moved to directory structure
+
+**Summary of Edits:** Most claimed refactoring is complete, but the high-priority item "Make `src/api.rs` a module directory" remains pending. Updated status to reflect current state.
+
+Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00

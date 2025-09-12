@@ -38,3 +38,22 @@
 - SPEC: §15 Security Requirements; §2 Safety Model
 - PLAN: 90-implementation-tiers.md
 - CODE: `src/fs/atomic.rs`, `src/fs/backup.rs`, `src/fs/restore.rs`, `src/logging/redact.rs`
+
+## Round 1 Peer Review (AI 2, 2025-09-12 15:06 +02:00)
+
+**Claims Verified:**
+- ✅ Path traversal mitigations: `SafePath` type exists in `src/types/safepath.rs`, `open_dir_nofollow` used in atomic operations
+- ✅ Atomicity via `*at` syscalls: `renameat`, `symlinkat`, `unlinkat` used throughout `src/fs/` modules
+- ✅ Backup sidecar schema: `BackupSidecar` struct in `src/fs/backup.rs:244-252` records topology
+- ✅ Redaction: `src/logging/redact.rs` exists and masks sensitive fields
+- ✅ Locking: `FileLockManager` serializes mutations as verified in previous documents
+
+**Key Citations:**
+- `src/types/safepath.rs`: SafePath type definition
+- `src/fs/atomic.rs`: Uses `open_dir_nofollow` and `*at` syscalls
+- `src/fs/backup.rs:244-252`: BackupSidecar schema with prior_kind/prior_dest
+- `src/logging/redact.rs`: Event redaction implementation
+
+**Summary of Edits:** All security claims are supported by the codebase. The threat model and mitigations accurately reflect the implemented security measures.
+
+Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00

@@ -70,3 +70,22 @@
 - SPEC: §2 Safety/Rescue/Degraded; §3 Public Interfaces
 - PLAN: 15-policy-and-adapters.md; 45-preflight.md
 - CODE: `src/policy/config.rs`, `src/policy/gating.rs`, `src/policy/rescue.rs`, `src/preflight/checks.rs`, `src/api/apply/mod.rs`
+
+## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
+
+**Claims Verified:**
+- ✅ `Policy::production_preset()` in `src/policy/config.rs:135-142` enables `require_rescue=true`, `rescue_exec_check=true`, `require_lock_manager=true`, `require_smoke_in_commit=true`
+- ✅ `Policy::coreutils_switch_preset()` in `src/policy/config.rs:180-212` builds on production preset and adds: `allow_degraded_fs=false`, `strict_ownership=true`, `require_preservation=true`, `backup_tag="coreutils"`
+- ✅ Extra mount checks include `/usr`, `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin` (L193-199)
+- ✅ Forbid paths include `/proc`, `/sys`, `/dev`, `/run`, `/tmp` (L202-208)
+- ✅ Both presets have corresponding `apply_*_preset()` mutator methods (L145-151, L215-244)
+
+**Key Citations:**
+- `src/policy/config.rs:135-142`: Production preset implementation
+- `src/policy/config.rs:180-212`: Coreutils switch preset implementation  
+- `src/policy/config.rs:193-199`: Extra mount checks configuration
+- `src/policy/config.rs:202-208`: Forbidden paths configuration
+
+**Summary of Edits:** All claims about preset configurations are accurately verified against the codebase. The document correctly describes the policy flags enabled by each preset and their rationale.
+
+Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00

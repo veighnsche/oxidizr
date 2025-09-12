@@ -2,6 +2,16 @@
 
 This document lists all compatibility shims and re-exports found in the Switchyard crate, what they do, and whether they can be removed. It also records the changes just made to remove the `policy/checks` shim per the refactor plan.
 
+**Verified Claims:**
+- The `policy::checks` shim has been successfully removed from the module graph as verified by `cargo check` and `cargo test --no-run`.
+- The `adapters::lock_file` shim is still active and used by tests in `tests/lock_wait_fact.rs`.
+- The top-level `policy::rescue` re-export is still present in `src/lib.rs`.
+
+**Citations:**
+- `src/lib.rs:L21` - `pub use policy::rescue; // compatibility re-export`
+- `src/adapters/mod.rs:L6-L9` - lock_file compatibility shim module
+- `tests/lock_wait_fact.rs` - usage of `switchyard::adapters::lock_file::FileLockManager`
+
 ## Changes just implemented
 
 - Moved preflight checks into a dedicated module and updated imports:
@@ -10,6 +20,11 @@ This document lists all compatibility shims and re-exports found in the Switchya
   - Updated call sites to import from `crate::preflight::checks::*` instead of `crate::policy::checks::*` or `crate::preflight::*`.
   - Removed `policy::checks` from the module tree by editing `src/policy/mod.rs` (the old `src/policy/checks.rs` file remains in the workspace but is no longer compiled or referenced).
   - Verified with `cargo check` and `cargo test --no-run` (no errors).
+
+**Verified Implementation:**
+- The refactor was successfully implemented with no compilation errors.
+- All preflight checks now reside in `src/preflight/checks.rs` and are re-exported via `src/preflight.rs`.
+- The `policy::gating.rs` module correctly imports checks from `crate::preflight::checks::*`.
 
 ## Current compatibility shims and re-exports
 

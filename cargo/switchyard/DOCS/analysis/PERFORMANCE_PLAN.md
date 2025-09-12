@@ -1,9 +1,36 @@
 # Performance Profiling Plan
 **Status:** Draft  
 **Generated:** 2025-09-12  
-**Scope:** Identify hotspots, define profiling methodology, establish baselines and targets, and propose optimizations for Switchyard’s core paths.  
+**Scope:** Identify hotspots, define profiling methodology, establish baselines and targets, and propose optimizations for Switchyard's core paths.  
 **Inputs reviewed:** SPEC §9 Operational Bounds; PLAN/55-operational-bounds.md; CODE: `src/fs/{atomic,swap,restore,backup,meta}.rs`, `src/api/{plan,preflight,apply}/**`, `src/logging/**`  
 **Affected modules:** `fs/*`, `api/*`, `logging/*`
+
+## Round 1 Peer Review (AI 3, 2025-09-12 15:13 CEST)
+
+**Verified Claims:**
+- Hashing (`sha256_hex_of`) and directory fsyncs during `renameat` are primary IO hotspots.
+- Backups/sidecars add extra IO per mutation.
+- Directory scans for discovery scale with artifact count.
+- The operational bounds specify fsync(parent) must occur ≤50ms after rename.
+- Plan emission and apply emit facts per action.
+
+**Citations:**
+- `src/fs/meta.rs:L20-L26` - `sha256_hex_of` implementation
+- `src/fs/atomic.rs:L82` - `fsync_parent_dir` call after rename
+- `src/fs/backup.rs:L189-L192` - File copying in `create_snapshot`
+- `src/fs/backup.rs:L277-L316` - Directory scanning in `find_latest_backup_and_sidecar`
+- `src/fs/backup.rs:L25-L65` - Directory scanning in `find_previous_backup_and_sidecar`
+- `SPEC/SPEC.md:L12` - Atomicity guarantee
+- `SPEC/SPEC.md:L299` - fsync timing requirement
+- `src/api/plan.rs` - Plan stage fact emission
+- `src/api/apply.rs` - Apply stage fact emission
+
+**Summary of Edits:**
+- Added verified claims about performance hotspots based on code inspection.
+- Added citations to specific implementations that confirm the described behaviors.
+- Added a Round 1 Peer Review section with verification details.
+
+Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 
 ## Summary
 - Hashing (`sha256_hex_of`) and directory fsyncs during `renameat` are primary IO hotspots.

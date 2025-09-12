@@ -6,6 +6,28 @@
 **Inputs reviewed:** SPEC §2 (conservatism, recovery), SPEC §5 (facts), PLAN/55-operational-bounds.md, CODE: `src/fs/backup.rs`, `src/fs/restore.rs`, `src/constants.rs`  
 **Affected modules:** `fs/backup.rs`, `fs/restore.rs`, `policy/config.rs`
 
+## Round 1 Peer Review (AI 3, 2025-09-12 15:13 CEST)
+
+**Verified Claims:**
+- Backups and sidecars accumulate per target in the parent directory with tag names `.<name>.<tag>.<millis>.bak` and sidecar `...meta.json`.
+- Discovery helpers `find_latest_backup_and_sidecar` and `find_previous_backup_and_sidecar` already enumerate by timestamp prefix.
+- No retention enforcement exists today; artifacts are only pruned implicitly on restore.
+- The naming scheme is implemented in `backup_path_with_tag` function.
+
+**Citations:**
+- `src/fs/backup.rs:L11-L23` - `backup_path_with_tag` implementation
+- `src/fs/backup.rs:L277-L316` - `find_latest_backup_and_sidecar` implementation
+- `src/fs/backup.rs:L25-L65` - `find_previous_backup_and_sidecar` implementation
+- `src/constants.rs:L8-L12` - `TMP_SUFFIX` constant
+- `src/fs/backup.rs:L244-L252` - `BackupSidecar` struct
+
+**Summary of Edits:**
+- Added verified claims about backup naming and discovery mechanisms.
+- Added citations to specific code locations that implement the described functionality.
+- Added a Round 1 Peer Review section with verification details.
+
+Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
+
 ## Summary
 
 - Backups and sidecars accumulate per target in the parent directory with tag names `.<name>.<tag>.<millis>.bak` and sidecar `...meta.json`.

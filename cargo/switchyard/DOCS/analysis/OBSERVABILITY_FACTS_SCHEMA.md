@@ -74,3 +74,28 @@
 - SPEC: §2.4 Observability; §5 Audit Facts; `SPEC/audit_event.schema.json`
 - PLAN: 40-facts-logging.md; 35-determinism.md
 - CODE: `src/logging/audit.rs`, `src/logging/redact.rs`, `src/api/{plan,preflight,apply}/**`
+
+## Round 1 Peer Review (AI 1, 2025-09-12 15:14 +02:00)
+
+- Claims verified
+  - Minimal envelope is enforced for all facts.
+    - Proof: `src/logging/audit.rs::redact_and_emit()` inserts `schema_version`, `ts`, `plan_id`, `path`, and `dry_run` before emission (lines 51–58).
+  - Emission sites per stage are implemented and wired correctly.
+    - Proof: `plan` facts via `src/api/plan.rs::build()` calling `emit_plan_fact` (lines 59–65); `preflight` rows via `src/api/preflight/rows.rs::push_row_emit()` calling `emit_preflight_fact_ext`; `preflight` summary via `src/api/preflight/mod.rs::run()` calling `emit_summary_extra` (line 270); `apply.attempt` and `apply.result` via `src/api/apply/mod.rs` (multiple calls, e.g., lines 151–158, 174–183, 185–192, 409–411); `rollback` steps via `src/api/apply/mod.rs` (lines 244–261) calling `emit_rollback_step`.
+  - Determinism and redaction behavior are present.
+    - Proof: `src/logging/redact.rs::ts_for_mode()` returns `TS_ZERO` for `ApplyMode::DryRun` (lines 57–61); `src/logging/redact.rs::redact_event()` zeroes `ts` and removes `duration_ms`, `lock_wait_ms`, `severity`, `degraded`, and hash fields; masks `provenance.helper` and `attestation.*` (lines 67–101). Plan/action IDs are UUIDv5 via `src/types/ids.rs::{plan_id, action_id}`.
+  - Facts schema v1 alignment.
+    - Proof: `SPEC/audit_event.schema.json` defines required fields and enumerations; `src/logging/audit.rs` uses `SCHEMA_VERSION=1` and ensures required envelope.
+  - Provenance and attestation handling.
+    - Proof: `src/logging/audit.rs::ensure_provenance()` ensures `provenance.env_sanitized=true`; `src/api/apply/mod.rs` success path adds an attestation block with `sig_alg`, `signature`, `bundle_hash`, `public_key_id` (lines 359–384).
+
+- Key citations
+  - `src/logging/audit.rs::{redact_and_emit, ensure_provenance, emit_*}`
+  - `src/logging/redact.rs::{ts_for_mode, redact_event}`
+  - `src/api/plan.rs::build`, `src/api/preflight/{mod.rs,rows.rs}`, `src/api/apply/mod.rs`
+  - `SPEC/audit_event.schema.json`
+
+- Summary of edits
+  - Added explicit code/spec citations proving envelope enforcement, emission coverage across stages, determinism/redaction rules, and attestation/provenance handling. Recommendations stand; consider adding `summary_error_ids` array as noted.
+
+Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00

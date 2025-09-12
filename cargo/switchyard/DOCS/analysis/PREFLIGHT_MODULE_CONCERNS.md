@@ -101,3 +101,21 @@ Relevant paths:
 - **Is there parallel preflight logic?** No. Only `src/api/preflight.rs` runs the preflight stage. The others are helpers.
 - **Is there overlap?** Yes in naming and import paths. Checks are accessible via two namespaces due to a re-export shim, which can confuse ownership and evolveability.
 - **Is this harmful now?** Not functionally, but it increases cognitive load and the risk of drift. The cleanup above lowers that risk and clarifies responsibility.
+
+## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
+
+**Claims Verified:**
+- ✅ `src/preflight.rs` exists as a delegator using `#[path]` attributes to `preflight/checks.rs` and `preflight/yaml.rs` (L7-10)
+- ✅ `src/api/preflight/mod.rs` orchestrates the preflight stage and emits facts (L17-292), depends on `rows.rs` helper (L15)
+- ✅ No `src/policy/checks.rs` file found - the re-export shim has been removed as claimed in the migration plan
+- ✅ `src/preflight.rs` re-exports common helpers: `check_immutable`, `check_source_trust`, `ensure_mount_rw_exec` (L13)
+
+**Key Citations:**
+- `src/preflight.rs:7-10`: Uses `#[path]` attributes for submodules
+- `src/api/preflight/mod.rs:17`: Main preflight orchestration function
+- `src/preflight/checks.rs`: Contains the actual check implementations
+- File system shows no `src/policy/checks.rs` exists
+
+**Summary of Edits:** Verified that the "triple preflight" concern is accurate but the migration appears partially complete - the policy/checks.rs shim has been removed. The document correctly identifies the naming overlap and layering concerns.
+
+Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00

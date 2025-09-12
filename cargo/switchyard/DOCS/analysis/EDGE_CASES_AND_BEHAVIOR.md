@@ -209,3 +209,22 @@ This document enumerates notable user-behavior edge cases and how Switchyard beh
 - `src/preflight/checks.rs` — ensure_mount_rw_exec, check_immutable, check_source_trust
 - `src/api/apply/mod.rs` — locking, policy gating, smoke tests, rollback behavior
 - `src/api/preflight/mod.rs` — per-action gating rows and summary facts
+
+## Round 1 Peer Review (AI 4, 2025-09-12 15:16 CET)
+
+- **Claims Verified:**
+  - Multiple experiments with different policies can be managed by creating separate `Switchyard` instances with distinct `Policy` configurations. Cited `src/policy/config.rs` for policy fields and presets.
+  - Package manager updates overwriting targets are handled by `restore_file()` which checks `prior_kind` and restores symlink topology. Cited `src/fs/restore.rs: restore_file()`.
+  - Concurrency within Switchyard processes can use `LockManager` for serialization. Cited `src/adapters/lock/file.rs` for `FileLockManager` implementation.
+  - Cross-filesystem moves (EXDEV) behavior is controlled by `Policy.allow_degraded_fs`. Cited `src/policy/config.rs: allow_degraded_fs` and `src/fs/swap.rs: replace_file_with_symlink()`.
+- **Key Citations:**
+  - `src/policy/config.rs`: Policy structure and presets.
+  - `src/fs/restore.rs: restore_file()`: Restore logic and idempotence checks.
+  - `src/fs/swap.rs: replace_file_with_symlink()`: Atomic swap and EXDEV fallback.
+  - `src/adapters/lock/file.rs`: LockManager implementation for concurrency control.
+- **Summary of Edits:**
+  - Added specific code citations to support claims about policy management, restore behavior, concurrency, and cross-filesystem operations.
+  - Clarified the behavior of `restore_file()` with respect to missing backups and the `force_restore_best_effort` flag.
+  - No major content changes were necessary as the claims aligned well with the codebase.
+
+Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET

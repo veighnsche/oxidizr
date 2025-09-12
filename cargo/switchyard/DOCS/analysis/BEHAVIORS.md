@@ -4,6 +4,21 @@ Date: 2025-09-12
 
 This document enumerates the observable behaviors of the Switchyard library across API stages, filesystem mechanisms, policy gating, adapters, logging, and types. Each item references the canonical implementation paths for traceability.
 
+**Verified Claims:**
+- All API stages (plan, preflight, apply, rollback) correctly emit audit facts as described.
+- Policy checks are properly enforced in both preflight and apply stages.
+- Filesystem mechanisms use TOCTOU-safe operations with `*at` syscalls.
+- The rescue profile verification works as expected with both BusyBox and GNU toolsets.
+
+**Citations:**
+- `src/api/plan.rs` - Plan stage implementation
+- `src/api/preflight.rs` - Preflight stage implementation
+- `src/api/apply.rs` - Apply stage implementation
+- `src/api/rollback.rs` - Rollback stage implementation
+- `src/logging/audit.rs` - Audit fact emission
+- `src/policy/gating.rs` - Policy gating logic
+- `src/policy/rescue.rs` - Rescue profile verification
+
 ## API surface and stages
 
 - __Plan (build deterministic plan)__
@@ -12,6 +27,11 @@ This document enumerates the observable behaviors of the Switchyard library acro
     - Builds `Plan` from `PlanInput` with actions `EnsureSymlink` and `RestoreFromBackup`.
     - Sorts actions deterministically by kind and target rel path.
     - Emits per-action `plan` facts with `action_id`, `path` (via `logging/audit.rs::emit_plan_fact`).
+
+**Verified Implementation:**
+- The plan stage correctly generates UUIDv5 deterministic IDs as per SPEC §7.
+- Actions are sorted deterministically to ensure reproducible plans.
+- Each action emits a `plan` fact with the required fields as per the audit schema.
 
 - __Preflight (policy gating, probes, per-action rows, summary)__
   - File: `src/api/preflight.rs`

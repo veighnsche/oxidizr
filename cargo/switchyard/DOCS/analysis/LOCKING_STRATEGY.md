@@ -67,3 +67,22 @@
 - SPEC: §2.5 Locking
 - PLAN: 50-locking-concurrency.md
 - CODE: `src/api/apply/mod.rs`, `src/adapters/lock/{mod,file}.rs`, `src/constants.rs`, `src/policy/config.rs`
+
+## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
+
+**Claims Verified:**
+- ✅ `LockManager` trait in `src/adapters/lock/mod.rs:6-8` with `acquire_process_lock(&self, timeout_ms: u64)` method
+- ✅ `FileLockManager` in `src/adapters/lock/file.rs:12-61` uses `fs2` advisory locks with polling at `LOCK_POLL_MS` intervals
+- ✅ Constants in `src/constants.rs`: `DEFAULT_LOCK_TIMEOUT_MS = 5000` (L22), `LOCK_POLL_MS = 25` (L19)
+- ✅ Apply module in `src/api/apply/mod.rs:57-77` tracks `lock_wait_ms` and emits `E_LOCKING` with exit code 30 on timeout
+- ✅ Policy controls in `src/policy/config.rs`: `require_lock_manager`, `allow_unlocked_commit` fields (L58-66)
+
+**Key Citations:**
+- `src/adapters/lock/mod.rs:6-8`: LockManager trait definition
+- `src/adapters/lock/file.rs:46-59`: Polling loop with timeout and `LOCK_POLL_MS`
+- `src/api/apply/mod.rs:67-77`: Lock failure handling with `E_LOCKING` error
+- `src/constants.rs:19,22`: Lock timing constants
+
+**Summary of Edits:** All technical claims about locking implementation are accurately supported. The document correctly describes the adapter interface, file-based implementation, timing constants, and error handling.
+
+Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00

@@ -1,4 +1,5 @@
 # Public API Surface Audit
+
 **Status:** Draft  
 **Generated:** 2025-09-12  
 **Scope:** Inventory all publicly exposed items across `fs`, `types`, `logging`, `policy`, `preflight`, `api`, and `adapters`; classify stability and propose cleanup/re-exports.  
@@ -6,6 +7,7 @@
 **Affected modules:** `src/lib.rs`, `src/api.rs`, `src/api/errors.rs`, `src/types/**`, `src/fs/**`, `src/logging/**`, `src/policy/**`, `src/preflight.rs`, `src/adapters/**`, `src/constants.rs`
 
 ## Summary
+
 - Switchyard exposes a clean facade via `src/lib.rs` (`pub mod …; pub use api::*;`) with focused core types (`SafePath`, `Plan`, `ApplyMode`, reports) and the `Switchyard` orchestrator.
 - Low-level FS atoms (`open_dir_nofollow`, `atomic_symlink_swap`, `fsync_parent_dir`) are publicly re-exported from `fs/` and should be considered Internal; they are footguns for integrators and duplicate internal invariants.
 - Adapters’ trait surfaces (LockManager, OwnershipOracle, SmokeTestRunner, Attestor, PathResolver) are stable; default impls (`FileLockManager`, `FsOwnershipOracle`, `DefaultSmokeRunner`) are provisional.
@@ -58,6 +60,7 @@ Legend: Stability = Stable | Provisional | Internal (consider private)
   - `constants::{DEFAULT_BACKUP_TAG, TMP_SUFFIX, FSYNC_WARN_MS, LOCK_POLL_MS, DEFAULT_LOCK_TIMEOUT_MS, NS_TAG, RESCUE_MUST_HAVE, RESCUE_MIN_COUNT}` — Provisional — `src/constants.rs`
 
 ## Recommendations
+
 - Tighten FS surface
   1. Mark `fs::open_dir_nofollow`, `fs::atomic_symlink_swap`, `fs::fsync_parent_dir`, and `fs::paths::is_safe_path` as `pub(crate)` and stop re-exporting them from `fs::mod.rs`. Keep only `replace_file_with_symlink`, `restore_file`, `restore_file_prev`, and metadata/backup helpers public.
   2. Document `replace_file_with_symlink` invariants (preconditions and guarantees) in Rustdoc, pointing to SPEC §2.1 and §2.10.
@@ -67,26 +70,56 @@ Legend: Stability = Stable | Provisional | Internal (consider private)
 
 - Preflight naming
   4. Avoid duplicate naming with `fs::mount::ensure_rw_exec` vs `preflight::checks::ensure_mount_rw_exec`. Either:
-     - Re-export the `fs::mount` helper into preflight and remove the wrapper, or
-     - Rename the preflight wrapper to `ensure_mount_is_rw_exec_preflight`.
+  - Re-export the `fs::mount` helper into preflight and remove the wrapper, or
+  - Rename the preflight wrapper to `ensure_mount_is_rw_exec_preflight`.
 
 - Shims and aliases
   5. Mark `adapters::lock_file::*` as deprecated in Rustdoc with a pointer to `adapters::lock::file::*` and a removal timeline.
 
 ## Risks & Trade-offs
+
 - Reducing public FS atoms may break power users. Mitigate with a deprecation window and release notes.
 - Stabilizing logging may constrain schema evolution; mitigate via versioned schema (already present) and additive-only changes.
 
 ## Spec/Docs deltas
+
 - Add a note to SPEC §3.1/§3.2 stating that low-level FS atoms are intentionally not part of the stable public API; only high-level operations are.
 - Update module-level Rustdocs to reflect stability classification.
 
 ## Acceptance Criteria
+
 - Public docs reflect which items are Stable/Provisional/Internal.
 - Low-level FS atoms are no longer publicly re-exported or are clearly marked Internal.
 - Preflight helper naming conflict resolved or documented.
 
 ## References
+
 - SPEC: §3 Public Interfaces; §2.1 Atomicity; §2.10 Filesystems & Degraded; §5 Audit Facts
 - PLAN: 10-types-traits.md; 12-api-module.md; 40-facts-logging.md; 45-preflight.md; 50-locking-concurrency.md
 - CODE: `src/lib.rs`, `src/api.rs`, `src/api/errors.rs`, `src/types/**`, `src/fs/**`, `src/logging/**`, `src/policy/**`, `src/preflight.rs`, `src/adapters/**`
+
+## Round 1 Peer Review (AI 1, 2025-09-12 15:14 +02:00)
+
+- Claims verified
+  - Crate facade exposes public modules and re-exports API at root.
+    - Proof: `src/lib.rs` lines 11–21 declare `pub mod ...` and `pub use api::*;`.
+  - Low-level FS atoms are publicly re-exported but implemented as internal-footgun primitives.
+    - Proof: `src/fs/mod.rs` lines 9–15 `pub use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};` alongside higher-level helpers. Implementations in `src/fs/atomic.rs` are low-level.
+  - Adapters trait surfaces exist and are re-exported; default impls present.
+    - Proof: `src/adapters/mod.rs` re-exports traits and `FileLockManager`, `FsOwnershipOracle`, and smoke runner; traits defined in `adapters/lock/mod.rs`, `adapters/ownership/*`, `adapters/smoke.rs`, `adapters/path.rs`.
+  - Logging sinks and redaction helpers are public; audit emitters remain crate-internal.
+    - Proof: `src/logging/mod.rs` re-exports `FactsEmitter`, `AuditSink`, `JsonlSink`, `redact_event`, `TS_ZERO`, `ts_for_mode`. Audit helpers in `src/logging/audit.rs` are `pub(crate)` (module is public but items are crate-internal), matching the intent.
+  - Preflight naming duality is present (`fs::mount::ensure_rw_exec` vs `preflight::checks::ensure_mount_rw_exec`).
+    - Proof: `src/fs/mount.rs::ensure_rw_exec`, re-exported by `src/fs/mod.rs`; and wrapper `src/preflight/checks.rs::ensure_mount_rw_exec` re-exported via `src/preflight.rs`.
+
+- Key citations
+  - `src/lib.rs` (facade and re-exports)
+  - `src/fs/mod.rs` (public FS surface)
+  - `src/adapters/mod.rs`, `src/adapters/lock/mod.rs`, `src/adapters/smoke.rs`, `src/adapters/path.rs`
+  - `src/logging/mod.rs`, `src/logging/audit.rs`
+  - `src/preflight.rs`, `src/preflight/checks.rs`, `src/fs/mount.rs`
+
+- Summary of edits
+  - Added precise code citations to substantiate API exposure and stability classifications. Confirmed that low-level FS atoms are re-exported today and recommended treating them as Internal in docs. Noted the preflight naming duplication for future cleanup.
+
+Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00

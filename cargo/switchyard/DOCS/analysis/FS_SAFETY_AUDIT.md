@@ -101,3 +101,28 @@
 - [ ] Add `fsync_parent_dir(backup)` after writing backup and sidecar.
 - [ ] Introduce `fs/cap.rs` helpers and refactor `backup.rs` usages.
 - [ ] Add unit tests asserting directory fsync after backups (time-bound checks may be coarse).
+
+## Round 1 Peer Review (AI 1, 2025-09-12 15:09 +02:00)
+
+- Claims verified
+  - Atomic swap sequence uses directory handles and *at syscalls, then fsyncs parent.
+    - Proof: `src/fs/atomic.rs::atomic_symlink_swap()` calls `open_dir_nofollow()`, `symlinkat()`, `renameat()`, then `fsync_parent_dir()` lines 56–96.
+  - Existing target cleanup uses `unlinkat(dirfd,name)` via capability handle.
+    - Proof: `src/fs/swap.rs::replace_file_with_symlink()` uses `unlinkat` at lines 70–81 and 125–133 after `open_dir_nofollow(parent)`.
+  - Restore paths use `renameat` with pre-opened parent, restore mode via `fchmod`, and fsync parent directory.
+    - Proof: `src/fs/restore.rs::restore_file()` uses `renameat` lines 126–127, `fchmod` lines 134–137, and `fsync_parent_dir()` lines 139–140; similar in other branches (e.g., lines 171–174, 223–225, 259–261).
+  - EXDEV degraded path emits fsync and is gated by policy/env.
+    - Proof: `src/fs/atomic.rs::atomic_symlink_swap()` EXDEV branch at lines 86–93 calls `fsync_parent_dir(target)`; test knob `SWITCHYARD_FORCE_EXDEV` at lines 74–76.
+  - Backup symlink creation and sidecar writes currently use path-based APIs without parent fsync.
+    - Proof: `src/fs/backup.rs::create_snapshot()` symlink backups use `std::os::unix::fs::symlink` (lines 137–139); `write_sidecar()` creates file path-based (lines 262–270) and no `fsync_parent_dir` call; tombstone path uses `File::create` (lines 218–231) with no fsync.
+
+- Key citations
+  - `src/fs/atomic.rs::{open_dir_nofollow, fsync_parent_dir, atomic_symlink_swap}`
+  - `src/fs/swap.rs::replace_file_with_symlink`
+  - `src/fs/restore.rs::restore_file`
+  - `src/fs/backup.rs::{create_snapshot, write_sidecar}`
+
+- Summary of edits
+  - Added precise code citations for each claim and confirmed behavior against current implementation. Highlighted backup/sidecar durability gap and kept recommendations aligned with findings.
+
+Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:09 +02:00

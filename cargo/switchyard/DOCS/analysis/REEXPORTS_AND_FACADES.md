@@ -2,6 +2,24 @@
 
 This document enumerates all `pub use` re-exports in the Switchyard crate, classifies them as ergonomics facades vs. backwards-compatibility shims, and suggests actions.
 
+**Verified Claims:**
+- The crate root contains two re-exports: `api::*` and `policy::rescue`.
+- The fs module re-exports atomic operations, backup helpers, metadata functions, mount inspection, path utilities, and restore functions.
+- The logging module re-exports fact emission and redaction utilities.
+- The types module re-exports errors, IDs, plan structures, reports, and SafePath utilities.
+- The policy module re-exports the Policy configuration structure.
+- The preflight module re-exports checks and YAML export functionality.
+- The adapters module contains both facade re-exports and a compatibility shim for lock_file.
+
+**Citations:**
+- `src/lib.rs:L20-L21` - crate root re-exports
+- `src/fs/mod.rs:L9-L15` - filesystem facade re-exports
+- `src/logging/mod.rs:L5-L6` - logging facade re-exports
+- `src/types/mod.rs:L7-L11` - types facade re-exports
+- `src/policy/mod.rs:L5` - policy facade re-export
+- `src/preflight.rs:L13-L14` - preflight facade re-exports
+- `src/adapters/mod.rs:L11-L17` - adapters facade re-exports
+
 Generated on: 2025-09-12
 
 ## Legend

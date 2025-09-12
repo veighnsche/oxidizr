@@ -89,3 +89,21 @@
 - SPEC: §2.3 Safety Preconditions; §4 Preflight Diff; §5 Audit Facts
 - PLAN: 45-preflight.md; 60-rollback-exdev.md
 - CODE: `src/fs/backup.rs`, `src/fs/restore.rs`, `src/fs/meta.rs`, `src/api/preflight/mod.rs`, `src/policy/config.rs`
+
+## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
+
+**Claims Verified:**
+- ✅ `detect_preservation_capabilities()` function exists in `src/fs/meta.rs:75-106` and correctly probes owner (root check via `/proc/self/status`), mode, timestamps, xattrs, with ACLs/caps hard-coded false
+- ✅ Backup creation in `src/fs/backup.rs:118-232` captures mode via `fchmod` and stores in `BackupSidecar.mode` as octal string for files; symlinks store `prior_dest`; missing files create tombstone with `prior_kind="none"`
+- ✅ Restore logic in `src/fs/restore.rs:14-271` uses `renameat` for file restoration and `fchmod` to restore mode when present in sidecar; symlinks restored via `atomic_symlink_swap`
+- ✅ Preflight integration in `src/api/preflight/mod.rs:140-144` calls `detect_preservation_capabilities()` and gates on `require_preservation` policy
+
+**Key Citations:**
+- `src/fs/meta.rs:88-91`: Owner detection via `effective_uid_is_root()` parsing `/proc/self/status`
+- `src/fs/backup.rs:194-204`: Mode capture and sidecar storage for files
+- `src/fs/restore.rs:128-138`: Mode restoration via `fchmod` when sidecar contains mode
+- `src/api/preflight/mod.rs:142-144`: Policy gating on preservation capabilities
+
+**Summary of Edits:** No corrections needed - all technical claims are accurately supported by the codebase. The document correctly describes current preservation support (mode only), capability probing, and proposed tiered approach.
+
+Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
