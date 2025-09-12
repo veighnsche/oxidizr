@@ -1,3 +1,4 @@
+pub mod fs;
 use crate::types::{errors::Result, safepath::SafePath};
 
 #[derive(Clone, Debug)]

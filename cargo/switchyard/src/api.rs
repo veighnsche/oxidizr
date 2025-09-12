@@ -7,10 +7,6 @@ use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 
 // Internal API submodules (planned split)
-#[path = "api/fs_meta.rs"]
-mod fs_meta;
-#[path = "api/audit.rs"]
-mod audit;
 #[path = "api/errors.rs"]
 pub mod errors;
 #[path = "api/rollback.rs"]

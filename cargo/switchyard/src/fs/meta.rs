@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use serde_json::json;
 
 /// Compute SHA-256 of a file at `path`, returning a lowercase hex string.
-pub(crate) fn sha256_hex_of(path: &Path) -> Option<String> {
+pub fn sha256_hex_of(path: &Path) -> Option<String> {
     let mut f = std::fs::File::open(path).ok()?;
     let mut hasher = Sha256::new();
     std::io::copy(&mut f, &mut hasher).ok()?;
@@ -27,7 +27,7 @@ pub(crate) fn sha256_hex_of(path: &Path) -> Option<String> {
 
 /// If `target` is a symlink, resolve its target to an absolute path.
 /// Relative links are resolved relative to the parent directory of `target`.
-pub(crate) fn resolve_symlink_target(target: &Path) -> Option<PathBuf> {
+pub fn resolve_symlink_target(target: &Path) -> Option<PathBuf> {
     if let Ok(md) = std::fs::symlink_metadata(target) {
         if md.file_type().is_symlink() {
             if let Ok(mut link) = std::fs::read_link(target) {
@@ -44,7 +44,7 @@ pub(crate) fn resolve_symlink_target(target: &Path) -> Option<PathBuf> {
 }
 
 /// Return a string describing the kind of filesystem node at `path`.
-pub(crate) fn kind_of(path: &Path) -> String {
+pub fn kind_of(path: &Path) -> String {
     match std::fs::symlink_metadata(path) {
         Ok(md) => {
             let ft = md.file_type();
@@ -72,7 +72,7 @@ pub(crate) fn kind_of(path: &Path) -> String {
 /// - xattrs (Linux extended attributes via getxattr syscall presence; best-effort probe)
 /// - acls (no portable check; report false)
 /// - caps (Linux file capabilities; report false unless libcap is present — we report false)
-pub(crate) fn detect_preservation_capabilities(path: &Path) -> (serde_json::Value, bool) {
+pub fn detect_preservation_capabilities(path: &Path) -> (serde_json::Value, bool) {
     let mut owner = false;
     let mut mode = false;
     let mut timestamps = false;

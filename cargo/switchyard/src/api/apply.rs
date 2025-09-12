@@ -19,14 +19,13 @@ use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::plan_id;
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 
-use super::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode};
+use crate::logging::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode};
 use super::errors::{ErrorId, exit_code_for};
-#[path = "apply/gating.rs"]
-mod gating;
+use crate::policy::gating;
 #[path = "apply/handlers.rs"]
 mod handlers;
-#[path = "apply/audit_emit.rs"]
-mod audit_emit;
+#[path = "apply/audit_fields.rs"]
+mod audit_fields;
 
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
@@ -118,7 +117,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
     if !api.policy.override_preflight && !dry {
-        let gating_errors = gating::gating_errors(api, plan);
+        let gating_errors = gating::gating_errors(&api.policy, api.owner.as_deref(), plan);
         if !gating_errors.is_empty() {
             api.audit.log(Level::Warn, "apply: policy gating rejected plan (E_POLICY)");
             let ec = exit_code_for(ErrorId::E_POLICY);

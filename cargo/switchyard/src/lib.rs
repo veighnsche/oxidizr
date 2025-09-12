@@ -15,7 +15,7 @@ pub mod fs;
 pub mod logging;
 pub mod policy;
 pub mod preflight;
-pub mod rescue;
 pub mod types;
 
 pub use api::*;
+pub use policy::rescue; // compatibility re-export

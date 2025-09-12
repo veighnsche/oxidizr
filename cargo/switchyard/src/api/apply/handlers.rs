@@ -6,10 +6,10 @@ use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::action_id;
 use crate::types::Action;
 
-use super::super::fs_meta::{kind_of, resolve_symlink_target, sha256_hex_of};
-use super::super::audit::{emit_apply_attempt, emit_apply_result, ensure_provenance, AuditCtx};
-use super::audit_emit::{insert_hashes, maybe_warn_fsync};
-use super::super::errors::{exit_code_for, id_str, ErrorId};
+use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
+use crate::logging::audit::{emit_apply_attempt, emit_apply_result, ensure_provenance, AuditCtx};
+use super::audit_fields::{insert_hashes, maybe_warn_fsync};
+use crate::api::errors::{exit_code_for, id_str, ErrorId};
 
 /// Handle an EnsureSymlink action: perform the operation and emit per-action facts.
 /// Returns (executed_action_if_success, error_message_if_failure).
@@ -38,7 +38,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     );
 
     let degraded_used: bool;
-    let fsync_ms: u64;
+    let mut fsync_ms: u64 = 0;
     let before_kind = kind_of(&target.as_path());
     // Compute before/after hashes
     let before_hash = match resolve_symlink_target(&target.as_path()) {

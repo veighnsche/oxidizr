@@ -1,13 +1,15 @@
 pub mod attest;
-pub mod lock;
-pub mod lock_file;
-pub mod ownership;
-pub mod ownership_default;
+pub mod lock;        // contains mod.rs and file.rs
+pub mod ownership;   // contains mod.rs and fs.rs
 pub mod smoke;
+pub mod path;
+// Compatibility shim for old path switchyard::adapters::lock_file::FileLockManager
+pub mod lock_file { pub use super::lock::file::*; }
 
 pub use attest::*;
 pub use lock::*;
-pub use lock_file::FileLockManager;
+pub use lock::file::FileLockManager;
 pub use ownership::*;
-pub use ownership_default::FsOwnershipOracle;
+pub use ownership::fs::FsOwnershipOracle;
 pub use smoke::*;
+pub use path::*;

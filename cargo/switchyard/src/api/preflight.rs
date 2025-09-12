@@ -10,10 +10,10 @@ use crate::types::ids::plan_id;
 use crate::types::{Action, Plan, PreflightReport};
 use serde_json::json;
 
-use super::fs_meta::{kind_of, detect_preservation_capabilities};
-use super::audit::{AuditCtx, AuditMode};
-#[path = "preflight/report.rs"]
-mod report;
+use crate::fs::meta::{kind_of, detect_preservation_capabilities};
+use crate::logging::audit::{AuditCtx, AuditMode};
+#[path = "preflight/rows.rs"]
+mod rows;
 
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
@@ -32,7 +32,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     );
 
     // Global rescue verification: if required by policy, STOP when unavailable.
-    let rescue_ok = crate::rescue::verify_rescue_tools_with_exec_min(
+    let rescue_ok = crate::policy::rescue::verify_rescue_tools_with_exec_min(
         api.policy.rescue_exec_check,
         api.policy.rescue_min_count,
     );
@@ -137,7 +137,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 }
                 let policy_ok = stops.len() == stops_before;
                 let current_kind = kind_of(&target.as_path());
-                report::push_row_emit(
+                rows::push_row_emit(
                     api,
                     plan,
                     act,
@@ -212,7 +212,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     stops.push("restore requested but no backup artifacts present".to_string());
                     notes.push("no backup artifacts present".to_string());
                 }
-                report::push_row_emit(
+                rows::push_row_emit(
                     api,
                     plan,
                     act,
@@ -237,7 +237,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     // Emit preflight summary with rescue_profile for visibility
     let prof = if rescue_ok { Some("available") } else { Some("none") };
     let extra = json!({ "rescue_profile": prof });
-    super::audit::emit_summary_extra(&ctx, "preflight", decision, extra);
+    crate::logging::audit::emit_summary_extra(&ctx, "preflight", decision, extra);
 
     // Stable ordering of rows by (path, action_id)
     rows.sort_by(|a, b| {

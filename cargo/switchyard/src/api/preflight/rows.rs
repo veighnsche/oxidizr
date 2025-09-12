@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::{Action, Plan};
 
-use super::super::audit::{emit_preflight_fact_ext, AuditCtx};
+use crate::logging::audit::{emit_preflight_fact_ext, AuditCtx};
 
 /// Helper to push a preflight row into the rows vec and emit the corresponding fact.
 pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
