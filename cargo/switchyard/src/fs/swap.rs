@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
-use rustix::fs::{fchmod, openat, renameat, unlinkat, AtFlags, Mode, OFlags};
+use rustix::fs::{fchmod, openat, unlinkat, AtFlags, Mode, OFlags};
 use std::os::unix::fs as unix_fs;
 use std::os::unix::fs::PermissionsExt;
 

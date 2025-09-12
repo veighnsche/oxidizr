@@ -193,3 +193,69 @@ pub fn restore_file(
         Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"))
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::DEFAULT_BACKUP_TAG;
+    use crate::fs::swap::replace_file_with_symlink;
+
+    fn td() -> tempfile::TempDir { tempfile::tempdir().unwrap() }
+
+    #[test]
+    fn symlink_topology_restore_roundtrip() {
+        let t = td();
+        let root = t.path();
+        let src_old = root.join("old");
+        let src_new = root.join("new");
+        let tgt = root.join("bin");
+        std::fs::write(&src_old, b"old").unwrap();
+        std::fs::write(&src_new, b"new").unwrap();
+        // Start with target being a symlink to old (relative link)
+        let _ = std::os::unix::fs::symlink("old", &tgt);
+
+        // Replace target to point to new; backup should capture prior symlink target
+        let _ = replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        // Now restore
+        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let md2 = std::fs::symlink_metadata(&tgt).unwrap();
+        assert!(md2.file_type().is_symlink(), "target should be symlink after restore");
+        let link = std::fs::read_link(&tgt).unwrap();
+        assert_eq!(link, PathBuf::from("old"));
+    }
+
+    #[test]
+    fn none_topology_restore_removes_target() {
+        let t = td();
+        let root = t.path();
+        let src_new = root.join("new");
+        let tgt = root.join("bin");
+        std::fs::write(&src_new, b"new").unwrap();
+        // Target does not exist initially
+        assert!(!tgt.exists());
+        let _ = replace_file_with_symlink(&src_new, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        assert!(tgt.exists());
+        // Restore should remove target (prior_kind=none)
+        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        assert!(!tgt.exists(), "target should be absent after restore of prior_kind=none");
+    }
+
+    #[test]
+    fn idempotent_restore_file_twice_is_noop() {
+        let t = td();
+        let root = t.path();
+        let src = root.join("src");
+        let tgt = root.join("tgt");
+        std::fs::write(&src, b"new").unwrap();
+        std::fs::write(&tgt, b"old").unwrap();
+        let _ = replace_file_with_symlink(&src, &tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        // Second restore should be a no-op
+        restore_file(&tgt, false, false, DEFAULT_BACKUP_TAG).unwrap();
+        let md = std::fs::symlink_metadata(&tgt).unwrap();
+        assert!(md.file_type().is_file());
+        let content = std::fs::read_to_string(&tgt).unwrap();
+        assert!(content.starts_with("old"));
+    }
+}

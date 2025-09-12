@@ -6,12 +6,14 @@
 //! - Returns a `PreflightReport` with stable row ordering suitable for YAML export via `preflight::to_yaml()`.
 
 use crate::logging::{FactsEmitter, TS_ZERO};
-use crate::types::ids::{action_id, plan_id};
+use crate::types::ids::plan_id;
 use crate::types::{Action, Plan, PreflightReport};
 use serde_json::json;
 
 use super::fs_meta::{kind_of, detect_preservation_capabilities};
-use super::audit::{emit_preflight_fact_ext, AuditCtx, AuditMode};
+use super::audit::{AuditCtx, AuditMode};
+#[path = "preflight/report.rs"]
+mod report;
 
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
@@ -122,8 +124,6 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     notes.push("target in forbidden path".to_string());
                 }
 
-                let idx = plan.actions.iter().position(|a| std::ptr::eq(a, act)).unwrap_or(0);
-                let aid = action_id(&pid, act, idx);
                 let prov = match &api.owner {
                     Some(oracle) => match oracle.owner_of(target) {
                         Ok(info) => Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg})),
@@ -136,29 +136,15 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     stops.push("preservation unsupported for target".to_string());
                 }
                 let policy_ok = stops.len() == stops_before;
-                // Build preflight row for report
                 let current_kind = kind_of(&target.as_path());
-                let mut row = json!({
-                    "action_id": aid.to_string(),
-                    "path": target.as_path().display().to_string(),
-                    "current_kind": current_kind,
-                    "planned_kind": "symlink",
-                    "policy_ok": policy_ok,
-                });
-                if let Some(p) = prov.as_ref() {
-                    if let Some(o) = row.as_object_mut() { o.insert("provenance".into(), p.clone()); }
-                }
-                if !notes.is_empty() {
-                    if let Some(o) = row.as_object_mut() { o.insert("notes".into(), json!(notes)); }
-                }
-                if let Some(o) = row.as_object_mut() { o.insert("preservation".into(), preservation.clone()); }
-                if let Some(o) = row.as_object_mut() { o.insert("preservation_supported".into(), json!(preservation_supported)); }
-                rows.push(row);
-                emit_preflight_fact_ext(
+                report::push_row_emit(
+                    api,
+                    plan,
+                    act,
+                    &mut rows,
                     &ctx,
-                    &aid.to_string(),
-                    Some(target.as_path().display().to_string()),
-                    &current_kind,
+                    target.as_path().display().to_string(),
+                    current_kind,
                     "symlink",
                     Some(policy_ok),
                     prov,
@@ -218,34 +204,22 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     notes.push("target in forbidden path".to_string());
                 }
 
-                let idx = plan.actions.iter().position(|a| std::ptr::eq(a, act)).unwrap_or(0);
-                let aid = action_id(&pid, act, idx);
                 let policy_ok = stops.len() == stops_before;
                 let (preservation, preservation_supported) = detect_preservation_capabilities(&target.as_path());
                 // Annotate whether backup artifacts are present (payload and/or sidecar)
-                let backup_present = crate::fs::backup::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
+                let backup_present = crate::fs::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
                 if api.policy.require_rescue && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
                     notes.push("no backup artifacts present".to_string());
                 }
-                // Build preflight row for report
-                let mut row = json!({
-                    "action_id": aid.to_string(),
-                    "path": target.as_path().display().to_string(),
-                    "current_kind": "unknown",
-                    "planned_kind": "restore_from_backup",
-                    "policy_ok": policy_ok,
-                    "backup_present": backup_present,
-                });
-                if !notes.is_empty() { if let Some(o) = row.as_object_mut() { o.insert("notes".into(), json!(notes)); } }
-                if let Some(o) = row.as_object_mut() { o.insert("preservation".into(), preservation.clone()); }
-                if let Some(o) = row.as_object_mut() { o.insert("preservation_supported".into(), json!(preservation_supported)); }
-                rows.push(row);
-                emit_preflight_fact_ext(
+                report::push_row_emit(
+                    api,
+                    plan,
+                    act,
+                    &mut rows,
                     &ctx,
-                    &aid.to_string(),
-                    Some(target.as_path().display().to_string()),
-                    &"unknown".to_string(),
+                    target.as_path().display().to_string(),
+                    "unknown".to_string(),
                     "restore_from_backup",
                     Some(policy_ok),
                     None,
