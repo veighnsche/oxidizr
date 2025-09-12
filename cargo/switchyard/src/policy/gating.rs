@@ -24,8 +24,11 @@ pub(crate) fn gating_errors(
     for act in &plan.actions {
         match act {
             Action::EnsureSymlink { source, target } => {
-                if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(std::path::Path::new("/usr")) {
-                    gating_errors.push(format!("/usr not rw+exec: {}", e));
+                // Policy-driven extra mount checks (replaces hard-coded "/usr").
+                for p in &policy.extra_mount_checks {
+                    if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(p.as_path()) {
+                        gating_errors.push(format!("{} not rw+exec: {}", p.display(), e));
+                    }
                 }
                 if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(&target.as_path()) {
                     gating_errors.push(format!(
@@ -90,17 +93,19 @@ pub(crate) fn gating_errors(
                 }
             }
             Action::RestoreFromBackup { target } => {
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(std::path::Path::new("/usr")) {
-                    gating_errors.push(format!("/usr not rw+exec: {}", e));
+                for p in &policy.extra_mount_checks {
+                    if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(p.as_path()) {
+                        gating_errors.push(format!("{} not rw+exec: {}", p.display(), e));
+                    }
                 }
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(&target.as_path()) {
+                if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(&target.as_path()) {
                     gating_errors.push(format!(
                         "target not rw+exec: {} (target={})",
                         e,
                         target.as_path().display()
                     ));
                 }
-                if let Err(e) = crate::preflight::check_immutable(&target.as_path()) {
+                if let Err(e) = crate::policy::checks::check_immutable(&target.as_path()) {
                     gating_errors.push(format!(
                         "immutable target: {} (target={})",
                         e,

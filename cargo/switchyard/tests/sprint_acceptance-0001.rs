@@ -31,7 +31,10 @@ fn preflight_rows_schema_and_ordering() {
     std::fs::write(root.join("usr/bin/app1"), b"o1").unwrap();
     std::fs::write(root.join("usr/sbin/app2"), b"o2").unwrap();
     policy.allow_roots.push(root.join("usr/bin"));
-
+    // Allow Commit path without a LockManager so we reach policy gating
+    policy.allow_unlocked_commit = true;
+    policy.allow_unlocked_commit = true; // allow Commit without LockManager for this test
+    
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
 
@@ -230,6 +233,7 @@ fn golden_determinism_dryrun_equals_commit() {
     // Commit path now enforces preflight fail-closed unless overridden.
     // Permit untrusted (non-root-owned) sources in this deterministic test.
     policy.force_untrusted_source = true;
+    policy.allow_unlocked_commit = true; // allow Commit without LockManager to compare DryRun vs Commit
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));

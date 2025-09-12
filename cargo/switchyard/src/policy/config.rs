@@ -72,6 +72,17 @@ pub struct Policy {
     /// or spawning "--help" with a very small timeout). Typically enabled in production only.
     /// See `rescue::verify_rescue_tools_with_exec(exec_check)`.
     pub rescue_exec_check: bool,
+    /// Additional mount roots to verify for rw+exec during preflight/gating.
+    ///
+    /// This replaces ad hoc checks like hard-coded "/usr". When non-empty,
+    /// preflight and gating will iterate these paths and ensure their mounts
+    /// are read-write and executable; ambiguity fails closed.
+    pub extra_mount_checks: Vec<PathBuf>,
+    /// When true, the engine captures a snapshot (backup + sidecar) of the target's
+    /// current state before performing a RestoreFromBackup action. This makes restore
+    /// invertible: the inverse plan of a restore is another restore using the freshly
+    /// captured snapshot.
+    pub capture_restore_snapshot: bool,
 }
 
 impl Default for Policy {
@@ -92,7 +103,9 @@ impl Default for Policy {
             require_lock_manager: false,
             require_smoke_in_commit: false,
             rescue_exec_check: false,
-            allow_unlocked_commit: true,
+            allow_unlocked_commit: false,
+            extra_mount_checks: Vec::new(),
+            capture_restore_snapshot: true,
         }
     }
 }

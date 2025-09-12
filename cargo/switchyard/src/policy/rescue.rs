@@ -37,7 +37,8 @@ pub fn verify_rescue(exec_check: bool) -> Result<RescueStatus, RescueError> { ve
 
 fn verify_rescue_min(exec_check: bool, min_count: usize) -> Result<RescueStatus, RescueError> {
     // Test override knobs:
-    if let Some(v) = env::var_os("SWITCHYARD_FORCE_RESCUE_OK") {
+    if let Ok(v) = env::var("SWITCHYARD_FORCE_RESCUE_OK") {
+        let v = v.trim();
         if v == "1" { return Ok(RescueStatus::GNU { found: min_count, min: min_count }); }
         if v == "0" { return Err(RescueError::Unavailable); }
     }

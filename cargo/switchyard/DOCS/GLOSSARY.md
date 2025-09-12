@@ -102,7 +102,11 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __Severity / Decision / Stage__ — Core fact fields describing outcome and context of an event. `stage ∈ {plan, preflight, apply.attempt, apply.result, rollback}`, `decision ∈ {success, failure, warn}`, `severity ∈ {info, warn, error}`. See `audit_event.schema.json`.
 
+- __Sidecar__ — 
+
 - __SmokeTestRunner__ — Adapter that executes the minimal smoke test suite after apply; controls auto‑rollback behavior via policy. See `SPEC §3.2`, `§11`.
+
+- __Stamp__ — 
 
 - __Switchyard__ — The library crate that orchestrates safe, atomic, reversible filesystem swaps with strong auditability and recovery guarantees. See `SPEC §0`.
 

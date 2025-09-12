@@ -18,7 +18,7 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - Auditable, tamper-evident facts (schema v1): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance.
 - Conservative by default: dry-run mode; fail-closed on critical compatibility differences unless policy overrides.
 - Health verification required: minimal smoke suite runs post-apply; failure triggers auto-rollback (unless explicitly disabled).
-- Cross-filesystem safety: EXDEV fallback with degraded-mode policy and telemetry.
+- Cross-filesystem safety: EXDEV fallback with degraded-mode policy and telemetry. When degraded fallback is disallowed and EXDEV occurs, apply fails with `exdev_fallback_failed` and facts include `degraded=false` with a stable reason marker.
 
 ## 2. Normative Requirements
 
@@ -222,7 +222,9 @@ Dry-run output must match real-run preflight rows byte-for-byte.
     "preservation_supported": {"type":["boolean","null"]},
     "exit_code": {"type":["integer","null"]},
     "duration_ms": {"type":["integer","null"]},
-    "lock_wait_ms": {"type":["integer","null"]}
+    "lock_wait_ms": {"type":["integer","null"]},
+    "error_id": {"type": ["string", "null"]},
+    "error_detail": {"type": ["string", "null"]}
   }
 }
 ```
@@ -247,7 +249,7 @@ restore_failed = 70
 smoke_test_failed = 80
 ```
 
-Errors are emitted in facts as stable identifiers (e.g. `E_POLICY`, `E_LOCKING`).
+Errors are emitted in facts as stable identifiers (e.g. `E_POLICY`, `E_LOCKING`). Preflight summary emits `error_id=E_POLICY` and `exit_code=10` when any STOP conditions are present.
 
 ---
 
@@ -310,8 +312,8 @@ Supported filesystems (tested):
 
 EXDEV path is explicitly exercised: when staging and target parents are on different filesystems, the engine MUST fall back to a safe copy+fsync+rename strategy. A policy flag `allow_degraded_fs` controls acceptance:
 
-- When `allow_degraded_fs=true`, facts MUST include `degraded=true` and the operation proceeds.
-- When `allow_degraded_fs=false`, the apply MUST fail with `exdev_fallback_failed`.
+- When `allow_degraded_fs=true`, facts MUST include `degraded=true` and the operation proceeds, with `degraded_reason="exdev_fallback"`.
+- When `allow_degraded_fs=false`, the apply MUST fail with `exdev_fallback_failed`; facts MUST include `degraded=false` and `degraded_reason="exdev_fallback"` for analytics consistency.
 
 ## 11. Smoke Tests (Normative Minimal Suite)
 

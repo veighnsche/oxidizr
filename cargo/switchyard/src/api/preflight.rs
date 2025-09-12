@@ -45,11 +45,13 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
             Action::EnsureSymlink { source, target } => {
                 let mut notes: Vec<String> = Vec::new();
                 let stops_before = stops.len();
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(std::path::Path::new("/usr")) {
-                    stops.push(format!("/usr not rw+exec: {}", e));
-                    notes.push("/usr not rw+exec".to_string());
+                for p in &api.policy.extra_mount_checks {
+                    if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(p.as_path()) {
+                        stops.push(format!("{} not rw+exec: {}", p.display(), e));
+                        notes.push(format!("{} not rw+exec", p.display()));
+                    }
                 }
-                if let Err(e) = crate::preflight::ensure_mount_rw_exec(&target.as_path()) {
+                if let Err(e) = crate::policy::checks::ensure_mount_rw_exec(&target.as_path()) {
                     stops.push(format!(
                         "target not rw+exec: {} (target={})",
                         e,
@@ -57,7 +59,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     ));
                     notes.push("target not rw+exec".to_string());
                 }
-                if let Err(e) = crate::preflight::check_immutable(&target.as_path()) {
+                if let Err(e) = crate::policy::checks::check_immutable(&target.as_path()) {
                     stops.push(format!(
                         "immutable target: {} (target={})",
                         e,
@@ -65,7 +67,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     ));
                     notes.push("immutable target".to_string());
                 }
-                match crate::preflight::check_source_trust(
+                match crate::policy::checks::check_source_trust(
                     &source.as_path(),
                     api.policy.force_untrusted_source,
                 ) {
@@ -234,9 +236,15 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     // Per-action preflight facts are emitted above with extended fields.
     // Minimal Facts v1: preflight summary
     let decision = if stops.is_empty() { "success" } else { "failure" };
-    // Emit preflight summary with rescue_profile for visibility
+    // Emit preflight summary with rescue_profile and error mapping when failure
     let prof = if rescue_ok { Some("available") } else { Some("none") };
-    let extra = json!({ "rescue_profile": prof });
+    let mut extra = json!({ "rescue_profile": prof });
+    if !stops.is_empty() {
+        if let Some(obj) = extra.as_object_mut() {
+            obj.insert("error_id".to_string(), json!(crate::api::errors::id_str(crate::api::errors::ErrorId::E_POLICY)));
+            obj.insert("exit_code".to_string(), json!(crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_POLICY)));
+        }
+    }
     crate::logging::audit::emit_summary_extra(&ctx, "preflight", decision, extra);
 
     // Stable ordering of rows by (path, action_id)

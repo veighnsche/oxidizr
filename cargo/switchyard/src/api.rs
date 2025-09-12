@@ -85,7 +85,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     }
 
     pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
-        rollback::inverse(report)
+        rollback::inverse_with_policy(&self.policy, report)
     }
 }
 
@@ -191,6 +191,8 @@ mod tests {
         let mut policy = Policy::default();
         // Allow untrusted sources in test to avoid preflight fail-closed gating
         policy.force_untrusted_source = true;
+        // Allow Commit without LockManager so the test exercises rollback logic
+        policy.allow_unlocked_commit = true;
         let api = Switchyard::new(facts.clone(), audit, policy);
 
         let td = tempfile::tempdir().unwrap();

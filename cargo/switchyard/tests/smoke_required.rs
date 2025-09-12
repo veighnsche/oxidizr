@@ -29,6 +29,7 @@ fn commit_requires_smoke_runner_when_policy_enforced() {
     policy.allow_degraded_fs = true;
     policy.force_untrusted_source = true; // avoid preflight source trust STOP in temp env
     policy.require_smoke_in_commit = true;
+    policy.allow_unlocked_commit = true; // allow Commit path in test without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

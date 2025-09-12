@@ -68,7 +68,10 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             let mut extra = json!({
                 "action_id": _aid.to_string(),
                 "path": target.as_path().display().to_string(),
-                "degraded": None::<bool>,
+                // On failure explicitly record degraded=false and reason when EXDEV
+                "degraded": Some(false),
+                "degraded_reason": if matches!(id, ErrorId::E_EXDEV) { Some("exdev_fallback") } else { None },
+                "error_detail": if matches!(id, ErrorId::E_EXDEV) { Some("exdev_fallback_failed") } else { None },
                 "duration_ms": fsync_ms,
                 "before_kind": before_kind,
                 "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
@@ -127,16 +130,54 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     );
 
     let before_kind = kind_of(&target.as_path());
-    match crate::fs::restore_file(
+    let mut used_prev = false;
+    if !dry && api.policy.capture_restore_snapshot {
+        let _ = crate::fs::create_snapshot(&target.as_path(), &api.policy.backup_tag);
+        used_prev = true;
+    }
+    let restore_res = if used_prev {
+        crate::fs::restore_file_prev(
+            &target.as_path(),
+            dry,
+            api.policy.force_restore_best_effort,
+            &api.policy.backup_tag,
+        )
+    } else {
+        crate::fs::restore_file(
         &target.as_path(),
         dry,
         api.policy.force_restore_best_effort,
         &api.policy.backup_tag,
-    ) {
+    )
+    };
+    match restore_res {
         Ok(()) => {
             // success
         }
-        Err(e) => {
+        Err(mut e) => {
+            // If we tried previous and it was NotFound (no previous), fall back to latest
+            if used_prev && e.kind() == std::io::ErrorKind::NotFound {
+                if let Err(e2) = crate::fs::restore_file(
+                    &target.as_path(),
+                    dry,
+                    api.policy.force_restore_best_effort,
+                    &api.policy.backup_tag,
+                ) {
+                    e = e2;
+                } else {
+                    // success on fallback
+                    let decision = "success";
+                    let mut extra = json!({
+                        "action_id": _aid.to_string(),
+                        "path": target.as_path().display().to_string(),
+                        "before_kind": before_kind,
+                        "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
+                    });
+                    ensure_provenance(&mut extra);
+                    emit_apply_result(tctx, decision, extra);
+                    return (Some(act.clone()), None);
+                }
+            }
             use std::io::ErrorKind;
             let id = match e.kind() { ErrorKind::NotFound => ErrorId::E_BACKUP_MISSING, _ => ErrorId::E_RESTORE_FAILED };
             let msg = format!("restore {} failed: {}", target.as_path().display(), e);

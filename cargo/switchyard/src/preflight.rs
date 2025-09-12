@@ -4,63 +4,20 @@
 //! higher-level API. It also exposes a small helper to render a `PreflightReport`
 //! into a SPEC-aligned YAML sequence for fixtures and artifacts.
 use std::fs;
-use std::io::Read;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
-
-fn mount_entry_for(path: &Path) -> Option<(PathBuf, String)> {
-    // Parse /proc/self/mounts and select the longest mountpoint that prefixes `path`.
-    let mut f = match fs::File::open("/proc/self/mounts") {
-        Ok(f) => f,
-        Err(_) => return None,
-    };
-    let mut s = String::new();
-    if f.read_to_string(&mut s).is_err() {
-        return None;
-    }
-    let p = match path.canonicalize() {
-        Ok(p) => p,
-        Err(_) => path.to_path_buf(),
-    };
-    let mut best: Option<(PathBuf, String)> = None;
-    for line in s.lines() {
-        // format: <src> <mountpoint> <fstype> <opts> ...
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 4 {
-            continue;
-        }
-        let mnt = PathBuf::from(parts[1]);
-        if p.starts_with(&mnt) {
-            let opts = parts[3].to_string();
-            match &best {
-                None => best = Some((mnt, opts)),
-                Some((b, _)) => {
-                    if mnt.as_os_str().len() > b.as_os_str().len() {
-                        best = Some((mnt, opts));
-                    }
-                }
-            }
-        }
-    }
-    best
-}
+use std::path::{Path};
 
 /// Ensure the filesystem backing `path` is read-write and not mounted with noexec.
 /// Returns Ok(()) if suitable; Err(String) with a human message otherwise.
 pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
-    if let Some((_mnt, opts)) = mount_entry_for(path) {
-        let opts_l = opts.to_ascii_lowercase();
-        let has_rw = opts_l.split(',').any(|o| o == "rw");
-        let noexec = opts_l.split(',').any(|o| o == "noexec");
-        if !has_rw || noexec {
-            return Err(format!(
-                "Filesystem at '{}' not suitable: requires rw and exec (opts: {})",
-                path.display(),
-                opts
-            ));
-        }
+    // Delegate to fs::mount inspector; fail closed on ambiguity.
+    match crate::fs::ensure_rw_exec(&crate::fs::ProcStatfsInspector, path) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(format!(
+            "Filesystem at '{}' not suitable or ambiguous (requires rw and exec)",
+            path.display()
+        )),
     }
-    Ok(())
 }
 
 /// Check immutability (best-effort via `lsattr -d`). Returns Err(String) when immutable.

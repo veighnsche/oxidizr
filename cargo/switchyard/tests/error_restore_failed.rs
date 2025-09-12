@@ -24,7 +24,8 @@ impl FactsEmitter for TestEmitter {
 fn restore_emits_e_restore_failed_on_rename_error() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
-    let policy = Policy::default();
+    let mut policy = Policy::default();
+    policy.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

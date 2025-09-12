@@ -16,7 +16,7 @@ use crate::fs;
 use log::Level;
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
-use crate::types::ids::plan_id;
+use crate::types::ids::{plan_id, action_id};
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 
 use crate::logging::audit::{emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode};
@@ -121,6 +121,17 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if !gating_errors.is_empty() {
             api.audit.log(Level::Warn, "apply: policy gating rejected plan (E_POLICY)");
             let ec = exit_code_for(ErrorId::E_POLICY);
+            // Emit per-action failures with action_id for visibility
+            for (idx, act) in plan.actions.iter().enumerate() {
+                let aid = action_id(&pid, act, idx).to_string();
+                let path = match act { Action::EnsureSymlink { target, .. } => target.as_path().display().to_string(), Action::RestoreFromBackup { target } => target.as_path().display().to_string(), };
+                emit_apply_result(&tctx, "failure", json!({
+                    "action_id": aid,
+                    "path": path,
+                    "error_id": "E_POLICY",
+                    "exit_code": ec,
+                }));
+            }
             emit_apply_result(&tctx, "failure", json!({
                 "error_id": "E_POLICY",
                 "exit_code": ec,
@@ -290,12 +301,16 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         }
     }
     // we already include ts/stage in helper
-    // If we failed post-apply due to smoke, emit E_SMOKE at summary level
+    // If we failed post-apply due to smoke, emit E_SMOKE at summary level; otherwise include a best-effort E_POLICY
     if decision == "failure" {
-        if errors.iter().any(|e| e.contains("smoke")) {
-            if let Some(obj) = fields.as_object_mut() {
+        if let Some(obj) = fields.as_object_mut() {
+            if errors.iter().any(|e| e.contains("smoke")) {
                 obj.insert("error_id".to_string(), json!(crate::api::errors::id_str(ErrorId::E_SMOKE)));
                 obj.insert("exit_code".to_string(), json!(exit_code_for(ErrorId::E_SMOKE)));
+            } else {
+                // Default summary mapping for non-smoke failures
+                obj.entry("error_id").or_insert(json!(crate::api::errors::id_str(ErrorId::E_POLICY)));
+                obj.entry("exit_code").or_insert(json!(exit_code_for(ErrorId::E_POLICY)));
             }
         }
     }

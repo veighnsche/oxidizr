@@ -39,6 +39,7 @@ fn smoke_failure_triggers_auto_rollback_and_emits_e_smoke() {
     policy.allow_degraded_fs = true;
     // Ensure preflight gating does not block on source trust in this temp environment
     policy.force_untrusted_source = true;
+    policy.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_smoke_runner(Box::new(FailingSmoke::default()))

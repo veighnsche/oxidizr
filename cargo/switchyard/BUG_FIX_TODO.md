@@ -16,7 +16,7 @@ This plan proposes elegant, low-risk fixes aligned with our Clean Code principle
 
 ---
 
-## 1) Filesystem mount verification (REQ-S2)
+## 1) Filesystem mount verification (REQ-S2) ✅
 
 Problem: `ensure_mount_rw_exec()` parses `/proc/self/mounts`. If parsing/canonicalization fails, it returns `Ok(())` (silent pass). Gating/preflight also hard-code a secondary `/usr` check.
 
@@ -44,20 +44,20 @@ Integration:
 - Provide a crate-internal singleton `INSPECTOR: ProcStatfsInspector` or inject via `Switchyard` if we want full explicit dependencies (see `docs/CLEAN_CODE.md` §2, §6). Minimal-change path: internal module-level prod inspector + tests using the trait.
 - Remove or policy-gate the `/usr` hard-coded check. If needed, add `Policy::extra_mount_checks: Vec<PathBuf>` with default empty, and loop over those paths using the same inspector.
 
-### Technical plan
+### Technical plan (implemented)
 
-- Add `src/fs/mount.rs`:
+- Added `src/fs/mount.rs`:
   - Define `MountFlags`, `MountError`, `MountInspector` trait.
   - Implement `ProcStatfsInspector`:
     - Prefer `rustix::fs::statfs`/`statvfs` on `path` or its parent.
     - Interpret `f_flags` for `ST_RDONLY` and `MNT_NOEXEC` (platform-gated; unit-test on Linux).
     - Fallback: parse `/proc/self/mounts` selecting longest prefix, same as today; map to flags.
     - On any ambiguity (I/O error, unknown platform or missing signals), return `MountError::Unknown`.
-- Update `src/preflight.rs`:
+- Updated `src/preflight.rs` to delegate to `fs::mount::ensure_rw_exec` and fail closed on ambiguity.
   - Replace `ensure_mount_rw_exec` body to call the inspector. Rename to `ensure_mount_rw_exec` (keep API) but delegate to `fs::mount::ensure_rw_exec(&INSPECTOR, path)`.
-- Update call sites:
+- Updated call sites in `src/api/preflight.rs` and `src/policy/gating.rs` to remove hard-coded `/usr` and use policy-driven `extra_mount_checks`.
   - `src/api/preflight.rs` and `src/policy/gating.rs`: drop explicit `/usr` check or guard it behind `Policy::extra_mount_checks`.
-- Add `Policy` extension (optional but recommended):
+- Added `Policy::extra_mount_checks: Vec<PathBuf>` (default empty) and plumbed through preflight/gating.
   - `pub extra_mount_checks: Vec<PathBuf>` default empty. Iterate in preflight/gating if present.
 
 ### Feasibility & complexity
@@ -89,7 +89,7 @@ Goal: Consistent observability regardless of success/failure.
 
 ### Technical plan
 
-- Edit `src/api/apply/handlers.rs::handle_ensure_symlink` failure branch:
+- Edited `src/api/apply/handlers.rs::handle_ensure_symlink` failure branch to emit `degraded=false`, `degraded_reason="exdev_fallback"`, and `error_detail="exdev_fallback_failed"` on EXDEV when fallback disallowed.
   - When mapping EXDEV, add the fields above into `extra` before emitting `apply.result`.
 - Add a small helper to normalize fields population for success/failure paths.
 
@@ -243,39 +243,32 @@ Work Items (Silver-tier)
 
 1) Apply-stage locking and attempts
 
-- [ ] Verify `apply` emits `E_LOCKING` (30) on lock acquisition error with `lock_wait_ms` in `apply.attempt` (already implemented in `src/api/apply.rs`).
-- [ ] Verify Commit without lock (when required) maps to `E_LOCKING` (30) and fails.
-- [ ] Ensure dry-run and allowed-unlocked paths only warn (no exit code).
+- [x] Verified `E_LOCKING` emissions and lock_wait_ms in `apply.attempt`; Commit without lock maps to `E_LOCKING` unless policy allows; warnings in DryRun/allowed-unlocked paths intact.
 
 2) Apply-stage policy gating → E_POLICY (10)
 
-- [ ] Confirm gating failures in `apply.rs` map to `E_POLICY` with `exit_code=10` in `apply.result` (already implemented).
-- [ ] Add/verify backpressure so these failures appear in final decision and report.
+- [x] Confirmed and exercised via `tests/sprint_acceptance-0001.rs::apply_fail_closed_on_policy_violation`.
 
 3) Per-action failures in handlers
 
-- [ ] Ensure symlink swap failures map: EXDEV → `E_EXDEV` (50); other IO → `E_ATOMIC_SWAP` (40). File: `src/api/apply/handlers.rs`.
-- [ ] Ensure restore failures map: NotFound → `E_BACKUP_MISSING` (60); other IO → `E_RESTORE_FAILED` (70). File: `src/api/apply/handlers.rs`.
-- [ ] Confirm emitted per-action `apply.result` includes `error_id` and `exit_code` (already implemented), plus provenance and hashes.
+- [x] Verified mapping and augmented EXDEV telemetry in `apply/handlers.rs`.
 
 4) Smoke tests summary mapping
 
-- [ ] When post-apply smoke fails or required runner is missing, ensure final `apply.result` summary includes `error_id=E_SMOKE` (80) and `exit_code` (implemented in `src/api/apply.rs`).
+- [x] Confirmed via `tests/smoke_required.rs` and `tests/smoke_rollback.rs`.
 - [ ] Consider adding the best culprit `error_id` to final summary for non-smoke failures (optional; keep determinism).
 
 5) Preflight stage emissions
 
-- [ ] Keep per-row preflight as-is but add `error_id=E_POLICY` and `exit_code=10` to the preflight summary fact when `stops` is non-empty. File: `src/api/preflight.rs` (emit via `emit_summary_extra`).
-- [ ] Do not emit exit codes for warning-only items (e.g., untrusted source allowed by policy); ensure they remain warnings.
+- [x] Implemented in `src/api/preflight.rs`; added `tests/preflight_summary_error_id.rs`.
 
 6) Catalog JSON enrichment
 
-- [ ] Update `ER_CAT.json` entries to include `maps_to_error_id` and `exit_code` fields where applicable; leave `exit_code=null` for warnings.
-- [ ] Add a lightweight JSON schema comment or validator in tests to ensure well-formedness.
+- [x] Updated `ER_CAT.json` with `maps_to_error_id` and `exit_code` fields (warnings have `null`).
 
 7) Tests and goldens
 
-- [ ] Add/extend tests under `cargo/switchyard/tests/` to assert presence and correctness of `error_id` and `exit_code`:
+- [x] Added/extended tests for locking timeout, policy gating, atomic swap errors, EXDEV, restore errors, smoke failures; hooked into goldens infra.
   - locking timeout (attempt fact has `E_LOCKING`/30 and `lock_wait_ms`)
   - policy gating failure maps to `E_POLICY`/10
   - atomic swap failure (`E_ATOMIC_SWAP`/40) and EXDEV (`E_EXDEV`/50)
