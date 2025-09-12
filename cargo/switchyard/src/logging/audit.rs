@@ -1,13 +1,13 @@
 /// replace this file with StageLogger facade — see zrefactor/logging_audit_refactor.INSTRUCTIONS.md
-//! Audit helpers that emit Minimal Facts v1 across Switchyard stages.
-//!
-//! Side-effects:
-//! - Emits JSON facts via `FactsEmitter` for the following stages:
-//!   - `plan`, `preflight` (per-action rows and summary), `apply.attempt`, `apply.result`, and `rollback` steps.
-//! - Ensures a minimal envelope is present on every fact: `schema_version`, `ts`, `plan_id`, `path`.
-//! - Applies redaction in dry-run to zero timestamps and drop volatile fields.
-//!
-//! See `SPEC/SPEC.md` for field semantics and Minimal Facts v1 schema.
+// Audit helpers that emit Minimal Facts v1 across Switchyard stages.
+//
+// Side-effects:
+// - Emits JSON facts via `FactsEmitter` for the following stages:
+//   - `plan`, `preflight` (per-action rows and summary), `apply.attempt`, `apply.result`, and `rollback` steps.
+// - Ensures a minimal envelope is present on every fact: `schema_version`, `ts`, `plan_id`, `path`.
+// - Applies redaction in dry-run to zero timestamps and drop volatile fields.
+//
+// See `SPEC/SPEC.md` for field semantics and Minimal Facts v1 schema.
 use crate::logging::{redact_event, FactsEmitter, TS_ZERO};
 use serde_json::{json, Value};
 

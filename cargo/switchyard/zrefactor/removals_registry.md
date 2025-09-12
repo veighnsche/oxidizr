@@ -22,4 +22,6 @@ Planned entries
 - replace: cargo/switchyard/src/fs/backup.rs -> cargo/switchyard/src/fs/backup/{mod.rs,snapshot.rs,sidecar.rs,index.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
 - replace: cargo/switchyard/src/fs/restore.rs -> cargo/switchyard/src/fs/restore/{mod.rs,types.rs,selector.rs,idempotence.rs,integrity.rs,steps.rs,engine.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
 - replace: cargo/switchyard/src/logging/audit.rs -> cargo/switchyard/src/logging/audit.rs — StageLogger facade replaces emit_* helpers per zrefactor/logging_audit_refactor.INSTRUCTIONS.md
- - remove: cargo/switchyard/zrefactor/documantation/code_smell.md — BREAKING: superseded by zrefactor/CODE_SMELL_AND_CLEAN_CODE_AUDIT.md
+- remove: cargo/switchyard/src/adapters/mod.rs::lock_file — deprecated shim; use switchyard::adapters::lock::file::*
+- remove: cargo/switchyard/src/lib.rs top-level `pub use policy::rescue` — deprecated facade alias; import from switchyard::policy::rescue instead
+- remove: cargo/switchyard/zrefactor/documantation/code_smell.md — BREAKING: superseded by zrefactor/CODE_SMELL_AND_CLEAN_CODE_AUDIT.md

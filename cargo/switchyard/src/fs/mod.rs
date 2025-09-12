@@ -17,7 +17,7 @@ pub mod swap;
 #[deprecated(
     note = "Low-level FS atoms are internal: prefer high-level API. This re-export will be removed in 0.2."
 )]
-pub(crate) use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
+// Intentionally no re-export to avoid public exposure and unused warnings.
 /// END REMOVE BLOCK
 
 pub use backup::{backup_path_with_tag, create_snapshot, has_backup_artifacts};

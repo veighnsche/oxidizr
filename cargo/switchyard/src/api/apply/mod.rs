@@ -97,6 +97,17 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         "lock_backend": lock_backend,
                         "lock_wait_ms": lock_wait_ms,
                         "lock_attempts": approx_attempts,
+                        "error_id": "E_LOCKING",
+                        "exit_code": 30,
+                    }),
+                );
+                emit_apply_result(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "lock_backend": lock_backend,
+                        "lock_wait_ms": lock_wait_ms,
+                        "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
                         "error": e.to_string(),
                         "error_id": "E_LOCKING",
                         "exit_code": 30
@@ -145,6 +156,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "failure",
                     json!({
                         "lock_backend": "none",
+                        "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
                         "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
                         "exit_code": exit_code_for(ErrorId::E_LOCKING),
                     }),
@@ -226,6 +238,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 json!({
                     "error_id": "E_POLICY",
                     "exit_code": ec,
+                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
                 }),
             );
             let duration_ms = t0.elapsed().as_millis() as u64;

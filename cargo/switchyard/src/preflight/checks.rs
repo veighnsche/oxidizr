@@ -61,6 +61,7 @@ pub fn check_suid_sgid_risk(path: &Path) -> std::io::Result<bool> {
 /// Returns `Err(String)` only when the target itself is immutable.
 /// If `lsattr` is missing or fails, this returns `Ok(())` (best-effort).
 pub fn check_immutable(path: &Path) -> Result<(), String> {
+    // Heuristic via lsattr -d; best-effort and non-fatal when unavailable
     let output = match std::process::Command::new("lsattr")
         .arg("-d")
         .arg(path) // avoid lossy UTF-8 conversion
