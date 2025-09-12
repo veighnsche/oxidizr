@@ -138,18 +138,18 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Complexity: 2
   - Scope: Ensure `create_snapshot()` and `write_sidecar()` use dir handles + `*at` syscalls and `fsync_parent_dir()`; emit `backup_durable` in `apply` facts; add policy in `src/policy/config.rs`.
   - Implementation Steps
-    - [ ] `src/fs/backup.rs::create_snapshot`
-      - [ ] Confirm usage of `open_dir_nofollow` + `openat` (present) and ensure parent dir is fsynced after payload and sidecar creation.
-      - [ ] After writing payload and sidecar, call `fsync_parent_dir(target)`.
-    - [ ] `src/fs/backup.rs::write_sidecar`
-      - [ ] After writing JSON, call `File::sync_all()` on the file handle.
-      - [ ] Ensure parent directory is fsynced via `fsync_parent_dir` (compute parent from `sc_path`).
-    - [ ] Policy + facts
-      - [ ] Add `require_backup_durability: bool` to `Policy` (default true).
-      - [ ] Emit `backup_durable=true` in `apply.attempt` or per-action facts when durability path taken; `false` when policy opts out.
-    - [ ] Tests
-      - [ ] Extend existing snapshot tests to assert sidecar/payload exist and are flushed (mock or rely on success path; crash-sim left for later).
-      - [ ] Add a test toggling policy to ensure `backup_durable` field flips.
+    - [x] `src/fs/backup.rs::create_snapshot`
+      - [x] Confirm usage of `open_dir_nofollow` + `openat` (present) and ensure parent dir is fsynced after payload and sidecar creation.
+      - [x] After writing payload and sidecar, call `fsync_parent_dir(target)`.
+    - [x] `src/fs/backup.rs::write_sidecar`
+      - [x] After writing JSON, call `File::sync_all()` on the file handle.
+      - [x] Ensure parent directory is fsynced via `fsync_parent_dir` (compute parent from `sc_path`).
+    - [x] Policy + facts
+      - [x] Add `require_backup_durability: bool` to `Policy` (default true).
+      - [x] Emit `backup_durable=true` in `apply.attempt` or per-action facts when durability path taken; `false` when policy opts out.
+    - [x] Tests
+      - [x] Extend existing snapshot tests to assert sidecar/payload exist and are flushed (mock or rely on success path; crash-sim left for later).
+      - [x] Add a test toggling policy to ensure `backup_durable` field flips.
 
 - Backup sidecar integrity (payload hash)
   - Priority: P0
@@ -161,19 +161,19 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Scope: Extend `src/fs/backup.rs::BackupSidecar` and sidecar write path with `payload_hash`; verify in `src/fs/restore.rs::restore_file()`; emit `sidecar_integrity_verified` fields; add policy knob in `src/policy/config.rs`.
   - Dependencies: SPEC for sidecar v2 schema.
   - Implementation Steps
-    - [ ] Schema evolution
-      - [ ] Add `payload_hash: Option<String>` to `BackupSidecar` (v2 marker: `schema: "backup_meta.v2"`).
-      - [ ] Write v2 sidecar for new snapshots; continue reading v1.
-    - [ ] Compute & store hash
-      - [ ] In `create_snapshot()` when payload exists, compute SHA-256 of payload and set `payload_hash`.
-    - [ ] Verify on restore
-      - [ ] In `restore_file()`, if sidecar has `payload_hash` and payload present, recompute and compare; if mismatch and policy requires integrity, return error (map to `E_BACKUP_MISSING` or new `E_BACKUP_TAMPERED`).
-      - [ ] Emit `sidecar_integrity_verified=true/false` in per-action facts.
-    - [ ] Policy wiring
-      - [ ] Add `require_sidecar_integrity: bool` (default true in production presets).
-    - [ ] Tests
-      - [ ] Unit: create snapshot, then modify payload; restore should fail when policy requires integrity and pass when disabled.
-      - [ ] Integration: round-trip success with intact payload.
+    - [x] Schema evolution
+      - [x] Add `payload_hash: Option<String>` to `BackupSidecar` (v2 marker: `schema: "backup_meta.v2"`).
+      - [x] Write v2 sidecar for new snapshots; continue reading v1.
+    - [x] Compute & store hash
+      - [x] In `create_snapshot()` when payload exists, compute SHA-256 of payload and set `payload_hash`.
+    - [x] Verify on restore
+      - [x] In `restore_file()`, if sidecar has `payload_hash` and payload present, recompute and compare; if mismatch and policy requires integrity, return error (map to `E_BACKUP_MISSING` or new `E_BACKUP_TAMPERED`).
+      - [x] Emit `sidecar_integrity_verified=true/false` in per-action facts.
+    - [x] Policy wiring
+      - [x] Add `require_sidecar_integrity: bool` (default true in production presets).
+    - [x] Tests
+      - [x] Unit: create snapshot, then modify payload; restore should fail when policy requires integrity and pass when disabled.
+      - [x] Integration: round-trip success with intact payload.
 
 - Prune backups (retention)
   - Priority: P0
@@ -185,19 +185,19 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Scope: Add `Switchyard::prune_backups(&SafePath) -> Result<PruneResult>` in `src/api.rs`; core in `src/fs/backup.rs`; add `prune.result` emission in `src/logging/audit.rs`.
   - Dependencies: SPEC for retention knobs/invariants.
   - Implementation Steps
-    - [ ] Policy knobs
-      - [ ] Add `retention_count_limit: Option<usize>` and `retention_age_limit: Option<std::time::Duration>` to `Policy`.
-    - [ ] Core pruning logic (`src/fs/backup.rs`)
-      - [ ] Enumerate artifacts for a target/tag via existing discovery helpers.
-      - [ ] Sort by timestamp descending; retain newest; apply count/age filters for deletion set.
-      - [ ] Delete pairs atomically (payload + sidecar) and fsync parent directory.
-    - [ ] Public API (`src/api.rs`)
-      - [ ] Add `Switchyard::prune_backups(&self, target: &SafePath) -> Result<PruneResult, ApiError>`; call core logic.
-    - [ ] Facts (`src/logging/audit.rs`)
-      - [ ] Emit `prune.result` with `target_path`, `policy_used`, `pruned_count`, `retained_count`.
-    - [ ] Tests
-      - [ ] Unit: selection logic (count and age); never delete the newest backup.
-      - [ ] Integration: create N backups, run prune, verify counts and that pairs are deleted together.
+    - [x] Policy knobs
+      - [x] Add `retention_count_limit: Option<usize>` and `retention_age_limit: Option<std::time::Duration>` to `Policy`.
+    - [x] Core pruning logic (`src/fs/backup.rs`)
+      - [x] Enumerate artifacts for a target/tag via existing discovery helpers.
+      - [x] Sort by timestamp descending; retain newest; apply count/age filters for deletion set.
+      - [x] Delete pairs atomically (payload + sidecar) and fsync parent directory.
+    - [x] Public API (`src/api.rs`)
+      - [x] Add `Switchyard::prune_backups(&self, target: &SafePath) -> Result<PruneResult, ApiError>`; call core logic.
+    - [x] Facts (`src/logging/audit.rs`)
+      - [x] Emit `prune.result` with `target_path`, `policy_used`, `pruned_count`, `retained_count`.
+    - [x] Tests
+      - [x] Unit: selection logic (count and age); never delete the newest backup.
+      - [x] Integration: create N backups, run prune, verify counts and that pairs are deleted together.
 
 ## P1 — Observability and Operability
 
@@ -210,15 +210,15 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Complexity: 3
   - Scope: Add `summary_error_ids` to `preflight.summary`, `apply.result`, `rollback.summary`; update `SPEC/audit_event.schema.json`; ensure preserved in `src/logging/redact.rs`.
   - Implementation Steps
-    - [ ] Schema: add optional `summary_error_ids: [string]` to `SPEC/audit_event.schema.json`.
-    - [ ] Emitters: in `logging/audit.rs::emit_summary_extra` callers, include chain in the `extra` field on failures.
-    - [ ] Redaction: ensure `redact_event` preserves `summary_error_ids`.
-    - [ ] Tests: extend JSON schema test to accept and validate the new field across summaries.
-    - [ ] Apply summary wiring (`src/api/apply/mod.rs`)
-      - [ ] At the final decision block where `fields` is constructed (search for `let mut fields = json!({` near the end), insert `summary_error_ids` when `decision == "failure"`.
-      - [ ] Populate using a helper (see Error taxonomy task) or a local vec like `vec![id_str(ErrorId::E_POLICY)]` plus specific causes if known (e.g., `E_SMOKE`, `E_LOCKING`).
-    - [ ] Preflight summary wiring (`src/api/preflight/mod.rs`)
-      - [ ] Where `emit_summary_extra(&ctx, "preflight", decision, extra)` is called, add `summary_error_ids` into `extra` on failure, e.g., `["E_POLICY"]`.
+    - [x] Schema: add optional `summary_error_ids: [string]` to `SPEC/audit_event.schema.json`.
+    - [x] Emitters: in `logging/audit.rs::emit_summary_extra` callers, include chain in the `extra` field on failures.
+    - [x] Redaction: ensure `redact_event` preserves `summary_error_ids`.
+    - [x] Tests: extend JSON schema test to accept and validate the new field across summaries.
+    - [x] Apply summary wiring (`src/api/apply/mod.rs`)
+      - [x] At the final decision block where `fields` is constructed (search for `let mut fields = json!({` near the end), insert `summary_error_ids` when `decision == "failure"`).
+      - [x] Populate using a helper (see Error taxonomy task) or a local vec like `vec![id_str(ErrorId::E_POLICY)]` plus specific causes if known (e.g., `E_SMOKE`, `E_LOCKING`).
+    - [x] Preflight summary wiring (`src/api/preflight/mod.rs`)
+      - [x] Where `emit_summary_extra(&ctx, "preflight", decision, extra)` is called, add `summary_error_ids` into `extra` on failure, e.g., `["E_POLICY"]`.
     - [ ] Rollback summary (if/when a summary event exists)
       - [ ] Mirror the approach used for apply/preflight when emitting a rollback summary.
     - [ ] Grep checklist
@@ -334,7 +334,7 @@ This file consolidates all feature proposals (AI1–AI4) into an actionable, pri
   - Complexity: 2
   - Scope: Change re-exports to `pub(crate)` or remove in `src/fs/mod.rs` immediately; add trybuild compile-fail tests.
   - Implementation Steps
-    - [ ] Change `pub use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};` to private or remove now; keep only high-level helpers public.
+    - [x] Change `pub use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};` to private or remove now; keep only high-level helpers public.
     - [ ] Add `trybuild` tests asserting crate users cannot import these atoms.
     - [ ] Update docs and Migration Guide with intended imports.
     - [ ] Grep checklist

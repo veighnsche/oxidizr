@@ -66,6 +66,10 @@ fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
                 && e.get("decision") == Some(&Value::from("failure"))
                 && e.get("error_id") == Some(&Value::from("E_POLICY"))
                 && e.get("exit_code") == Some(&Value::from(10))
+                && e.get("summary_error_ids")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().any(|s| s == &Value::from("E_POLICY")))
+                    .unwrap_or(false)
         }),
         "expected preflight summary failure to include E_POLICY/10"
     );

@@ -178,7 +178,7 @@ Dry-run output must match real-run preflight rows byte-for-byte.
     "plan_id": {"type":"string"},
     "schema_version": {"type":"integer","enum":[1]},
     "action_id": {"type":"string"},
-    "stage": {"enum":["plan","preflight","apply.attempt","apply.result","rollback"]},
+    "stage": {"enum":["plan","preflight","apply.attempt","apply.result","rollback","rollback.summary","prune.result"]},
     "decision": {"enum":["success","failure","warn"]},
     "severity": {"enum":["info","warn","error"]},
     "degraded": {"type":["boolean","null"]},
@@ -224,7 +224,8 @@ Dry-run output must match real-run preflight rows byte-for-byte.
     "duration_ms": {"type":["integer","null"]},
     "lock_wait_ms": {"type":["integer","null"]},
     "error_id": {"type": ["string", "null"]},
-    "error_detail": {"type": ["string", "null"]}
+    "error_detail": {"type": ["string", "null"]},
+    "summary_error_ids": {"type": ["array", "null"], "items": {"type": "string"}}
   }
 }
 ```

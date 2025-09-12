@@ -34,3 +34,4 @@ file-logging = []
 tempfile = "3"
 jsonschema = "0.17"
 serial_test = "2"
+trybuild = "1"

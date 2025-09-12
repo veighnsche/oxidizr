@@ -311,6 +311,12 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     crate::api::errors::ErrorId::E_POLICY
                 )),
             );
+            let mut chain = vec![crate::api::errors::id_str(crate::api::errors::ErrorId::E_POLICY)];
+            // Best-effort: co-emit E_OWNERSHIP if any stop references ownership
+            if stops.iter().any(|s| s.to_lowercase().contains("ownership")) {
+                chain.push(crate::api::errors::id_str(crate::api::errors::ErrorId::E_OWNERSHIP));
+            }
+            obj.insert("summary_error_ids".to_string(), json!(chain));
         }
     }
     crate::logging::audit::emit_summary_extra(&ctx, "preflight", decision, extra);

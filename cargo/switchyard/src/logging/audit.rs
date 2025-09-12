@@ -1,3 +1,4 @@
+/// replace this file with StageLogger facade — see zrefactor/logging_audit_refactor.INSTRUCTIONS.md
 //! Audit helpers that emit Minimal Facts v1 across Switchyard stages.
 //!
 //! Side-effects:
@@ -168,6 +169,22 @@ pub(crate) fn emit_apply_result(ctx: &AuditCtx, decision: &str, extra: Value) {
     }
     ensure_provenance(&mut fields);
     redact_and_emit(ctx, "switchyard", "apply.result", decision, fields);
+}
+
+pub(crate) fn emit_prune_result(ctx: &AuditCtx, decision: &str, extra: Value) {
+    let mut fields = json!({
+        "stage": "prune.result",
+        "decision": decision,
+    });
+    if let Some(obj) = fields.as_object_mut() {
+        if let Some(eobj) = extra.as_object() {
+            for (k, v) in eobj.iter() {
+                obj.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    ensure_provenance(&mut fields);
+    redact_and_emit(ctx, "switchyard", "prune.result", decision, fields);
 }
 
 #[allow(dead_code)]

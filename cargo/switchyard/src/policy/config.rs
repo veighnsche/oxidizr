@@ -105,6 +105,13 @@ pub struct Policy {
     /// invertible: the inverse plan of a restore is another restore using the freshly
     /// captured snapshot.
     pub capture_restore_snapshot: bool,
+    /// When true, immutable-bit detection may fall back to unreliable methods without STOP.
+    /// When false (default), inconclusive immutable checks still proceed but we record notes;
+    /// only explicit immutable detection (via ioctl/lsattr) yields STOP.
+    pub allow_unreliable_immutable_check: bool,
+    /// Preservation tier preference for sidecar capture and restore application.
+    /// This is advisory; current implementation captures extended fields best-effort.
+    pub preservation_tier: PreservationTier,
 }
 
 impl Default for Policy {
@@ -134,9 +141,19 @@ impl Default for Policy {
             allow_unlocked_commit: false,
             extra_mount_checks: Vec::new(),
             capture_restore_snapshot: true,
+            allow_unreliable_immutable_check: false,
+            preservation_tier: PreservationTier::Basic,
         }
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub enum PreservationTier {
+    Basic,
+    Extended,
+    Full,
+}
+
 impl Policy {
     /// Construct a Policy configured with recommended **production defaults**.
     ///
@@ -156,9 +173,16 @@ impl Policy {
     /// # Example
     /// ```rust
     /// use switchyard::policy::Policy;
+    /// use switchyard::{Switchyard, logging::JsonlSink};
+    /// // Optional adapters used in production
+    /// use switchyard::adapters::FileLockManager;
+    /// use switchyard::adapters::DefaultSmokeRunner;
+    ///
     /// let policy = Policy::production_preset();
-    /// // Optionally customize for your env:
-    /// // policy.allow_degraded_fs = true;
+    /// let api = Switchyard::new(JsonlSink::default(), JsonlSink::default(), policy)
+    ///     .with_lock_manager(Box::new(FileLockManager::new(std::path::PathBuf::from("/tmp/lock"))))
+    ///     .with_smoke_runner(Box::new(DefaultSmokeRunner::default()));
+    /// # let _ = api; // avoid unused warning
     /// ```
     pub fn production_preset() -> Self {
         let mut p = Self::default();

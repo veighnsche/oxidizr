@@ -13,6 +13,7 @@ use base64::Engine;
 use serde_json::json;
 
 use crate::fs;
+use crate::constants::LOCK_POLL_MS;
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::types::ids::{action_id, plan_id};
@@ -26,6 +27,13 @@ use crate::logging::audit::{
 use crate::policy::gating;
 mod audit_fields;
 mod handlers;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct PerfAgg {
+    pub hash_ms: u64,
+    pub backup_ms: u64,
+    pub swap_ms: u64,
+}
 
 fn lock_backend_label(mgr: Option<&Box<dyn crate::adapters::lock::LockManager>>) -> String {
     if let Some(m) = mgr {
@@ -81,12 +89,14 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
             Err(e) => {
                 lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
+                let approx_attempts = lock_wait_ms.map(|ms| 1 + (ms / LOCK_POLL_MS)).unwrap_or(1);
                 emit_apply_attempt(
                     &tctx,
                     "failure",
                     json!({
                         "lock_backend": lock_backend,
                         "lock_wait_ms": lock_wait_ms,
+                        "lock_attempts": approx_attempts,
                         "error": e.to_string(),
                         "error_id": "E_LOCKING",
                         "exit_code": 30
@@ -124,6 +134,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     "failure",
                     json!({
                         "lock_backend": "none",
+                        "lock_attempts": 0u64,
                         "error_id": "E_LOCKING",
                         "exit_code": 30,
                     }),
@@ -154,6 +165,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     json!({
                         "lock_backend": "none",
                         "no_lock_manager": true,
+                        "lock_attempts": 0u64,
                     }),
                 );
             }
@@ -164,21 +176,25 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 json!({
                     "lock_backend": "none",
                     "no_lock_manager": true,
+                    "lock_attempts": 0u64,
                 }),
             );
         }
     }
 
     // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
+    let approx_attempts = lock_wait_ms.map(|ms| 1 + (ms / LOCK_POLL_MS)).unwrap_or_else(|| if api.lock.is_some() { 1 } else { 0 });
     emit_apply_attempt(
         &tctx,
         "success",
         json!({
             "lock_backend": lock_backend,
             "lock_wait_ms": lock_wait_ms,
+            "lock_attempts": approx_attempts,
         }),
     );
 
+    // BEGIN REMOVE BLOCK — duplicate policy gating; centralize in policy::gating::evaluate_action
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
     if !api.policy.override_preflight && !dry {
         let gating_errors = gating::gating_errors(&api.policy, api.owner.as_deref(), plan);
@@ -223,11 +239,17 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             };
         }
     }
+    // END REMOVE BLOCK
 
+    let mut perf_total = PerfAgg::default();
     for (idx, act) in plan.actions.iter().enumerate() {
         match act {
             Action::EnsureSymlink { .. } => {
-                let (exec, err) = handlers::handle_ensure_symlink(api, &tctx, &pid, act, idx, dry);
+                let (exec, err, perf) =
+                    handlers::handle_ensure_symlink(api, &tctx, &pid, act, idx, dry);
+                perf_total.hash_ms += perf.hash_ms;
+                perf_total.backup_ms += perf.backup_ms;
+                perf_total.swap_ms += perf.swap_ms;
                 if let Some(e) = err {
                     errors.push(e);
                 }
@@ -236,7 +258,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 }
             }
             Action::RestoreFromBackup { .. } => {
-                let (exec, err) = handlers::handle_restore(api, &tctx, &pid, act, idx, dry);
+                let (exec, err, perf) =
+                    handlers::handle_restore(api, &tctx, &pid, act, idx, dry);
+                perf_total.hash_ms += perf.hash_ms;
+                perf_total.backup_ms += perf.backup_ms;
+                perf_total.swap_ms += perf.swap_ms;
                 if let Some(e) = err {
                     errors.push(e);
                 }
@@ -293,6 +319,26 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         }
                     }
                 }
+                // Emit rollback summary once after attempting rollback of executed actions
+                let rb_decision = if rollback_errors.is_empty() { "success" } else { "failure" };
+                let mut rb_extra = json!({});
+                if rb_decision == "failure" {
+                    if let Some(obj) = rb_extra.as_object_mut() {
+                        obj.insert(
+                            "error_id".to_string(),
+                            json!(crate::api::errors::id_str(ErrorId::E_RESTORE_FAILED)),
+                        );
+                        obj.insert(
+                            "exit_code".to_string(),
+                            json!(exit_code_for(ErrorId::E_RESTORE_FAILED)),
+                        );
+                        obj.insert(
+                            "summary_error_ids".to_string(),
+                            json!([crate::api::errors::id_str(ErrorId::E_RESTORE_FAILED), crate::api::errors::id_str(ErrorId::E_POLICY)]),
+                        );
+                    }
+                }
+                crate::logging::audit::emit_summary_extra(&tctx, "rollback.summary", rb_decision, rb_extra);
             }
             break;
         }
@@ -378,6 +424,17 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         "lock_backend": lock_backend,
         "lock_wait_ms": lock_wait_ms,
     });
+    // Attach perf aggregate (best-effort, zeros in DryRun may be redacted)
+    if let Some(obj) = fields.as_object_mut() {
+        obj.insert(
+            "perf".to_string(),
+            json!({
+                "hash_ms": perf_total.hash_ms,
+                "backup_ms": perf_total.backup_ms,
+                "swap_ms": perf_total.swap_ms,
+            }),
+        );
+    }
     // Optional attestation on success, non-dry-run
     if errors.is_empty() && !dry {
         if let Some(att) = &api.attest {
@@ -427,6 +484,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 obj.entry("exit_code")
                     .or_insert(json!(exit_code_for(ErrorId::E_POLICY)));
             }
+            // Compute chain best-effort from collected error messages
+            let chain = crate::api::errors::infer_summary_error_ids(&errors);
+            obj.insert("summary_error_ids".to_string(), json!(chain));
         }
     }
     emit_apply_result(&tctx, decision, fields);

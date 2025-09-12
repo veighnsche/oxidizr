@@ -1,3 +1,4 @@
+/// replace this file with src/fs/restore/{mod.rs,types.rs,selector.rs,idempotence.rs,integrity.rs,steps.rs,engine.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
 //! Restore logic extracted from symlink.rs, using backup sidecar schema.
 
 use std::fs;

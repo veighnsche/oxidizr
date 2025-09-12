@@ -7,6 +7,7 @@ use crate::types::ids::action_id;
 use crate::types::Action;
 
 use super::audit_fields::{insert_hashes, maybe_warn_fsync};
+use std::time::Instant;
 use crate::api::errors::{exit_code_for, id_str, ErrorId};
 use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
 use crate::logging::audit::{emit_apply_attempt, emit_apply_result, ensure_provenance, AuditCtx};
@@ -20,7 +21,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     act: &Action,
     idx: usize,
     dry: bool,
-) -> (Option<Action>, Option<String>) {
+) -> (Option<Action>, Option<String>, super::PerfAgg) {
     let (source, target) = match act {
         Action::EnsureSymlink { source, target } => (source, target),
         _ => unreachable!("expected EnsureSymlink"),
@@ -42,12 +43,14 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     let degraded_used: bool;
     let mut fsync_ms: u64 = 0;
     let before_kind = kind_of(&target.as_path());
-    // Compute before/after hashes
+    // Compute before/after hashes (time the operation)
+    let th0 = Instant::now();
     let before_hash = match resolve_symlink_target(&target.as_path()) {
         Some(p) => sha256_hex_of(&p),
         None => sha256_hex_of(&target.as_path()),
     };
     let after_hash = sha256_hex_of(&source.as_path());
+    let hash_ms = th0.elapsed().as_millis() as u64;
     match crate::fs::replace_file_with_symlink(
         &source,
         &target,
@@ -94,7 +97,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
             emit_apply_result(tctx, "failure", extra);
-            return (None, Some(msg));
+            return (None, Some(msg), super::PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms });
         }
     }
 
@@ -114,7 +117,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     maybe_warn_fsync(&mut extra, fsync_ms, FSYNC_WARN_MS);
     emit_apply_result(tctx, "success", extra);
 
-    (Some(act.clone()), None)
+    (Some(act.clone()), None, super::PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms })
 }
 
 /// Handle a RestoreFromBackup action: perform restore and emit per-action facts.
@@ -126,7 +129,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     act: &Action,
     idx: usize,
     dry: bool,
-) -> (Option<Action>, Option<String>) {
+) -> (Option<Action>, Option<String>, super::PerfAgg) {
     let target = match act {
         Action::RestoreFromBackup { target } => target,
         _ => unreachable!("expected RestoreFromBackup"),
@@ -146,12 +149,16 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
 
     let before_kind = kind_of(&target.as_path());
     let mut used_prev = false;
+    let mut backup_ms = 0u64;
     if !dry && api.policy.capture_restore_snapshot {
+        let tb0 = Instant::now();
         let _ = crate::fs::create_snapshot(&target.as_path(), &api.policy.backup_tag);
+        backup_ms = tb0.elapsed().as_millis() as u64;
         used_prev = true;
     }
     let force = api.policy.force_restore_best_effort || !api.policy.require_sidecar_integrity;
     // Pre-compute sidecar integrity verification (best-effort) before restore
+    let th0 = Instant::now();
     let integrity_verified = (|| {
         let pair = if used_prev {
             crate::fs::backup::find_previous_backup_and_sidecar(&target.as_path(), &api.policy.backup_tag)
@@ -167,6 +174,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             None
         }
     })();
+    let mut hash_ms = th0.elapsed().as_millis() as u64;
 
     let restore_res = if used_prev {
         crate::fs::restore_file_prev(&target, dry, force, &api.policy.backup_tag)
@@ -198,7 +206,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                     }
                     ensure_provenance(&mut extra);
                     emit_apply_result(tctx, decision, extra);
-                    return (Some(act.clone()), None);
+                    return (Some(act.clone()), None, super::PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
                 }
             }
             use std::io::ErrorKind;
@@ -222,7 +230,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
             emit_apply_result(tctx, decision, extra);
-            return (None, Some(msg));
+            return (None, Some(msg), super::PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
         }
     }
 
@@ -241,5 +249,5 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     ensure_provenance(&mut extra);
     emit_apply_result(tctx, decision, extra);
 
-    (Some(act.clone()), None)
+    (Some(act.clone()), None, super::PerfAgg { hash_ms, backup_ms, swap_ms: 0 })
 }

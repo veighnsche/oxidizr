@@ -3,6 +3,8 @@
 //! This module centralizes the backup payload and sidecar schema handling used
 //! by symlink replacement and restore operations.
 
+/// replace this file with src/fs/backup/{mod.rs,snapshot.rs,sidecar.rs,index.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
+
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 

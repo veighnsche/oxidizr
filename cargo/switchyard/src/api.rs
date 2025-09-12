@@ -1,8 +1,11 @@
+/// move this file -> src/api/mod.rs — idiomatic module layout; drop #[path] includes
 // Facade for API module; delegates to submodules under src/api/
 
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
 use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 use crate::logging::{AuditSink, FactsEmitter};
+use serde_json::json;
+use uuid::Uuid;
 use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 
@@ -82,6 +85,70 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
 
     pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
         rollback::inverse_with_policy(&self.policy, report)
+    }
+
+    /// Prune backup artifacts for a given target according to retention policy knobs.
+    ///
+    /// Emits a `prune.result` fact with details about counts and policy used.
+    pub fn prune_backups(
+        &self,
+        target: &crate::types::safepath::SafePath,
+    ) -> Result<crate::types::PruneResult, errors::ApiError> {
+        // Synthesize a stable plan-like ID for pruning based on target path and tag.
+        let plan_like = format!(
+            "prune:{}:{}",
+            target.as_path().display(),
+            self.policy.backup_tag
+        );
+        let pid = Uuid::new_v5(&Uuid::NAMESPACE_URL, plan_like.as_bytes());
+        let tctx = crate::logging::audit::AuditCtx::new(
+            &self.facts as &dyn FactsEmitter,
+            pid.to_string(),
+            crate::logging::redact::now_iso(),
+            crate::logging::audit::AuditMode {
+                dry_run: false,
+                redact: false,
+            },
+        );
+
+        let count_limit = self.policy.retention_count_limit;
+        let age_limit = self.policy.retention_age_limit;
+        match crate::fs::backup::prune_backups(
+            &target.as_path(),
+            &self.policy.backup_tag,
+            count_limit,
+            age_limit,
+        ) {
+            Ok(res) => {
+                crate::logging::audit::emit_prune_result(
+                    &tctx,
+                    "success",
+                    json!({
+                        "path": target.as_path().display().to_string(),
+                        "backup_tag": self.policy.backup_tag,
+                        "retention_count_limit": count_limit,
+                        "retention_age_limit_ms": age_limit.map(|d| d.as_millis() as u64),
+                        "pruned_count": res.pruned_count,
+                        "retained_count": res.retained_count,
+                    }),
+                );
+                Ok(res)
+            }
+            Err(e) => {
+                crate::logging::audit::emit_prune_result(
+                    &tctx,
+                    "failure",
+                    json!({
+                        "path": target.as_path().display().to_string(),
+                        "backup_tag": self.policy.backup_tag,
+                        "error": e.to_string(),
+                        "error_id": crate::api::errors::id_str(crate::api::errors::ErrorId::E_GENERIC),
+                        "exit_code": crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_GENERIC),
+                    }),
+                );
+                Err(errors::ApiError::FilesystemError(e.to_string()))
+            }
+        }
     }
 }
 

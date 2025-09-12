@@ -18,6 +18,45 @@ pub enum ApiError {
     AttestationFailed(String),
 }
 
+/// Best-effort mapping from apply-stage error strings to a chain of stable summary error IDs.
+/// Always includes a top-level classification; may include co-emitted categories like E_OWNERSHIP.
+pub fn infer_summary_error_ids(errors: &[String]) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = Vec::new();
+    let joined = errors.join("; ").to_lowercase();
+    if joined.contains("smoke") {
+        out.push(id_str(ErrorId::E_SMOKE));
+    }
+    if joined.contains("lock") {
+        out.push(id_str(ErrorId::E_LOCKING));
+    }
+    if joined.contains("ownership") {
+        out.push(id_str(ErrorId::E_OWNERSHIP));
+    }
+    if joined.contains("exdev") {
+        out.push(id_str(ErrorId::E_EXDEV));
+    }
+    if joined.contains("atomic") || joined.contains("symlink") {
+        out.push(id_str(ErrorId::E_ATOMIC_SWAP));
+    }
+    if joined.contains("backup") && joined.contains("missing") {
+        out.push(id_str(ErrorId::E_BACKUP_MISSING));
+    }
+    if joined.contains("restore") && joined.contains("failed") {
+        out.push(id_str(ErrorId::E_RESTORE_FAILED));
+    }
+    if out.is_empty() {
+        out.push(id_str(ErrorId::E_POLICY));
+    } else {
+        // Ensure E_POLICY is present last for routing when other specifics exist
+        out.push(id_str(ErrorId::E_POLICY));
+    }
+    // Deduplicate while preserving order
+    let mut seen = std::collections::HashSet::new();
+    out.into_iter()
+        .filter(|id| seen.insert(*id))
+        .collect()
+}
+
 impl From<crate::types::errors::Error> for ApiError {
     fn from(e: crate::types::errors::Error) -> Self {
         use crate::types::errors::ErrorKind::*;

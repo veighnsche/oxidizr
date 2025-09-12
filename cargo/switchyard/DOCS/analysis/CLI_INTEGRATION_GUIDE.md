@@ -25,7 +25,9 @@
 
 ## Retention
 
-- Expose a `prune` subcommand in your CLI that implements a retention policy client-side for now (e.g., delete older `.bak` and `.meta.json` pairs beyond your max count or age). The library-level `prune_backups(...)` helper is proposed but not yet available; track RETENTION_STRATEGY.md for updates.
+- Expose a `prune` subcommand in your CLI that calls the library API to prune backups deterministically under policy.
+- Use `Switchyard::prune_backups(&SafePath)` to apply count/age limits set in `Policy` (see `retention_count_limit` and `retention_age_limit`).
+- Facts will include a `prune.result` event with `pruned_count` and `retained_count` for auditability.
 
 ## Package Manager Interop
 
@@ -62,13 +64,30 @@ Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
 - Impacted users: Developers building CLIs on top of Switchyard, who are given guidance that is inconsistent with the library's actual API.
 - Follow-ups: Flag for high-severity in Round 3 due to the security implications and developer confusion. Prioritize the `SafePath` refactoring in Round 4.
 
-- Invariant: Documented library features are implemented.
-- Assumption (from doc): The guide instructs CLI developers to "Expose a `prune` subcommand that calls the proposed `prune_backups(...)` hook" (`CLI_INTEGRATION_GUIDE.md:28-29`).
-- Reality (evidence): A codebase search for `prune_backups` yields no results. The function does not exist. The related document, `RETENTION_STRATEGY.md`, may propose it, but it has not been implemented in the library.
-- Gap: The guide directs developers to use a non-existent function. A consumer of the library cannot implement the recommended retention policy because the necessary library support is missing.
-- Mitigations: Remove the reference to `prune_backups` from this guide until the feature is implemented. Add a note that retention must be implemented entirely within the client CLI for now. Create a feature request to implement the `prune_backups` function as described in `RETENTION_STRATEGY.md`.
-- Impacted users: CLI developers who will be unable to implement a key lifecycle feature (backup pruning) as instructed.
-- Follow-ups: Flag for implementation in Round 4. The absence of a core lifecycle function is a significant feature gap.
+- Invariant Update: The library now provides `Switchyard::prune_backups(&SafePath)`; this guide reflects the current API. Retention can be implemented using this API and `Policy` knobs.
+
+## SafePath Example
+
+```rust
+use switchyard::{Switchyard, logging::JsonlSink};
+use switchyard::policy::Policy;
+use switchyard::types::plan::{PlanInput, LinkRequest};
+use switchyard::types::safepath::SafePath;
+use switchyard::types::ApplyMode;
+
+let facts = JsonlSink::default();
+let audit = JsonlSink::default();
+let mut policy = Policy::production_preset();
+policy.allow_roots.push(std::path::PathBuf::from("/tmp/root/usr/bin"));
+
+let api = Switchyard::new(facts, audit, policy);
+let root = std::path::Path::new("/tmp/root");
+let src = SafePath::from_rooted(root, &root.join("opt/new/bin/ls")).unwrap();
+let tgt = SafePath::from_rooted(root, &root.join("usr/bin/ls")).unwrap();
+let plan = api.plan(PlanInput { link: vec![LinkRequest { source: src, target: tgt }], restore: vec![] });
+let _pf = api.preflight(&plan).unwrap();
+let _ar = api.apply(&plan, ApplyMode::Commit).unwrap();
+```
 
 Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00
 
