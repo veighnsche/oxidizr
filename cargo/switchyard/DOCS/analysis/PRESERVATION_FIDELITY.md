@@ -93,10 +93,10 @@
 ## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
 
 **Claims Verified:**
-- ✅ `detect_preservation_capabilities()` function exists in `src/fs/meta.rs:75-106` and correctly probes owner (root check via `/proc/self/status`), mode, timestamps, xattrs, with ACLs/caps hard-coded false
-- ✅ Backup creation in `src/fs/backup.rs:118-232` captures mode via `fchmod` and stores in `BackupSidecar.mode` as octal string for files; symlinks store `prior_dest`; missing files create tombstone with `prior_kind="none"`
-- ✅ Restore logic in `src/fs/restore.rs:14-271` uses `renameat` for file restoration and `fchmod` to restore mode when present in sidecar; symlinks restored via `atomic_symlink_swap`
-- ✅ Preflight integration in `src/api/preflight/mod.rs:140-144` calls `detect_preservation_capabilities()` and gates on `require_preservation` policy
+- `detect_preservation_capabilities()` function exists in `src/fs/meta.rs:75-106` and correctly probes owner (root check via `/proc/self/status`), mode, timestamps, xattrs, with ACLs/caps hard-coded false
+- Backup creation in `src/fs/backup.rs:118-232` captures mode via `fchmod` and stores in `BackupSidecar.mode` as octal string for files; symlinks store `prior_dest`; missing files create tombstone with `prior_kind="none"`
+- Restore logic in `src/fs/restore.rs:14-271` uses `renameat` for file restoration and `fchmod` to restore mode when present in sidecar; symlinks restored via `atomic_symlink_swap`
+- Preflight integration in `src/api/preflight/mod.rs:140-144` calls `detect_preservation_capabilities()` and gates on `require_preservation` policy
 
 **Key Citations:**
 - `src/fs/meta.rs:88-91`: Owner detection via `effective_uid_is_root()` parsing `/proc/self/status`
@@ -138,3 +138,34 @@ Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
   - Follow-ups: Add `restore_ready` to preflight rows; author retention guidance in docs/CLI.
 
 Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
+
+## Round 3 Severity Assessment (AI 4, 2025-09-12 15:52 CET)
+
+- **Title:** Lack of Extended Preservation Beyond Mode (Owner, Timestamps, Xattrs)
+  - **Category:** Missing Feature
+  - **Impact:** 4  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 3
+  - **Why update vs why not:** Not preserving extended metadata like owner, timestamps, and xattrs can disrupt system integrity and user expectations in environments where metadata is critical (e.g., backups, system migrations). Implementing tiered preservation enhances trust and utility for integrators. The cost of inaction is continued limitation of the tool's applicability in metadata-sensitive scenarios.
+  - **Evidence:** `src/fs/backup.rs::create_snapshot()` captures only `mode` for files and `prior_dest` for symlinks; no owner/timestamps/xattrs (lines 194–205, 140–151). `src/fs/restore.rs::restore_file()` restores only mode via `fchmod` (lines 129–137).
+  - **Next step:** Implement policy-controlled `preservation_tier` with tiers (Basic, Extended, Full) in `src/policy/config.rs`. Extend sidecar schema in `src/fs/backup.rs` for additional fields (`uid`, `gid`, `mtime_*`, `xattrs`) and update restore logic in `src/fs/restore.rs` to apply these when supported and requested. Plan for Round 4.
+
+- **Title:** Backup and Sidecar Durability Missing After Creation
+  - **Category:** Bug/Defect (Reliability)
+  - **Impact:** 4  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 2
+  - **Why update vs why not:** Lack of durability guarantees for backups and sidecars risks data loss in crash scenarios, undermining a core recovery feature. Adding `fsync_parent_dir()` is a straightforward fix with high reliability value. The cost of inaction is potential unavailability of rollback options during critical failures.
+  - **Evidence:** `src/fs/backup.rs::write_sidecar()` uses path-based `File::create` with no `fsync(parent)` (lines 262–270); symlink backups use `std::os::unix::fs::symlink` without parent sync (lines 137–151).
+  - **Next step:** Add `fsync_parent_dir(backup)` calls after creating backup payloads and sidecars in `src/fs/backup.rs`. Use `open_dir_nofollow(parent)` and `symlinkat` for symlink backups. Implement in Round 4.
+
+- **Title:** Restore Impossible After Manual Payload Pruning Despite Sidecar Presence
+  - **Category:** Missing Feature (Usability)
+  - **Impact:** 3  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 2
+  - **Why update vs why not:** If payloads are pruned but sidecars remain, restore fails with `E_BACKUP_MISSING`, frustrating users who expect best-effort recovery. Adding telemetry and guidance for retention policies improves usability and prevents unexpected failures. The cost of inaction is user confusion and reduced trust in recovery mechanisms.
+  - **Evidence:** `src/fs/restore.rs::restore_file()` errors with `E_BACKUP_MISSING` when payload is absent and `force_best_effort=false` (lines 96–107). Sidecar alone does not enable file reconstruction.
+  - **Next step:** Add `restore_ready=true|false` field to preflight rows based on `has_backup_artifacts()` in `src/api/preflight/mod.rs`. Document retention guidance to maintain at least one payload per target in CLI docs. Plan for Round 4.
+
+Severity assessed in Round 3 by AI 4 on 2025-09-12 15:52 CET

@@ -143,3 +143,25 @@ Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
   - **Follow-ups:** Flag this as a medium-severity documentation gap for Round 3. Plan to implement stability annotations and documentation updates in Round 4.
 
 Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET
+
+## Round 3 Severity Assessment (AI 3, 2025-09-12 15:49+02:00)
+
+- **Title:** Unsafe low-level filesystem functions are publicly exposed
+- **Category:** API Design (DX/Usability)
+- **Impact:** 4  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 1
+- **Why update vs why not:** Exposing low-level, unsafe primitives is an API design flaw that encourages misuse and can lead to security vulnerabilities (e.g., TOCTOU races) if not used correctly. Making them `pub(crate)` is a simple change that hardens the API surface and guides users to the correct, safe abstractions.
+- **Evidence:** `src/fs/mod.rs` publicly re-exports `atomic_symlink_swap`, `fsync_parent_dir`, and `open_dir_nofollow`, as noted in the Round 2 analysis.
+- **Next step:** Update the visibility of the low-level functions in `src/fs/mod.rs` to `pub(crate)` in Round 4.
+
+- **Title:** Public API items lack stability documentation
+- **Category:** Documentation Gap
+- **Impact:** 3  **Likelihood:** 5  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 2
+- **Why update vs why not:** Without explicit stability markers, consumers may unknowingly build upon provisional APIs, leading to breakage and frustration during upgrades. Documenting stability is a low-effort, high-value change that improves the developer experience and sets clear expectations.
+- **Evidence:** The codebase lacks Rustdoc annotations or other markers to indicate the `Stable` vs. `Provisional` status of public API items, as noted in the Round 2 analysis.
+- **Next step:** Add Rustdoc comments with stability classifications (`Stable`, `Provisional`, `Internal`) to all public modules and items during Round 4.
+
+Severity assessed in Round 3 by AI 3 on 2025-09-12 15:49+02:00

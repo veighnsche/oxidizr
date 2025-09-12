@@ -131,3 +131,34 @@ Generated on: 2025-09-12
 - **Follow-ups:** Conduct usage analysis of public API imports; refine re-export granularity based on findings
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: No API surface stability tests for facade imports
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Prevents accidental breakage during refactors by ensuring public `pub use` imports remain valid.
+  - Evidence: Facade re-exports at `src/fs/mod.rs:9-15`, `src/types/mod.rs:57-63`, `src/logging/mod.rs:51-53` with no integration test coverage.
+  - Next step: Add a `tests/public_api.rs` that imports all documented public paths; wire into CI.
+
+- Title: Lack of lifecycle policy distinguishing facades vs compatibility shims
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Clarifies long-term stability guarantees and deprecation expectations for consumers.
+  - Evidence: Shim at `src/adapters/mod.rs:6-9` and crate-root `policy::rescue` re-export at `src/lib.rs:21` without documented lifecycle.
+  - Next step: Add an API lifecycle section to SPEC §3 and this doc; tag shims with `#[deprecated]` notes and timelines.
+
+- Title: Over-broad glob re-exports risk namespace pollution
+  - Category: DX/Usability
+  - Impact: 2  Likelihood: 2  Confidence: 3  → Priority: 2  Severity: S3
+  - Disposition: Backlog  LHF: No
+  - Feasibility: Medium  Complexity: 3
+  - Why update vs why not: Selective re-exports improve clarity but require usage analysis and potential breaking changes.
+  - Evidence: `src/types/mod.rs` uses `pub use errors::*;`, `ids::*`, etc.; mixed granularity across modules.
+  - Next step: Analyze consumer usage and consider narrowing re-exports in a major/minor with deprecations.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

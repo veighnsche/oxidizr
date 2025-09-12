@@ -112,3 +112,34 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 - **Follow-ups:** Complete environment variable test coverage; document test knob behavior guarantees
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Facts schema validation tests are missing
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Prevents schema drift that can break consumers; low-effort unit tests using `jsonschema`.
+  - Evidence: No tests validate facts against `SPEC/audit_event.schema.json`; recommended earlier in this doc.
+  - Next step: Add tests to validate `plan`, `preflight` rows/summary, `apply.attempt`, `apply.result`, and `rollback` facts against the schema in CI.
+
+- Title: EXDEV degraded-path behavior lacks tests
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 2  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Ensures degraded mode telemetry and policy behavior are correct when crossing filesystems.
+  - Evidence: Guidance in this doc; use `SWITCHYARD_FORCE_EXDEV=1` to simulate; no current test asserts `degraded=true` or `E_EXDEV` when disallowed.
+  - Next step: Add unit/integration tests for both allowed and disallowed degraded paths with assertions on facts and exit codes.
+
+- Title: Sidecar corruption and mismatch handling lacks tests
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 2  Confidence: 3  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: No
+  - Feasibility: Medium  Complexity: 3
+  - Why update vs why not: Increases restore reliability by covering malformed JSON and orphaned payload/sidecar scenarios.
+  - Evidence: Only positive-path snapshot tests exist in `src/fs/backup.rs:L76-L111`.
+  - Next step: Create negative-path tests for malformed sidecars and mismatched pairs; ensure robust error mapping.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

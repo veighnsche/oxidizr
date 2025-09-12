@@ -127,3 +127,25 @@ Traceability and next steps
 - **Follow-ups:** Document experiment-library interface contract; add integration tests verifying boundary enforcement
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Make preserve list a policy knob instead of hard constant
+  - Category: Policy/Default Mismatch
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Hardcoded preservation lists reduce portability across distros; exposing a policy knob enables environment-specific behavior with minimal code churn.
+  - Evidence: `cargo/oxidizr-arch/src/experiments/constants.rs:L1-L23` defines `CHECKSUM_BINS`; recommendation already suggests `policy.preserve_bins`.
+  - Next step: Add `preserve_bins: Vec<String>` to `src/policy/config.rs`; thread into apply-stage where replacements are decided; default from experiments crate.
+
+- Title: Guardrails to prevent policy-internals from hardcoding environment choices in core
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: A documented rule and ADR reduce future drift of env-dependent lists into core.
+  - Evidence: This doc’s guidance; no ADR/lints currently enforce separation.
+  - Next step: Add ADR on constants vs policy classification; update `CODING_STANDARDS.md` with a checklist; consider a simple lint/CI grep for suspicious hardcoded allowlists.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

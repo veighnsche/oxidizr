@@ -78,3 +78,43 @@ Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00
   - Follow-ups: Introduce `public-api` diff check in CI and require CHANGELOG updates.
 
 Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
+
+## Round 3 Severity Assessment (AI 4, 2025-09-12 15:52 CET)
+
+- **Title:** Lack of Deprecation Warnings for Legacy Shims and API Changes
+  - **Category:** Documentation Gap (DX/Usability)
+  - **Impact:** 3  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Without deprecation warnings on legacy shims and low-level API exports, consumers may integrate with components slated for removal, risking breakage in future updates. Adding `#[deprecated]` attributes and changelog entries is a simple, high-value step to ensure smooth transitions. The cost of inaction is potential integration issues during upgrades.
+  - **Evidence:** No deprecation attributes on shims like `adapters::lock_file::*` in `src/adapters/mod.rs` (lines 6–9) or low-level FS atoms in `src/fs/mod.rs` (lines 9–15).
+  - **Next step:** Add `#[deprecated]` attributes with notes to legacy shims and low-level exports in relevant files. Document these in CHANGELOG under 'Deprecated' for the next release. Add CI check to prevent new usages. Implement in Round 4.
+
+- **Title:** Missing Dual-Emit Period for Schema Version Bumps
+  - **Category:** Missing Feature (Reliability)
+  - **Impact:** 3  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 3
+  - **Why update vs why not:** Without a dual-emit period for facts schema changes, downstream consumers may face immediate breakage when upgrading. Implementing dual-emit (v1+v2) during migration ensures compatibility, reducing disruption. The cost of inaction is potential analytics pipeline failures during schema updates.
+  - **Evidence:** `src/logging/audit.rs` uses a single `SCHEMA_VERSION=1` with no dual-emit mechanism (line 13).
+  - **Next step:** Introduce feature-gated dual-emit for v1 and v2 schemas in `src/logging/audit.rs`. Update test fixtures for both versions and add CI gate to ensure compatibility during migration. Update SPEC §13 for dual-emit mechanics. Plan for Round 4.
+
+- **Title:** Absence of Repository-Local CI Gates for SKIP and Unwrap/Expect
+  - **Category:** Test & Validation (Reliability)
+  - **Impact:** 2  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Without local checks for skipped tests or unwrap/expect patterns, there's a risk of regressions slipping through before CI. Adding simple scripts or xtasks to catch these issues locally enhances code quality with minimal effort. The cost of inaction is occasional CI failures, which are minor but avoidable.
+  - **Evidence:** `src/lib.rs` enforces `#![deny]` for unwrap/expect in non-test code (lines 1–9), but no local checks for SKIPs or deprecation usage are in place.
+  - **Next step:** Add a cargo xtask or script to fail on `#[ignore]` or similar patterns in test code. Add grep-based CI checks for deprecation coverage. Document in CONTRIBUTING. Implement in Round 4.
+
+- **Title:** Missing Crate-Level CHANGELOG for Public API Changes
+  - **Category:** Documentation Gap (DX/Usability)
+  - **Impact:** 2  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Without a crate-level CHANGELOG, consumers and maintainers lack an easily accessible record of API changes, complicating upgrade decisions. Adding `CHANGELOG.md` and gating CI on updates for public API diffs is a straightforward way to improve transparency. The cost of inaction is minor user inconvenience during upgrades.
+  - **Evidence:** No `CHANGELOG.md` exists in `cargo/switchyard/` directory (process doc only).
+  - **Next step:** Create `cargo/switchyard/CHANGELOG.md` following the template. Add CI gate using `cargo public-api` to require changelog updates on API diffs. Implement in Round 4.
+
+Severity assessed in Round 3 by AI 4 on 2025-09-12 15:52 CET

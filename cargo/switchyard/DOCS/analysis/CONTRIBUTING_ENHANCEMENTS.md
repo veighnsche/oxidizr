@@ -77,3 +77,34 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 - **Follow-ups:** Create comprehensive feature flag documentation; add development workflow examples
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Toolchain pinning and contributor environment guidance
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 2  Confidence: 4  → Priority: 1  Severity: S4
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Explicitly referencing `rust-toolchain.toml` and expected components reduces build/lint drift across contributor machines and CI.
+  - Evidence: Workspace root contains `rust-toolchain.toml` with `channel = "stable"`, `components = ["clippy", "rustfmt"]`.
+  - Next step: Add a short note linking to `rust-toolchain.toml`; specify running with `rustup component add clippy rustfmt` if needed.
+
+- Title: Prevent tests from using system paths
+  - Category: Missing Feature
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: A simple lint or CI grep avoids recurring test failures due to permission or environment differences.
+  - Evidence: Standards encourage `tempfile`; intermittent issues in downstream repos often stem from absolute paths.
+  - Next step: Add a CI job that greps tests for banned prefixes (e.g., `/usr`, `/bin`) unless explicitly feature-gated; provide a test template that uses `tempfile`.
+
+- Title: Feature flags documentation incomplete for development workflows
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 3  Confidence: 3  → Priority: 2  Severity: S3
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Clear docs on dev-oriented features (e.g., `file-logging`) improve contributor efficiency and reduce support load.
+  - Evidence: This document references feature flags but lacks a comprehensive list and examples.
+  - Next step: Add a "Feature flags" section listing flags, effects, and examples; ensure `--features file-logging` usage is demonstrated.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

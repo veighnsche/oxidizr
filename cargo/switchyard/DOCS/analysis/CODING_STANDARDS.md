@@ -72,3 +72,34 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 - **Follow-ups:** Create architectural documentation; establish module organization guidelines for future development
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: No automated enforcement of standards beyond clippy
+  - Category: Missing Feature
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Pre-commit hooks/CI checks reduce reviewer burden and drift from documented practices.
+  - Evidence: Standards documented here; enforced only via crate lints in `src/lib.rs:1-3`.
+  - Next step: Add pre-commit hooks (fmt, clippy, tests) and a CI workflow job that fails on deviations (format, lints, doc links).
+
+- Title: Error-handling pattern consistency not enforced
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 2  Confidence: 3  → Priority: 2  Severity: S3
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Document concrete templates and examples to avoid ad-hoc error patterns.
+  - Evidence: Guidance references `thiserror` patterns (`src/types/errors.rs`), but no prescriptive template.
+  - Next step: Add an “Error patterns” section with examples and a checklist; consider custom lint or review checklist.
+
+- Title: Module organization principles not captured in ADRs
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 2  Confidence: 4  → Priority: 1  Severity: S4
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: ADRs make rationale explicit and guide future structure changes.
+  - Evidence: This doc mentions `mod.rs` conventions; no ADR documenting layering principles.
+  - Next step: Write a short ADR on module layout and re-export policy; link from this doc.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

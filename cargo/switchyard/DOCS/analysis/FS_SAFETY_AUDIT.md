@@ -146,3 +146,25 @@ Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:09 +02:00
   - **Follow-ups:** Flag this as a high-severity security gap for Round 3. Prioritize refactoring for `SafePath` enforcement in Round 4.
 
 Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET
+
+## Round 3 Severity Assessment (AI 3, 2025-09-12 15:49+02:00)
+
+- **Title:** Backup and sidecar creation lacks durability guarantees
+- **Category:** Bug/Defect (Reliability)
+- **Impact:** 4  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 2
+- **Why update vs why not:** This is essential for the tool's reliability promise. Without durability, backups cannot be trusted in crash scenarios, undermining a core recovery feature. The fix is low complexity and provides high value by ensuring data consistency.
+- **Evidence:** `src/fs/backup.rs::create_snapshot()` and `write_sidecar()` lack calls to `fsync_parent_dir()` after file creation, as noted in the Round 2 analysis.
+- **Next step:** Implement `fsync_parent_dir()` calls after backup and sidecar file creation in `src/fs/backup.rs` during Round 4.
+
+- **Title:** Path traversal vulnerability due to lack of SafePath enforcement
+- **Category:** Bug/Defect (Security)
+- **Impact:** 5  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 4  **Severity:** S1
+- **Disposition:** Implement  **LHF:** No
+- **Feasibility:** Medium  **Complexity:** 4
+- **Why update vs why not:** A path traversal vulnerability is a critical security issue that could allow an attacker to write files outside the intended scope, potentially leading to system compromise. The `SafePath` type exists but is not enforced where it matters most. The cost of inaction is a significant, exploitable security flaw.
+- **Evidence:** Core mutating functions in `src/fs/` (e.g., `swap.rs`, `restore.rs`) accept raw `&Path` arguments, bypassing the `SafePath` validation layer.
+- **Next step:** This is a critical security fix. Prioritize the refactoring of all core `fs` functions to accept `SafePath` arguments in Round 4.
+
+Severity assessed in Round 3 by AI 3 on 2025-09-12 15:49+02:00

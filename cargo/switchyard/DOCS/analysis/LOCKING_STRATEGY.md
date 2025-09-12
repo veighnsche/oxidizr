@@ -71,11 +71,11 @@
 ## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
 
 **Claims Verified:**
-- ✅ `LockManager` trait in `src/adapters/lock/mod.rs:6-8` with `acquire_process_lock(&self, timeout_ms: u64)` method
-- ✅ `FileLockManager` in `src/adapters/lock/file.rs:12-61` uses `fs2` advisory locks with polling at `LOCK_POLL_MS` intervals
-- ✅ Constants in `src/constants.rs`: `DEFAULT_LOCK_TIMEOUT_MS = 5000` (L22), `LOCK_POLL_MS = 25` (L19)
-- ✅ Apply module in `src/api/apply/mod.rs:57-77` tracks `lock_wait_ms` and emits `E_LOCKING` with exit code 30 on timeout
-- ✅ Policy controls in `src/policy/config.rs`: `require_lock_manager`, `allow_unlocked_commit` fields (L58-66)
+- `LockManager` trait in `src/adapters/lock/mod.rs:6-8` with `acquire_process_lock(&self, timeout_ms: u64)` method
+- `FileLockManager` in `src/adapters/lock/file.rs:12-61` uses `fs2` advisory locks with polling at `LOCK_POLL_MS` intervals
+- Constants in `src/constants.rs`: `DEFAULT_LOCK_TIMEOUT_MS = 5000` (L22), `LOCK_POLL_MS = 25` (L19)
+- Apply module in `src/api/apply/mod.rs:57-77` tracks `lock_wait_ms` and emits `E_LOCKING` with exit code 30 on timeout
+- Policy controls in `src/policy/config.rs`: `require_lock_manager`, `allow_unlocked_commit` fields (L58-66)
 
 **Key Citations:**
 - `src/adapters/lock/mod.rs:6-8`: LockManager trait definition
@@ -122,3 +122,43 @@ Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
   - Follow-ups: Track resolution in policy doc; add a test asserting intended default.
 
 Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
+
+## Round 3 Severity Assessment (AI 4, 2025-09-12 15:52 CET)
+
+- **Title:** Insufficient Lock Telemetry for Backend Identification
+  - **Category:** Observability (DX/Usability)
+  - **Impact:** 2  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Lack of a `lock_backend` field in telemetry limits ops teams' ability to correlate lock contention or failures to specific backend implementations (e.g., file-based). Adding this field is a simple, low-risk enhancement for better diagnostics. The cost of inaction is minor inconvenience in fleet-wide analysis.
+  - **Evidence:** `src/api/apply/mod.rs` includes `lock_wait_ms` in attempt and summary facts (lines 355–357), but no `lock_backend` field is present.
+  - **Next step:** Add `lock_backend` field (e.g., "file") to `apply.attempt` and optionally to summary facts in `src/api/apply/mod.rs`. Update SPEC §2.5 to document this additive field. Implement in Round 4.
+
+- **Title:** Lock Acquisition Lacks Fairness Under Contention
+  - **Category:** Performance/Scalability
+  - **Impact:** 3  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 2
+  - **Why update vs why not:** Fixed-interval polling in `FileLockManager` without backoff or jitter can lead to herding and contention spikes in highly concurrent environments, delaying lock acquisition. Adding exponential backoff or jitter improves fairness and reduces contention. The cost of inaction is potential delays in high-load scenarios.
+  - **Evidence:** `src/adapters/lock/file.rs` uses fixed `LOCK_POLL_MS` sleep without backoff or jitter (lines 50–56).
+  - **Next step:** Update `FileLockManager` in `src/adapters/lock/file.rs` to implement exponential backoff or jitter in the polling loop. Add telemetry for total attempts in `apply.attempt`. Plan a stress test for Round 4.
+
+- **Title:** Risk of Lock File Path Collisions Without Standardization
+  - **Category:** Missing Feature (Reliability)
+  - **Impact:** 3  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Without a standardized lock file path, there's a risk of collisions across different roots or processes, potentially causing lock conflicts or deadlocks. Providing a helper for consistent paths mitigates this risk with minimal effort. The cost of inaction is potential interference in multi-tenant or CI environments.
+  - **Evidence:** `FileLockManager::new(PathBuf)` in `src/adapters/lock/file.rs` accepts a free-form path with no default convention (lines 17–19).
+  - **Next step:** Add `Policy::default_lock_path(root)` helper in `src/policy/config.rs` to standardize paths (e.g., `<root>/.switchyard/lock`). Update documentation and examples to promote per-root locking. Implement in Round 4.
+
+- **Title:** Documentation and Code Divergence for `allow_unlocked_commit` Default
+  - **Category:** Documentation Gap (DX/Usability)
+  - **Impact:** 2  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** The discrepancy between documented (`true` for dev ergonomics) and actual (`false`) default for `allow_unlocked_commit` can confuse developers testing Commit mode without a LockManager. Aligning docs or code is a simple fix to prevent minor usability issues. The cost of inaction is slight confusion during development.
+  - **Evidence:** `src/policy/config.rs` docstring states `allow_unlocked_commit` defaults to `true` (lines 62–66), but `impl Default for Policy` sets it to `false` (line 106).
+  - **Next step:** Update either the code to set `allow_unlocked_commit = true` by default in `src/policy/config.rs` or revise the docstring to reflect the current default. Add a test to assert the intended behavior. Implement in Round 4.
+
+Severity assessed in Round 3 by AI 4 on 2025-09-12 15:52 CET

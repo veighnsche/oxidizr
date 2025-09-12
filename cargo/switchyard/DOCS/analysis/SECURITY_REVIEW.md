@@ -42,11 +42,11 @@
 ## Round 1 Peer Review (AI 2, 2025-09-12 15:06 +02:00)
 
 **Claims Verified:**
-- ✅ Path traversal mitigations: `SafePath` type exists in `src/types/safepath.rs`, `open_dir_nofollow` used in atomic operations
-- ✅ Atomicity via `*at` syscalls: `renameat`, `symlinkat`, `unlinkat` used throughout `src/fs/` modules
-- ✅ Backup sidecar schema: `BackupSidecar` struct in `src/fs/backup.rs:244-252` records topology
-- ✅ Redaction: `src/logging/redact.rs` exists and masks sensitive fields
-- ✅ Locking: `FileLockManager` serializes mutations as verified in previous documents
+- Path traversal mitigations: `SafePath` type exists in `src/types/safepath.rs`, `open_dir_nofollow` used in atomic operations
+- Atomicity via `*at` syscalls: `renameat`, `symlinkat`, `unlinkat` used throughout `src/fs/` modules
+- Backup sidecar schema: `BackupSidecar` struct in `src/fs/backup.rs:244-252` records topology
+- Redaction: `src/logging/redact.rs` exists and masks sensitive fields
+- Locking: `FileLockManager` serializes mutations as verified in previous documents
 
 **Key Citations:**
 - `src/types/safepath.rs`: SafePath type definition
@@ -93,3 +93,43 @@ Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00
   - Follow-ups: Add a small sanitizer helper and thread it through preflight/apply setup.
 
 Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
+
+## Round 3 Severity Assessment (AI 4, 2025-09-12 15:52 CET)
+
+- **Title:** Lack of Sidecar Integrity and Rollback Trust
+  - **Category:** Bug/Defect (Security)
+  - **Impact:** 4  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 3
+  - **Why update vs why not:** Without durability guarantees and integrity checks for sidecars, there's a risk of data loss during crashes or tampering going undetected, undermining rollback reliability. Implementing durability measures and optional signing enhances trust in recovery mechanisms. The cost of inaction is potential untrustworthy rollbacks, which could be critical in failure scenarios.
+  - **Evidence:** `src/fs/backup.rs::write_sidecar()` uses path-based `File::create` without `fsync(parent)` (lines 262–270); symlink backups use `std::os::unix::fs::symlink` (path-based) (lines 137–151). No integrity binding between payload and sidecar.
+  - **Next step:** Use `open_dir_nofollow(parent)` with `openat`/`symlinkat` and add `fsync_parent_dir(backup)` in `src/fs/backup.rs` for durability. Design optional sidecar signing with `bundle_hash` in `backup_meta.v2` schema. Emit `backup_durable` and `sidecar_signed` facts. Plan for Round 4.
+
+- **Title:** Public Exposure of Low-Level FS Atoms Bypassing `SafePath`
+  - **Category:** API Design (Security)
+  - **Impact:** 5  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 2
+  - **Why update vs why not:** Publicly exposing low-level FS atoms allows consumers to bypass `SafePath` safety checks, risking TOCTOU vulnerabilities and path traversal attacks. Restricting these to `pub(crate)` enforces safer usage patterns, significantly enhancing security. The cost of inaction is a high risk of exploitable misuse by integrators.
+  - **Evidence:** `src/fs/mod.rs` publicly re-exports `open_dir_nofollow`, `atomic_symlink_swap`, and `fsync_parent_dir` (lines 9–15).
+  - **Next step:** Restrict low-level FS re-exports to `pub(crate)` in `src/fs/mod.rs`. If breaking, deprecate with clear Rustdoc and changelog notes. Coordinate with release policy for timeline. Implement in Round 4.
+
+- **Title:** Incomplete Secret Redaction in Facts Output
+  - **Category:** Bug/Defect (Security)
+  - **Impact:** 3  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 2
+  - **Why update vs why not:** Failing to redact sensitive information in `notes` or command-line fragments risks leaking environment paths or arguments in facts output, compromising security. Extending redaction to cover these fields mitigates potential data exposure. The cost of inaction is a moderate risk of sensitive data leakage.
+  - **Evidence:** `src/logging/redact.rs::redact_event()` masks specific fields but does not sanitize `notes` or command-line fragments in provenance (lines not covering free-form strings).
+  - **Next step:** Extend redaction logic in `src/logging/redact.rs` to mask sensitive substrings in `notes`. Add hooks for custom masks and unit tests to ensure no path-like strings leak. Update SPEC §13 for secret-masking policy. Plan for Round 4.
+
+- **Title:** Optimistic Environment Sanitization Claim for Rescue Checks
+  - **Category:** Documentation Gap (Security)
+  - **Impact:** 2  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Claiming `env_sanitized=true` without actual sanitization misleads consumers about environment safety for rescue checks, potentially allowing PATH or locale manipulation risks. Adding real sanitization or correcting the flag is a simple fix for transparency. The cost of inaction is minor but could mislead security assessments.
+  - **Evidence:** `src/logging/audit.rs::ensure_provenance()` sets `provenance.env_sanitized=true` unconditionally without enforcing sanitization (lines 210–219).
+  - **Next step:** Implement a sanitizer helper for PATH and locale in `src/policy/rescue.rs` or adjust `env_sanitized` to reflect actual status in `src/logging/audit.rs`. Emit `env_vars_checked=true|false` in facts. Implement in Round 4.
+
+Severity assessed in Round 3 by AI 4 on 2025-09-12 15:52 CET

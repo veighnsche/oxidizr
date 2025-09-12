@@ -71,3 +71,25 @@ Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
 - Follow-ups: Flag for implementation in Round 4. The absence of a core lifecycle function is a significant feature gap.
 
 Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00
+
+## Round 3 Severity Assessment (AI 2, 2025-09-12 15:45+02:00)
+
+- **Title:** SafePath integration guidance inconsistent with API reality
+- **Category:** Documentation Gap
+- **Impact:** 3  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+- **Disposition:** Spec-only  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 1
+- **Why update vs why not:** Misleading documentation causes developer confusion and potentially unsafe usage patterns. Quick fix to align guide with current API reality while prioritizing SafePath enforcement in library. Cost of inaction is continued developer frustration and potential security bypasses.
+- **Evidence:** Guide recommends `SafePath::from_rooted` but core fs functions in `src/fs/` don't accept SafePath arguments
+- **Next step:** Update guide to reflect current API while noting planned SafePath enforcement
+
+- **Title:** Non-existent prune_backups function referenced
+- **Category:** Documentation Gap  
+- **Impact:** 2  **Likelihood:** 5  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Spec-only  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 1
+- **Why update vs why not:** Referencing non-existent functions breaks developer trust and prevents implementation of key features. Simple documentation fix until feature implemented. Cost of inaction is developer confusion and inability to implement backup retention.
+- **Evidence:** No `prune_backups` function exists in codebase; function referenced in guide at line 28
+- **Next step:** Remove reference and note that retention must be implemented in CLI until library support added
+
+Severity assessed in Round 3 by AI 2 on 2025-09-12 15:45+02:00

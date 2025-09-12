@@ -111,3 +111,34 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 - **Follow-ups:** Implement backup indexing optimization; integrate with retention strategy for performance management
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: No performance telemetry fields for enforcement/visibility
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Without explicit performance fields, consumers cannot monitor regressions or enforce bounds.
+  - Evidence: Facts include `fsync_ms` per action in extra via `apply/audit_fields.rs::maybe_warn_fsync`, but no summary-level performance fields or thresholds.
+  - Next step: Add optional `perf` object to `apply.result` summary with aggregates (p95-ish approximations) and emit `fsync_ms` consistently; add SPEC hooks for thresholds.
+
+- Title: Large-file hashing may cause unacceptable delays
+  - Category: Performance/Scalability
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: No
+  - Feasibility: Medium  Complexity: 3
+  - Why update vs why not: Hashing entire files can dominate runtime for tens of MiB binaries; need policy to cap/disable.
+  - Evidence: `src/fs/meta.rs::sha256_hex_of` streams entire file; no size-gated policy today.
+  - Next step: Add policy knob to disable hashing above size threshold; benchmark with Criterion to set sensible defaults.
+
+- Title: Directory scans for backup discovery degrade with artifact count
+  - Category: Performance/Scalability
+  - Impact: 3  Likelihood: 2  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Backlog  LHF: No
+  - Feasibility: Medium  Complexity: 3
+  - Why update vs why not: Indexing or retention can alleviate; implement after retention lands.
+  - Evidence: `src/fs/backup.rs::{find_latest_backup_and_sidecar (L277–316), find_previous_backup_and_sidecar (L25–65)}` iterate full directories.
+  - Next step: Add optional append-only index file to accelerate discovery; or rely on retention to bound counts.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

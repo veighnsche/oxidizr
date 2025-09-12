@@ -116,3 +116,25 @@ Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
   - **Follow-ups:** Flag this as a low-to-medium severity usability gap for Round 3. Plan to implement distinct ownership error tagging in Round 4.
 
 Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET
+
+## Round 3 Severity Assessment (AI 3, 2025-09-12 15:49+02:00)
+
+- **Title:** Error summaries lose detail by collapsing multiple causes into one ID
+- **Category:** Observability (DX/Usability)
+- **Impact:** 3  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** Medium  **Complexity:** 3
+- **Why update vs why not:** This is the same issue identified in the `OBSERVABILITY_FACTS_SCHEMA.md` analysis. Collapsing multiple errors into a generic `E_POLICY` significantly harms debuggability. Implementing a `summary_error_ids` array provides crucial diagnostic information with low risk.
+- **Evidence:** `src/api/apply/mod.rs:401-406` and `src/api/preflight/mod.rs:255-270` show the default fallback to `E_POLICY` in summaries.
+- **Next step:** Implement the `summary_error_ids` array in preflight and apply summary facts during Round 4.
+
+- **Title:** Ownership errors are not distinctly identified with E_OWNERSHIP
+- **Category:** Observability (DX/Usability)
+- **Impact:** 2  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 2
+- **Why update vs why not:** Failing to use a specific error code for a common class of failures (ownership) makes it harder for users and automation to react appropriately. Correctly tagging these errors is a low-effort change that improves the clarity and actionability of the tool's output.
+- **Evidence:** Preflight checks for ownership currently result in human-readable notes rather than a machine-readable `E_OWNERSHIP` error ID, as noted in the Round 2 analysis.
+- **Next step:** Update the preflight and gating logic in `src/policy/gating.rs` to emit `E_OWNERSHIP` for relevant failures in Round 4.
+
+Severity assessed in Round 3 by AI 3 on 2025-09-12 15:49+02:00

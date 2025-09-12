@@ -110,3 +110,34 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:13 CEST
 - **Follow-ups:** Implement prune_backups with safety patterns; add security-focused testing
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: No retention enforcement → risk of disk fill and degraded performance
+  - Category: Missing Feature
+  - Impact: 4  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: No
+  - Feasibility: High  Complexity: 3
+  - Why update vs why not: Unbounded backup accumulation can exhaust storage and slow discovery; consumers expect predictable retention controls.
+  - Evidence: No retention logic in `src/fs/backup.rs`; helpers only discover: `find_latest_backup_and_sidecar` (L277–316), `find_previous_backup_and_sidecar` (L25–65).
+  - Next step: Implement `prune_backups(target, tag, policy)` with `Policy` knobs `retention_keep_last_n`, `retention_max_age_days`, `retention_max_total_bytes`; add unit tests and docs.
+
+- Title: Pruning may orphan payload/sidecar pairs without atomic pair operations
+  - Category: Bug/Defect
+  - Impact: 3  Likelihood: 2  Confidence: 3  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: No
+  - Feasibility: High  Complexity: 3
+  - Why update vs why not: Orphaned artifacts lead to restore failures; pairwise deletion prevents inconsistent state.
+  - Evidence: Pair discovery split across files; no prune implementation guaranteeing atomic pair handling.
+  - Next step: In `prune_backups`, validate both payload and sidecar exist before deletion; delete both via dirfd + `unlinkat` with parent `fsync`; add integrity check tests.
+
+- Title: Safety invariants for retention operations not enforced
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 2  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Operating via directory handles and pattern validation is necessary to preserve TOCTOU safety during pruning.
+  - Evidence: Safety guidance listed in this doc; no code exists yet.
+  - Next step: Implement retention using `open_dir_nofollow(parent)` and `unlinkat` with strict filename pattern validation; add tests for traversal attempts.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

@@ -119,3 +119,25 @@ Reviewed and updated in Round 1 by AI 1 on 2025-09-12 15:14 +02:00
   - **Follow-ups:** Flag this as a medium-severity reliability gap for Round 3. Plan to add schema validation tests in Round 4 to ensure long-term consistency.
 
 Gap analysis in Round 2 by AI 4 on 2025-09-12 15:38 CET
+
+## Round 3 Severity Assessment (AI 3, 2025-09-12 15:49+02:00)
+
+- **Title:** Summary facts lack detailed error aggregation
+- **Category:** Observability (DX/Usability)
+- **Impact:** 3  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** Medium  **Complexity:** 3
+- **Why update vs why not:** Collapsing multiple failure reasons into a single generic error ID (like `E_POLICY`) significantly hinders debuggability for consumers. Adding a `summary_error_ids` array is a low-risk, high-value improvement for diagnostics.
+- **Evidence:** Preflight and apply summaries currently emit only a single `error_id`, as noted in the Round 2 analysis. `src/api/preflight/mod.rs:270` is an example.
+- **Next step:** Implement the `summary_error_ids` array in preflight and apply summary facts during Round 4.
+
+- **Title:** Emitted observability facts are not validated against the JSON schema
+- **Category:** Test & Validation
+- **Impact:** 3  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 2
+- **Why update vs why not:** Without automated validation, the emitted facts can easily drift from the published schema, breaking downstream consumers. Adding a CI validation step is a crucial measure to ensure long-term reliability and maintain the contract with consumers.
+- **Evidence:** The codebase lacks a unit or integration test that validates emitted facts against `SPEC/audit_event.schema.json`, as noted in the Round 2 analysis.
+- **Next step:** Add a test module that uses the `jsonschema` crate to validate all facts generated during the existing test suites in Round 4.
+
+Severity assessed in Round 3 by AI 3 on 2025-09-12 15:49+02:00

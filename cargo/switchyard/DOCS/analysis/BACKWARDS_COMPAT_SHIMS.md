@@ -128,3 +128,25 @@ This document lists all compatibility shims and re-exports found in the Switchya
 - **Follow-ups:** Implement API stability CI checks; clarify public API surface documentation
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Shim deprecation signaling and migration path are missing
+  - Category: Documentation Gap
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Without `#[deprecated]` and explicit migration notes, downstreams can unknowingly depend on legacy paths and be broken later. Low-risk additive change with high clarity value.
+  - Evidence: `src/adapters/mod.rs:6-9` exposes `adapters::lock_file::*`; `src/lib.rs:21` re-exports `policy::rescue` without deprecation.
+  - Next step: Add `#[deprecated(note = "use switchyard::adapters::FileLockManager")]` to the `lock_file` shim and `#[deprecated(note = "use switchyard::policy::rescue")]` to the root re-export; add CHANGELOG entries and MIGRATION_GUIDE pointers.
+
+- Title: Remove `adapters::lock_file` shim after migration window
+  - Category: DX/Usability
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Backlog  LHF: No
+  - Feasibility: High  Complexity: 3
+  - Why update vs why not: Keeps API clean and reduces confusion; however, removal is breaking and should wait for a minor/major release with telemetry that no in-repo usages remain.
+  - Evidence: Shim defined at `src/adapters/mod.rs:6-9`; in-repo usage noted in this doc.
+  - Next step: Migrate all internal usages/tests to `switchyard::adapters::FileLockManager`; add CI grep to block new `adapters::lock_file` imports; remove shim in next planned breaking release.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

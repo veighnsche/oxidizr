@@ -288,3 +288,25 @@ Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
 - Follow-ups: This is a high-severity security gap. It should be prioritized for implementation in Round 4.
 
 Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00
+
+## Round 3 Severity Assessment (AI 2, 2025-09-12 15:45+02:00)
+
+- **Title:** SafePath not enforced in core filesystem operations
+- **Category:** Bug/Defect (Security)
+- **Impact:** 5  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+- **Disposition:** Implement  **LHF:** No
+- **Feasibility:** Medium  **Complexity:** 4
+- **Why update vs why not:** Path traversal vulnerabilities are critical security issues that could allow attackers to modify files outside intended scope. The SafePath type exists but isn't enforced where it matters most. High impact on security posture. Cost of inaction is potential privilege escalation or system compromise.
+- **Evidence:** `src/fs/swap.rs`, `src/fs/restore.rs`, `src/fs/backup.rs` accept raw `&Path`; `SafePath` in `src/types/safepath.rs` not used in core mutations
+- **Next step:** Refactor core fs functions to accept `SafePath` internally; add conversion layer in API module
+
+- **Title:** Missing SUID/SGID binary protection gate
+- **Category:** Missing Feature (Security)
+- **Impact:** 4  **Likelihood:** 2  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** Yes
+- **Feasibility:** High  **Complexity:** 1
+- **Why update vs why not:** Modifying SUID/SGID binaries without explicit consent poses significant security risks. Simple preflight check with clear UX prevents accidental privilege escalation. Low complexity, high security value.
+- **Evidence:** No `S_ISUID`/`S_ISGID` checks in `src/preflight/checks.rs`; library operates on privileged binaries without warning
+- **Next step:** Add `check_suid_sgid_risk` preflight check with `allow_suid_sgid_mutation` policy knob
+
+Severity assessed in Round 3 by AI 2 on 2025-09-12 15:45+02:00

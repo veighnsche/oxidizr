@@ -78,3 +78,25 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 - **Follow-ups:** Create API stability guide with usage examples; implement architectural decision records for API boundaries
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Deprecation communication lacks proactive, codified channel
+  - Category: Documentation Gap
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Explicit deprecation annotations and CHANGELOG guidance reduce unexpected breakage for consumers migrating off internalized APIs.
+  - Evidence: `src/lib.rs:21` re-exports `policy::rescue` without `#[deprecated]`; `src/adapters/mod.rs:6-9` provides `adapters::lock_file` shim; this guide describes timelines but not concrete comms.
+  - Next step: Add `#[deprecated(...)]` to shims; add a MIGRATION section per release in CHANGELOG; include concrete examples in this guide.
+
+- Title: No equivalence tests between low-level atoms and high-level helpers
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 2  Confidence: 3  → Priority: 2  Severity: S3
+  - Disposition: Implement  LHF: No
+  - Feasibility: High  Complexity: 3
+  - Why update vs why not: Ensures that migrating to `fs::replace_file_with_symlink`/`restore_file` preserves behavior relative to internal atoms.
+  - Evidence: High-level helpers exported in `src/fs/mod.rs:14-15` with no dedicated migration compatibility tests.
+  - Next step: Add tests that perform the same operation via atoms vs helpers and assert identical state and facts; document any intentional differences here.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

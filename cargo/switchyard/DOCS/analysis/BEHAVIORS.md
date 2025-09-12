@@ -204,3 +204,33 @@ This document enumerates the observable behaviors of the Switchyard library acro
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:23 CEST
 
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Dry-run redaction removes timing data needed for analysis
+  - Category: Documentation Gap
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Consumers may expect timing fields to be present for performance/regression analysis even in DryRun; clarifying limitations avoids misinterpretation.
+  - Evidence: `src/logging/redact.rs::redact_event()` zeroes `ts` and removes `duration_ms`, `lock_wait_ms` and others in dry-run; behavior referenced in this doc.
+  - Next step: Update SPEC §9 and docs to explicitly state redaction removes timing in DryRun; optionally propose a policy knob to preserve timing for perf-only dry runs (planned in Round 4).
+
+- Title: Preflight override surprises consumers with apply-stage policy failures
+  - Category: DX/Usability
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: When `override_preflight=true`, apply still enforces `policy::gating`, surprising workflows that skipped preflight. Adding explicit warnings improves predictability.
+  - Evidence: `src/policy/gating.rs` computes `gating_errors`; `src/api/apply/mod.rs` enforces them even if preflight was overridden.
+  - Next step: Emit a prominent `apply.attempt` note `preflight_overridden=true` and a WARN `notes` entry when gating later fails; update docs to describe this interaction.
+
+- Title: Test-only environment knobs risk accidental production use
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Clarifying that `SWITCHYARD_FORCE_EXDEV` and rescue overrides are test-only reduces risk of misuse and support load.
+  - Evidence: `src/fs/atomic.rs` (EXDEV simulation) and `src/policy/rescue.rs` (rescue overrides) implement env-based test hooks.
+  - Next step: Document test-only status; optionally emit a WARN fact when such knobs are detected in Commit.
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00

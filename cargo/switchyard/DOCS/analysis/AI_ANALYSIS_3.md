@@ -125,6 +125,24 @@ Scope: Verify claims, provide proofs, and patch gaps in the assigned documents o
 
 - [ ] <question>
 
+## Round 3 Severity Reports
+
+This triage board summarizes the severity assessments for findings in the documents reviewed during Round 3.
+
+| File | Title | Category | Severity | Priority | Disposition | Feasibility | Complexity | Next Step |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `FS_SAFETY_AUDIT.md` | Backup and sidecar creation lacks durability guarantees | Bug/Defect (Reliability) | S2 | 3 | Implement | High | 2 | Implement `fsync_parent_dir()` calls after backup/sidecar creation. |
+| `FS_SAFETY_AUDIT.md` | Path traversal vulnerability due to lack of SafePath enforcement | Bug/Defect (Security) | S1 | 4 | Implement | Medium | 4 | Prioritize refactoring of core `fs` functions to accept `SafePath`. |
+| `API_SURFACE_AUDIT.md` | Unsafe low-level filesystem functions are publicly exposed | API Design (DX/Usability) | S2 | 3 | Implement | High | 1 | Update visibility of low-level `fs` functions to `pub(crate)`. |
+| `API_SURFACE_AUDIT.md` | Public API items lack stability documentation | Documentation Gap | S3 | 2 | Implement | High | 2 | Add Rustdoc comments with stability classifications to all public items. |
+| `OBSERVABILITY_FACTS_SCHEMA.md` | Summary facts lack detailed error aggregation | Observability (DX/Usability) | S3 | 2 | Implement | Medium | 3 | Implement `summary_error_ids` array in summary facts. |
+| `OBSERVABILITY_FACTS_SCHEMA.md` | Emitted observability facts are not validated against the JSON schema | Test & Validation | S3 | 2 | Implement | High | 2 | Add a test module to validate emitted facts against the JSON schema. |
+| `ERROR_TAXONOMY.md` | Error summaries lose detail by collapsing multiple causes | Observability (DX/Usability) | S3 | 2 | Implement | Medium | 3 | Implement `summary_error_ids` array in summary facts. |
+| `ERROR_TAXONOMY.md` | Ownership errors are not distinctly identified with E_OWNERSHIP | Observability (DX/Usability) | S3 | 2 | Implement | High | 2 | Update gating logic to emit `E_OWNERSHIP` for relevant failures. |
+| `INDEX.md` | Missing analysis for package manager interoperability | Documentation Gap | S2 | 3 | Implement | High | 3 | Create a new analysis document for PM interoperability. |
+| `INDEX.md` | Analysis index does not track multi-round review status | Documentation Gap (DX/Usability) | S3 | 2 | Implement | High | 1 | Update `INDEX.md` to include a more detailed status tracking mechanism. |
+
+
 ## Round 2 Plan (Do NOT start yet)
 
 - You will peer review AI 4’s outputs and assigned docs in Round 2:
@@ -395,3 +413,97 @@ Scope: Verify claims, provide proofs, and patch gaps in the assigned documents o
   - **Gap 2: Non-Existent Pruning Function.** The guide directs developers to implement a `prune` subcommand using a `prune_backups` function that does not exist in the library.
   - **Mitigations:** Correct the guide to reflect the current API limitations. Remove the reference to the non-existent pruning function until it is implemented. Prioritize implementing the features to close these gaps.
 
+
+## Round 4 Implementation Plans (AI 3, 2025-09-12 16:14+02:00)
+
+Based on Round 2 Gap Analyses and Round 3 Severity Assessments from my original document set, focusing on high-value security/reliability items plus selected LHF changes.
+
+### 1. Implement Extended Preservation Tiers (S2, P3)
+
+- **Summary:** Implement policy-controlled preservation tiers to capture and restore metadata beyond just file mode.
+- **Code targets:**
+  - `src/policy/config.rs`
+  - `src/fs/backup.rs`
+  - `src/fs/restore.rs`
+  - `src/api/preflight/mod.rs`
+- **Steps:**
+  1. **Changes:**
+     - Add `preservation_tier: PreservationTier` enum (`Basic`, `Extended`, `Full`) to `policy::Config`.
+     - Extend `BackupSidecar` in `fs/backup.rs` with optional fields: `uid`, `gid`, `mtime_sec`, `mtime_nsec`.
+     - In `create_snapshot()`, capture the extended metadata based on the policy tier.
+     - In `restore_file()`, apply the extended metadata (`fchownat`, `utimensat`) if present in the sidecar and the policy tier allows.
+  2. **Tests:**
+     - Add unit tests to verify round-trip preservation of `mtime`.
+     - Add a test (skipped if not running as root) to verify `uid`/`gid` round-trip.
+     - Update preflight tests to check for correct gating based on `preservation_tier` and capabilities.
+  3. **Telemetry/docs:**
+     - Add a `preservation_applied` object to `apply.result` facts to report which metadata was restored.
+     - Update `PRESERVATION_FIDELITY.md` to document the new tiers and behavior.
+- **Feasibility:** Medium
+- **Complexity:** 3
+- **Risks:** Platform differences in `xattrs` and ownership handling. **Mitigation:** Start with `mtime` and `uid`/`gid` which are more portable. Defer `xattrs`/ACLs. Use capability detection to gracefully degrade.
+- **Dependencies:** None.
+
+### 2. Improve Immutable-Bit Detection Reliability (S2, P3)
+
+- **Summary:** Replace the unreliable `lsattr` shell-out with a direct `ioctl` call for detecting immutable files.
+- **Code targets:**
+  - `src/preflight/checks.rs::check_immutable()`
+  - `cargo/switchyard/Cargo.toml`
+- **Steps:**
+  1. **Changes:**
+     - Add the `nix` crate as an optional dependency.
+     - In `check_immutable()`, use `nix::sys::fs::ioctl_read!` with `FS_IOC_GETFLAGS` to read file flags.
+     - If `ioctl` fails or is unavailable, fall back to `lsattr`.
+     - If both fail, return an error or a specific status indicating unknown immutability.
+     - Update policy gating to handle the 'unknown' status, likely as a STOP unless overridden.
+  2. **Tests:**
+     - Add an integration test that creates an immutable file with `chattr +i` and verifies that preflight detects it via `ioctl`.
+     - Add a unit test that mocks the `ioctl` failure and verifies the `lsattr` fallback.
+  3. **Telemetry/docs:**
+     - Add `immutable_detection_method: "ioctl" | "lsattr" | "unknown"` to preflight facts.
+     - Update `PREFLIGHT_MODULE_CONCERNS.md` to reflect the improved reliability.
+- **Feasibility:** Medium
+- **Complexity:** 3
+- **Risks:** The `nix` crate adds a heavy dependency. **Mitigation:** Make it an optional feature flag (`--features nix`).
+- **Dependencies:** None.
+
+### 3. Add Deprecation Warnings for Legacy APIs (S2, P3)
+
+- **Summary:** Add `#[deprecated]` attributes to legacy shims and publicly exposed low-level functions to guide users to safer, modern APIs.
+- **Code targets:**
+  - `src/adapters/mod.rs`
+  - `src/fs/mod.rs`
+- **Steps:**
+  1. **Changes:**
+     - Add `#[deprecated(since = "<next_version>", note = "Use switchyard::adapters::FileLockManager directly")]` to the `lock_file` shim in `src/adapters/mod.rs`.
+     - Add `#[deprecated(note = "Internal atom, prefer using high-level helpers like replace_file_with_symlink")]` to the public re-exports of `open_dir_nofollow`, `atomic_symlink_swap`, and `fsync_parent_dir` in `src/fs/mod.rs`.
+  2. **Tests:**
+     - Add a compile-fail test that attempts to use the deprecated paths without suppression.
+  3. **Telemetry/docs:**
+     - Create `cargo/switchyard/CHANGELOG.md` and add entries to the `Deprecated` section for the next release.
+     - Update `RELEASE_AND_CHANGELOG_POLICY.md` to mention the new changelog file.
+- **Feasibility:** High
+- **Complexity:** 1
+- **Risks:** None. This is a non-breaking change.
+- **Dependencies:** None.
+
+### 4. Low-Hanging Fruit & Documentation Fixes (S3/S4)
+
+#### 4.1 Add Adapter Configuration Examples (S2, P3, LHF)
+- **Summary:** Add Rustdoc examples to `production_preset` to show how to configure required adapters.
+- **Code targets:** `src/policy/config.rs::production_preset()`
+- **Steps:** Add a `## Examples` section in the Rustdoc for `production_preset` showing how to instantiate and pass a `FileLockManager` and a mock `SmokeTestRunner` to the `Switchyard` builder.
+- **Feasibility:** High, **Complexity:** 1
+
+#### 4.2 Add Lock Backend Telemetry (S4, P1, LHF)
+- **Summary:** Add the `lock_backend` to apply facts for better diagnostics.
+- **Code targets:** `src/api/apply/mod.rs`
+- **Steps:** When a lock is acquired, add `lock_backend: "file"` (or similar based on the adapter type) to the `apply.attempt` and `apply.result` summary facts.
+- **Feasibility:** High, **Complexity:** 1
+
+#### 4.3 Clarify Preflight Module Roles (S4, P1, LHF)
+- **Summary:** Add module-level documentation to disambiguate the `preflight` helper module from the `api/preflight` stage orchestrator.
+- **Code targets:** `src/preflight.rs`, `src/api/preflight/mod.rs`
+- **Steps:** Add a doc comment at the top of `src/preflight.rs` explaining it contains helpers and exporters. Add a similar comment to `src/api/preflight/mod.rs` explaining it is the stage orchestrator.
+- **Feasibility:** High, **Complexity:** 1

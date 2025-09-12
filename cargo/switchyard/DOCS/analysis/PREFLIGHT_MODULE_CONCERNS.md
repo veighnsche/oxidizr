@@ -105,10 +105,10 @@ Relevant paths:
 ## Round 1 Peer Review (AI 2, 2025-09-12 15:01 +02:00)
 
 **Claims Verified:**
-- ✅ `src/preflight.rs` exists as a delegator using `#[path]` attributes to `preflight/checks.rs` and `preflight/yaml.rs` (L7-10)
-- ✅ `src/api/preflight/mod.rs` orchestrates the preflight stage and emits facts (L17-292), depends on `rows.rs` helper (L15)
-- ✅ No `src/policy/checks.rs` file found - the re-export shim has been removed as claimed in the migration plan
-- ✅ `src/preflight.rs` re-exports common helpers: `check_immutable`, `check_source_trust`, `ensure_mount_rw_exec` (L13)
+- `src/preflight.rs` exists as a delegator using `#[path]` attributes to `preflight/checks.rs` and `preflight/yaml.rs` (L7-10)
+- `src/api/preflight/mod.rs` orchestrates the preflight stage and emits facts (L17-292), depends on `rows.rs` helper (L15)
+- `src/policy/checks.rs` file is not found - the re-export shim has been removed as claimed in the migration plan
+- `src/preflight.rs` re-exports common helpers: `check_immutable`, `check_source_trust`, `ensure_mount_rw_exec` (L13)
 
 **Key Citations:**
 - `src/preflight.rs:7-10`: Uses `#[path]` attributes for submodules
@@ -147,3 +147,34 @@ Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:01 +02:00
   - Follow-ups: Add short module docs in `src/api/preflight/mod.rs` and `src/preflight.rs` as per Recommendations.
 
 Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
+
+## Round 3 Severity Assessment (AI 4, 2025-09-12 15:52 CET)
+
+- **Title:** Unreliable Immutable-Bit Detection Across Environments
+  - **Category:** Bug/Defect (Reliability)
+  - **Impact:** 3  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 3
+  - **Why update vs why not:** Relying on `lsattr` for immutable-bit detection fails in minimal environments where it's absent, potentially allowing operations on immutable files to proceed undetected until failure at apply time. This disrupts user expectations of robust preflight checks. Implementing a more reliable method like `ioctl` enhances gating accuracy. The cost of inaction is unexpected runtime failures and reduced trust in preflight.
+  - **Evidence:** `src/preflight/checks.rs::check_immutable()` uses `lsattr -d` and silently returns `Ok(())` if it fails or is missing (lines 20–41).
+  - **Next step:** Implement an alternative detection method using `ioctl(FS_IOC_GETFLAGS)` via an optional crate in `src/preflight/checks.rs`. Add a preflight note and fact field `immutable_check=unknown` for cases where detection is unreliable, and treat as STOP unless overridden by policy. Plan for Round 4.
+
+- **Title:** Incomplete Preflight YAML Export Missing Preservation Fields
+  - **Category:** Documentation Gap (Usability)
+  - **Impact:** 2  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Omitting preservation fields from YAML exports limits consumers' ability to make informed decisions based on preservation readiness, reducing the utility of YAML reports. Adding these fields is a simple, low-risk update that improves usability. The cost of inaction is minor user inconvenience and potential oversight of preservation issues.
+  - **Evidence:** `src/preflight/yaml.rs::to_yaml()` exports only a subset of fields, missing `preservation` and `preservation_supported` (lines 11–25), while facts include them (`src/api/preflight/mod.rs:140-161`).
+  - **Next step:** Update `src/preflight/yaml.rs::to_yaml()` to include `preservation` and `preservation_supported` fields in YAML output. Document YAML as a minimal subset if full facts are still needed elsewhere. Implement in Round 4.
+
+- **Title:** Naming Overlap and Ambiguity in Preflight Modules
+  - **Category:** Documentation Gap (DX/Usability)
+  - **Impact:** 2  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** Naming overlap between `preflight` as a helper module and as an API stage can confuse contributors and integrators, increasing cognitive load. Adding clear module-level documentation or renaming is a low-effort fix that enhances clarity. The cost of inaction is minor but persistent confusion for new users of the codebase.
+  - **Evidence:** `src/preflight.rs` serves as helpers, while `src/api/preflight/mod.rs` is the stage orchestrator, creating naming ambiguity despite no functional duplication.
+  - **Next step:** Add module-level documentation in `src/api/preflight/mod.rs` and `src/preflight.rs` to clarify roles (stage vs. helpers). Optionally, consider renaming `src/preflight.rs` to `preflight_checks.rs` for clarity. Plan for Round 4.
+
+Severity assessed in Round 3 by AI 4 on 2025-09-12 15:52 CET

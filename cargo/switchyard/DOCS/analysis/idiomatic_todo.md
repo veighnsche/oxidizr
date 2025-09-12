@@ -160,3 +160,43 @@ Reviewed and updated in Round 1 by AI 2 on 2025-09-12 15:06 +02:00
   - Follow-ups: Implement the proposed trait and refactor callers; update tests and docs accordingly.
 
 Gap analysis in Round 2 by AI 1 on 2025-09-12 15:22 +02:00
+
+## Round 3 Severity Assessment (AI 4, 2025-09-12 15:52 CET)
+
+- **Title:** Non-Idiomatic Module Structure for API with `#[path]` Attributes
+  - **Category:** Documentation Gap (DX/Usability)
+  - **Impact:** 2  **Likelihood:** 4  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 2
+  - **Why update vs why not:** The use of `#[path]` attributes in `src/api.rs` instead of a proper directory-module structure (`src/api/mod.rs`) deviates from Rust conventions, complicating navigation and IDE support for contributors. Moving to an idiomatic structure is a straightforward fix that improves maintainability. The cost of inaction is ongoing minor frustration for developers.
+  - **Evidence:** `src/api.rs` exists as a single file with `#[path]` attributes, not moved to `src/api/mod.rs` as planned (file presence confirmed in repo).
+  - **Next step:** Execute the high-priority task to move `src/api.rs` to `src/api/mod.rs` and replace `#[path]` with `mod ...;` declarations. Update imports accordingly. Implement in Round 4.
+
+- **Title:** Lingering Legacy Shim for `adapters::lock_file::*`
+  - **Category:** Documentation Gap (DX/Usability)
+  - **Impact:** 2  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** Yes
+  - **Feasibility:** High  **Complexity:** 1
+  - **Why update vs why not:** The continued presence of the `adapters::lock_file::*` shim risks prolonging duplicate import paths, confusing integrators and documentation. Deprecating and eventually removing it is a low-effort task that clarifies the API surface. The cost of inaction is minor but persistent confusion.
+  - **Evidence:** `src/adapters/mod.rs` still contains the shim for `lock_file::*` (lines 6–9).
+  - **Next step:** Add a deprecation notice to `adapters::lock_file::*` in Rustdoc in `src/adapters/mod.rs`. Plan removal after a minor version cycle, updating samples and tests to use the correct path. Add CI check to prevent new usages. Implement in Round 4.
+
+- **Title:** Public Exposure of Low-Level FS Atoms
+  - **Category:** API Design (DX/Usability)
+  - **Impact:** 4  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 3  **Severity:** S2
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 2
+  - **Why update vs why not:** Exposing low-level FS atoms like `open_dir_nofollow` publicly allows misuse by consumers, potentially bypassing safety mechanisms like `SafePath` and risking TOCTOU vulnerabilities. Restricting visibility to `pub(crate)` guides users to safer abstractions, enhancing security. The cost of inaction is potential unsafe usage leading to bugs or vulnerabilities.
+  - **Evidence:** `src/fs/mod.rs` publicly re-exports `open_dir_nofollow`, `atomic_symlink_swap`, and `fsync_parent_dir` (lines 9–15).
+  - **Next step:** Mark low-level FS re-exports as `pub(crate)` in `src/fs/mod.rs`. If breaking, deprecate with clear Rustdoc and changelog notes. Coordinate with release policy for timeline. Implement in Round 4.
+
+- **Title:** Non-Deterministic Backup Naming in Tests
+  - **Category:** Test & Validation (Reliability)
+  - **Impact:** 2  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 1  **Severity:** S4
+  - **Disposition:** Implement  **LHF:** No
+  - **Feasibility:** Medium  **Complexity:** 2
+  - **Why update vs why not:** Non-deterministic backup naming due to timestamp usage can lead to flaky tests and unreliable assertions, impacting CI stability. Introducing a `Clock` trait for test determinism is a moderate-effort improvement for test reliability. The cost of inaction is occasional test flakiness, which is minor but annoying.
+  - **Evidence:** `src/fs/backup.rs::backup_path_with_tag()` uses `SystemTime::now()` for naming (lines 18–23).
+  - **Next step:** Implement a `Clock` trait in `src/fs/backup.rs` with a default `SystemClock` and allow tests to inject a fixed clock for deterministic naming. Refactor callers and update test fixtures. Plan for Round 4.
+
+Severity assessed in Round 3 by AI 4 on 2025-09-12 15:52 CET

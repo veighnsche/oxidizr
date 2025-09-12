@@ -248,3 +248,25 @@ Reviewed and updated in Round 1 by AI 4 on 2025-09-12 15:16 CET
 - Follow-ups: Flag for severity scoring in Round 3. This is a security enhancement that should be prioritized in the implementation plan for Round 4.
 
 Gap analysis in Round 2 by AI 3 on 2025-09-12 15:33+02:00
+
+## Round 3 Severity Assessment (AI 2, 2025-09-12 15:45+02:00)
+
+- **Title:** Missing hardlink breakage preflight check
+- **Category:** Missing Feature
+- **Impact:** 3  **Likelihood:** 3  **Confidence:** 5  → **Priority:** 2  **Severity:** S3
+- **Disposition:** Implement  **LHF:** No
+- **Feasibility:** High  **Complexity:** 2
+- **Why update vs why not:** Silent hardlink breakage can cause data duplication, break backup systems, and violate user expectations. Low implementation complexity with clear user value. Cost of inaction is silent corruption of file management strategies.
+- **Evidence:** `src/fs/restore.rs` uses `renameat` creating new inodes; no `nlink > 1` check in `src/preflight/checks.rs`
+- **Next step:** Add `check_hardlink_hazard` to preflight checks with policy knob `allow_hardlink_breakage`
+
+- **Title:** Backup sidecar tampering vulnerability  
+- **Category:** Bug/Defect (Security)
+- **Impact:** 4  **Likelihood:** 2  **Confidence:** 4  → **Priority:** 2  **Severity:** S3
+- **Why update vs why not:** Tampering with sidecars could alter restore behavior, creating security risks in sensitive environments. However, requires local filesystem access. Integrity verification adds robust security layer with minimal performance cost.
+- **Evidence:** `BackupSidecar` struct in `src/fs/backup.rs:245` lacks hash field; `restore_file` trusts sidecar content without verification
+- **Disposition:** Implement  **LHF:** No
+- **Feasibility:** Medium  **Complexity:** 3
+- **Next step:** Add `payload_hash` field to sidecar schema and implement verification in restore logic
+
+Severity assessed in Round 3 by AI 2 on 2025-09-12 15:45+02:00

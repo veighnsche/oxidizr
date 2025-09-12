@@ -85,3 +85,34 @@ Reviewed and updated in Round 1 by AI 3 on 2025-09-12 15:14 CEST
 - **Follow-ups:** Add milestone timeline estimates; implement progress tracking and reporting
 
 Gap analysis in Round 2 by AI 2 on 2025-09-12 15:29 CEST
+
+## Round 3 Severity Assessment (AI 1, 2025-09-12 15:44 +02:00)
+
+- Title: Roadmap lacks consumer feedback loop and prioritization signals
+  - Category: Documentation Gap
+  - Impact: 3  Likelihood: 3  Confidence: 3  → Priority: 3  Severity: S2
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Ensures milestones reflect real user pain; low code churn, high planning value.
+  - Evidence: Milestones listed without consumer validation artifacts; Round 2 notes call this out.
+  - Next step: Add a “Consumer input” column with links to issues/surveys; include acceptance criteria tied to user workflows.
+
+- Title: No delivery timeline or version targeting per milestone
+  - Category: Documentation Gap
+  - Impact: 2  Likelihood: 3  Confidence: 4  → Priority: 2  Severity: S3
+  - Disposition: Spec-only  LHF: Yes
+  - Feasibility: High  Complexity: 1
+  - Why update vs why not: Gives consumers predictability for integration planning.
+  - Evidence: Current roadmap uses High/Medium priority labels only; no versions/dates.
+  - Next step: Add target versions or quarters; include “at risk” flags if uncertain.
+
+- Title: Acceptance criteria miss end-to-end consumer workflow validation
+  - Category: Missing Feature
+  - Impact: 3  Likelihood: 3  Confidence: 4  → Priority: 3  Severity: S2
+  - Disposition: Implement  LHF: Yes
+  - Feasibility: High  Complexity: 2
+  - Why update vs why not: Technical unit tests alone don’t ensure user-visible success; E2E workflows reduce regressions.
+  - Evidence: Criteria focus on unit/integration tests; no E2E consumer scenarios.
+  - Next step: Add E2E scenarios to acceptance criteria (e.g., post-upgrade activation persistence, retention+restore drill).
+
+Severity assessed in Round 3 by AI 1 on 2025-09-12 15:44 +02:00
