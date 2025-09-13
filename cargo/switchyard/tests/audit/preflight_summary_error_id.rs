@@ -62,7 +62,7 @@ fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
 
     assert!(
         redacted.iter().any(|e| {
-            e.get("stage") == Some(&Value::from("preflight"))
+            e.get("stage") == Some(&Value::from("preflight.summary"))
                 && e.get("decision") == Some(&Value::from("failure"))
                 && e.get("error_id") == Some(&Value::from("E_POLICY"))
                 && e.get("exit_code") == Some(&Value::from(10))

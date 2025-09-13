@@ -171,9 +171,9 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     }
     let slog = crate::logging::StageLogger::new(&ctx);
     match decision {
-        "success" => slog.preflight().merge(extra).emit_success(),
-        "failure" => slog.preflight().merge(extra).emit_failure(),
-        _ => slog.preflight().merge(extra).emit_success(),
+        "success" => slog.preflight_summary().merge(extra).emit_success(),
+        "failure" => slog.preflight_summary().merge(extra).emit_failure(),
+        _ => slog.preflight_summary().merge(extra).emit_success(),
     }
 
     // Stable ordering of rows by (path, action_id)

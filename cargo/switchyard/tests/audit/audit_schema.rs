@@ -50,8 +50,8 @@ fn facts_conform_to_json_schema() {
     let _ = api.preflight(&plan).unwrap();
     let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
 
-    // Load schema
-    let schema_str = include_str!("../SPEC/audit_event.schema.json");
+    // Load schema (v2)
+    let schema_str = include_str!("../SPEC/audit_event.v2.schema.json");
     let schema_json: serde_json::Value = serde_json::from_str(schema_str).unwrap();
     let compiled = jsonschema::JSONSchema::compile(&schema_json).expect("valid schema");
 

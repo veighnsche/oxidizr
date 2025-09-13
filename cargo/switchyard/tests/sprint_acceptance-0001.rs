@@ -197,7 +197,7 @@ fn golden_two_action_plan_preflight_apply() {
 
     // Schema validation
     let schema_path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.schema.json");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.v2.schema.json");
     let schema_text =
         std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.schema.json");
     let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
@@ -343,7 +343,7 @@ fn golden_determinism_dryrun_equals_commit() {
 
     // Load and compile JSON Schema (once per test)
     let schema_path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.schema.json");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.v2.schema.json");
     let schema_text =
         std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.schema.json");
     let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
@@ -667,7 +667,7 @@ fn golden_minimal_plan_preflight_apply() {
         .iter()
         .any(|e| e.get("stage") == Some(&Value::from("apply.result"))));
     for e in &got {
-        assert_eq!(e.get("schema_version"), Some(&Value::from(1)));
+        assert_eq!(e.get("schema_version"), Some(&Value::from(2)));
         assert!(e.get("plan_id").is_some());
         assert!(e.get("decision").is_some());
     }
