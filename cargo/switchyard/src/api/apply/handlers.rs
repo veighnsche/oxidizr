@@ -7,6 +7,7 @@ use crate::types::ids::action_id;
 use crate::types::Action;
 
 use super::audit_fields::{insert_hashes, maybe_warn_fsync};
+use super::perf::PerfAgg;
 use std::time::Instant;
 use crate::api::errors::{exit_code_for, id_str, ErrorId};
 use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
@@ -22,7 +23,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     act: &Action,
     idx: usize,
     dry: bool,
-) -> (Option<Action>, Option<String>, super::PerfAgg) {
+) -> (Option<Action>, Option<String>, PerfAgg) {
     let (source, target) = match act {
         Action::EnsureSymlink { source, target } => (source, target),
         _ => unreachable!("expected EnsureSymlink"),
@@ -97,7 +98,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
             StageLogger::new(tctx).apply_result().merge(extra).emit_failure();
-            return (None, Some(msg), super::PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms });
+            return (None, Some(msg), PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms });
         }
     }
 
@@ -117,7 +118,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     maybe_warn_fsync(&mut extra, fsync_ms, FSYNC_WARN_MS);
     StageLogger::new(tctx).apply_result().merge(extra).emit_success();
 
-    (Some(act.clone()), None, super::PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms })
+    (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms })
 }
 
 /// Handle a RestoreFromBackup action: perform restore and emit per-action facts.
@@ -129,7 +130,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     act: &Action,
     idx: usize,
     dry: bool,
-) -> (Option<Action>, Option<String>, super::PerfAgg) {
+) -> (Option<Action>, Option<String>, PerfAgg) {
     let target = match act {
         Action::RestoreFromBackup { target } => target,
         _ => unreachable!("expected RestoreFromBackup"),
@@ -201,7 +202,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                     }
                     ensure_provenance(&mut extra);
                     StageLogger::new(tctx).apply_result().merge(extra).emit_success();
-                    return (Some(act.clone()), None, super::PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
+                    return (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
                 }
             }
             use std::io::ErrorKind;
@@ -224,7 +225,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
             StageLogger::new(tctx).apply_result().merge(extra).emit_failure();
-            return (None, Some(msg), super::PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
+            return (None, Some(msg), PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
         }
     }
 
@@ -242,5 +243,5 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     ensure_provenance(&mut extra);
     StageLogger::new(tctx).apply_result().merge(extra).emit_success();
 
-    (Some(act.clone()), None, super::PerfAgg { hash_ms, backup_ms, swap_ms: 0 })
+    (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms, swap_ms: 0 })
 }

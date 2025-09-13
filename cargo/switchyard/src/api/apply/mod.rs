@@ -11,42 +11,25 @@ use std::time::Instant;
 
 use serde_json::json;
 
-use crate::fs;
-use crate::constants::LOCK_POLL_MS;
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
-use crate::types::ids::{action_id, plan_id};
+use crate::types::ids::plan_id;
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 use log::Level;
 
 use super::errors::{exit_code_for, ErrorId};
 use crate::logging::audit::{AuditCtx, AuditMode};
 use crate::logging::StageLogger;
-use crate::policy::gating;
 mod audit_fields;
 mod handlers;
+mod perf;
+mod util;
+mod lock;
+mod policy_gate;
+mod rollback;
+use perf::PerfAgg;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct PerfAgg {
-    pub hash_ms: u64,
-    pub backup_ms: u64,
-    pub swap_ms: u64,
-}
-
-fn lock_backend_label(mgr: Option<&Box<dyn crate::adapters::lock::LockManager>>) -> String {
-    if let Some(m) = mgr {
-        // Best-effort dynamic type name; map common implementations to concise labels
-        let tn = std::any::type_name_of_val(&**m);
-        if tn.ends_with("::file::FileLockManager") || tn.ends_with("FileLockManager") {
-            "file".to_string()
-        } else {
-            // Fallback: last segment lowercased
-            tn.rsplit("::").next().unwrap_or("custom").to_lowercase()
-        }
-    } else {
-        "none".to_string()
-    }
-}
+// PerfAgg moved to perf.rs; lock backend helper and acquisition moved to util.rs and lock.rs
 
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
@@ -76,141 +59,22 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 
     // Locking (required by default in Commit): acquire process lock with bounded wait; emit telemetry via apply.attempt
     api.audit.log(Level::Info, "apply: starting");
-    let mut lock_wait_ms: Option<u64> = None;
-    let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
-    let lock_backend = lock_backend_label(api.lock.as_ref());
-    if let Some(mgr) = &api.lock {
-        let lt0 = Instant::now();
-        match mgr.acquire_process_lock(api.lock_timeout_ms) {
-            Ok(guard) => {
-                lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
-                _lock_guard = Some(guard);
-            }
-            Err(e) => {
-                lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
-                let approx_attempts = lock_wait_ms.map(|ms| 1 + (ms / LOCK_POLL_MS)).unwrap_or(1);
-                slog.apply_attempt().merge(json!({
-                    "lock_backend": lock_backend,
-                    "lock_wait_ms": lock_wait_ms,
-                    "lock_attempts": approx_attempts,
-                    "error_id": "E_LOCKING",
-                    "exit_code": 30,
-                })).emit_failure();
-                slog.apply_result().merge(json!({
-                    "lock_backend": lock_backend,
-                    "lock_wait_ms": lock_wait_ms,
-                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-                    "error": e.to_string(),
-                    "error_id": "E_LOCKING",
-                    "exit_code": 30
-                })).emit_failure();
-                // Stage parity: also emit a summary apply.result failure for locking errors
-                slog.apply_result().merge(json!({
-                    "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
-                    "exit_code": exit_code_for(ErrorId::E_LOCKING),
-                })).emit_failure();
-                let duration_ms = t0.elapsed().as_millis() as u64;
-                api.audit
-                    .log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
-                return ApplyReport {
-                    executed,
-                    duration_ms,
-                    errors: vec![format!("lock: {}", e)],
-                    plan_uuid: Some(pid),
-                    rolled_back,
-                    rollback_errors,
-                };
-            }
-        }
-    } else {
-        if !dry {
-            // Enforce by default unless explicitly allowed through policy, or when require_lock_manager is set.
-            let must_fail = matches!(api.policy.governance.locking, crate::policy::types::LockingPolicy::Required)
-                || !api.policy.governance.allow_unlocked_commit;
-            if must_fail {
-                slog.apply_attempt().merge(json!({
-                    "lock_backend": "none",
-                    "lock_attempts": 0u64,
-                    "error_id": "E_LOCKING",
-                    "exit_code": 30,
-                })).emit_failure();
-                // Stage parity: also emit a summary apply.result failure for locking errors
-                slog.apply_result().merge(json!({
-                    "lock_backend": "none",
-                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-                    "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
-                    "exit_code": exit_code_for(ErrorId::E_LOCKING),
-                })).emit_failure();
-                let duration_ms = t0.elapsed().as_millis() as u64;
-                return ApplyReport {
-                    executed,
-                    duration_ms,
-                    errors: vec!["lock manager required in Commit mode".to_string()],
-                    plan_uuid: Some(pid),
-                    rolled_back,
-                    rollback_errors,
-                };
-            } else {
-                slog.apply_attempt().merge(json!({
-                    "lock_backend": "none",
-                    "no_lock_manager": true,
-                    "lock_attempts": 0u64,
-                })).emit_warn();
-            }
-        } else {
-            slog.apply_attempt().merge(json!({
-                "lock_backend": "none",
-                "no_lock_manager": true,
-                "lock_attempts": 0u64,
-            })).emit_warn();
-        }
+    let linfo = lock::acquire(api, t0, pid, mode, &tctx);
+    let mut _lock_guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = linfo.guard;
+    if let Some(early) = linfo.early_report {
+        return early;
     }
 
     // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
-    let approx_attempts = lock_wait_ms.map(|ms| 1 + (ms / LOCK_POLL_MS)).unwrap_or_else(|| if api.lock.is_some() { 1 } else { 0 });
+    let approx_attempts = linfo.approx_attempts;
     slog.apply_attempt().merge(json!({
-        "lock_backend": lock_backend,
-        "lock_wait_ms": lock_wait_ms,
+        "lock_backend": linfo.lock_backend,
+        "lock_wait_ms": linfo.lock_wait_ms,
         "lock_attempts": approx_attempts,
     })).emit_success();
     
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
-    if !api.policy.apply.override_preflight && !dry {
-        let gating_errors = gating::gating_errors(&api.policy, api.owner.as_deref(), plan);
-        if !gating_errors.is_empty() {
-            api.audit
-                .log(Level::Warn, "apply: policy gating rejected plan (E_POLICY)");
-            let ec = exit_code_for(ErrorId::E_POLICY);
-            // Emit per-action failures with action_id for visibility
-            for (idx, act) in plan.actions.iter().enumerate() {
-                let aid = action_id(&pid, act, idx).to_string();
-                let path = match act {
-                    Action::EnsureSymlink { target, .. } => target.as_path().display().to_string(),
-                    Action::RestoreFromBackup { target } => target.as_path().display().to_string(),
-                };
-                slog.apply_result().merge(json!({
-                    "action_id": aid,
-                    "path": path,
-                    "error_id": "E_POLICY",
-                    "exit_code": ec,
-                })).emit_failure();
-            }
-            slog.apply_result().merge(json!({
-                "error_id": "E_POLICY",
-                "exit_code": ec,
-                "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-            })).emit_failure();
-            let duration_ms = t0.elapsed().as_millis() as u64;
-            return ApplyReport {
-                executed,
-                duration_ms,
-                errors: gating_errors,
-                plan_uuid: Some(pid),
-                rolled_back,
-                rollback_errors,
-            };
-        }
-    }
+    if let Some(report) = policy_gate::enforce(api, plan, pid, dry, t0, &slog) { return report; }
     
 
     let mut perf_total = PerfAgg::default();
@@ -248,65 +112,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if !errors.is_empty() {
             if !dry {
                 rolled_back = true;
-                for prev in executed.iter().rev() {
-                    match prev {
-                        Action::EnsureSymlink {
-                            source: _source,
-                            target,
-                        } => {
-                            match fs::restore::restore_file(
-                                &target,
-                                dry,
-                                api.policy.apply.best_effort_restore,
-                                &api.policy.backup.tag,
-                            ) {
-                                Ok(()) => {
-                                    slog.rollback().path(target.as_path().display().to_string()).emit_success();
-                                }
-                                Err(e) => {
-                                    rollback_errors.push(format!(
-                                        "rollback restore {} failed: {}",
-                                        target.as_path().display(),
-                                        e
-                                    ));
-                                    slog.rollback().path(target.as_path().display().to_string()).emit_failure();
-                                }
-                            }
-                        }
-                        Action::RestoreFromBackup { .. } => {
-                            // No reliable inverse without prior state capture; record informational error.
-                            rollback_errors.push(
-                                "rollback of RestoreFromBackup not supported (no prior state)"
-                                    .to_string(),
-                            );
-                            slog.rollback().emit_failure();
-                        }
-                    }
-                }
-                // Emit rollback summary once after attempting rollback of executed actions
-                let rb_decision = if rollback_errors.is_empty() { "success" } else { "failure" };
-                let mut rb_extra = json!({});
-                if rb_decision == "failure" {
-                    if let Some(obj) = rb_extra.as_object_mut() {
-                        obj.insert(
-                            "error_id".to_string(),
-                            json!(crate::api::errors::id_str(ErrorId::E_RESTORE_FAILED)),
-                        );
-                        obj.insert(
-                            "exit_code".to_string(),
-                            json!(exit_code_for(ErrorId::E_RESTORE_FAILED)),
-                        );
-                        obj.insert(
-                            "summary_error_ids".to_string(),
-                            json!([crate::api::errors::id_str(ErrorId::E_RESTORE_FAILED), crate::api::errors::id_str(ErrorId::E_POLICY)]),
-                        );
-                    }
-                }
-                if rb_decision == "failure" {
-                    slog.rollback_summary().merge(rb_extra).emit_failure();
-                } else {
-                    slog.rollback_summary().merge(rb_extra).emit_success();
-                }
+                rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
+                rollback::emit_summary(&slog, &rollback_errors);
             }
             break;
         }
@@ -320,31 +127,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 let auto_rb = match api.policy.governance.smoke { crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback, crate::policy::types::SmokePolicy::Off => true };
                 if auto_rb {
                     rolled_back = true;
-                    for prev in executed.iter().rev() {
-                        match prev {
-                            Action::EnsureSymlink { source: _s, target } => {
-                                let _ = fs::restore::restore_file(
-                                    &target,
-                                    dry,
-                                    api.policy.apply.best_effort_restore,
-                                    &api.policy.backup.tag,
-                                )
-                                .map_err(|e| {
-                                    rollback_errors.push(format!(
-                                        "rollback restore {} failed: {}",
-                                        target.as_path().display(),
-                                        e
-                                    ))
-                                });
-                            }
-                            Action::RestoreFromBackup { .. } => {
-                                rollback_errors.push(
-                                    "rollback of RestoreFromBackup not supported (no prior state)"
-                                        .to_string(),
-                                );
-                            }
-                        }
-                    }
+                    rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
                 }
             }
         } else {
@@ -354,31 +137,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 let auto_rb = match api.policy.governance.smoke { crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback, crate::policy::types::SmokePolicy::Off => true };
                 if auto_rb {
                     rolled_back = true;
-                    for prev in executed.iter().rev() {
-                        match prev {
-                            Action::EnsureSymlink { source: _s, target } => {
-                                let _ = fs::restore::restore_file(
-                                    &target,
-                                    dry,
-                                    api.policy.apply.best_effort_restore,
-                                    &api.policy.backup.tag,
-                                )
-                                .map_err(|e| {
-                                    rollback_errors.push(format!(
-                                        "rollback restore {} failed: {}",
-                                        target.as_path().display(),
-                                        e
-                                    ))
-                                });
-                            }
-                            Action::RestoreFromBackup { .. } => {
-                                rollback_errors.push(
-                                    "rollback of RestoreFromBackup not supported (no prior state)"
-                                        .to_string(),
-                                );
-                            }
-                        }
-                    }
+                    rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
                 }
             }
         }
@@ -391,8 +150,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         "failure"
     };
     let mut fields = json!({
-        "lock_backend": lock_backend,
-        "lock_wait_ms": lock_wait_ms,
+        "lock_backend": linfo.lock_backend,
+        "lock_wait_ms": linfo.lock_wait_ms,
     });
     // Attach perf aggregate (best-effort, zeros in DryRun may be redacted)
     if let Some(obj) = fields.as_object_mut() {
