@@ -1,5 +1,5 @@
 use serde_json::Value;
-use switchyard::adapters::{Attestor, Signature};
+use switchyard::adapters::{Attestor, Signature, AttestationError};
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
@@ -26,7 +26,7 @@ impl FactsEmitter for TestEmitter {
 struct MockAttestor;
 
 impl Attestor for MockAttestor {
-    fn sign(&self, _bundle: &[u8]) -> switchyard::types::errors::Result<Signature> {
+    fn sign(&self, _bundle: &[u8]) -> Result<Signature, AttestationError> {
         Ok(Signature(vec![0xAA, 0xBB, 0xCC]))
     }
     fn key_id(&self) -> String {

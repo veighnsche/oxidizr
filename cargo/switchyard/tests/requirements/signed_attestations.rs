@@ -2,6 +2,7 @@
 //! Assert attestation signing and verification.
 
 use serde_json::Value;
+use switchyard::adapters::AttestationError;
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
@@ -23,7 +24,7 @@ impl FactsEmitter for TestEmitter {
 #[derive(Debug)]
 struct MockAttestor;
 impl switchyard::adapters::Attestor for MockAttestor {
-    fn sign(&self, _bundle: &[u8]) -> Result<switchyard::adapters::Signature, switchyard::adapters::AttestationError> {
+    fn sign(&self, _bundle: &[u8]) -> std::result::Result<switchyard::adapters::Signature, AttestationError> {
         Ok(switchyard::adapters::Signature(
             "mock-signature".to_string().into_bytes()
         ))

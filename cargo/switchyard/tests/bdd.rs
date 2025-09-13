@@ -114,7 +114,7 @@ mod steps {
     use cucumber::{given, then, when};
     use jsonschema::JSONSchema;
     use switchyard::adapters::LockManager;
-    use switchyard::adapters::{Attestor, Signature};
+    use switchyard::adapters::{Attestor, Signature, AttestationError};
     use switchyard::logging::redact::redact_event;
 
     // Given steps
@@ -663,7 +663,7 @@ mod steps {
     #[derive(Debug)]
     struct DummyAttestor;
     impl Attestor for DummyAttestor {
-        fn sign(&self, _bundle: &[u8]) -> Result<Signature, switchyard::types::errors::Error> {
+        fn sign(&self, _bundle: &[u8]) -> Result<Signature, AttestationError> {
             Ok(Signature(vec![0xAA; 64]))
         }
         fn key_id(&self) -> String {

@@ -3,7 +3,7 @@
 
 use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
-use switchyard::types::plan::{LinkRequest, PlanInput, RestoreRequest};
+use switchyard::types::plan::{PlanInput, RestoreRequest};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 

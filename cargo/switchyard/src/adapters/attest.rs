@@ -1,4 +1,22 @@
-use crate::types::errors::Result;
+use thiserror::Error;
+use crate::types::errors::{Error, ErrorKind};
+
+#[derive(Debug, Error)]
+pub enum AttestationError {
+    #[error("attestation signing failed: {msg}")]
+    Signing { msg: String },
+    #[error("attestation verification failed: {msg}")]
+    Verification { msg: String },
+}
+
+impl From<AttestationError> for Error {
+    fn from(e: AttestationError) -> Self {
+        Error {
+            kind: ErrorKind::Io,  // Using Io for now, could be more specific
+            msg: e.to_string(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Signature(pub Vec<u8>);
@@ -7,7 +25,7 @@ pub trait Attestor: Send + Sync {
     /// Sign the given bundle.
     /// # Errors
     /// Returns an error if signing fails.
-    fn sign(&self, bundle: &[u8]) -> Result<Signature>;
+    fn sign(&self, bundle: &[u8]) -> Result<Signature, AttestationError>;
     /// Return a stable identifier for the public key used to sign (e.g., fingerprint or KID).
     fn key_id(&self) -> String;
     /// Return the signature algorithm label for attestations. Defaults to "ed25519".

@@ -5,7 +5,6 @@ use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
-use switchyard::types::ApplyMode;
 
 #[test]
 fn req_s5_preservation_capability_gating() {

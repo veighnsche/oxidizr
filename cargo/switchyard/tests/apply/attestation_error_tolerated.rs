@@ -1,7 +1,7 @@
 //! E2E-APPLY-013 — Attestation signing error tolerated; attestation omitted (REQ-O4)
 
 use serde_json::Value;
-use switchyard::adapters::{Attestor, Signature};
+use switchyard::adapters::{Attestor, Signature, AttestationError};
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
@@ -26,8 +26,8 @@ impl FactsEmitter for TestEmitter {
 #[derive(Clone, Debug, Default)]
 struct FailingAttestor;
 impl Attestor for FailingAttestor {
-    fn sign(&self, _bundle: &[u8]) -> switchyard::types::errors::Result<Signature> {
-        Err(switchyard::types::errors::Error { kind: switchyard::types::errors::ErrorKind::Io, msg: "sign failed".to_string() })
+    fn sign(&self, _bundle: &[u8]) -> Result<Signature, AttestationError> {
+        Err(AttestationError::Signing { msg: "sign failed".to_string() })
     }
     fn key_id(&self) -> String { "mock-key".to_string() }
 }
