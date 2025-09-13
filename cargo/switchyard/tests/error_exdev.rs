@@ -25,9 +25,9 @@ fn ensure_symlink_emits_e_exdev_when_fallback_disallowed() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = false; // disallow degraded
-    policy.force_untrusted_source = true;
-    policy.allow_unlocked_commit = true; // allow Commit without lock manager for this test
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::Fail; // disallow degraded
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    policy.governance.allow_unlocked_commit = true; // allow Commit without lock manager for this test
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

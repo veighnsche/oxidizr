@@ -25,7 +25,7 @@ fn apply_result_includes_perf_object() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_unlocked_commit = true; // no lock manager in test
+    policy.governance.allow_unlocked_commit = true; // no lock manager in test
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
 

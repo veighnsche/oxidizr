@@ -39,10 +39,10 @@ fn smoke_failure_triggers_auto_rollback_and_emits_e_smoke() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true;
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
     // Ensure preflight gating does not block on source trust in this temp environment
-    policy.force_untrusted_source = true;
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_smoke_runner(Box::new(FailingSmoke::default()))

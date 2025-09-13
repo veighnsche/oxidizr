@@ -47,8 +47,8 @@ fn run_and_get_events(require_durable: bool) -> Vec<(String, String, String, Val
     let facts = TestEmitter::default();
     let audit = TestAudit::default();
     let mut policy = Policy::default();
-    policy.allow_unlocked_commit = true;
-    policy.require_backup_durability = require_durable;
+    policy.governance.allow_unlocked_commit = true;
+    policy.durability.backup_durability = require_durable;
     let api = Switchyard::new(facts.clone(), audit, policy);
 
     let td = tempfile::tempdir().unwrap();

@@ -10,7 +10,7 @@ fn build_api(
     mut policy: Policy,
 ) -> Switchyard<switchyard::logging::JsonlSink, switchyard::logging::JsonlSink> {
     // Keep test hermetic: allow unlocked commit and ignore smoke by using DryRun preflight only.
-    policy.allow_unlocked_commit = true;
+    policy.governance.allow_unlocked_commit = true;
     let facts = switchyard::logging::JsonlSink::default();
     let audit = switchyard::logging::JsonlSink::default();
     let api = Switchyard::new(facts, audit, policy)
@@ -25,7 +25,7 @@ fn build_api(
 fn preflight_stops_on_suid_sgid_when_disallowed() {
     let mut policy = Policy::default();
     // Avoid unrelated STOP from untrusted source
-    policy.force_untrusted_source = true;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
     let api = build_api(policy);
 
     let td = tempfile::tempdir().unwrap();
@@ -63,8 +63,8 @@ fn preflight_stops_on_suid_sgid_when_disallowed() {
 #[test]
 fn preflight_warns_on_suid_sgid_when_allowed() {
     let mut policy = Policy::default();
-    policy.force_untrusted_source = true;
-    policy.allow_suid_sgid_mutation = true;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    policy.risks.suid_sgid = switchyard::policy::types::RiskLevel::Allow;
     let api = build_api(policy);
 
     let td = tempfile::tempdir().unwrap();

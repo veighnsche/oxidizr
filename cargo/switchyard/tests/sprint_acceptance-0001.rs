@@ -30,10 +30,10 @@ fn preflight_rows_schema_and_ordering() {
     std::fs::write(root.join("bin/new2"), b"n2").unwrap();
     std::fs::write(root.join("usr/bin/app1"), b"o1").unwrap();
     std::fs::write(root.join("usr/sbin/app2"), b"o2").unwrap();
-    policy.allow_roots.push(root.join("usr/bin"));
+    policy.scope.allow_roots.push(root.join("usr/bin"));
     // Allow Commit path without a LockManager so we reach policy gating
-    policy.allow_unlocked_commit = true;
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager for this test
+    policy.governance.allow_unlocked_commit = true;
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager for this test
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
@@ -100,7 +100,7 @@ fn apply_fail_closed_on_policy_violation() {
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
     // Ensure Commit mode reaches policy gating (bypass LockManager requirement in tests)
-    policy.allow_unlocked_commit = true;
+    policy.governance.allow_unlocked_commit = true;
     // Fail-closed default; allow only usr/bin so usr/sbin target violates policy
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
@@ -109,7 +109,7 @@ fn apply_fail_closed_on_policy_violation() {
     std::fs::create_dir_all(root.join("usr/sbin")).unwrap();
     std::fs::write(root.join("bin/new"), b"new").unwrap();
     std::fs::write(root.join("usr/sbin/app"), b"old").unwrap();
-    policy.allow_roots.push(root.join("usr/bin"));
+    policy.scope.allow_roots.push(root.join("usr/bin"));
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
@@ -166,8 +166,8 @@ fn golden_two_action_plan_preflight_apply() {
 
     // Build policy allowing only usr/bin so that usr/sbin action violates allow_roots (policy_ok=false)
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true;
-    policy.allow_roots.push(root.join("usr/bin"));
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
+    policy.scope.allow_roots.push(root.join("usr/bin"));
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
@@ -309,11 +309,11 @@ fn golden_determinism_dryrun_equals_commit() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true;
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
     // Commit path now enforces preflight fail-closed unless overridden.
     // Permit untrusted (non-root-owned) sources in this deterministic test.
-    policy.force_untrusted_source = true;
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager to compare DryRun vs Commit
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager to compare DryRun vs Commit
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));
@@ -565,7 +565,7 @@ fn golden_minimal_plan_preflight_apply() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true;
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));

@@ -14,7 +14,7 @@ fn preflight_stops_for_restore_when_no_backup_present_and_rescue_required() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_rescue = true; // enforce STOP behavior
+    policy.rescue.require = true; // enforce STOP behavior
 
     let api = switchyard::Switchyard::new(facts, audit, policy);
 

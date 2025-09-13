@@ -24,7 +24,7 @@ fn preflight_summary_includes_e_ownership_in_chain_when_strict_ownership_stops()
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.strict_ownership = true; // requires OwnershipOracle which we won't provide
+    policy.risks.ownership_strict = true; // requires OwnershipOracle which we won't provide
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
 

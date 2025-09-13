@@ -25,9 +25,9 @@ fn restore_emits_e_backup_missing_when_no_backup_exists() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.force_restore_best_effort = false; // enforce failure when missing
-    policy.capture_restore_snapshot = false; // do not create snapshot pre-restore in this test
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager
+    policy.apply.best_effort_restore = false; // enforce failure when missing
+    policy.apply.capture_restore_snapshot = false; // do not create snapshot pre-restore in this test
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

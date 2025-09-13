@@ -26,9 +26,9 @@ fn provenance_present_and_env_sanitized_across_stages_including_rollback() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true;
-    policy.force_untrusted_source = true;
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

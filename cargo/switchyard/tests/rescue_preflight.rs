@@ -21,8 +21,8 @@ fn preflight_stops_when_rescue_required_and_unavailable() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_rescue = true;
-    policy.force_untrusted_source = true;
+    policy.rescue.require = true;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
 
     let api = switchyard::Switchyard::new(facts, audit, policy);
 
@@ -75,8 +75,8 @@ fn preflight_succeeds_when_rescue_required_and_available() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_rescue = true;
-    policy.force_untrusted_source = true;
+    policy.rescue.require = true;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
 
     let api = switchyard::Switchyard::new(facts, audit, policy);
 

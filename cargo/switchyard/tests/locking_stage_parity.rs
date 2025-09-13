@@ -17,8 +17,8 @@ fn apply_emits_apply_result_on_lock_failure_when_require_lock_manager() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_lock_manager = true; // precedence over allow_unlocked_commit
-    policy.allow_unlocked_commit = true; // even if true, require_lock_manager forces fail
+    policy.governance.locking = switchyard::policy::types::LockingPolicy::Required; // precedence over allow_unlocked_commit
+    policy.governance.allow_unlocked_commit = true; // even if true, require_lock_manager forces fail
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(FsOwnershipOracle::default()));

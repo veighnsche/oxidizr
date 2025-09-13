@@ -42,8 +42,8 @@ fn attestation_fields_present_on_success_and_masked_after_redaction() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_unlocked_commit = true; // allow Commit path without LockManager
-    policy.force_untrusted_source = true; // avoid gating STOP on source trust
+    policy.governance.allow_unlocked_commit = true; // allow Commit path without LockManager
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid gating STOP on source trust
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_attestor(Box::new(MockAttestor::default()))

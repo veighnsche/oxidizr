@@ -38,7 +38,7 @@ fn commit_requires_lock_manager_when_policy_enforced() {
 
     assert!(
         !report.errors.is_empty(),
-        "apply should fail early when require_lock_manager=true and no manager configured"
+        "apply should fail early when locking=Required and no manager configured"
     );
 
     // Find a failing apply.attempt event and assert it maps to E_LOCKING with exit_code 30

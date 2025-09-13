@@ -14,8 +14,8 @@ fn preflight_stops_when_preservation_required_and_unsupported() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_preservation = true;
-    policy.force_untrusted_source = true; // avoid source trust STOP
+    policy.durability.preservation = switchyard::policy::types::PreservationPolicy::RequireBasic;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid source trust STOP
 
     // Use allow_roots to avoid scope STOPs for this test
     let td = tempfile::tempdir().unwrap();
@@ -29,9 +29,9 @@ fn preflight_stops_when_preservation_required_and_unsupported() {
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
 
     let mut pol = switchyard::policy::Policy::default();
-    pol.require_preservation = true;
-    pol.force_untrusted_source = true;
-    pol.allow_roots.push(root.join("usr/bin"));
+    pol.durability.preservation = switchyard::policy::types::PreservationPolicy::RequireBasic;
+    pol.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    pol.scope.allow_roots.push(root.join("usr/bin"));
     let api = switchyard::Switchyard::new(TestEmitter::default(), JsonlSink::default(), pol);
 
     let plan = api.plan(PlanInput {

@@ -14,7 +14,7 @@ fn preflight_yaml_export_matches_shape_and_writes_golden_when_requested() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true;
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
 
     let api = switchyard::Switchyard::new(facts, audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

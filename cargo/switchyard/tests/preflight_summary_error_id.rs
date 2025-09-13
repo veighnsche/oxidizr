@@ -24,8 +24,8 @@ fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_rescue = true; // force a stop
-    policy.force_untrusted_source = true; // avoid unrelated stops
+    policy.rescue.require = true; // force a stop
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid unrelated stops
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
 

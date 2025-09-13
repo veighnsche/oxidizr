@@ -25,8 +25,8 @@ fn restore_is_invertible_with_snapshot() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager
-    policy.force_untrusted_source = true; // avoid preflight STOP on non-root source in temp env
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid preflight STOP on non-root source in temp env
                                           // capture_restore_snapshot defaults to true
 
     let api = switchyard::Switchyard::new(facts, audit, policy)

@@ -123,9 +123,9 @@ impl Policy {
     /// use switchyard::policy::Policy;
     /// # let root = std::path::PathBuf::from("/tmp/fakeroot");
     /// let mut policy = Policy::coreutils_switch_preset();
-    /// policy.allow_roots.push(root.join("usr/bin")); // narrow the blast radius
+    /// policy.scope.allow_roots.push(root.join("usr/bin")); // narrow the blast radius
     /// // Optionally tighten expectations on rescue tool count:
-    /// // policy.rescue_min_count = policy.rescue_min_count.max(6);
+    /// // policy.rescue.min_count = policy.rescue.min_count.max(6);
     /// ```
     pub fn coreutils_switch_preset() -> Self {
         let mut p = Self::production_preset();

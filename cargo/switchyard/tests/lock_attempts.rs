@@ -27,7 +27,7 @@ fn apply_attempt_emits_lock_attempts_greater_than_one_when_contended() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.force_untrusted_source = true;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
 
     let td = tempfile::tempdir().unwrap();
     let root = td.path();

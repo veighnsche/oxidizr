@@ -25,9 +25,9 @@ fn ensure_symlink_emits_e_atomic_swap_on_permission_error() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_degraded_fs = true; // allow degraded, but we aren't simulating EXDEV here
-    policy.force_untrusted_source = true;
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager
+    policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback; // allow degraded, but we aren't simulating EXDEV here
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

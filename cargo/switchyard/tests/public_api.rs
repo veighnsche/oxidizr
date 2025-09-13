@@ -14,7 +14,7 @@ fn public_api_compiles_and_runs_dry() {
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.allow_unlocked_commit = true; // allow Commit without lock manager in tests
+    policy.governance.allow_unlocked_commit = true; // allow Commit without lock manager in tests
 
     let td = tempfile::tempdir().unwrap();
     let root = td.path();

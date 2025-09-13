@@ -25,9 +25,10 @@ fn apply_refuses_with_e_policy_when_preflight_gates_fail_and_override_is_false()
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_rescue = true; // require rescue availability
-    policy.override_preflight = false; // fail-closed
-    policy.allow_unlocked_commit = true; // allow Commit without LockManager for this test
+    policy.rescue.require = true; // require rescue availability
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid unrelated stops
+    policy.apply.override_preflight = false; // fail-closed
+    policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager for this test
 
     // Force rescue check to fail deterministically
     std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");

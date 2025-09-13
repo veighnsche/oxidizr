@@ -27,7 +27,7 @@ fn apply_summary_includes_lock_wait_ms() {
     let facts = TestEmitter::default();
     let audit = switchyard::logging::JsonlSink::default();
     let mut policy = Policy::default();
-    policy.force_untrusted_source = true;
+    policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
 
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
