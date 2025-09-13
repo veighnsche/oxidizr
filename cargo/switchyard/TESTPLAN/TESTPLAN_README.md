@@ -11,5 +11,6 @@ This README links the full set of deliverables and summarizes scope and method.
 - `traceability.md` — Function × Axis × Level → Scenario IDs
 - `flakiness_and_repro.md` — Determinism, retries, quarantine
 - `scheduling_and_cost.md` — Counts, parallelism, CI tiers
+- `TODO_TESTPLAN.md` — Missing tests and TODOs
 
 All scenarios are deterministic (seeds/time/tempdirs recorded) and auditable. The default construction path for the API is the builder (`Switchyard::builder`), and tests focus on library entry points in `src/api/`.

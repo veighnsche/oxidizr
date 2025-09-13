@@ -48,7 +48,6 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-S5: Preservation gating: filesystem capabilities for ownership, mode, timestamps, xattrs/ACLs/caps **MUST** be probed during preflight; if required by policy but unsupported, preflight **MUST** STOP (fail-closed) unless explicitly overridden.
 - REQ-S6: Backup sidecars SHOULD record a payload_hash when a backup payload exists (sidecar v2). On restore, if policy requires sidecar integrity and a payload_hash is present, the engine MUST verify the backup payload hash and fail restore on mismatch.
 
-
 ### 2.4 Observability & Audit
 
 - REQ-O1: Every step **MUST** emit a structured fact (JSON).
@@ -65,8 +64,8 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-L1: Only one `apply()` **MUST** mutate at a time.
 - REQ-L2: If no lock manager, concurrent `apply()` is **UNSUPPORTED** (dev/test only) and a WARN fact **MUST** be emitted.
 - REQ-L3: Lock acquisition **MUST** use a bounded wait with timeout → `E_LOCKING`, and facts **MUST** record `lock_wait_ms`.
-- REQ-L5: For observability, apply.attempt facts **SHOULD** include an approximate `lock_attempts` count.
 - REQ-L4: In production deployments, a `LockManager` **MUST** be present. Omission is permitted only in development/testing.
+- REQ-L5: For observability, apply.attempt facts **SHOULD** include an approximate `lock_attempts` count.
 
 ### 2.6 Rescue
 
