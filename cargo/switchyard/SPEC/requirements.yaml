@@ -5,7 +5,7 @@
 schema_version: 1
 spec_version: "Reproducible v1.3"
 generated_from: "cargo/switchyard/SPEC.md"
-last_updated: "2025-09-10"
+last_updated: "2025-09-13"
 
 requirements:
   - id: REQ-A1
@@ -117,6 +117,35 @@ requirements:
     text: "FS capabilities for ownership, mode, timestamps, xattrs/ACLs/caps MUST be probed during preflight; if required by policy but unsupported, preflight MUST STOP (fail-closed) unless explicitly overridden."
     tags: [safety, preservation, preflight]
 
+  - id: REQ-S6
+    title: Backup sidecar integrity
+    section: "2.3 Safety Preconditions"
+    level: MUST
+    text: "Backup sidecars SHOULD record a payload_hash when a backup payload exists (sidecar v2). On restore, if policy requires sidecar integrity and a payload_hash is present, the engine MUST verify the backup payload hash and fail restore on mismatch."
+    tags: [preservation, policy]
+    verify:
+      bdd: ["Backup Sidecar Payload Hash And Verification"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications:
+      - "Recording payload_hash is SHOULD; verification is MUST when required by policy."
+
+  - id: REQ-PF1
+    title: Preflight YAML dry-run parity
+    section: "4. Preflight Diff (Normative Schema)"
+    level: MUST
+    text: "Dry-run output must match real-run preflight rows byte-for-byte."
+    tags: [preflight, determinism]
+    verify:
+      bdd: ["Preflight YAML Dry-Run Byte-Identical To Real"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
   - id: REQ-O1
     title: Structured fact for every step
     section: "2.4 Observability & Audit"
@@ -170,6 +199,48 @@ requirements:
     text: "Provenance MUST include origin, helper, uid/gid, pkg, and confirmation of environment sanitization."
     tags: [audit, provenance]
 
+  - id: REQ-O8
+    title: Summary error chain
+    section: "2.4 Observability & Audit"
+    level: MUST
+    text: "Summary events (preflight, apply.result, and rollback.summary) MUST include a summary_error_ids array on failures that lists stable error identifiers, with a top-level classification (e.g., E_POLICY) and any specific causes (e.g., E_LOCKING, E_SMOKE) when determinable."
+    tags: [audit]
+    verify:
+      bdd: ["Summary Error Chain Present On Failures"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
+  - id: REQ-E1
+    title: Stable error identifiers in facts
+    section: "6. Error Taxonomy & Exit Codes"
+    level: MUST
+    text: "Errors are emitted in facts as stable identifiers."
+    tags: [audit, error-codes]
+    verify:
+      bdd: ["Stable Error Identifiers Emitted In Facts"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
+  - id: REQ-E2
+    title: Preflight summary exit-code mapping
+    section: "6. Error Taxonomy & Exit Codes"
+    level: MUST
+    text: "Preflight summary emits error_id=E_POLICY and exit_code=10 when any STOP conditions are present."
+    tags: [error-codes, preflight]
+    verify:
+      bdd: ["Preflight Summary Maps To Policy Exit Code"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: ["E_POLICY:10"]
+    clarifications: []
+
   - id: REQ-L1
     title: Single mutator
     section: "2.5 Locking"
@@ -197,6 +268,20 @@ requirements:
     level: MUST
     text: "In production deployments, a LockManager MUST be present; omission only permitted in development/testing."
     tags: [locking]
+
+  - id: REQ-L5
+    title: Lock attempts metric
+    section: "2.5 Locking"
+    level: SHOULD
+    text: "For observability, apply.attempt facts SHOULD include an approximate lock_attempts count."
+    tags: [locking]
+    verify:
+      bdd: ["Lock Attempts Included In Apply Attempt"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
 
   - id: REQ-RC1
     title: Rescue profile available
@@ -303,6 +388,48 @@ requirements:
     text: "Open parent O_DIRECTORY|O_NOFOLLOW → openat on final component → renameat → fsync(parent) is normative for every mutation."
     tags: [api, toctou, safety]
 
+  - id: REQ-PN1
+    title: Newest backup retained
+    section: "3.4 Retention (Prune Backups)"
+    level: MUST
+    text: "The newest backup is never deleted."
+    tags: [policy, filesystem]
+    verify:
+      bdd: ["Prune Retains Newest Backup"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
+  - id: REQ-PN2
+    title: Prune deletes both payload and sidecar and fsyncs parent
+    section: "3.4 Retention (Prune Backups)"
+    level: MUST
+    text: "Deletions remove payload+sidecar pairs and fsync the parent directory."
+    tags: [policy, filesystem]
+    verify:
+      bdd: ["Prune Deletes Payload And Sidecar And Fsyncs Parent"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
+  - id: REQ-PN3
+    title: Prune emits result summary event
+    section: "3.4 Retention (Prune Backups)"
+    level: MUST
+    text: "A prune.result event is emitted with fields including target_path, policy_used, pruned_count, and retained_count."
+    tags: [audit, policy]
+    verify:
+      bdd: ["Prune Emits Result Summary Event"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
   - id: REQ-BND1
     title: fsync within 50ms of rename
     section: "9. Operational Bounds"
@@ -337,6 +464,41 @@ requirements:
     level: MUST
     text: "Facts include schema_version (current=v2). Schema changes bump this field."
     tags: [audit, schema]
+    verify:
+      bdd: ["Every Step Emits Schema V2 Facts"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
+  - id: REQ-T1
+    title: Core types are Send + Sync
+    section: "14. Thread-safety"
+    level: MUST
+    text: "Core types (e.g., Plan, apply engine) are Send + Sync."
+    tags: [security]
+    verify:
+      bdd: ["Core Types Are Send And Sync"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
+
+  - id: REQ-T2
+    title: Single mutator under lock across threads
+    section: "14. Thread-safety"
+    level: MUST
+    text: "apply() MAY be called from multiple threads, but only one mutator proceeds at a time under the LockManager. Without a LockManager, concurrent apply is unsupported."
+    tags: [locking]
+    verify:
+      bdd: ["Only One Mutator Proceeds Under Lock"]
+      property: []
+      fixtures: []
+      golden: []
+      error_codes: []
+    clarifications: []
 
 # Verification mapping conventions
 # - bdd: Names of scenarios in SPEC.md section 8; .feature files will mirror these names.

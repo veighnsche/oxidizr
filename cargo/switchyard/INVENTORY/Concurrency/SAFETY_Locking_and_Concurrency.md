@@ -81,8 +81,8 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| `apply.attempt` | `lock_backend`, `lock_wait_ms` | Minimal Facts v1 |
-| `apply.result` | `error_id=E_LOCKING` on failure | Minimal Facts v1 |
+| `apply.attempt` | `lock_backend`, `lock_wait_ms` | Audit v2 |
+| `apply.result` | `error_id=E_LOCKING` on failure | Audit v2 |
 
 Test Coverage Map
 

@@ -1,7 +1,7 @@
 //! Apply stage: executes plan actions with atomic symlink swap, backup/restore, and rollback.
 //!
 //! Side-effects:
-//! - Emits Minimal Facts v1 for `apply.attempt` and `apply.result` per action, plus a summary.
+//! - Emits Audit v2 facts for `apply.attempt` and `apply.result` per action, plus a summary.
 //! - Enforces locking policy and maps failures to `E_LOCKING` with bounded wait.
 //! - Enforces policy gating (unless `override_preflight=true`).
 //! - Optionally runs smoke tests post-apply and triggers auto-rollback on failures.
@@ -68,7 +68,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         return early;
     }
 
-    // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
+    // Audit v2: apply attempt summary (include lock_wait_ms when present)
     let approx_attempts = linfo.approx_attempts;
     slog.apply_attempt().merge(json!({
         "lock_backend": linfo.lock_backend,

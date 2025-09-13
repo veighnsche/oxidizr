@@ -35,3 +35,9 @@ Feature: Safety preconditions and gating
     And the filesystem or environment lacks support for one or more of these
     When I run preflight
     Then preflight stops with a fail-closed decision unless an explicit override is set
+
+  @REQ-S6
+  Scenario: Backup Sidecar Payload Hash And Verification
+    Given a backup sidecar v2 with payload present
+    When I restore under policy requiring sidecar integrity
+    Then the engine verifies the payload hash and fails restore on mismatch

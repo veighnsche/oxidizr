@@ -89,8 +89,8 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| `apply.attempt`/`apply.result` | `path`, `plan_id`, `dry_run`, `error_id?` | Minimal Facts v1 (`SPEC/audit_event.schema.json`) |
-| `preflight.row` | `path`, `policy_ok` | Minimal Facts v1 |
+| `apply.attempt`/`apply.result` | `path`, `plan_id`, `dry_run`, `error_id?` | Audit v2 (`SPEC/audit_event.v2.schema.json`) |
+| `preflight.row` | `path`, `policy_ok` | Audit v2 |
 
 Test Coverage Map
 

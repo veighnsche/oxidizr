@@ -48,7 +48,7 @@ Pros & Cons
 - Complexity: Low. Helper functions and stable IDs.
 - Risk & Blast Radius: Medium; incorrect use of helpers can leak non-determinism into goldens.
 - Performance Budget: Negligible overhead for redaction and UUIDv5.
-- Observability: All emitted facts carry redacted timestamps in DryRun; schema planned.
+- Observability: All emitted facts carry redacted timestamps in DryRun; events validate against Audit v2 schema.
 - Test Coverage: Unit tests for redaction; gaps: property tests for UUID stability and cross-run determinism.
 - Determinism & Redaction: Core purpose; DryRun forces `TS_ZERO`.
 - Policy Knobs: None directly; determinism interacts with DryRun mode.
@@ -74,7 +74,7 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| All stage events | `schema_version`, `ts` (zero in DryRun), `plan_id`, `path`, `dry_run` | Minimal Facts v1 (planned validation) |
+| All stage events | `schema_version`, `ts` (zero in DryRun), `plan_id`, `path?`, `dry_run` | Audit v2 (`SPEC/audit_event.v2.schema.json`) |
 
 Test Coverage Map
 
@@ -111,7 +111,7 @@ Test Coverage Map
 
 ## Next Steps to Raise Maturity
 
-- Add JSON Schema for Minimal Facts v1 and validate in tests.
+- Validate emitted events against Audit v2 schema in tests.
 - Add property tests for UUIDv5 stability.
 
 ## Related

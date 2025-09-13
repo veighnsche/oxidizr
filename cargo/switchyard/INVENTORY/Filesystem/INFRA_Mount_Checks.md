@@ -72,8 +72,8 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| `preflight.row` | `mount_ok`, `notes/stops` | Minimal Facts v1 |
-| `preflight.summary` | `policy_ok`, `error_ids?` | Minimal Facts v1 |
+| `preflight.row` | `mount_ok`, `notes/stops` | Audit v2 |
+| `preflight.summary` | `policy_ok`, `error_ids?` | Audit v2 |
 
 Test Coverage Map
 
