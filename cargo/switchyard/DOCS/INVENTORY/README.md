@@ -1,6 +1,6 @@
 # Switchyard Implementation Inventory
 
-This folder tracks one entry per implemented feature across Safety, UX/DX, and Infra. Each entry includes a maturity rating and proofs with code citations. Use `TEMPLATE.md` for new entries.
+This folder tracks one entry per implemented feature across API Safety, Filesystem, Policy, Concurrency, Determinism, Observability, Recovery, Attestation, Tooling, and Performance. Each entry includes a maturity rating and proofs with code citations. Use `TEMPLATE.md` for new entries.
 
 ## Maintenance and Contributions
 
@@ -25,6 +25,27 @@ Use this inventory as a living document. Keep entries up-to-date as code changes
 - Living inventory guidance
   - Prefer precise repo-relative paths for code references (e.g., `cargo/switchyard/src/fs/mount.rs`).
   - Keep entries concise; link to SPEC/ADRs for depth. Use the maintenance checklist in `TEMPLATE.md`.
+
+## Template Requirements & Placement
+
+Use `TEMPLATE.md` strictly and include these mandatory sections and tables in every entry:
+
+- Pros & Cons (table)
+  - Placement: immediately after `## Summary`.
+- Feature Analytics
+  - Placement: immediately after `## Evidence and Proof`.
+  - Include: Complexity; Risk & Blast Radius; Performance Budget; Observability; Test Coverage; Determinism & Redaction; Policy Knobs; Exit Codes & Error Mapping; Concurrency/Locking Touchpoints; Cross-FS/Degraded Behavior; Platform Notes; DX Ergonomics.
+- Policy Controls Matrix (table)
+- Exit Reasons / Error → Exit Code Map (table)
+- Observability Map (table)
+- Test Coverage Map (table)
+- Maturity & Upgrade Path (Bronze → Platinum)
+  - State whether each tier transition is Additive or Replacement and why. Prefer Additive.
+- Maintenance Checklist
+- Observations log
+- Change history
+
+Every behavioral claim must cite concrete repo-relative code/tests. When a test is missing, mark a Gap and propose a PR-sized next step in "Next Steps to Raise Maturity".
 
 ### Licensing Inventory
 
