@@ -15,3 +15,10 @@ This project adheres to Semantic Versioning.
 - Add compile-only public API test and JSON Schema validation test for audit facts.
 - CI: guard against absolute system paths in `cargo/switchyard/tests/`.
 - Docs: Update CLI Integration Guide to clarify SafePath usage and remove non-existent `prune_backups` reference.
+
+### Removed (breaking, pre-1.0)
+
+- Remove deprecated adapters shim `adapters::lock_file::*` (import from `adapters::lock::file::*`).
+- Remove top-level alias `pub use policy::rescue` (import from `switchyard::policy::rescue`).
+- Remove legacy logging helpers `audit::emit_*`; all call sites use `StageLogger` facade.
+- Remove transitional restore core file `src/fs/restore/core.rs` (restore split complete).

@@ -1,18 +1,7 @@
 //! Filesystem mount inspection and policy helpers.
 
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MountFlags {
-    pub read_only: bool,
-    pub no_exec: bool,
-}
-
-#[derive(Debug, thiserror::Error, Clone)]
-pub enum MountError {
-    #[error("unknown or ambiguous mount state")]
-    Unknown,
-}
+use crate::types::{MountError, MountFlags};
 
 pub trait MountInspector {
     fn flags_for(&self, path: &Path) -> Result<MountFlags, MountError>;

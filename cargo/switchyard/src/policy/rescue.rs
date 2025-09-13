@@ -10,17 +10,7 @@
 //!
 use crate::constants::{RESCUE_MIN_COUNT, RESCUE_MUST_HAVE};
 use std::env;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RescueStatus {
-    BusyBox { path: String },
-    GNU { found: usize, min: usize },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RescueError {
-    Unavailable,
-}
+use crate::types::{RescueError, RescueStatus};
 
 /// Verify that at least one rescue toolset is available on PATH (BusyBox or GNU core utilities).
 /// Wrapper that does not enforce executability checks.

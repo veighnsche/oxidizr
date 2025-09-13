@@ -10,6 +10,15 @@ use crate::fs::atomic::fsync_parent_dir;
 use super::sidecar::sidecar_path_for_backup;
 
 /// Prune backups by *count* and *age*. The newest backup is never deleted.
+///
+/// Retention semantics:
+/// - `count_limit = Some(N)`: retain up to N newest backups in total, including the newest. N is clamped to at least 1.
+/// - `count_limit = None`: no count-based pruning (age policy may still prune).
+/// - `age_limit = Some(d)`: prune any backup older than `d` relative to now (ms precision), regardless of count, but still never delete the newest entry.
+/// - `age_limit = None`: no age-based pruning.
+///
+/// Both policies apply together: a backup is pruned if it violates either count or age policy.
+/// Sidecar files are deleted alongside their payloads. The directory containing entries is fsynced best‑effort.
 pub fn prune_backups(
     target: &Path,
     tag: &str,

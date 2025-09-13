@@ -93,7 +93,7 @@ Note: This is not a separate checklist. The sections below are the single consol
 - [ ] Docs (execute end-to-end): `./zrefactor/TYPES_AUDIT.md`
 - [x] Centralize data-only types under `src/types/` where beneficial
 - [x] Move `OwnershipInfo` to `src/types/ownership.rs` and re-export from `types/mod.rs`.
-- [ ] Consider `RescueStatus`/`RescueError` → `src/types/rescue.rs`; `MountFlags`/`MountError` → `src/types/mount.rs` (keep traits/impls in their modules).
+- [x] Consider `RescueStatus`/`RescueError` → `src/types/rescue.rs`; `MountFlags`/`MountError` → `src/types/mount.rs` (keep traits/impls in their modules).
 - [x] Introduce a typed `PreflightRow` under `src/types/preflight.rs`
   - [x] Refactor `api/preflight/rows.rs` to build `PreflightRow` and serialize for emission (after logging facade lands).
 - Acceptance
@@ -136,20 +136,22 @@ Note: This is not a separate checklist. The sections below are the single consol
 
 ## 9) Clean Code and Code Smell sweep (non-functional)
   
-- [ ] Run the combined smell/cleanliness audit; fix top offenders without changing behavior
-- [ ] Docs (execute end-to-end): `./zrefactor/CODE_SMELL_AND_CLEAN_CODE_AUDIT.md`, `../../docs/CLEAN_CODE.md`
+- [x] Run the combined smell/cleanliness audit; fix top offenders without changing behavior
+- [x] Docs (execute end-to-end): `./zrefactor/CODE_SMELL_AND_CLEAN_CODE_AUDIT.md`, `../../docs/CLEAN_CODE.md`
 - Grep aids (examples in the audit doc): no `unsafe`, production code avoids `.unwrap()`/`.expect()`, no stray `println!/dbg!/todo!`, no `tracing` in `src/`, etc.
 - Cohesion guardrails: avoid god functions; extract helpers where duplication exists; aim for submodules < ~800 LOC as noted in cohesion report.
 - Bridging tasks:
-  - Run the provided grep suite and open small follow‑ups for any non‑blocking findings; tackle top offenders in this sweep.
-  - Add optional lightweight `tracing` spans at API boundaries behind a feature if decided; keep emitted facts unchanged.
-  - Replan checkpoint: verify readiness for removals sweep (§10).
+  - [x] Run the provided grep suite and open small follow‑ups for any non‑blocking findings; tackle top offenders in this sweep.
+  - [x] Add optional lightweight `tracing` spans at API boundaries behind a feature if decided; keep emitted facts unchanged.
+  - [x] Replan checkpoint: verify readiness for removals sweep (§10).
+
+Notes: Grep suite clean (no unsafe/unwrap/expect/println!/dbg!/todo! in production). Added optional `tracing` feature and spans at API boundaries; clarified `prune_backups` retention semantics via doc comment. No behavior changes.
 
 ## 10) Backwards-compat removals sweep
   
-- [ ] Remove deprecated shims and re-exports once their replacements are in place
-- [ ] Verify acceptance greps (no adapters::lock_file, no top-level `pub use policy::rescue`, no stray fs atoms)
-- [ ] Docs (execute end-to-end): `./zrefactor/backwards_compat_removals.md`, `./zrefactor/removals_registry.md`
+- [x] Remove deprecated shims and re-exports once their replacements are in place
+- [x] Verify acceptance greps (no adapters::lock_file, no top-level `pub use policy::rescue`, no stray fs atoms)
+- [x] Docs (execute end-to-end): `./zrefactor/backwards_compat_removals.md`, `./zrefactor/removals_registry.md`
 - Bridging tasks:
   - Generate removal list from markers and registry; delete files per Rulebook PR C; ensure CI guards remain.
   - Re-run `cargo test -p switchyard`; grep tree to confirm deprecated surfaces are gone.

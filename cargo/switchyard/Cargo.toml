@@ -24,6 +24,7 @@ hex = "0.4"
 time = { version = "0.3", features = ["formatting"] }
 fs2 = "0.4"
 xattr = "1"
+tracing = { version = "0.1", optional = true }
 
 [features]
 default = []

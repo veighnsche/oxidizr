@@ -5,6 +5,8 @@ pub mod report;
 pub mod safepath;
 pub mod ownership;
 pub mod preflight;
+pub mod mount;
+pub mod rescue;
 
 pub use errors::*;
 pub use ids::*;
@@ -13,3 +15,5 @@ pub use report::*;
 pub use safepath::*;
 pub use ownership::*;
 pub use preflight::*;
+pub use mount::*;
+pub use rescue::*;

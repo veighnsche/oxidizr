@@ -173,8 +173,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         "lock_wait_ms": lock_wait_ms,
         "lock_attempts": approx_attempts,
     })).emit_success();
-
-    // BEGIN REMOVE BLOCK — duplicate policy gating; centralize in policy::gating::evaluate_action
+    
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
     if !api.policy.apply.override_preflight && !dry {
         let gating_errors = gating::gating_errors(&api.policy, api.owner.as_deref(), plan);
@@ -212,7 +211,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             };
         }
     }
-    // END REMOVE BLOCK
+    
 
     let mut perf_total = PerfAgg::default();
     for (idx, act) in plan.actions.iter().enumerate() {

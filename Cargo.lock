@@ -2085,6 +2085,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "time",
+ "tracing",
  "trybuild",
  "uuid",
  "xattr",

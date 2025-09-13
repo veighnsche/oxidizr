@@ -67,18 +67,26 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     }
 
     pub fn plan(&self, input: PlanInput) -> Plan {
+        #[cfg(feature = "tracing")]
+        let _span = tracing::info_span!("switchyard.plan").entered();
         plan::build(self, input)
     }
 
     pub fn preflight(&self, plan: &Plan) -> Result<PreflightReport, errors::ApiError> {
+        #[cfg(feature = "tracing")]
+        let _span = tracing::info_span!("switchyard.preflight").entered();
         Ok(preflight::run(self, plan))
     }
 
     pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> Result<ApplyReport, errors::ApiError> {
+        #[cfg(feature = "tracing")]
+        let _span = tracing::info_span!("switchyard.apply", mode = ?mode).entered();
         Ok(apply::run(self, plan, mode))
     }
 
     pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
+        #[cfg(feature = "tracing")]
+        let _span = tracing::info_span!("switchyard.plan_rollback").entered();
         rollback::inverse_with_policy(&self.policy, report)
     }
 
@@ -89,6 +97,12 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         &self,
         target: &crate::types::safepath::SafePath,
     ) -> Result<crate::types::PruneResult, errors::ApiError> {
+        #[cfg(feature = "tracing")]
+        let _span = tracing::info_span!(
+            "switchyard.prune_backups",
+            path = %target.as_path().display(),
+            tag = %self.policy.backup.tag
+        ).entered();
         // Synthesize a stable plan-like ID for pruning based on target path and tag.
         let plan_like = format!(
             "prune:{}:{}",
