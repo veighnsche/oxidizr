@@ -28,7 +28,37 @@ Source: `cargo/switchyard/src/fs/restore/engine.rs`
 - `fn restore_symlink_kind(target: &Path, dest: &Path, backup_opt: Option<&Path>) -> std::io::Result<()>`
 - `fn legacy_rename_or_best_effort(target: &Path, backup: Option<&Path>, force: bool) -> std::io::Result<()>`
 
-## Implementation TODOs
+## Architecture alternative (preferred): RestorePlanner (plan→execute)
+
+Shift `restore_impl` to a two-phase model: planning (pure) and execution (I/O). This simplifies control flow and makes testing easier.
+
+- Define:
+
+  ```rust
+  enum RestoreAction {
+      Noop,
+      FileRename { backup: PathBuf, mode: Option<u32> },
+      SymlinkTo { dest: PathBuf, cleanup_backup: bool },
+      EnsureAbsent,
+      LegacyRename { backup: PathBuf },
+  }
+  struct RestorePlanner;
+  impl RestorePlanner {
+      fn plan(target: &Path, sel: SnapshotSel, opts: &RestoreOptions) -> std::io::Result<(Option<PathBuf>, Option<Sidecar>, RestoreAction)> { /* select, read sidecar, idempotence, derive action */ }
+  }
+  ```
+
+- Execution maps `RestoreAction` variants to existing `steps::*` helpers.
+- Best-effort and integrity behaviors remain identical; idempotence yields `Noop`.
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Implement `RestorePlanner::plan` using current selection + sidecar reading + idempotence logic.
+- [ ] Implement `execute(action)` that calls `steps::{restore_file_bytes, restore_symlink_to, legacy_rename, ensure_absent}` as appropriate.
+- [ ] Refactor `restore_impl` to `let (_, _, action) = RestorePlanner::plan(...)?; if opts.dry_run { return Ok(()); } execute(action)`.
+- [ ] Add unit tests over `plan` to validate scenarios (file, symlink, none, other; with/without backup; best-effort; integrity mismatch).
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Extract selection logic and sidecar read to helpers.
 - [ ] Factor `prior_kind` arms into dedicated functions (file, symlink, none, other).

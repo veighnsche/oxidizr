@@ -36,7 +36,40 @@ Source: `cargo/switchyard/src/api/apply/handlers.rs`
 - `fn map_swap_error(e: &std::io::Error) -> ErrorId`
 - `fn build_apply_result_fields(..., degraded_used: bool, fsync_ms: u64, before_kind: String, after_kind: String) -> serde_json::Value`
 
-## Implementation TODOs
+## Architecture alternative (preferred): ActionExecutor pattern
+
+Rather than only splitting into helpers, define a per-action executor that owns the orchestration and telemetry for this action type. This encodes the concept and minimizes `handlers.rs` growth.
+
+- Define trait:
+
+  ```rust
+  trait ActionExecutor {
+      fn execute(
+          &self,
+          api: &Switchyard<impl FactsEmitter, impl AuditSink>,
+          tctx: &AuditCtx<'_>,
+          pid: &Uuid,
+          act: &Action,
+          idx: usize,
+          dry: bool,
+      ) -> (Option<Action>, Option<String>, PerfAgg);
+  }
+  ```
+
+- Provide `EnsureSymlinkExec` implementing `ActionExecutor`.
+- In `apply::run`, dispatch by action kind to the appropriate executor (this will also shrink `apply::run`).
+- Keep `StageLogger` usage inside the executor and reuse fluent helpers (see cross-cutting notes below).
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Create `api/apply/executors.rs` and define `ActionExecutor` trait.
+- [ ] Implement `EnsureSymlinkExec` using existing logic but moving field assembly and perf into small private fns.
+- [ ] Update `apply::run` to instantiate/dispatch to `EnsureSymlinkExec` for `Action::EnsureSymlink`.
+- [ ] Add fluent helpers to `logging/audit.rs::EventBuilder` (e.g., `.perf(..)`, `.error(..)`, `.exit_code(..)`) and replace ad-hoc field merges where possible.
+- [ ] Keep `swap::replace_file_with_symlink` semantics unchanged; preserve error-id mapping and degraded flags.
+- [ ] Optionally add a temporary `#[allow(clippy::too_many_lines)]` while landing the trait.
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Create `api/apply/ops.rs` or extend `audit_fields.rs` with the helpers above.
 - [ ] Replace inline JSON construction in `handle_ensure_symlink` with `build_apply_attempt_fields` and `build_apply_result_fields`.

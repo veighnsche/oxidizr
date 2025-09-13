@@ -26,7 +26,19 @@ Source: `cargo/switchyard/src/api/preflight/mod.rs`
 - `fn emit_preflight_row_for_restore(...)`
 - `fn emit_preflight_summary(...)`
 
-## Implementation TODOs
+## Architecture alternative (preferred): RowEmitter + Kind enum
+
+- Introduce a `Kind` enum for `current_kind`/`planned_kind` rather than using stringly-typed literals.
+- Create a `RowEmitter` helper that takes a typed `PreflightRowArgs` (see 08-*.md) and handles both `rows.push` and `StageLogger` emission.
+- `preflight::run` becomes a thin orchestrator: compute policy eval, preservation, provenance, and delegate to `RowEmitter`.
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Define `enum Kind { File, Symlink, None, Unknown, RestoreFromBackup }` with `Display`/serde mapping to preserve output shape.
+- [ ] Introduce `RowEmitter` that encapsulates `StageLogger` emissions and row assembly.
+- [ ] Update call sites to pass `PreflightRowArgs` + `Kind` values; preserve row ordering and fields.
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Extract rescue profile check and summary emission.
 - [ ] Move per-action row assembly to helpers; reuse `rows::push_row_emit`.

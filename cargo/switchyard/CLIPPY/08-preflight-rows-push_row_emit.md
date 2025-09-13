@@ -51,7 +51,23 @@ Source: `cargo/switchyard/src/api/preflight/rows.rs`
 
 - Change signature to: `push_row_emit<E, A>(api: &Switchyard<E, A>, plan: &Plan, act: &Action, rows: &mut Vec<Value>, ctx: &AuditCtx<'_>, args: &PreflightRowArgs)`
 
-## Implementation TODOs
+## Architecture alternative (preferred): PreflightRowArgs + RowEmitter + Kind
+
+- Introduce a `Kind` enum shared with preflight run (see 05-*.md) and ensure serde/Display preserves output shapes.
+- Add a `RowEmitter` helper that:
+  - Builds the typed `PreflightRow` and pushes into `rows`.
+  - Emits the `StageLogger` event with fluent helpers (consider adding `.perf(..)`, `.error(..)`, `.exit_code(..)` if applicable here or reuse `.field`).
+  - Accepts `PreflightRowArgs` + `Kind` inputs to avoid argument sprawl.
+- This consolidates both the row JSON construction and event emission logic and prevents drift.
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Define `Kind` enum and its mapping.
+- [ ] Implement `RowEmitter` with `emit_row(args: &PreflightRowArgs)` that pushes row and logs the event.
+- [ ] Refactor `push_row_emit` to a thin wrapper or deprecate it in favor of `RowEmitter` usage at call sites.
+- [ ] Update `preflight/mod.rs` to construct `PreflightRowArgs` and call `RowEmitter`.
+
+## Implementation TODOs (fallback: interface change only)
 
 - [ ] Define `PreflightRowArgs` near `push_row_emit` (same file/mod) and derive `Default` where sensible.
 - [ ] Update `preflight/mod.rs` call sites to construct and pass `PreflightRowArgs`.

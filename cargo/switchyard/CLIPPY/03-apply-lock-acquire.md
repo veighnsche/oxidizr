@@ -28,7 +28,27 @@ Source: `cargo/switchyard/src/api/apply/lock.rs`
 - `fn emit_lock_failure_attempt_and_result(tctx: &AuditCtx, lock_backend: &str, wait_ms: Option<u64>, attempts: u64)`
 - `fn early_apply_report(pid: Uuid, t0: Instant, msg: String) -> ApplyReport`
 
-## Implementation TODOs
+## Architecture alternative (preferred): LockOrchestrator facade
+
+Encapsulate lock acquisition lifecycle (policy decision, bounded wait metrics, audit emissions, and early report shaping) in a dedicated orchestrator type. This reduces duplication and stabilizes telemetry shape.
+
+- Define `struct LockOrchestrator;`
+- Methods:
+  - `fn acquire(&self, api: &Switchyard<_, _>, mode: ApplyMode) -> LockOutcome { guard, wait_ms, backend, attempts }`
+  - `fn emit_failure(&self, slog: &StageLogger<'_>, outcome: &LockOutcome)`
+  - `fn early_report(&self, pid: Uuid, t0: Instant, msg: String) -> ApplyReport`
+- Update `apply::run` to call the orchestrator; `lock.rs` owns the logic instead of a long free function.
+- Add StageLogger fluent helpers like `.perf(..)`, `.error(..)`, `.exit_code(..)` to simplify field assembly.
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Create `LockOrchestrator` in `api/apply/lock.rs` (or new `lock/mod.rs`).
+- [ ] Port logic from `acquire` into `LockOrchestrator::acquire/emit_failure/early_report`.
+- [ ] Use `util::lock_backend_label` for backend naming; keep bounded wait math and attempts identical.
+- [ ] Update `apply::run` to use orchestrator; shrink `lock.rs` API to small, composable methods.
+- [ ] Adopt StageLogger fluent helpers to reduce boilerplate.
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Extract policy decision into `policy_requires_lock`.
 - [ ] Extract telemetry emissions for failure into `emit_lock_failure_attempt_and_result`.

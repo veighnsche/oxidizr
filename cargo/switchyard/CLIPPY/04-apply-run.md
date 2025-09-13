@@ -28,7 +28,26 @@ Source: `cargo/switchyard/src/api/apply/mod.rs`
 - `fn post_apply_smoke_and_maybe_rollback(...) -> (bool /*rolled_back*/, Vec<String> /*rb_errors*/)`
 - `fn emit_summary_result(...)`
 
-## Implementation TODOs
+## Architecture alternative (preferred): ActionExecutor + ApplySummary builder
+
+Beyond local helpers, adopt:
+
+- `ActionExecutor` dispatch for per-action execution (see 01/02 plans). This turns the actions loop into a thin dispatcher and shrinks `run()` considerably.
+- A typed `ApplySummary` builder to assemble the final `apply.result` summary with:
+  - lock metadata (backend, wait_ms, attempts)
+  - perf aggregate
+  - error_id/exit_code mapping (including smoke → E_SMOKE; default → E_POLICY) and `summary_error_ids`
+  - optional attestation field
+  - fluent StageLogger helpers (e.g., `.perf(..)`, `.error(..)`, `.exit_code(..)`)
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Introduce `apply::summary::ApplySummary` builder and use it to emit the final `apply.result`.
+- [ ] Dispatch to `ActionExecutor` implementations for per-action logic; remove bulky match bodies.
+- [ ] Keep policy gate enforcement and lock paths unchanged, but adopt fluent StageLogger helpers to reduce boilerplate.
+- [ ] Ensure identical summary fields (including `summary_error_ids` ordering) and attestation behavior.
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Extract locking stage into helper (reusing `lock::acquire`).
 - [ ] Extract policy gating into helper (reusing `policy_gate::enforce`).

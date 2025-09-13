@@ -32,7 +32,29 @@ Source: `cargo/switchyard/src/policy/gating.rs`
   - `source_trust_check(policy: &Policy, src: &Path)`
   - `scope_allow_forbid_check(policy: &Policy, target: &Path)`
 
-## Implementation TODOs
+## Architecture alternative (preferred): Checklist pipeline
+
+Make gating declarative by composing small checks into a pipeline per action kind. Each check returns a normalized output consumed to build `Evaluation`.
+
+- Define:
+
+  ```rust
+  struct CheckOutput { stop: Option<String>, note: Option<String> }
+  trait GateCheck { fn run(&self) -> CheckOutput }
+  ```
+
+- Provide concrete checks (wrapping `preflight::checks`): `MountRwExecCheck`, `ImmutableCheck`, `HardlinkRiskCheck`, `SuidSgidRiskCheck`, `SourceTrustCheck`, `ScopeCheck`.
+- For each action kind, assemble a `Vec<Box<dyn GateCheck>>` based on policy and action fields, run them, and fold into `Evaluation`.
+- Benefits: eliminates repeated code, easier to test and extend per policy preset.
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Define `CheckOutput` and `GateCheck` in `policy/gating.rs` or a sibling `gating/checks.rs`.
+- [ ] Implement concrete check structs that wrap existing functions in `preflight/checks.rs`.
+- [ ] Rework `evaluate_action` to build pipelines for `EnsureSymlink` and `RestoreFromBackup` and fold outputs.
+- [ ] Ensure STOP/notes text remains byte-for-byte compatible to avoid regressions.
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Route match arms to `eval_*` functions.
 - [ ] Implement and reuse the common helpers to DRY repeated logic.

@@ -34,7 +34,24 @@ Source: `cargo/switchyard/src/api/apply/handlers.rs`
 - `fn try_restore(target: &SafePath, used_prev: bool, dry: bool, force: bool, tag: &str) -> std::io::Result<()>`
 - `fn emit_restore_success(...)` and `fn emit_restore_failure(...)`
 
-## Implementation TODOs
+## Architecture alternative (preferred): ActionExecutor pattern
+
+Similar to `EnsureSymlink`, introduce a per-action executor that encapsulates apply-time orchestration and telemetry for `RestoreFromBackup`.
+
+- Define `ActionExecutor` trait (shared with symlink executor), and implement `RestoreFromBackupExec`.
+- Move audit field assembly, timing, and error-id mapping into the executor implementation.
+- Keep the actual restore call routed through `crate::fs::restore::{restore_file, restore_file_prev}`; this integrates cleanly with a future `RestorePlanner` in the restore engine (see 06-*.md).
+- Benefit: isolates per-action logic, reduces growth of `handlers.rs`, and simplifies `apply::run`.
+
+### Updated Implementation TODOs (preferred)
+
+- [ ] Implement `RestoreFromBackupExec` under `api/apply/executors.rs` using the outlined helpers for snapshot/integrity/fallback.
+- [ ] Update `apply::run` dispatch to call `RestoreFromBackupExec` for `Action::RestoreFromBackup`.
+- [ ] Add StageLogger fluent helpers (e.g., `.perf(..)`, `.error(..)`, `.exit_code(..)`) and adopt them here to shrink boilerplate.
+- [ ] Preserve fallback semantics (prev NotFound → latest) and integrity flag emission.
+- [ ] Optional temporary `#[allow(clippy::too_many_lines)]` during transition.
+
+## Implementation TODOs (fallback: helper split only)
 
 - [ ] Extract pre-restore snapshot capture + timing into `pre_restore_snapshot_if_enabled`.
 - [ ] Extract integrity verification into `compute_integrity_verified` (use sidecar if present; best-effort).
