@@ -1,8 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://oxidizr.dev/switchyard/defs/stages/apply.attempt.schema.json",
-  "title": "Stage: apply.attempt",
-  "description": "Constraint: apply.attempt requires lock fields.",
-  "if": { "properties": { "stage": { "const": "apply.attempt" } } },
-  "then": { "required": ["lock_backend", "lock_attempts"] }
-}

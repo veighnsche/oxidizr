@@ -85,7 +85,7 @@ Notes:
 
 - Purpose: Validate more stages with schema guarantees.
 - Scope:
-  - Validate facts against `SPEC/audit_event.schema.json` (or Rust-side equivalent) in tests.
+  - Validate facts against `SPEC/audit_event.v2.schema.json` (or Rust-side equivalent) in tests.
   - Store and diff canon for selected stages: `plan`, `preflight`, `apply.attempt`, `apply.result`.
   - Introduce a simple generator: write canon files out (behind a `--update-goldens` or test feature flag).
 - Tooling:

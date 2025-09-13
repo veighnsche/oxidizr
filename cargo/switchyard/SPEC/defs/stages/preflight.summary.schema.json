@@ -1,8 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://oxidizr.dev/switchyard/defs/stages/preflight.summary.schema.json",
-  "title": "Stage: preflight.summary",
-  "description": "Constraint: preflight summary rows have no additional required fields.",
-  "if": { "properties": { "stage": { "const": "preflight.summary" } } },
-  "then": { }
-}

@@ -1,8 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://oxidizr.dev/switchyard/defs/stages/prune.result.schema.json",
-  "title": "Stage: prune.result",
-  "description": "Constraint: prune.result requires path and prune/retain counts.",
-  "if": { "properties": { "stage": { "const": "prune.result" } } },
-  "then": { "required": ["path", "pruned_count", "retained_count"] }
-}

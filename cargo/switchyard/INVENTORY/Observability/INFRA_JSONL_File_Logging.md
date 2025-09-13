@@ -13,7 +13,7 @@ Pros & Cons
 | --- | --- |
 | Simple append-only file sink | `cargo/switchyard/src/logging/facts.rs::FileJsonlSink` |
 | Integrates with existing emission path | Used via `Switchyard::new` sinks |
-| Useful for local debugging and artifact capture | Works with Minimal Facts v1 events |
+| Useful for local debugging and artifact capture | Works with Audit v2 events |
 
 | Cons | Notes |
 | --- | --- |
@@ -45,7 +45,7 @@ Pros & Cons
 - Complexity: Low. Thin wrapper around file append.
 - Risk & Blast Radius: Low for dev; in prod, lack of rotation/retention/concurrency can be risky.
 - Performance Budget: Write throughput bounded by file I/O.
-- Observability: Captures Minimal Facts v1 lines for post-analysis.
+- Observability: Captures Audit v2 lines for post-analysis.
 - Test Coverage: Gap — add tests that write to temp file and validate lines.
 - Determinism & Redaction: Same as emitted facts; sink does not alter content.
 - Policy Knobs: N/A.
@@ -71,7 +71,7 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| All stage events | JSONL lines per Minimal Facts v1 | `SPEC/audit_event.schema.json` (validation in related entry) |
+| All stage events | JSONL lines per Audit v2 | `SPEC/audit_event.v2.schema.json` (validation in related entry) |
 
 Test Coverage Map
 

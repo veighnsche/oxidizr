@@ -50,7 +50,7 @@ Pros & Cons
 - Complexity: Low-Medium. Requires scripting in CI and curated artifacts.
 - Risk & Blast Radius: Medium; improper redaction leads to flaky goldens.
 - Performance Budget: CI time for artifact generation/compare.
-- Observability: Diff uploads aid diagnosis; facts under Minimal Facts v1.
+- Observability: Diff uploads aid diagnosis; facts under Audit v2.
 - Test Coverage: Acceptance/golden tests; gaps: CI gate implementation.
 - Determinism & Redaction: Depends on `logging/redact.rs` and stage helpers.
 - Policy Knobs: N/A.
@@ -64,7 +64,7 @@ Observability Map
 
 | Artifact/Fact | Fields | Schema |
 | --- | --- | --- |
-| Golden artifacts | Scenario-specific fields (preflight/apply outputs) | Project-defined; redaction aligns with Minimal Facts v1 |
+| Golden artifacts | Scenario-specific fields (preflight/apply outputs) | Project-defined; redaction aligns with Audit v2 |
 
 Test Coverage Map
 

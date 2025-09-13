@@ -2,7 +2,7 @@
 
 Generated: 2025-09-12
 Authors: AI 1, AI 2, AI 3, AI 4 (consolidated)
-Inputs: `DOCS/proposals/SPEC_CHANGES_AI{1,2,3,4}.md`, `SPEC/SPEC.md`, `SPEC/audit_event.schema.json`, code in `src/**`
+Inputs: `DOCS/proposals/SPEC_CHANGES_AI{1,2,3,4}.md`, `SPEC/SPEC.md`, `SPEC/audit_event.v2.schema.json`, code in `src/**`
 
 ## Overview
 
@@ -129,7 +129,7 @@ This consolidation intentionally does not prescribe back-compat/deprecation wind
 - Why
   - Improves observability and policy by surfacing all relevant error classes.
 - Affected
-  - SPEC §13 Audit Event Schema; `SPEC/audit_event.schema.json`.
+  - SPEC §13 Audit Event Schema; `SPEC/audit_event.v2.schema.json`.
 
 ---
 
@@ -180,7 +180,7 @@ This consolidation intentionally does not prescribe back-compat/deprecation wind
 
 ## Schema delta (summary)
 
-Proposed additive changes to `SPEC/audit_event.schema.json`:
+Proposed additive changes to `SPEC/audit_event.v2.schema.json`:
 
 - Add `summary_error_ids: array[string]` (summaries)
 - Add optional `perf: object { total_fsync_ms, total_hash_ms, total_backup_ms, total_restore_ms }` (apply/rollback summaries)

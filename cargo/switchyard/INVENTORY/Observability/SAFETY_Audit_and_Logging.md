@@ -1,17 +1,17 @@
-# Audit and logging (Minimal Facts v1)
+# Audit and logging (Audit v2)
 
 - Category: Safety
 - Maturity: Silver
 
 ## Summary
 
-Central helpers emit stage facts with a stable envelope (schema_version, ts, plan_id, path, dry_run) to a `FactsEmitter`. Redaction applied as configured.
+Central helpers emit stage facts with a stable envelope (schema_version=2, ts, plan_id, optional action_id; event_id, run_id, switchyard_version, redaction, seq, dry_run) to a `FactsEmitter`. Redaction applied as configured.
 
 Pros & Cons
 
 | Pros | Proof (code/tests) |
 | --- | --- |
-| Centralized emission ensures uniform schema/envelope | `cargo/switchyard/src/logging/audit.rs` helpers used by all stages |
+| Centralized emission ensures uniform schema/envelope | `cargo/switchyard/src/logging/audit.rs` `StageLogger` used by all stages |
 | Redaction applied consistently | `logging/redact.rs` used by helpers; DryRun → `TS_ZERO` |
 | Pluggable sinks | `logging/facts.rs::{FactsEmitter, AuditSink, JsonlSink}` |
 
@@ -29,7 +29,7 @@ Pros & Cons
 
 ## Implementation
 
-- Core: `cargo/switchyard/src/logging/audit.rs` (`AuditCtx`, `emit_*` helpers).
+- Core: `cargo/switchyard/src/logging/audit.rs` (`AuditCtx`, `StageLogger`).
 - Sinks: `cargo/switchyard/src/logging/facts.rs::{FactsEmitter, AuditSink, JsonlSink}` and optional `FileJsonlSink` under `file-logging` feature.
 
 ## Wiring Assessment
@@ -47,7 +47,7 @@ Pros & Cons
 - Complexity: Low-Medium. Central helpers + sink interfaces.
 - Risk & Blast Radius: High observability value; mis-emission affects all analytics; mitigated by centralization.
 - Performance Budget: Minimal overhead for serialization and emission; acceptable for CLI workflows.
-- Observability: Primary mechanism; emits Minimal Facts v1 envelope + extras.
+- Observability: Primary mechanism; emits Audit v2 envelope + extras.
 - Test Coverage: Tests exist in `api.rs`; gaps: schema validation and golden facts.
 - Determinism & Redaction: DryRun redaction applied in helpers.
 - Policy Knobs: None directly; redaction controlled by mode.
@@ -73,9 +73,9 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| `apply.attempt` | envelope + lock info | Minimal Facts v1 |
-| `apply.result` | envelope + perf, error ids | Minimal Facts v1 |
-| `rollback.step`/`rollback.summary` | envelope + rollback data | Minimal Facts v1 |
+| `apply.attempt` | Audit v2 envelope + lock info | Audit v2 |
+| `apply.result` | Audit v2 envelope + perf, error ids | Audit v2 |
+| `rollback.step`/`rollback.summary` | Audit v2 envelope + rollback data | Audit v2 |
 
 Test Coverage Map
 
@@ -109,4 +109,4 @@ Test Coverage Map
 
 ## Related
 
-- SPEC v1.1 (Minimal Facts schema and redaction policy).
+- SPEC v2 (Audit schema and redaction policy).
