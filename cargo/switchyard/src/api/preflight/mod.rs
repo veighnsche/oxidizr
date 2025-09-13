@@ -30,7 +30,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     let pid = plan_id(plan);
     let run_id = new_run_id();
     let ctx = AuditCtx::new(
-        &api.facts as &dyn FactsEmitter,
+        &api.facts,
         pid.to_string(),
         run_id,
         TS_ZERO.to_string(),

@@ -12,7 +12,7 @@ pub struct MountFlags {
 
 /// Error types for mount operations.
 /// Centralized under `crate::types` for cross-layer reuse.
-#[derive(Debug, thiserror::Error, Clone)]
+#[derive(Debug, Copy, Clone, thiserror::Error)]
 pub enum MountError {
     /// Unknown or ambiguous mount state
     #[error("unknown or ambiguous mount state")]

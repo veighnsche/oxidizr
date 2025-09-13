@@ -107,18 +107,18 @@ mod tests {
     #[test]
     #[serial]
     fn forced_ok_env_yields_ok() {
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
+        env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
         let r = verify_rescue(false);
-        std::env::remove_var("SWITCHYARD_FORCE_RESCUE_OK");
+        env::remove_var("SWITCHYARD_FORCE_RESCUE_OK");
         assert!(r.is_ok());
     }
 
     #[test]
     #[serial]
     fn forced_fail_env_yields_err() {
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");
+        env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");
         let r = verify_rescue(false);
-        std::env::remove_var("SWITCHYARD_FORCE_RESCUE_OK");
+        env::remove_var("SWITCHYARD_FORCE_RESCUE_OK");
         assert!(r.is_err());
     }
 }

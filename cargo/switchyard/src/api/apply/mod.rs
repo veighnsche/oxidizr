@@ -49,7 +49,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     // Audit context
     let run_id = new_run_id();
     let tctx = AuditCtx::new(
-        &api.facts as &dyn FactsEmitter,
+        &api.facts,
         pid.to_string(),
         run_id,
         ts_now.clone(),

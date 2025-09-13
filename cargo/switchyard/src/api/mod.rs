@@ -31,14 +31,31 @@ pub use builder::ApiBuilder;
 /// DX alias for `ApiBuilder`.
 pub type SwitchyardBuilder<E, A> = ApiBuilder<E, A>;
 
+/// Trait for lock managers that can be debugged
+pub trait DebugLockManager: LockManager + std::fmt::Debug {}
+impl<T: LockManager + std::fmt::Debug> DebugLockManager for T {}
+
+/// Trait for ownership oracles that can be debugged
+pub trait DebugOwnershipOracle: OwnershipOracle + std::fmt::Debug {}
+impl<T: OwnershipOracle + std::fmt::Debug> DebugOwnershipOracle for T {}
+
+/// Trait for attestors that can be debugged
+pub trait DebugAttestor: Attestor + std::fmt::Debug {}
+impl<T: Attestor + std::fmt::Debug> DebugAttestor for T {}
+
+/// Trait for smoke test runners that can be debugged
+pub trait DebugSmokeTestRunner: SmokeTestRunner + std::fmt::Debug {}
+impl<T: SmokeTestRunner + std::fmt::Debug> DebugSmokeTestRunner for T {}
+
+#[derive(Debug)]
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
     audit: A,
     policy: Policy,
-    lock: Option<Box<dyn LockManager>>, // None in dev/test; required in production
-    owner: Option<Box<dyn OwnershipOracle>>, // for strict ownership gating
-    attest: Option<Box<dyn Attestor>>,  // for final summary attestation
-    smoke: Option<Box<dyn SmokeTestRunner>>, // for post-apply health verification
+    lock: Option<Box<dyn DebugLockManager>>, // None in dev/test; required in production
+    owner: Option<Box<dyn DebugOwnershipOracle>>, // for strict ownership gating
+    attest: Option<Box<dyn DebugAttestor>>,  // for final summary attestation
+    smoke: Option<Box<dyn DebugSmokeTestRunner>>, // for post-apply health verification
     lock_timeout_ms: u64,
 }
 
@@ -57,25 +74,25 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     }
 
     /// Configure via `ApiBuilder::with_lock_manager`.
-    pub fn with_lock_manager(mut self, lock: Box<dyn LockManager>) -> Self {
+    pub fn with_lock_manager(mut self, lock: Box<dyn DebugLockManager>) -> Self {
         self.lock = Some(lock);
         self
     }
 
     /// Configure via `ApiBuilder::with_ownership_oracle`.
-    pub fn with_ownership_oracle(mut self, owner: Box<dyn OwnershipOracle>) -> Self {
+    pub fn with_ownership_oracle(mut self, owner: Box<dyn DebugOwnershipOracle>) -> Self {
         self.owner = Some(owner);
         self
     }
 
     /// Configure via `ApiBuilder::with_attestor`.
-    pub fn with_attestor(mut self, attest: Box<dyn Attestor>) -> Self {
+    pub fn with_attestor(mut self, attest: Box<dyn DebugAttestor>) -> Self {
         self.attest = Some(attest);
         self
     }
 
     /// Configure via `ApiBuilder::with_smoke_runner`.
-    pub fn with_smoke_runner(mut self, smoke: Box<dyn SmokeTestRunner>) -> Self {
+    pub fn with_smoke_runner(mut self, smoke: Box<dyn DebugSmokeTestRunner>) -> Self {
         self.smoke = Some(smoke);
         self
     }
@@ -132,7 +149,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let pid = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, plan_like.as_bytes());
         let run_id = new_run_id();
         let tctx = crate::logging::audit::AuditCtx::new(
-            &self.facts as &dyn FactsEmitter,
+            &self.facts,
             pid.to_string(),
             run_id,
             crate::logging::redact::now_iso(),

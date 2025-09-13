@@ -1,22 +1,23 @@
-use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
+use crate::api::{DebugAttestor, DebugLockManager, DebugOwnershipOracle, DebugSmokeTestRunner};
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::policy::Policy;
 use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 
 /// Builder for constructing a Switchyard with ergonomic chaining.
 /// Mirrors `Switchyard::new(...).with_*` but avoids duplication at call sites.
+#[derive(Debug)]
 pub struct ApiBuilder<E: FactsEmitter, A: AuditSink> {
     facts: E,
     audit: A,
     policy: Policy,
     // Optional adapters/handles
-    lock: Option<Box<dyn LockManager>>,              // None in dev/test; required in production
-    owner: Option<Box<dyn OwnershipOracle>>,         // strict ownership gating
-    attest: Option<Box<dyn Attestor>>,               // final summary attestation
-    smoke: Option<Box<dyn SmokeTestRunner>>,         // post-apply health verification
+    lock: Option<Box<dyn DebugLockManager>>,              // None in dev/test; required in production
+    owner: Option<Box<dyn DebugOwnershipOracle>>,         // strict ownership gating
+    attest: Option<Box<dyn DebugAttestor>>,               // final summary attestation
+    smoke: Option<Box<dyn DebugSmokeTestRunner>>,         // post-apply health verification
     lock_timeout_ms: Option<u64>,
 }
-
+    
 impl<E: FactsEmitter, A: AuditSink> ApiBuilder<E, A> {
     pub fn new(facts: E, audit: A, policy: Policy) -> Self {
         Self {
@@ -64,22 +65,22 @@ impl<E: FactsEmitter, A: AuditSink> ApiBuilder<E, A> {
         api
     }
 
-    pub fn with_lock_manager(mut self, lock: Box<dyn LockManager>) -> Self {
+    pub fn with_lock_manager(mut self, lock: Box<dyn DebugLockManager>) -> Self {
         self.lock = Some(lock);
         self
     }
 
-    pub fn with_ownership_oracle(mut self, owner: Box<dyn OwnershipOracle>) -> Self {
+    pub fn with_ownership_oracle(mut self, owner: Box<dyn DebugOwnershipOracle>) -> Self {
         self.owner = Some(owner);
         self
     }
 
-    pub fn with_attestor(mut self, attest: Box<dyn Attestor>) -> Self {
+    pub fn with_attestor(mut self, attest: Box<dyn DebugAttestor>) -> Self {
         self.attest = Some(attest);
         self
     }
 
-    pub fn with_smoke_runner(mut self, smoke: Box<dyn SmokeTestRunner>) -> Self {
+    pub fn with_smoke_runner(mut self, smoke: Box<dyn DebugSmokeTestRunner>) -> Self {
         self.smoke = Some(smoke);
         self
     }

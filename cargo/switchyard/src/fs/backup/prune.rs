@@ -78,7 +78,7 @@ pub fn prune_backups(
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let age_cutoff_ms: Option<u128> = age_limit.map(|d| d.as_millis() as u128);
+    let age_cutoff_ms: Option<u128> = age_limit.map(|d| d.as_millis());
 
     // Determine how many newest to retain by count policy.
     // We never delete the newest, so clamp minimum to 1.

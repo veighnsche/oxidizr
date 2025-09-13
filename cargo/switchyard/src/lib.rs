@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 /* ---- unwrap/expect policy ---- */
 // Warn everywhere (incl. tests), but deny in non-test builds.

@@ -1,7 +1,8 @@
-use crate::adapters::OwnershipOracle;
+use crate::api::DebugOwnershipOracle;
+use crate::types::plan::Action;
 use crate::policy::Policy;
 use crate::policy::types::{RiskLevel, SourceTrustPolicy};
-use crate::types::{Action, Plan};
+use crate::types::Plan;
 
 /// Centralized evaluation result for a single action under a given Policy.
 #[derive(Debug, Default, Clone)]
@@ -14,7 +15,7 @@ pub(crate) struct Evaluation {
 /// Evaluate policy gating for a single action.
 pub(crate) fn evaluate_action(
     policy: &Policy,
-    owner: Option<&dyn OwnershipOracle>,
+    owner: Option<&dyn DebugOwnershipOracle>,
     act: &Action,
 ) -> Evaluation {
     let mut stops: Vec<String> = Vec::new();
@@ -203,7 +204,7 @@ pub(crate) fn evaluate_action(
 /// This mirrors the gating performed in apply.rs before executing actions.
 pub(crate) fn gating_errors(
     policy: &Policy,
-    owner: Option<&dyn OwnershipOracle>,
+    owner: Option<&dyn DebugOwnershipOracle>,
     plan: &Plan,
 ) -> Vec<String> {
     let mut errs: Vec<String> = Vec::new();

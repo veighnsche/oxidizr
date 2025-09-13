@@ -93,7 +93,7 @@ pub fn check_immutable(path: &Path) -> Result<(), String> {
 /// Source trust checks. Returns Err(String) if untrusted and `force` is false. When `force` is true,
 /// returns Ok(()) and leaves it to callers to emit warnings.
 pub fn check_source_trust(source: &Path, force: bool) -> Result<(), String> {
-    let meta = fs::symlink_metadata(source).map_err(|e| format!("{}", e))?;
+    let meta = fs::symlink_metadata(source).map_err(|e| format!("{e}"))?;
     let mode = meta.mode();
     if (mode & 0o002) != 0 && !force {
         return Err(format!(

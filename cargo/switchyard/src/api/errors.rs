@@ -69,7 +69,7 @@ impl From<crate::types::errors::Error> for ApiError {
 
 // Stable identifiers aligned with SPEC/error_codes.toml
 // We intentionally keep SCREAMING_SNAKE_CASE to match emitted IDs.
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, reason = "Error IDs must match SPEC/error_codes.toml format")]
 #[derive(Clone, Copy, Debug)]
 pub enum ErrorId {
     E_POLICY,

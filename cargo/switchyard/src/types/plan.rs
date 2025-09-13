@@ -1,6 +1,6 @@
 use super::safepath::SafePath;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum ApplyMode {
     DryRun,
     Commit,

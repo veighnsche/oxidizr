@@ -48,7 +48,7 @@ pub struct Scope {
     pub forbid_paths: Vec<PathBuf>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Rescue {
     pub require: bool,
     pub exec_check: bool,
@@ -61,7 +61,7 @@ impl Default for Rescue {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Risks {
     pub suid_sgid: RiskLevel,
     pub hardlinks: RiskLevel,
@@ -75,7 +75,7 @@ impl Default for Risks {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Durability {
     pub backup_durability: bool,
     pub sidecar_integrity: bool,
@@ -97,7 +97,7 @@ pub struct ApplyFlow {
     pub capture_restore_snapshot: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Governance {
     pub locking: LockingPolicy,
     pub smoke: SmokePolicy,

@@ -3,7 +3,6 @@ use uuid::Uuid;
 
 // Typed representation of a preflight report.
 /// Centralized under `crate::types` for cross-layer reuse.
-
 #[must_use]
 #[derive(Clone, Debug, Default)]
 pub struct PreflightReport {
@@ -19,7 +18,6 @@ pub struct PreflightReport {
 
 // Typed representation of an apply report.
 /// Centralized under `crate::types` for cross-layer reuse.
-
 #[must_use]
 #[derive(Clone, Debug, Default)]
 pub struct ApplyReport {
@@ -39,7 +37,6 @@ pub struct ApplyReport {
 
 /// Typed representation of a prune result.
 /// Centralized under `crate::types` for cross-layer reuse.
-
 #[must_use]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PruneResult {

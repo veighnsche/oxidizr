@@ -9,6 +9,7 @@ use fs2::FileExt;
 
 use super::{LockGuard, LockManager};
 
+#[derive(Debug)]
 pub struct FileLockManager {
     path: PathBuf,
 }

@@ -8,6 +8,7 @@ pub trait MountInspector {
 }
 
 /// Production inspector. Prefer kernel syscalls when available; fall back to parsing /proc/self/mounts.
+#[derive(Debug, Copy, Clone)]
 pub struct ProcStatfsInspector;
 
 impl ProcStatfsInspector {

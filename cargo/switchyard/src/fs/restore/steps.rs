@@ -87,6 +87,7 @@ pub fn restore_symlink_to(target_path: &Path, dest: &Path) -> std::io::Result<()
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

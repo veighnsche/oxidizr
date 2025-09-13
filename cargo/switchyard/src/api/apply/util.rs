@@ -1,5 +1,7 @@
+use crate::api::DebugLockManager;
+
 pub(crate) fn lock_backend_label(
-    mgr: Option<&Box<dyn crate::adapters::lock::LockManager>>,
+    mgr: Option<&Box<dyn DebugLockManager>>,
 ) -> String {
     if let Some(m) = mgr {
         // Best-effort dynamic type name; map common implementations to concise labels

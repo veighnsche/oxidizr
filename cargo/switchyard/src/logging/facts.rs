@@ -1,7 +1,7 @@
 use log::Level;
 use serde_json::Value;
 
-pub trait FactsEmitter {
+pub trait FactsEmitter: std::fmt::Debug {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value);
 }
 
@@ -10,6 +10,7 @@ pub trait AuditSink {
 }
 
 #[derive(Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct JsonlSink;
 
 impl FactsEmitter for JsonlSink {
@@ -23,7 +24,7 @@ impl AuditSink for JsonlSink {
 // Optional: file-backed JSONL sink for production integration.
 // Enabled via `--features file-logging`.
 #[cfg(feature = "file-logging")]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FileJsonlSink {
     path: std::path::PathBuf,
 }
@@ -55,10 +56,10 @@ impl FactsEmitter for FileJsonlSink {
         // Merge subsystem/event/decision into the JSON object if it's an object; otherwise, wrap.
         let out = match fields {
             Value::Object(mut m) => {
-                m.entry("subsystem".into())
+                m.entry("subsystem".to_string())
                     .or_insert(Value::from(subsystem));
-                m.entry("event".into()).or_insert(Value::from(event));
-                m.entry("decision".into()).or_insert(Value::from(decision));
+                m.entry("event".to_string()).or_insert(Value::from(event));
+                m.entry("decision".to_string()).or_insert(Value::from(decision));
                 Value::Object(m)
             }
             other => serde_json::json!({

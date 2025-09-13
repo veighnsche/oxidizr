@@ -49,9 +49,8 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
         None => {
             if !opts.force_best_effort {
                 return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"));
-            } else {
-                return Ok(());
             }
+            return Ok(());
         }
     };
     // Read sidecar if present

@@ -28,7 +28,12 @@ impl SafePath {
     /// 
     /// * `Result<Self>` - A SafePath if the candidate is valid, or an error otherwise
     pub fn from_rooted(root: &Path, candidate: &Path) -> Result<Self> {
-        assert!(root.is_absolute(), "root must be absolute");
+        if !root.is_absolute() {
+            return Err(Error {
+                kind: ErrorKind::InvalidPath,
+                msg: "root must be absolute".into(),
+            });
+        }
         let effective = if candidate.is_absolute() {
             match candidate.strip_prefix(root) {
                 Ok(p) => p.to_path_buf(),
@@ -95,6 +100,7 @@ impl SafePath {
 }
 
 #[cfg(test)]
+#[allow(clippy::panic)]
 mod tests {
     use super::*;
     use std::path::Path;
@@ -109,7 +115,7 @@ mod tests {
     fn accepts_absolute_inside_root() {
         let root = Path::new("/tmp/root");
         let candidate = Path::new("/tmp/root/usr/bin/ls");
-        let sp = SafePath::from_rooted(root, candidate).expect("inside root");
+        let sp = SafePath::from_rooted(root, candidate).unwrap_or_else(|e| panic!("Failed to create SafePath for absolute path inside root: {e}"));
         assert!(sp.as_path().starts_with(root));
         assert_eq!(sp.rel(), Path::new("usr/bin/ls"));
     }
@@ -125,7 +131,7 @@ mod tests {
     fn normalizes_curdir_components() {
         let root = Path::new("/tmp/root");
         let candidate = Path::new("./usr/./bin/./ls");
-        let sp = SafePath::from_rooted(root, candidate).expect("normalize");
+        let sp = SafePath::from_rooted(root, candidate).unwrap_or_else(|e| panic!("Failed to create SafePath with normalized curdir components: {e}"));
         assert_eq!(sp.rel(), Path::new("usr/bin/ls"));
         assert_eq!(sp.as_path(), Path::new("/tmp/root/usr/bin/ls"));
     }

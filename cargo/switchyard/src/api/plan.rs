@@ -49,7 +49,7 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     let pid = pid_uuid.to_string();
     let run_id = new_run_id();
     let tctx = AuditCtx::new(
-        &api.facts as &dyn FactsEmitter,
+        &api.facts,
         pid.clone(),
         run_id,
         crate::logging::TS_ZERO.to_string(),

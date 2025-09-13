@@ -178,7 +178,7 @@ mod tests {
         let t = tmp();
         let root = t.path();
         let tgt = root.join("file.txt");
-        std::fs::write(&tgt, b"hello").unwrap();
+        fs::write(&tgt, b"hello").unwrap();
         create_snapshot(&tgt, DEFAULT_BACKUP_TAG).unwrap();
         let pair = index::find_latest_backup_and_sidecar(&tgt, DEFAULT_BACKUP_TAG).expect("pair");
         assert!(pair.0.is_some(), "payload present");
@@ -190,10 +190,10 @@ mod tests {
         let t = tmp();
         let root = t.path();
         let target = root.join("bin");
-        std::fs::create_dir_all(&target).unwrap();
+        fs::create_dir_all(&target).unwrap();
         let link = root.join("usr/bin/app");
-        std::fs::create_dir_all(link.parent().unwrap()).unwrap();
-        let _ = std::os::unix::fs::symlink("../../bin", &link); // relative symlink
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        let _ = unix::fs::symlink("../../bin", &link); // relative symlink
         create_snapshot(&link, DEFAULT_BACKUP_TAG).unwrap();
         let pair = index::find_latest_backup_and_sidecar(&link, DEFAULT_BACKUP_TAG).expect("pair");
         assert!(pair.1.exists(), "sidecar exists");

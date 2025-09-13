@@ -99,8 +99,8 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
                 })).emit_failure();
                 let duration_ms = t0.elapsed().as_millis() as u64;
                 return LockInfo {
-                    lock_backend,
-                    lock_wait_ms,
+                    lock_backend: "none".to_string(),
+                    lock_wait_ms: None,
                     approx_attempts: 0,
                     guard: None,
                     early_report: Some(ApplyReport {
@@ -112,19 +112,7 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
                         rollback_errors: Vec::new(),
                     }),
                 };
-            } else {
-                StageLogger::new(tctx).apply_attempt().merge(json!({
-                    "lock_backend": "none",
-                    "no_lock_manager": true,
-                    "lock_attempts": 0u64,
-                })).emit_warn();
             }
-        } else {
-            StageLogger::new(tctx).apply_attempt().merge(json!({
-                "lock_backend": "none",
-                "no_lock_manager": true,
-                "lock_attempts": 0u64,
-            })).emit_warn();
         }
     }
 

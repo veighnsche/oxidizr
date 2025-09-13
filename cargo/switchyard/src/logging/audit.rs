@@ -23,6 +23,7 @@ pub(crate) struct AuditMode {
     pub redact: bool,
 }
 
+#[derive(Debug)]
 pub(crate) struct AuditCtx<'a> {
     pub facts: &'a dyn FactsEmitter,
     pub plan_id: String,
@@ -98,6 +99,7 @@ impl Decision {
 }
 
 /// Builder facade over audit emission with centralized envelope+redaction.
+#[derive(Debug)]
 pub struct StageLogger<'a> {
     ctx: &'a AuditCtx<'a>,
 }
@@ -115,6 +117,7 @@ impl<'a> StageLogger<'a> {
     pub fn prune_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PruneResult) }
 }
 
+#[derive(Debug)]
 pub struct EventBuilder<'a> {
     ctx: &'a AuditCtx<'a>,
     stage: Stage,
@@ -206,15 +209,18 @@ fn redact_and_emit(
             }
             // process
             if let Entry::Vacant(e) = obj.entry("process".to_string()) {
-                let pid = std::process::id() as u32;
-                let ppid = unsafe { libc::getppid() as u32 };
-                e.insert(json!({"pid": pid, "ppid": ppid}));
+                let process_id = std::process::id();
+                #[allow(unsafe_code, reason = "libc::getppid() requires unsafe block")]
+                let parent_process_id = unsafe { libc::getppid() };
+                e.insert(json!({"pid": process_id, "ppid": parent_process_id}));
             }
             // actor (effective ids)
             if let Entry::Vacant(e) = obj.entry("actor".to_string()) {
-                let euid = unsafe { libc::geteuid() } as u32;
-                let egid = unsafe { libc::getegid() } as u32;
-                e.insert(json!({"euid": euid, "egid": egid}));
+                #[allow(unsafe_code, reason = "libc::geteuid() requires unsafe block")]
+                let effective_user_id = unsafe { libc::geteuid() };
+                #[allow(unsafe_code, reason = "libc::getegid() requires unsafe block")]
+                let effective_group_id = unsafe { libc::getegid() };
+                e.insert(json!({"euid": effective_user_id, "egid": effective_group_id}));
             }
             // build
             if let Entry::Vacant(e) = obj.entry("build".to_string()) {
