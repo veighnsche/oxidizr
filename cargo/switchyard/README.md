@@ -11,7 +11,7 @@ Switchyard is a Rust library that provides a safe, deterministic, and auditable 
 
 This crate lives inside the `oxidizr-arch` monorepo and is designed to be embedded by higher-level CLIs.
 
-Status: Silver-tier coverage for exit codes and core flows; some features are stubbed or intentionally minimal to ensure determinism. See `PLAN/90-implementation-tiers.md`.
+Status: Core flows implemented with structured audit and locking; some features are intentionally minimal while SPEC v1.1 evolves. See `SPEC/SPEC.md`, `SPEC_CHECKLIST.md`, and `TODO.md` for current coverage and roadmap.
 
 ---
 
@@ -28,6 +28,15 @@ Status: Silver-tier coverage for exit codes and core flows; some features are st
 - Optional smoke runner; default deterministic subset validates symlink targets resolve to sources
 
 ---
+
+## Module Overview
+
+- `src/types/`: core types (`Plan`, `Action`, `ApplyMode`, `SafePath`, IDs, reports)
+- `src/fs/`: filesystem ops (atomic swap, backup/sidecar, restore engine, mount checks)
+- `src/policy/`: policy `Policy` config, `types`, `gating` (apply parity), and `rescue` helpers
+- `src/adapters/`: integration traits (`LockManager`, `OwnershipOracle`, `PathResolver`, `Attestor`, `SmokeTestRunner`) and defaults
+- `src/api/`: facade (`Switchyard`) delegating to `plan`, `preflight`, `apply`, `rollback`
+- `src/logging/`: `StageLogger` audit facade, `FactsEmitter`/`AuditSink`, and `redact`
 
 ## Quick Start
 
@@ -47,22 +56,16 @@ switchyard = { path = "./cargo/switchyard" }
 ### Minimal Example
 
 ```rust
-use switchyard::Switchyard;
-use switchyard::logging::JsonlSink;
-use switchyard::policy::Policy;
-use switchyard::types::plan::{PlanInput, LinkRequest};
-use switchyard::types::safepath::SafePath;
-use switchyard::types::ApplyMode;
+use switchyard::{Switchyard, logging::JsonlSink, policy::Policy};
+use switchyard::types::{PlanInput, LinkRequest, SafePath, ApplyMode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Facts sink and audit sink; replace with your own emitters
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();
 
-    // Policy: require rescue tools and allow degraded cross-FS symlink fallback
-    let mut policy = Policy::default();
-    policy.require_rescue = true;
-    policy.allow_degraded_fs = true;
+    // Start from defaults for a minimal example
+    let policy = Policy::default();
 
     let api = Switchyard::new(facts.clone(), audit, policy)
         .with_lock_timeout_ms(500);
@@ -72,6 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = td.path();
     std::fs::create_dir_all(root.join("usr/bin"))?;
     std::fs::write(root.join("usr/bin/ls"), b"old")?;
+    std::fs::create_dir_all(root.join("bin"))?;
     std::fs::write(root.join("bin/new"), b"new")?;
 
     let source = SafePath::from_rooted(root, &root.join("bin/new"))?;
@@ -88,7 +92,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Apply in Commit mode; in DryRun mode timestamps are zeroed for determinism
     let report = api.apply(&plan, ApplyMode::Commit)?;
-    println!("Apply decision: {}", report.decision);
+    println!(
+        "Apply decision: {}",
+        if report.errors.is_empty() { "success" } else { "failure" }
+    );
     Ok(())
 }
 ```
@@ -167,44 +174,66 @@ See `docs/testing/TESTING_POLICY.md` for project-wide rules (zero SKIPs, harness
 
 ---
 
+## Cargo Features
+
+- `file-logging`: enables a file‑backed JSONL sink (`logging::facts::FileJsonlSink`) for facts/audit emission.
+
+---
+
 ## Integration Notes
 
-- Emitters: Provide your own `FactsEmitter` and `AuditSink` implementations to integrate with your logging/telemetry stack. `JsonlSink` is bundled for development/testing.
-- Adapters: Implement or wire in `OwnershipOracle`, `LockManager`, `PathResolver`, `Attestor`, and `SmokeTestRunner` as needed.
-- Policy: Start from `Policy::default()` and enable gates:
-  - `require_rescue`, `require_preservation`, `allow_degraded_fs`, `strict_ownership`, `force_untrusted_source`, `disable_auto_rollback`.
+- **Emitters**: Provide your own `FactsEmitter` and `AuditSink` implementations to integrate with your logging/telemetry stack. `JsonlSink` is bundled for development/testing.
+- **Adapters**: Implement or wire in `OwnershipOracle`, `LockManager`, `PathResolver`, `Attestor`, and `SmokeTestRunner` as needed.
+- **Policy**: Start from `Policy::default()` or a preset (`Policy::production_preset()`, `Policy::coreutils_switch_preset()`). Key knobs are grouped:
+  - `policy.rescue.{require, exec_check, min_count}`
+  - `policy.apply.{exdev, override_preflight, best_effort_restore, extra_mount_checks, capture_restore_snapshot}`
+  - `policy.risks.{ownership_strict, source_trust, suid_sgid, hardlinks}`
+  - `policy.durability.preservation`
+  - `policy.governance.{locking, smoke, allow_unlocked_commit}`
+  - `policy.scope.{allow_roots, forbid_paths}`
+  - `policy.backup.tag`, `policy.retention_count_limit`, `policy.retention_age_limit`
 
 ---
 
 ## Production Policy Preset
 
-For production, enable the following policy toggles to satisfy SPEC v1.1 requirements (L4, H3, RC1) and harden rescue checks:
+Use the hardened preset and wire required adapters. Adjust EXDEV behavior per environment.
 
 ```rust
-use switchyard::policy::Policy;
+use switchyard::policy::{Policy, types::ExdevPolicy};
+use switchyard::adapters::{FileLockManager, DefaultSmokeRunner};
+use std::path::PathBuf;
 
-let mut policy = Policy::default();
-// Rescue required, with executability checks (BusyBox or ≥6/10 GNU tools must be present and executable)
-policy.require_rescue = true;
-policy.rescue_exec_check = true;
-// Locking and health gates in Commit
-policy.require_lock_manager = true;
-policy.require_smoke_in_commit = true;
-// Optional depending on environment
-policy.allow_degraded_fs = true; // allow EXDEV fallback with telemetry
-// Keep fail-closed behavior (override_preflight=false) unless explicitly overridden for dev
+let mut policy = Policy::production_preset();
+// Optional depending on environment: allow cross‑FS degraded fallback with telemetry
+policy.apply.exdev = ExdevPolicy::DegradedFallback;
 
 let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
-    .with_lock_manager(Box::new(your_lock_manager))
-    .with_smoke_runner(Box::new(your_smoke_runner))
-    .with_ownership_oracle(Box::new(your_ownership_oracle));
+    .with_lock_manager(Box::new(FileLockManager::new(PathBuf::from("/var/lock/switchyard.lock"))))
+    .with_smoke_runner(Box::new(DefaultSmokeRunner::default()));
 ```
 
-These toggles ensure:
+This preset ensures:
 
-- Lock manager is mandatory in Commit; absence fails with `E_LOCKING` (exit code 30).
-- Smoke verification is mandatory in Commit; missing or failing runner yields `E_SMOKE` with auto‑rollback.
-- Rescue profile is verified (presence and X bits) before mutate when required.
+- Lock manager is required in Commit; absence fails with `E_LOCKING` (exit code 30).
+- Smoke verification is required in Commit; missing or failing runner yields `E_SMOKE` and triggers auto‑rollback (unless explicitly disabled by policy).
+- Rescue profile is verified (presence and X bits) before mutation.
+
+---
+
+## Prune Backups
+
+Prune backup artifacts for a target under the current retention policy. Emits a `prune.result` fact.
+
+```rust
+use switchyard::types::SafePath;
+
+let target = SafePath::from_rooted(root, &root.join("usr/bin/ls"))?;
+let res = api.prune_backups(&target)?;
+println!("pruned={}, retained={}", res.pruned_count, res.retained_count);
+```
+
+Knobs: `policy.retention_count_limit: Option<usize>`, `policy.retention_age_limit: Option<Duration>`.
 
 ---
 
@@ -272,15 +301,17 @@ Notes:
 ## Documentation and Change Control
 
 - Baseline SPEC: `SPEC/SPEC.md`
-- Immutable updates: `SPEC/SPEC_UPDATE_*.md` (see `SPEC_UPDATE_0002.md` for rescue and degraded symlink clarifications)
-- ADRs: `PLAN/adr/*.md` (see `ADR-0015-exit-codes-silver-and-ci-gates.md`)
-- Implementation tiers and roadmap: `PLAN/90-implementation-tiers.md`
+- Immutable updates: `SPEC/SPEC_UPDATE_*.md`
+- Checklist and compliance: `SPEC_CHECKLIST.md`
+- Deep dives and topics: `DOCS/` and `INVENTORY/`
+- Refactors and ongoing work: `zrefactor/`
+- Gaps and tasks: `TODO.md`, `a-test-gaps.md`
 
 When introducing normative behavior changes:
 
 1. Add a `SPEC_UPDATE_####.md` entry
-2. Add or update an ADR
-3. Update PLAN notes and tests/goldens accordingly
+2. Update relevant docs (`DOCS/`, `INVENTORY/`) and checklist
+3. Update tests/goldens accordingly
 
 ---
 

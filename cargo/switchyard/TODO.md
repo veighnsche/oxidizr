@@ -37,7 +37,7 @@ Note: This is not a separate checklist. The sections below are the single consol
 - [x] Tighten fs atoms visibility; no re-exports at `src/fs/mod.rs`
 - [x] Move `src/preflight.rs` -> `src/preflight/mod.rs`; drop `#[path]` includes and use standard `mod` declarations
 - Notes: low-level FS atoms are internal-only (`pub(crate)`), satisfying trybuild compile-fail expectations.
-- [ ] Docs (execute end-to-end): `./zrefactor/idiomatic_todo.INSTRUCTIONS.md`
+- [x] Docs (execute end-to-end): `./zrefactor/idiomatic_todo.INSTRUCTIONS.md`
 - Bridging tasks:
   - Paste acceptance greps into the PR description; ensure CI gates for `#[path]` and `adapters::lock_file` are active.
   - Update imports across the crate after moves; add/remove `mod` declarations as needed.
@@ -92,10 +92,10 @@ Note: This is not a separate checklist. The sections below are the single consol
   
 - [ ] Docs (execute end-to-end): `./zrefactor/TYPES_AUDIT.md`
 - [x] Centralize data-only types under `src/types/` where beneficial
-- [ ] Move `OwnershipInfo` to `src/types/ownership.rs` and re-export from `types/mod.rs`.
+- [x] Move `OwnershipInfo` to `src/types/ownership.rs` and re-export from `types/mod.rs`.
 - [ ] Consider `RescueStatus`/`RescueError` → `src/types/rescue.rs`; `MountFlags`/`MountError` → `src/types/mount.rs` (keep traits/impls in their modules).
 - [x] Introduce a typed `PreflightRow` under `src/types/preflight.rs`
-  - [ ] Refactor `api/preflight/rows.rs` to build `PreflightRow` and serialize for emission (after logging facade lands).
+  - [x] Refactor `api/preflight/rows.rs` to build `PreflightRow` and serialize for emission (after logging facade lands).
 - Acceptance
   - `cargo check && cargo test` pass; imports updated across adapters/policy/preflight.
   - `rg -n "struct OwnershipInfo" cargo/switchyard/src/adapters/ownership -S` returns 0; new `types/ownership.rs` exists.
@@ -113,7 +113,7 @@ Note: This is not a separate checklist. The sections below are the single consol
 - [x] Remove any internal re-exports of atoms at `fs/mod.rs`; prefer direct module use
 - Notes: backup split completed; restore split completed. `engine.rs` is now a thin facade over `restore_impl` which composes `selector`, `idempotence`, `integrity`, and `steps` helpers.
 - Progress: added `restore/{idempotence,integrity,steps,selector,types}.rs`; trimmed `restore/engine.rs` to wrappers + `restore_impl`; moved `backup::prune_backups` into `backup/prune.rs` and updated `Switchyard::prune_backups` to delegate to it. Added unit tests for `restore::steps` and `restore::idempotence`. All tests pass.
-- [ ] Docs (execute end-to-end): `./zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md`
+- [x] Docs (execute end-to-end): `./zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md`
 - Bridging tasks:
   - [x] Extract restore code into `restore/*` modules; wire `engine::restore_impl` behind public fns; update `fs/mod.rs` re‑exports.
   - [x] Update API/handlers call sites to new module paths; move and add unit tests for selector/idempotence/integrity/steps.
@@ -122,10 +122,10 @@ Note: This is not a separate checklist. The sections below are the single consol
 
 ## 8) Tests reorganization (crate + repo e2e)
   
-- [ ] Group crate integration tests under `tests/{locking,preflight,apply,fs,audit}/`; keep `tests/common.rs`
+- [x] Group crate integration tests under `tests/{locking,preflight,apply,fs,audit}/`; keep `tests/common.rs`
 - [ ] Ensure all test files `mod common;` and update `tests/README.md`
 - [ ] Maintain golden fixtures and trybuild tests
-- [ ] Docs (execute end-to-end): `./zrefactor/tests_refactor.INSTRUCTIONS.md`
+- [x] Docs (execute end-to-end): `./zrefactor/tests_refactor.INSTRUCTIONS.md`
 - Acceptance greps (mirrored from doc):
   - `rg -n "^mod common;" cargo/switchyard/tests/*.rs | wc -l` matches count of non-helper test files.
   - No top-level test files remain outside `cargo/switchyard/tests/{locking,preflight,apply,fs,audit}/` (except `common.rs`, `trybuild.rs`, `README.md`, golden fixtures).
