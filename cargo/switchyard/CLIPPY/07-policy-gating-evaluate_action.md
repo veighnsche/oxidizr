@@ -20,45 +20,53 @@ Source: `cargo/switchyard/src/policy/gating.rs`
 
 - Split per-action evaluators and deduplicate common checks.
 
-## Proposed helpers
-
-- `fn eval_ensure_symlink(policy: &Policy, owner: Option<&dyn DebugOwnershipOracle>, source: &SafePath, target: &SafePath) -> Evaluation`
-- `fn eval_restore_from_backup(policy: &Policy, owner: Option<&dyn DebugOwnershipOracle>, target: &SafePath) -> Evaluation`
-- Common helpers:
-  - `mount_rw_exec_check(p: &Path)`
-  - `immutable_check(p: &Path)`
-  - `hardlink_risk_check(policy: &Policy, p: &Path)`
-  - `suid_sgid_risk_check(policy: &Policy, p: &Path)`
-  - `source_trust_check(policy: &Policy, src: &Path)`
-  - `scope_allow_forbid_check(policy: &Policy, target: &Path)`
-
 ## Architecture alternative (preferred): Checklist pipeline
 
 Make gating declarative by composing small checks into a pipeline per action kind. Each check returns a normalized output consumed to build `Evaluation`.
 
 - Define:
 
-  ```rust
-  struct CheckOutput { stop: Option<String>, note: Option<String> }
-  trait GateCheck { fn run(&self) -> CheckOutput }
-  ```
+```rust
+struct CheckOutput { stop: Option<String>, note: Option<String> }
+trait GateCheck { fn run(&self) -> CheckOutput }
+```
 
 - Provide concrete checks (wrapping `preflight::checks`): `MountRwExecCheck`, `ImmutableCheck`, `HardlinkRiskCheck`, `SuidSgidRiskCheck`, `SourceTrustCheck`, `ScopeCheck`.
 - For each action kind, assemble a `Vec<Box<dyn GateCheck>>` based on policy and action fields, run them, and fold into `Evaluation`.
 - Benefits: eliminates repeated code, easier to test and extend per policy preset.
 
-### Updated Implementation TODOs (preferred)
+### Implementation plan (preferred, granular)
 
-- [ ] Define `CheckOutput` and `GateCheck` in `policy/gating.rs` or a sibling `gating/checks.rs`.
-- [ ] Implement concrete check structs that wrap existing functions in `preflight/checks.rs`.
-- [ ] Rework `evaluate_action` to build pipelines for `EnsureSymlink` and `RestoreFromBackup` and fold outputs.
-- [ ] Ensure STOP/notes text remains byte-for-byte compatible to avoid regressions.
+- [ ] Create module layout
+  - [ ] Add `src/policy/gating/checks.rs` (or nested module) to host types and concrete checks; re-export from `gating.rs`.
+  - [ ] Define types:
 
-## Implementation TODOs (fallback: helper split only)
+    ```rust
+    pub(crate) struct CheckOutput { pub stop: Option<String>, pub note: Option<String> }
+    pub(crate) trait GateCheck { fn run(&self) -> CheckOutput }
+    ```
 
-- [ ] Route match arms to `eval_*` functions.
-- [ ] Implement and reuse the common helpers to DRY repeated logic.
-- [ ] Preserve STOP/notes behavior exactly.
+- [ ] Implement concrete check structs wrapping `preflight::checks`
+  - [ ] `MountRwExecCheck { path: PathBuf }` → uses `ensure_mount_rw_exec`; on Err(e) set `stop=Some(..)`, `note=Some(..)` with same wording.
+  - [ ] `ImmutableCheck { path: PathBuf }` → uses `check_immutable`; on Err(e) produce identical message text.
+  - [ ] `HardlinkRiskCheck { policy: Policy, path: PathBuf }` → uses `check_hardlink_hazard`; map to Stop/Note per `policy.risks.hardlinks`.
+  - [ ] `SuidSgidRiskCheck { policy: Policy, path: PathBuf }` → uses `check_suid_sgid_risk`; map to Stop/Note per `policy.risks.suid_sgid`.
+  - [ ] `SourceTrustCheck { policy: Policy, source: PathBuf }` → uses `check_source_trust` with `force` per policy; Stop/Note wording preserved.
+  - [ ] `ScopeCheck { policy: Policy, target: PathBuf }` → checks `allow_roots` and `forbid_paths` with identical messages.
+- [ ] Build per-action pipelines in `evaluate_action`
+  - [ ] For `EnsureSymlink { source, target }`: assemble Vec<Box<dyn GateCheck>> with mount checks (extra + target), immutable, hardlink risk (target), suid/sgid (target), source trust (source), scope check (target), and strict ownership check using `owner` when `ownership_strict`.
+  - [ ] For `RestoreFromBackup { target }`: assemble appropriate checks (no source trust).
+  - [ ] Run all checks; fold outputs into `Evaluation { policy_ok, stops, notes }` while preserving order and exact text.
+- [ ] Ownership strict handling
+  - [ ] Keep inline check for ownership using `owner.owner_of(target)` with identical stop/note messages when strict.
+- [ ] Invariants and compatibility
+  - [ ] Message strings (STOPs and notes) must remain byte-for-byte identical to current outputs.
+  - [ ] Evaluation ordering of stops/notes preserved relative to present implementation.
+  - [ ] Function line count < 100 after refactor.
+- [ ] Tests
+  - [ ] Unit-test each GateCheck with synthetic success/failure paths (mock filesystem where feasible).
+  - [ ] Integration tests for `evaluate_action` for both action kinds and key policy permutations (hardlinks Stop/Warn/Allow, suid/sgid Stop/Warn/Allow, ownership_strict on/off).
+  - [ ] Ensure aggregated stops/notes match current outputs for a set of golden inputs.
 
 ## Acceptance criteria
 

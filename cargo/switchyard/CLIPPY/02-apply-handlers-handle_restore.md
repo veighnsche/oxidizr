@@ -27,13 +27,6 @@ Source: `cargo/switchyard/src/api/apply/handlers.rs`
 
 - Reduce to < 100 LOC while preserving fallback semantics and emitted fields.
 
-## Proposed helpers
-
-- `fn pre_restore_snapshot_if_enabled(target: &SafePath, api: &Switchyard<_, _>, dry: bool) -> (used_prev: bool, backup_ms: u64)`
-- `fn compute_integrity_verified(target: &SafePath, used_prev: bool, tag: &str) -> Option<bool>`
-- `fn try_restore(target: &SafePath, used_prev: bool, dry: bool, force: bool, tag: &str) -> std::io::Result<()>`
-- `fn emit_restore_success(...)` and `fn emit_restore_failure(...)`
-
 ## Architecture alternative (preferred): ActionExecutor pattern
 
 Similar to `EnsureSymlink`, introduce a per-action executor that encapsulates apply-time orchestration and telemetry for `RestoreFromBackup`.
@@ -43,22 +36,51 @@ Similar to `EnsureSymlink`, introduce a per-action executor that encapsulates ap
 - Keep the actual restore call routed through `crate::fs::restore::{restore_file, restore_file_prev}`; this integrates cleanly with a future `RestorePlanner` in the restore engine (see 06-*.md).
 - Benefit: isolates per-action logic, reduces growth of `handlers.rs`, and simplifies `apply::run`.
 
-### Updated Implementation TODOs (preferred)
+### Implementation TODOs (preferred, granular)
 
-- [ ] Implement `RestoreFromBackupExec` under `api/apply/executors.rs` using the outlined helpers for snapshot/integrity/fallback.
-- [ ] Update `apply::run` dispatch to call `RestoreFromBackupExec` for `Action::RestoreFromBackup`.
-- [ ] Add StageLogger fluent helpers (e.g., `.perf(..)`, `.error(..)`, `.exit_code(..)`) and adopt them here to shrink boilerplate.
-- [ ] Preserve fallback semantics (prev NotFound → latest) and integrity flag emission.
-- [ ] Optional temporary `#[allow(clippy::too_many_lines)]` during transition.
+- [ ] Create executor skeleton
+  - [ ] Add `src/api/apply/executors/restore.rs`.
+  - [ ] Define `struct RestoreFromBackupExec;` implementing the shared `ActionExecutor` trait:
 
-## Implementation TODOs (fallback: helper split only)
+    ```rust
+    impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupExec {
+        fn execute(
+            &self,
+            api: &super::super::Switchyard<E, A>,
+            tctx: &crate::logging::audit::AuditCtx<'_>,
+            pid: &uuid::Uuid,
+            act: &crate::types::Action,
+            idx: usize,
+            dry: bool,
+        ) -> (Option<crate::types::Action>, Option<String>, super::perf::PerfAgg) { /* ... */ }
+    }
+    ```
 
-- [ ] Extract pre-restore snapshot capture + timing into `pre_restore_snapshot_if_enabled`.
-- [ ] Extract integrity verification into `compute_integrity_verified` (use sidecar if present; best-effort).
-- [ ] Implement `try_restore` that attempts previous→latest fallback on NotFound only.
-- [ ] Move JSON building for success/failure into dedicated emitters; reuse in main.
-- [ ] Keep `force` logic identical: `best_effort_restore || !sidecar_integrity`.
-- [ ] Optional temporary `#[allow(clippy::too_many_lines)]` while landing helpers.
+- [ ] Private helpers inside executor (encapsulate incumbent logic)
+  - [ ] `fn pre_restore_snapshot_if_enabled(target: &SafePath, api: &Switchyard<_, _>, dry: bool, tag: &str) -> (used_prev: bool, backup_ms: u64)`
+  - [ ] `fn compute_integrity_verified(target: &SafePath, used_prev: bool, tag: &str) -> Option<bool>`
+    - [ ] Use `fs::backup::{find_latest_backup_and_sidecar, find_previous_backup_and_sidecar}` and `read_sidecar`.
+    - [ ] Compare `sha256_hex_of(backup)` with sidecar `payload_hash` when present.
+  - [ ] `fn try_restore_force(target: &SafePath, used_prev: bool, dry: bool, force: bool, tag: &str) -> std::io::Result<()>`
+    - [ ] Attempt `restore_file_prev` when `used_prev`, else `restore_file`.
+    - [ ] If `used_prev` and NotFound, fallback to `restore_file`.
+- [ ] Emit attempt/result via StageLogger
+  - [ ] Attempt: include `action_id`, `path`, `safepath_validation=success`, `backup_durable`.
+  - [ ] Result success: include `before_kind`, `after_kind` (respect dry), `backup_durable`, optional `sidecar_integrity_verified`.
+  - [ ] Result failure: include `error_id` and `exit_code` using `ErrorId` mapping; carry `sidecar_integrity_verified` when computed.
+  - [ ] Adopt fluent helpers added to `EventBuilder` (perf, error_id, exit_code) to reduce boilerplate.
+- [ ] Force semantics and policy wiring
+  - [ ] Preserve: `force = api.policy.apply.best_effort_restore || !api.policy.durability.sidecar_integrity`.
+  - [ ] Dry-run behavior: no I/O actions performed; success path emits appropriate kinds, timings zeroed.
+- [ ] Wire dispatch in `src/api/apply/mod.rs::run`
+  - [ ] Replace direct call to `handlers::handle_restore` with executor dispatch using `RestoreFromBackupExec`.
+  - [ ] Keep perf aggregation identical (hash_ms, backup_ms, swap_ms).
+- [ ] Remove/Deprecate legacy handler
+  - [ ] Keep a thin wrapper `handle_restore` temporarily delegating to the executor to de-risk rollout; remove after stable.
+- [ ] Telemetry invariants
+  - [ ] `apply.attempt`/`apply.result` fields and values identical; especially `before_kind`/`after_kind`, integrity flag, and error mapping.
+  - [ ] Fallback semantics (prev NotFound → latest) unchanged.
+  - [ ] Hash timing (`hash_ms`) maintained from pre-check computations.
 
 ## Acceptance criteria
 

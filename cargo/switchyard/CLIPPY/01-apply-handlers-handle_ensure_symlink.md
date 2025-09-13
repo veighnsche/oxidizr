@@ -29,13 +29,6 @@ Source: `cargo/switchyard/src/api/apply/handlers.rs`
 
 - Reduce function to < 100 LOC without changing behavior or audit field shapes.
 
-## Proposed helpers (new, `pub(super)` in `api/apply/`)
-
-- `fn build_apply_attempt_fields(aid: &Uuid, target: &SafePath, api: &Switchyard<_, _>) -> serde_json::Value`
-- `fn compute_symlink_hashes(source: &SafePath, target: &SafePath) -> (String /*before*/, String /*after*/, u64 /*hash_ms*/)`
-- `fn map_swap_error(e: &std::io::Error) -> ErrorId`
-- `fn build_apply_result_fields(..., degraded_used: bool, fsync_ms: u64, before_kind: String, after_kind: String) -> serde_json::Value`
-
 ## Architecture alternative (preferred): ActionExecutor pattern
 
 Rather than only splitting into helpers, define a per-action executor that owns the orchestration and telemetry for this action type. This encodes the concept and minimizes `handlers.rs` growth.
@@ -60,23 +53,64 @@ Rather than only splitting into helpers, define a per-action executor that owns 
 - In `apply::run`, dispatch by action kind to the appropriate executor (this will also shrink `apply::run`).
 - Keep `StageLogger` usage inside the executor and reuse fluent helpers (see cross-cutting notes below).
 
-### Updated Implementation TODOs (preferred)
+### Updated Implementation TODOs (preferred, granular)
 
-- [ ] Create `api/apply/executors.rs` and define `ActionExecutor` trait.
-- [ ] Implement `EnsureSymlinkExec` using existing logic but moving field assembly and perf into small private fns.
-- [ ] Update `apply::run` to instantiate/dispatch to `EnsureSymlinkExec` for `Action::EnsureSymlink`.
-- [ ] Add fluent helpers to `logging/audit.rs::EventBuilder` (e.g., `.perf(..)`, `.error(..)`, `.exit_code(..)`) and replace ad-hoc field merges where possible.
-- [ ] Keep `swap::replace_file_with_symlink` semantics unchanged; preserve error-id mapping and degraded flags.
-- [ ] Optionally add a temporary `#[allow(clippy::too_many_lines)]` while landing the trait.
+- [ ] Create module layout for executors
+  - [ ] Add `src/api/apply/executors/mod.rs` with the trait and re-exports.
+  - [ ] Define trait:
 
-## Implementation TODOs (fallback: helper split only)
+    ```rust
+    pub(crate) trait ActionExecutor<E: FactsEmitter, A: AuditSink> {
+        fn execute(
+            &self,
+            api: &super::super::Switchyard<E, A>,
+            tctx: &crate::logging::audit::AuditCtx<'_>,
+            pid: &uuid::Uuid,
+            act: &crate::types::Action,
+            idx: usize,
+            dry: bool,
+        ) -> (Option<crate::types::Action>, Option<String>, super::perf::PerfAgg);
+    }
+    ```
 
-- [ ] Create `api/apply/ops.rs` or extend `audit_fields.rs` with the helpers above.
-- [ ] Replace inline JSON construction in `handle_ensure_symlink` with `build_apply_attempt_fields` and `build_apply_result_fields`.
-- [ ] Replace inline hashing section with `compute_symlink_hashes`.
-- [ ] Replace inline EXDEV/generic swap mapping with `map_swap_error`.
-- [ ] Keep call to `swap::replace_file_with_symlink` and error handling semantics identical.
-- [ ] Optionally add a targeted `#[allow(clippy::too_many_lines, reason = "orchestrator; split into helpers")]` as a temporary gate if needed.
+- [ ] Implement `EnsureSymlinkExec` in `src/api/apply/executors/ensure_symlink.rs`
+  - [ ] Factor tiny private helpers inside this file:
+    - [ ] `compute_hashes(source: &SafePath, target: &SafePath) -> (String, String, u64)`
+    - [ ] `map_swap_error(e: &std::io::Error) -> ErrorId` (preserve EXDEV vs swap mapping)
+    - [ ] `after_kind(dry, target) -> String` uses `kind_of()` when non-dry
+  - [ ] Emit attempt/result via `StageLogger` with fluent helpers (see below).
+  - [ ] Call `crate::fs::swap::replace_file_with_symlink` exactly as today; propagate `(degraded_used, fsync_ms)` and timing into `PerfAgg`.
+- [ ] Wire dispatch in `src/api/apply/mod.rs::run`
+  - [ ] Replace direct call to `handlers::handle_ensure_symlink` with executor dispatch:
+
+    ```rust
+    match act {
+        Action::EnsureSymlink { .. } => {
+            let exec = executors::EnsureSymlinkExec;
+            exec.execute(api, &tctx, &pid, act, idx, dry)
+        }
+        // ...
+    }
+    ```
+
+  - [ ] Ensure perf aggregation and error collection remain unchanged.
+- [ ] Add StageLogger fluent helpers in `src/logging/audit.rs`
+  - [ ] Methods on `EventBuilder`:
+    - [ ] `fn perf(self, hash_ms: u64, backup_ms: u64, swap_ms: u64) -> Self`
+    - [ ] `fn error_id(self, id: ErrorId) -> Self`
+    - [ ] `fn exit_code_for(self, id: ErrorId) -> Self`
+    - [ ] `fn action_id(self, aid: impl Into<String>) -> Self` (wrapper over existing `.action()` if desired)
+  - [ ] Replace ad-hoc `.merge(json!({...}))` sites in the new executor with these helpers to reduce lines.
+- [ ] Delete or deprecate `handle_ensure_symlink`
+  - [ ] Keep a thin wrapper temporarily that calls the executor to minimize churn; remove after all call sites use the executor.
+- [ ] Telemetry invariants (document and assert during review)
+  - [ ] `apply.attempt` and `apply.result` must retain all fields and values (including `degraded`/`degraded_reason`, `before_kind`/`after_kind`, `backup_durable`).
+  - [ ] Hash fields and `hash_alg` unchanged; `maybe_warn_fsync` semantics preserved.
+  - [ ] Error-id mapping and `exit_code` values identical.
+- [ ] Tests
+  - [ ] Unit-test `map_swap_error` with EXDEV and non-EXDEV paths.
+  - [ ] Integration test a plan with `EnsureSymlink` to confirm no-op on identical symlink and success path telemetry.
+  - [ ] Run `cargo clippy -p switchyard` to confirm the function no longer triggers `too_many_lines`.
 
 ## Acceptance criteria
 

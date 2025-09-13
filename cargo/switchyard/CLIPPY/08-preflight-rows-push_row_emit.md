@@ -60,26 +60,21 @@ Source: `cargo/switchyard/src/api/preflight/rows.rs`
   - Accepts `PreflightRowArgs` + `Kind` inputs to avoid argument sprawl.
 - This consolidates both the row JSON construction and event emission logic and prevents drift.
 
-### Updated Implementation TODOs (preferred)
-
-- [ ] Define `Kind` enum and its mapping.
-- [ ] Implement `RowEmitter` with `emit_row(args: &PreflightRowArgs)` that pushes row and logs the event.
-- [ ] Refactor `push_row_emit` to a thin wrapper or deprecate it in favor of `RowEmitter` usage at call sites.
-- [ ] Update `preflight/mod.rs` to construct `PreflightRowArgs` and call `RowEmitter`.
-
-## Implementation TODOs (fallback: interface change only)
-
-- [ ] Define `PreflightRowArgs` near `push_row_emit` (same file/mod) and derive `Default` where sensible.
-- [ ] Update `preflight/mod.rs` call sites to construct and pass `PreflightRowArgs`.
-- [ ] Keep emitted facts and row contents identical.
-- [ ] Optionally add `#[allow(clippy::too_many_arguments)]` temporarily while landing changes.
+### Implementation plan (preferred, granular)
+- [ ] Define `Kind` enum and its mapping (serde + Display) to match existing string values ("file", "symlink", "none", "unknown", "restore_from_backup").
+- [ ] Introduce `PreflightRowArgs` as a typed struct with builder-style setters where needed; derive `Default` when possible.
+- [ ] Implement `RowEmitter` with method `emit_row(args: &PreflightRowArgs, kind_current: Kind, kind_planned: Kind)` that:
+  - [ ] Builds and pushes `PreflightRow` into `rows`.
+  - [ ] Emits `StageLogger` event with fields `current_kind`, `planned_kind`, `path`, and optional fields (`policy_ok`, `provenance`, `notes`, `preservation`, `preservation_supported`, `backup_tag`).
+  - [ ] Uses StageLogger fluent helpers where available.
+- [ ] Refactor `push_row_emit` to a thin wrapper or deprecate it in favor of `RowEmitter` calls from `preflight/mod.rs`.
+- [ ] Update `preflight/mod.rs` to construct `PreflightRowArgs` and call `RowEmitter` for both symlink and restore actions.
 
 ## Acceptance criteria
 
-- [ ] Argument count ≤ 7; warning resolved.
-- [ ] No changes in emitted row fields or order.
-- [ ] Tests remain green.
+- [ ] Argument count reduced; original too_many_arguments warning resolved.
+- [ ] Row contents and fact shapes unchanged; stable order preserved.
 
 ## Test & verification notes
 
-- Run preflight and compare rows/facts before/after.
+- [ ] Run preflight on plans containing both action kinds; diff resulting rows and facts before/after.
