@@ -1,7 +1,19 @@
 // Facade for API module; delegates to submodules under src/api/
+//! API facade and orchestrators.
+//!
+//! Construct using the builder:
+//!
+//! ```rust
+//! use switchyard::api::Switchyard;
+//! use switchyard::logging::JsonlSink;
+//! use switchyard::policy::Policy;
+//!
+//! let facts = JsonlSink::default();
+//! let audit = JsonlSink::default();
+//! let _api = Switchyard::builder(facts, audit, Policy::default()).build();
+//! ```
 
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
-use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 use crate::logging::{AuditSink, FactsEmitter, StageLogger};
 use serde_json::json;
 use uuid::Uuid;
@@ -15,6 +27,9 @@ mod builder;
 mod plan;
 mod preflight;
 mod rollback;
+pub use builder::ApiBuilder;
+/// DX alias for `ApiBuilder`.
+pub type SwitchyardBuilder<E, A> = ApiBuilder<E, A>;
 
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
@@ -28,39 +43,44 @@ pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
 }
 
 impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
+    /// Construct a `Switchyard` with defaults. This function delegates to the builder.
+    ///
+    /// This delegates to `ApiBuilder::new(facts, audit, policy).build()` to
+    /// avoid duplicating initialization logic.
     pub fn new(facts: E, audit: A, policy: Policy) -> Self {
-        Self {
-            facts,
-            audit,
-            policy,
-            lock: None,
-            owner: None,
-            attest: None,
-            smoke: None,
-            lock_timeout_ms: DEFAULT_LOCK_TIMEOUT_MS,
-        }
+        ApiBuilder::new(facts, audit, policy).build()
     }
 
+    /// Entrypoint for constructing via the builder (default construction path).
+    pub fn builder(facts: E, audit: A, policy: Policy) -> ApiBuilder<E, A> {
+        ApiBuilder::new(facts, audit, policy)
+    }
+
+    /// Configure via `ApiBuilder::with_lock_manager`.
     pub fn with_lock_manager(mut self, lock: Box<dyn LockManager>) -> Self {
         self.lock = Some(lock);
         self
     }
 
+    /// Configure via `ApiBuilder::with_ownership_oracle`.
     pub fn with_ownership_oracle(mut self, owner: Box<dyn OwnershipOracle>) -> Self {
         self.owner = Some(owner);
         self
     }
 
+    /// Configure via `ApiBuilder::with_attestor`.
     pub fn with_attestor(mut self, attest: Box<dyn Attestor>) -> Self {
         self.attest = Some(attest);
         self
     }
 
+    /// Configure via `ApiBuilder::with_smoke_runner`.
     pub fn with_smoke_runner(mut self, smoke: Box<dyn SmokeTestRunner>) -> Self {
         self.smoke = Some(smoke);
         self
     }
 
+    /// Configure via `ApiBuilder::with_lock_timeout_ms`.
     pub fn with_lock_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.lock_timeout_ms = timeout_ms;
         self

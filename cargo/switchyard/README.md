@@ -56,19 +56,21 @@ switchyard = { path = "./cargo/switchyard" }
 ### Minimal Example
 
 ```rust
-use switchyard::{Switchyard, logging::JsonlSink, policy::Policy};
+use switchyard::api::{ApiBuilder, Switchyard};
+use switchyard::logging::JsonlSink;
+use switchyard::policy::Policy;
 use switchyard::types::{PlanInput, LinkRequest, SafePath, ApplyMode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Facts sink and audit sink; replace with your own emitters
+    // Provide your emitters
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();
-
-    // Start from defaults for a minimal example
     let policy = Policy::default();
 
-    let api = Switchyard::new(facts.clone(), audit, policy)
-        .with_lock_timeout_ms(500);
+    // Construct using the builder (or use Switchyard::builder(...))
+    let api: Switchyard<_, _> = ApiBuilder::new(facts.clone(), audit, policy)
+        .with_lock_timeout_ms(500)
+        .build();
 
     // All mutating paths must be SafePath rooted under a directory you control
     let td = tempfile::tempdir()?;
@@ -83,14 +85,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let plan = api.plan(PlanInput { link: vec![LinkRequest { source, target }], restore: vec![] });
 
-    // Preflight applies policy gating (mount rw/exec, ownership, preservation, rescue, etc.)
     let preflight = api.preflight(&plan)?;
     if !preflight.ok {
         eprintln!("Preflight failed: {:?}", preflight.stops);
         std::process::exit(10);
     }
 
-    // Apply in Commit mode; in DryRun mode timestamps are zeroed for determinism
     let report = api.apply(&plan, ApplyMode::Commit)?;
     println!(
         "Apply decision: {}",
@@ -98,6 +98,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     Ok(())
 }
+```
+
+Alternate entrypoint:
+
+```rust
+use switchyard::api::Switchyard;
+use switchyard::logging::JsonlSink;
+use switchyard::policy::Policy;
+
+let facts = JsonlSink::default();
+let audit = JsonlSink::default();
+let policy = Policy::default();
+let api = Switchyard::builder(facts, audit, policy)
+    .with_lock_timeout_ms(500)
+    .build();
 ```
 
 ---
@@ -182,6 +197,24 @@ See `docs/testing/TESTING_POLICY.md` for project-wide rules (zero SKIPs, harness
 
 ## Integration Notes
 
+### Construction options
+
+- Construct via `ApiBuilder` or `Switchyard::builder`:
+  - `with_lock_manager(Box<dyn LockManager>)`
+  - `with_ownership_oracle(Box<dyn OwnershipOracle>)`
+  - `with_attestor(Box<dyn Attestor>)`
+  - `with_smoke_runner(Box<dyn SmokeTestRunner>)`
+  - `with_lock_timeout_ms(u64)`
+
+- `Switchyard::new(facts, audit, policy)` remains available for compatibility and delegates to the builder internally.
+
+### Naming conventions
+
+- Facts/Audit sinks: `facts`, `audit`
+- Policy: `policy`
+- API instance: `api`
+- Builder variable (if kept): `builder`
+
 - **Emitters**: Provide your own `FactsEmitter` and `AuditSink` implementations to integrate with your logging/telemetry stack. `JsonlSink` is bundled for development/testing.
 - **Adapters**: Implement or wire in `OwnershipOracle`, `LockManager`, `PathResolver`, `Attestor`, and `SmokeTestRunner` as needed.
 - **Policy**: Start from `Policy::default()` or a preset (`Policy::production_preset()`, `Policy::coreutils_switch_preset()`). Key knobs are grouped:
@@ -195,22 +228,27 @@ See `docs/testing/TESTING_POLICY.md` for project-wide rules (zero SKIPs, harness
 
 ---
 
-## Production Policy Preset
+## Production Policy Preset (with builder)
 
 Use the hardened preset and wire required adapters. Adjust EXDEV behavior per environment.
 
 ```rust
+use switchyard::api::ApiBuilder;
 use switchyard::policy::{Policy, types::ExdevPolicy};
 use switchyard::adapters::{FileLockManager, DefaultSmokeRunner};
+use switchyard::logging::JsonlSink;
 use std::path::PathBuf;
 
+let facts = JsonlSink::default();
+let audit = JsonlSink::default();
+
 let mut policy = Policy::production_preset();
-// Optional depending on environment: allow cross‑FS degraded fallback with telemetry
 policy.apply.exdev = ExdevPolicy::DegradedFallback;
 
-let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+let api = ApiBuilder::new(facts.clone(), audit, policy)
     .with_lock_manager(Box::new(FileLockManager::new(PathBuf::from("/var/lock/switchyard.lock"))))
-    .with_smoke_runner(Box::new(DefaultSmokeRunner::default()));
+    .with_smoke_runner(Box::new(DefaultSmokeRunner::default()))
+    .build();
 ```
 
 This preset ensures:

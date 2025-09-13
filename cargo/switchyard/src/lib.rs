@@ -7,6 +7,16 @@
 //! - All mutations follow a TOCTOU-safe sequence using directory handles (open parent O_DIRECTORY|O_NOFOLLOW → *at on final component → renameat → fsync(parent)).
 //! - Public mutating APIs operate on `SafePath` only; internal FS code uses capability-style directory handles.
 //! - This crate forbids `unsafe` and uses `rustix` for syscalls.
+//!
+//! Quickstart (builder is the default way to construct the API):
+//! ```rust
+//! use switchyard::api::Switchyard;
+//! use switchyard::logging::JsonlSink;
+//! use switchyard::policy::Policy;
+//! let facts = JsonlSink::default();
+//! let audit = JsonlSink::default();
+//! let _api = Switchyard::builder(facts, audit, Policy::default()).build();
+//! ```
 
 pub mod adapters;
 pub mod api;
