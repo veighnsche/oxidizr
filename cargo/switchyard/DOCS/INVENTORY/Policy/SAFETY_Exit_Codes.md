@@ -7,6 +7,12 @@
 
 Stable `error_id` → `exit_code` mapping for core failure classes, aligned with SPEC. Emitted in facts where applicable.
 
+## Behaviors
+
+- Maps `ErrorId` to a stable numeric `exit_code` for process-level failures.
+- Attaches `error_id` and `exit_code` to facts on failures in preflight/apply.
+- Provides a best-effort summary error chain for apply-stage failures.
+
 ## Implementation
 
 - `cargo/switchyard/src/api/errors.rs` defines `ErrorId`, `id_str()`, `exit_code_for()`, and `infer_summary_error_ids()`.

@@ -7,6 +7,13 @@
 
 Post-apply health verification via `SmokeTestRunner`. Failures map to `E_SMOKE` and trigger auto-rollback unless disabled by policy.
 
+## Behaviors
+
+- Executes configured `SmokeTestRunner` after successful apply in Commit mode.
+- On smoke failure, maps to `E_SMOKE` and attempts rollback of executed actions unless disabled by policy.
+- Emits failure classification in summary facts; includes rollback step events.
+- When no runner present but required by policy, records an error and attempts rollback accordingly.
+
 ## Implementation
 
 - Adapter: `cargo/switchyard/src/adapters/smoke.rs::{SmokeTestRunner, DefaultSmokeRunner}`.

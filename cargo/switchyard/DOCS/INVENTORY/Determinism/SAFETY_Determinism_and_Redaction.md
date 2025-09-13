@@ -7,6 +7,13 @@
 
 Deterministic IDs and ordering with stable timestamps in DryRun, plus redaction of volatile fields to enable golden tests and reproducible logs.
 
+## Behaviors
+
+- Generates stable `plan_id`/`action_id` using UUIDv5 from content and a fixed namespace.
+- Sorts preflight rows deterministically (e.g., by path and action_id) before export.
+- In DryRun, timestamps are zeroed via `TS_ZERO` and volatile fields are redacted.
+- Ensures facts emitted from all stages go through redaction-aware helpers.
+
 ## Implementation
 
 - IDs: `cargo/switchyard/src/types/ids.rs::{plan_id, action_id}` with UUIDv5 under namespace `constants::NS_TAG`.

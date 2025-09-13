@@ -7,6 +7,15 @@
 
 Performs symlink replacement using a TOCTOU-safe sequence with directory handles: `open parent O_DIRECTORY|O_NOFOLLOW → symlinkat(tmp) → renameat(tmp→final) → fsync(parent)`.
 
+## Behaviors
+
+- Opens parent directory with `O_DIRECTORY|O_NOFOLLOW` and operates via dirfd to avoid TOCTOU.
+- Creates a temporary symlink name and atomically renames it into place.
+- Fsyncs the parent directory to persist metadata and directory entry changes.
+- Cleans up temporary names best-effort without failing the operation.
+- When `EXDEV` occurs and `allow_degraded_fs=true`, falls back to unlink + `symlinkat` (records `degraded=true`).
+- Emits perf fields (`swap_ms`) and flags (`degraded`) in `apply.result`.
+
 ## Implementation
 
 - Core atom: `cargo/switchyard/src/fs/atomic.rs::atomic_symlink_swap()` and helpers (`open_dir_nofollow`, `fsync_parent_dir`).

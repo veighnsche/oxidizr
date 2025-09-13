@@ -11,6 +11,13 @@
 
 Enforce strict ownership policy and record provenance (uid/gid/pkg where available) for targets. Used to reduce risk of hijacking and ensure controlled sources.
 
+## Behaviors
+
+- Queries filesystem metadata for uid/gid and (optionally) package provenance via an injected oracle.
+- Attaches provenance fields to preflight rows for operator visibility.
+- Enforces `strict_ownership` by adding STOPs when provenance does not meet policy.
+- Leaves behavior advisory when no oracle is configured (best-effort enrichment only).
+
 ## Implementation
 
 - Adapter: `cargo/switchyard/src/adapters/ownership/fs.rs::{FsOwnershipOracle, OwnershipOracle}` provides uid/gid via filesystem metadata.

@@ -7,6 +7,13 @@
 
 Ensures targets reside on mounts that are writable and executable before mutations proceed.
 
+## Behaviors
+
+- Parses `/proc/self/mounts` via `ProcStatfsInspector` to collect mount flags.
+- Verifies the target and any policy-provided extra roots are on mounts with `rw` and `exec`.
+- On ambiguity or parsing errors, fails closed (treats as not rw+exec) to avoid unsafe mutations.
+- Used by preflight to produce STOP/notes and by gating to enforce in Commit.
+
 ## Implementation
 
 - Mount inspector and helper: `cargo/switchyard/src/fs/mount.rs::{MountInspector, ProcStatfsInspector, ensure_rw_exec}`.

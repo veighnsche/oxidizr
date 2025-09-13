@@ -7,6 +7,13 @@
 
 Central helpers emit stage facts with a stable envelope (schema_version, ts, plan_id, path, dry_run) to a `FactsEmitter`. Redaction applied as configured.
 
+## Behaviors
+
+- Emits `apply.attempt`, `apply.result`, per-action results, and rollback step/summary events.
+- Attaches envelope fields and stage-specific extras (perf, lock info, error IDs).
+- Applies redaction policy in DryRun (e.g., timestamps zeroed, volatile fields masked).
+- Sends structured events to configured sinks (in-memory test emitter, JSONL sinks).
+
 ## Implementation
 
 - Core: `cargo/switchyard/src/logging/audit.rs` (`AuditCtx`, `emit_*` helpers).

@@ -7,6 +7,12 @@
 
 Extensible adapter traits for locking, ownership, smoke tests, and attestation allow integrators to plug in environment-specific behaviors.
 
+## Behaviors
+
+- Exposes `with_*` builder methods on `Switchyard` to inject adapters (lock, ownership, smoke, attest, path).
+- Provides minimal default implementations where practical (e.g., file-backed lock, default smoke runner).
+- Defers environment-specific behaviors to integrator-supplied adapters.
+
 ## Implementation
 
 - Traits:

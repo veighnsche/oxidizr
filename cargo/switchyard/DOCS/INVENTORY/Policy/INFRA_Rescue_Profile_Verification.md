@@ -7,6 +7,13 @@
 
 Verifies that a minimal rescue toolset (BusyBox or GNU subset) exists on PATH. Policy can require rescue; preflight and apply honor it.
 
+## Behaviors
+
+- Scans PATH for presence of required rescue tools (BusyBox or configured subset).
+- Applies `rescue_min_count` threshold and `rescue_exec_check` strategy.
+- Records `rescue_profile` in preflight summary; adds STOP when `require_rescue=true` and unavailable.
+- Honors environment override in tests to simulate presence/absence.
+
 ## Implementation
 
 - `cargo/switchyard/src/policy/rescue.rs` provides `verify_rescue_tools_with_exec_min()`; environment override for tests.

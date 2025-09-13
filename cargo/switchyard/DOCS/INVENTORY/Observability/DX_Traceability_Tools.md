@@ -11,6 +11,13 @@
 
 Documentation tooling to map requirements → implementations → tests for better reviewability and compliance.
 
+## Behaviors
+
+- Parses SPEC requirements and links them to code references and tests.
+- Produces a human-readable traceability report.
+- Highlights gaps where requirements lack code or tests.
+- Intended for maintainers; not enforced at runtime.
+
 ## Implementation
 
 - Tooling: `cargo/switchyard/SPEC/tools/traceability.py` and `SPEC/traceability.md`.

@@ -11,6 +11,13 @@
 
 Probe filesystem support for preservation dimensions (owner, mode, timestamps, xattrs, ACLs, capabilities) and record both the desired preservation and what is supported.
 
+## Behaviors
+
+- Probes platform/filesystem to detect if preservation dimensions are supported.
+- Populates `preservation` (desired) and `preservation_supported` (detected) in preflight rows.
+- Feeds policy gating when strict preservation is required.
+- Exposed via YAML exporter for operator visibility.
+
 ## Implementation
 
 - Probe: `cargo/switchyard/src/fs/meta.rs::detect_preservation_capabilities()` — best-effort detection of supported preservation features.

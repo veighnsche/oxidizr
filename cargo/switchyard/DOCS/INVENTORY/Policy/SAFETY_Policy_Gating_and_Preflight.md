@@ -7,6 +7,13 @@
 
 Preflight computes per-action policy status and emits facts. Apply refuses Commit when policy gates fail unless `override_preflight=true`.
 
+## Behaviors
+
+- Builds per-action preflight rows (preservation, ownership, suid/sgid, hardlinks, mounts, immutability).
+- Computes STOPs vs notes based on policy and observed state.
+- Emits a preflight summary and per-action entries for observability.
+- Blocks `apply` in Commit on STOPs unless `override_preflight=true`.
+
 ## Implementation
 
 - Orchestrator: `cargo/switchyard/src/api/preflight/mod.rs` builds rows, detects preservation, ownership, suid/sgid, hardlink hazards, mount rw+exec, immutability.

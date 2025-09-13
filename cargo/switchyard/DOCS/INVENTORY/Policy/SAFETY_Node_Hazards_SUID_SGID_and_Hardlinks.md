@@ -11,6 +11,13 @@
 
 Detect and gate on node hazards including SUID/SGID permission bits and multi-link (hardlink) targets. Policy toggles allow operators to permit certain hazards with explicit acknowledgment.
 
+## Behaviors
+
+- Detects SUID/SGID bits on symlink-resolved targets best-effort.
+- Detects multi-link (hardlink) hazards via `nlink > 1` for regular files.
+- Adds preflight STOPs when hazards are found and the policy forbids them.
+- Adds notes when hazards are allowed by policy; advisory when detection inconclusive.
+
 ## Implementation
 
 - Checks: `cargo/switchyard/src/preflight/checks.rs::{check_suid_sgid_risk, check_hardlink_hazard}`

@@ -7,6 +7,13 @@
 
 Prunes older backups and sidecars by count and age, preserving the newest. Emits facts via API wrapper.
 
+## Behaviors
+
+- Scans for backup artifacts matching the tag/pattern for a target.
+- Selects deletion set by applying count and age limits while preserving the newest.
+- Deletes chosen backups and sidecars; fsyncs parent directory best-effort.
+- Emits `prune.result` facts including `backup_tag`, retention knobs, and counts.
+
 ## Implementation
 
 - Engine: `cargo/switchyard/src/fs/backup.rs::prune_backups()` selects deletion set; fsyncs parent.

@@ -11,6 +11,12 @@
 
 Define and observe operational bounds (e.g., fsync warn thresholds, hashing/swap/backup duration tracking) to aid SLOs and tuning.
 
+## Behaviors
+
+- Tracks per-action perf times (hash, backup, swap) and aggregates for summary.
+- Emits `perf.*` fields in `apply.result` summary for observability.
+- Warn-level logging may be emitted when fsync exceeds `FSYNC_WARN_MS` (implementation-specific).
+
 ## Implementation
 
 - Constants: `cargo/switchyard/src/constants.rs::FSYNC_WARN_MS` (warn threshold for fsync).

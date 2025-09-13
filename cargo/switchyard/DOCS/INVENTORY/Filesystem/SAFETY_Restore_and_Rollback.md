@@ -7,6 +7,14 @@
 
 Restores targets from latest or previous backups using sidecar-guided logic. Apply performs reverse-order rollback on first failure.
 
+## Behaviors
+
+- Reads sidecar metadata to determine prior state and destination.
+- Short-circuits restore when current state already matches prior (idempotence).
+- Verifies `payload_hash` when present; maps failures to appropriate error IDs.
+- On apply failure, attempts reverse-order rollback for executed actions.
+- Emits `rollback.step` events per action and a `rollback.summary` with error classification.
+
 ## Implementation
 
 - Restore engine: `cargo/switchyard/src/fs/restore.rs::{restore_file, restore_file_prev}`

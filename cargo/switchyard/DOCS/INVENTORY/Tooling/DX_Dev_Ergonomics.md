@@ -7,6 +7,13 @@
 
 Crate forbids unsafe code and enables strict clippy lints; modular layout with focused modules; tests cover core atoms.
 
+## Behaviors
+
+- Forbids `unsafe_code` at crate root.
+- Denies `unwrap`/`expect` in non-test code paths.
+- Enables clippy pedantic lints in CI/development to maintain code quality.
+- Encourages modular boundaries and test coverage across core atoms and stages.
+
 ## Implementation
 
 - Root crate flags: `cargo/switchyard/src/lib.rs` sets `#![forbid(unsafe_code)]`, denies unwrap/expect in non-test, enables clippy pedantic.

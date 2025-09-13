@@ -7,6 +7,14 @@
 
 Creates adjacent timestamped backups and sidecars when mutating targets, preserving mode and recording provenance and optional payload hash.
 
+## Behaviors
+
+- Derives backup and sidecar paths using `backup_path_with_tag()` naming convention.
+- Captures current node state (file/symlink/none) and preserves mode/ownership.
+- Writes sidecar v1/v2 with provenance and optional `payload_hash` if hashing enabled.
+- Fsyncs parent directory best-effort to improve durability of backup artifacts.
+- Provides helpers to locate and read sidecars for restore and integrity checks.
+
 ## Implementation
 
 - Backup API: `cargo/switchyard/src/fs/backup.rs`

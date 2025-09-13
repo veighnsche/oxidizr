@@ -7,6 +7,12 @@
 
 Converts `PreflightReport.rows` to a SPEC-aligned YAML sequence for human and CI consumption.
 
+## Behaviors
+
+- Serializes a subset of preflight row fields to YAML in a stable order.
+- Relies on upstream deterministic sorting to ensure golden-friendly output.
+- Intended to be consumed by CLIs and CI jobs; not a public API within this crate.
+
 ## Implementation
 
 - Exporter: `cargo/switchyard/src/preflight/yaml.rs::to_yaml()` preserves key subset and order.

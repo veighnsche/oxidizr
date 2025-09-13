@@ -11,6 +11,12 @@
 
 Validate emitted facts against a JSON Schema to guarantee shape consistency and enable stable goldens.
 
+## Behaviors
+
+- Loads `SPEC/audit_event.schema.json` and validates emitted JSONL facts against it (planned).
+- Fails tests/CI on schema mismatches to prevent drift (planned).
+- Anchors facts to a schema version field for forward migration.
+
 ## Implementation
 
 - Schema: `cargo/switchyard/SPEC/audit_event.schema.json` defines the Minimal Facts v1 envelope and fields.
