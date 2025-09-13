@@ -203,13 +203,13 @@ impl<'a> EventBuilder<'a> {
     }
 
     pub fn emit_success(self) {
-        self.emit(Decision::Success)
+        self.emit(Decision::Success);
     }
     pub fn emit_failure(self) {
-        self.emit(Decision::Failure)
+        self.emit(Decision::Failure);
     }
     pub fn emit_warn(self) {
-        self.emit(Decision::Warn)
+        self.emit(Decision::Warn);
     }
 }
 

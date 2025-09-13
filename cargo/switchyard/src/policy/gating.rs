@@ -13,6 +13,7 @@ pub(crate) struct Evaluation {
 }
 
 /// Evaluate policy gating for a single action.
+#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn evaluate_action(
     policy: &Policy,
     owner: Option<&dyn DebugOwnershipOracle>,

@@ -15,7 +15,8 @@ pub struct FileLockManager {
 }
 
 impl FileLockManager {
-    pub fn new(path: PathBuf) -> Self {
+    #[must_use]
+    pub const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 }
@@ -39,6 +40,7 @@ impl LockManager for FileLockManager {
             .create(true)
             .read(true)
             .write(true)
+            .truncate(true)
             .open(&self.path)
             .map_err(|e| Error {
                 kind: ErrorKind::Io,

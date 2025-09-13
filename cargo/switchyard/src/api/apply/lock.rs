@@ -20,11 +20,13 @@ pub(crate) struct LockInfo {
 
 impl LockInfo {
     #[must_use]
+    #[allow(dead_code, reason = "deferred cleanup")]
     pub(super) const fn with_lock_timeout_ms(self, _timeout_ms: u64) -> Self {
         self
     }
 }
 
+#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     t0: Instant,
@@ -35,7 +37,7 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
     let dry = matches!(mode, ApplyMode::DryRun);
     let mut lock_wait_ms: Option<u64> = None;
     let mut guard: Option<Box<dyn crate::adapters::lock::LockGuard>> = None;
-    let lock_backend = lock_backend_label(api.lock.as_ref());
+    let lock_backend = lock_backend_label(api.lock.as_deref());
 
     if let Some(mgr) = &api.lock {
         let lt0 = Instant::now();

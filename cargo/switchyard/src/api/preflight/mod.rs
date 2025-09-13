@@ -19,6 +19,7 @@ use crate::logging::audit::{AuditCtx, AuditMode};
 use crate::policy::gating;
 mod rows;
 
+#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,

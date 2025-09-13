@@ -1,4 +1,6 @@
 use serde_json::json;
+use std::io::ErrorKind;
+use std::time::Instant;
 use uuid::Uuid;
 
 use crate::constants::FSYNC_WARN_MS;
@@ -12,10 +14,10 @@ use crate::api::errors::{exit_code_for, id_str, ErrorId};
 use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
 use crate::logging::audit::{ensure_provenance, AuditCtx};
 use crate::logging::StageLogger;
-use std::time::Instant;
 
-/// Handle an EnsureSymlink action: perform the operation and emit per-action facts.
-/// Returns (executed_action_if_success, error_message_if_failure).
+/// Handle an `EnsureSymlink` action: perform the operation and emit per-action facts.
+/// Returns (`executed_action_if_success`, `error_message_if_failure`).
+#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     tctx: &AuditCtx<'_>,
@@ -25,18 +27,21 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     dry: bool,
     _slog: &StageLogger<'_>,
 ) -> (Option<Action>, Option<String>, PerfAgg) {
-    let (source, target) = match act {
-        Action::EnsureSymlink { source, target } => (source, target),
-        _ => unreachable!("expected EnsureSymlink"),
+    let Action::EnsureSymlink { source, target } = act else {
+        return (
+            None,
+            Some("expected EnsureSymlink".to_string()),
+            PerfAgg::default(),
+        );
     };
 
-    let _aid = action_id(pid, act, idx);
+    let aid = action_id(pid, act, idx);
     // Attempt fact
     {
         let slog = StageLogger::new(tctx);
         slog.apply_attempt()
             .merge(&json!({
-                "action_id": _aid.to_string(),
+                "action_id": aid.to_string(),
                 "path": target.as_path().display().to_string(),
                 "safepath_validation": "success",
                 "backup_durable": api.policy.durability.backup_durability,
@@ -54,10 +59,10 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         None => sha256_hex_of(&target.as_path()),
     };
     let after_hash = sha256_hex_of(&source.as_path());
-    let hash_ms = th0.elapsed().as_millis() as u64;
+    let hash_ms = u64::try_from(th0.elapsed().as_millis()).unwrap_or(u64::MAX);
     match crate::fs::swap::replace_file_with_symlink(
-        &source,
-        &target,
+        source,
+        target,
         dry,
         matches!(
             api.policy.apply.exdev,
@@ -88,7 +93,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             );
             // Emit result with failure now
             let mut extra = json!({
-                "action_id": _aid.to_string(),
+                "action_id": aid.to_string(),
                 "path": target.as_path().display().to_string(),
                 // On failure explicitly record degraded=false and reason when EXDEV
                 "degraded": Some(false),
@@ -99,10 +104,11 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
                 "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
             });
             ensure_provenance(&mut extra);
-            insert_hashes(&mut extra, &before_hash, &after_hash);
-            let obj = extra.as_object_mut().unwrap();
-            obj.insert("error_id".to_string(), json!(id_str(id)));
-            obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
+            insert_hashes(&mut extra, before_hash.as_ref(), after_hash.as_ref());
+            if let Some(obj) = extra.as_object_mut() {
+                obj.insert("error_id".to_string(), json!(id_str(id)));
+                obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
+            }
             StageLogger::new(tctx)
                 .apply_result()
                 .merge(&extra)
@@ -111,9 +117,9 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
                 None,
                 Some(msg),
                 PerfAgg {
-                    hash_ms,
-                    backup_ms: 0,
-                    swap_ms: fsync_ms,
+                    hash: hash_ms,
+                    backup: 0,
+                    swap: fsync_ms,
                 },
             );
         }
@@ -121,7 +127,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
 
     // Success path: emit result
     let mut extra = json!({
-        "action_id": _aid.to_string(),
+        "action_id": aid.to_string(),
         "path": target.as_path().display().to_string(),
         "degraded": if degraded_used { Some(true) } else { None },
         "degraded_reason": if degraded_used { Some("exdev_fallback") } else { None },
@@ -131,7 +137,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         "backup_durable": api.policy.durability.backup_durability,
     });
     ensure_provenance(&mut extra);
-    insert_hashes(&mut extra, &before_hash, &after_hash);
+    insert_hashes(&mut extra, before_hash.as_ref(), after_hash.as_ref());
     maybe_warn_fsync(&mut extra, fsync_ms, FSYNC_WARN_MS);
     StageLogger::new(tctx)
         .apply_result()
@@ -142,15 +148,16 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         Some(act.clone()),
         None,
         PerfAgg {
-            hash_ms,
-            backup_ms: 0,
-            swap_ms: fsync_ms,
+            hash: hash_ms,
+            backup: 0,
+            swap: fsync_ms,
         },
     )
 }
 
-/// Handle a RestoreFromBackup action: perform restore and emit per-action facts.
-/// Returns (executed_action_if_success, error_message_if_failure).
+/// Handle a `RestoreFromBackup` action: perform restore and emit per-action facts.
+/// Returns (`executed_action_if_success`, `error_message_if_failure`).
+#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     tctx: &AuditCtx<'_>,
@@ -160,16 +167,19 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     dry: bool,
     _slog: &StageLogger<'_>,
 ) -> (Option<Action>, Option<String>, PerfAgg) {
-    let target = match act {
-        Action::RestoreFromBackup { target } => target,
-        _ => unreachable!("expected RestoreFromBackup"),
+    let Action::RestoreFromBackup { target } = act else {
+        return (
+            None,
+            Some("expected RestoreFromBackup".to_string()),
+            PerfAgg::default(),
+        );
     };
-    let _aid = action_id(pid, act, idx);
+    let aid = action_id(pid, act, idx);
 
     StageLogger::new(tctx)
         .apply_attempt()
         .merge(&json!({
-            "action_id": _aid.to_string(),
+            "action_id": aid.to_string(),
             "path": target.as_path().display().to_string(),
             "safepath_validation": "success",
             "backup_durable": api.policy.durability.backup_durability,
@@ -182,7 +192,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     if !dry && api.policy.apply.capture_restore_snapshot {
         let tb0 = Instant::now();
         let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
-        backup_ms = tb0.elapsed().as_millis() as u64;
+        backup_ms = u64::try_from(tb0.elapsed().as_millis()).unwrap_or(u64::MAX);
         used_prev = true;
     }
     let force = api.policy.apply.best_effort_restore || !api.policy.durability.sidecar_integrity;
@@ -209,12 +219,12 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             None
         }
     })();
-    let hash_ms = th0.elapsed().as_millis() as u64;
+    let hash_ms = u64::try_from(th0.elapsed().as_millis()).unwrap_or(u64::MAX);
 
     let restore_res = if used_prev {
-        crate::fs::restore::restore_file_prev(&target, dry, force, &api.policy.backup.tag)
+        crate::fs::restore::restore_file_prev(target, dry, force, &api.policy.backup.tag)
     } else {
-        crate::fs::restore::restore_file(&target, dry, force, &api.policy.backup.tag)
+        crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag)
     };
     match restore_res {
         Ok(()) => {
@@ -224,13 +234,13 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             // If we tried previous and it was NotFound (no previous), fall back to latest
             if used_prev && e.kind() == ErrorKind::NotFound {
                 if let Err(e2) =
-                    crate::fs::restore::restore_file(&target, dry, force, &api.policy.backup.tag)
+                    crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag)
                 {
                     e = e2;
                 } else {
                     // success on fallback
                     let mut extra = json!({
-                        "action_id": _aid.to_string(),
+                        "action_id": aid.to_string(),
                         "path": target.as_path().display().to_string(),
                         "before_kind": before_kind,
                         "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
@@ -249,21 +259,58 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                         Some(act.clone()),
                         None,
                         PerfAgg {
-                            hash_ms,
-                            backup_ms,
-                            swap_ms: 0,
+                            hash: hash_ms,
+                            backup: backup_ms,
+                            swap: 0,
                         },
                     );
                 }
             }
-            use std::io::ErrorKind;
             let id = match e.kind() {
                 ErrorKind::NotFound => ErrorId::E_BACKUP_MISSING,
-                _ => ErrorId::E_RESTORE_FAILED,
+                ErrorKind::PermissionDenied
+                | ErrorKind::ConnectionRefused
+                | ErrorKind::ConnectionReset
+                | ErrorKind::HostUnreachable
+                | ErrorKind::NetworkUnreachable
+                | ErrorKind::ConnectionAborted
+                | ErrorKind::NotConnected
+                | ErrorKind::AddrInUse
+                | ErrorKind::AddrNotAvailable
+                | ErrorKind::NetworkDown
+                | ErrorKind::BrokenPipe
+                | ErrorKind::AlreadyExists
+                | ErrorKind::WouldBlock
+                | ErrorKind::NotADirectory
+                | ErrorKind::IsADirectory
+                | ErrorKind::DirectoryNotEmpty
+                | ErrorKind::ReadOnlyFilesystem
+                | ErrorKind::StaleNetworkFileHandle
+                | ErrorKind::InvalidInput
+                | ErrorKind::InvalidData
+                | ErrorKind::TimedOut
+                | ErrorKind::WriteZero
+                | ErrorKind::StorageFull
+                | ErrorKind::NotSeekable
+                | ErrorKind::QuotaExceeded
+                | ErrorKind::FileTooLarge
+                | ErrorKind::ResourceBusy
+                | ErrorKind::ExecutableFileBusy
+                | ErrorKind::Deadlock
+                | ErrorKind::CrossesDevices
+                | ErrorKind::TooManyLinks
+                | ErrorKind::InvalidFilename
+                | ErrorKind::ArgumentListTooLong
+                | ErrorKind::Interrupted
+                | ErrorKind::Unsupported
+                | ErrorKind::UnexpectedEof
+                | ErrorKind::OutOfMemory
+                | ErrorKind::Other
+                | _ => ErrorId::E_RESTORE_FAILED,
             };
             let msg = format!("restore {} failed: {}", target.as_path().display(), e);
             let mut extra = json!({
-                "action_id": _aid.to_string(),
+                "action_id": aid.to_string(),
                 "path": target.as_path().display().to_string(),
                 "before_kind": before_kind,
                 "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
@@ -274,9 +321,10 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                 }
             }
             ensure_provenance(&mut extra);
-            let obj = extra.as_object_mut().unwrap();
-            obj.insert("error_id".to_string(), json!(id_str(id)));
-            obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
+            if let Some(obj) = extra.as_object_mut() {
+                obj.insert("error_id".to_string(), json!(id_str(id)));
+                obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
+            }
             StageLogger::new(tctx)
                 .apply_result()
                 .merge(&extra)
@@ -285,9 +333,9 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                 None,
                 Some(msg),
                 PerfAgg {
-                    hash_ms,
-                    backup_ms,
-                    swap_ms: 0,
+                    hash: hash_ms,
+                    backup: backup_ms,
+                    swap: 0,
                 },
             );
         }
@@ -295,7 +343,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
 
     // Success path
     let mut extra = json!({
-        "action_id": _aid.to_string(),
+        "action_id": aid.to_string(),
         "path": target.as_path().display().to_string(),
         "before_kind": before_kind,
         "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
@@ -316,9 +364,9 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         Some(act.clone()),
         None,
         PerfAgg {
-            hash_ms,
-            backup_ms,
-            swap_ms: 0,
+            hash: hash_ms,
+            backup: backup_ms,
+            swap: 0,
         },
     )
 }

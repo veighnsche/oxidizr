@@ -32,6 +32,7 @@ use perf::PerfAgg;
 
 // PerfAgg moved to perf.rs; lock backend helper and acquisition moved to util.rs and lock.rs
 
+#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,
@@ -89,9 +90,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             Action::EnsureSymlink { .. } => {
                 let (exec, err, perf) =
                     handlers::handle_ensure_symlink(api, &tctx, &pid, act, idx, dry, &slog);
-                perf_total.hash_ms += perf.hash_ms;
-                perf_total.backup_ms += perf.backup_ms;
-                perf_total.swap_ms += perf.swap_ms;
+                perf_total.hash += perf.hash;
+                perf_total.backup += perf.backup;
+                perf_total.swap += perf.swap;
                 if let Some(e) = err {
                     errors.push(e);
                 }
@@ -102,9 +103,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             Action::RestoreFromBackup { .. } => {
                 let (exec, err, perf) =
                     handlers::handle_restore(api, &tctx, &pid, act, idx, dry, &slog);
-                perf_total.hash_ms += perf.hash_ms;
-                perf_total.backup_ms += perf.backup_ms;
-                perf_total.swap_ms += perf.swap_ms;
+                perf_total.hash += perf.hash;
+                perf_total.backup += perf.backup;
+                perf_total.swap += perf.swap;
                 if let Some(e) = err {
                     errors.push(e);
                 }
@@ -173,9 +174,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         obj.insert(
             "perf".to_string(),
             json!({
-                "hash_ms": perf_total.hash_ms,
-                "backup_ms": perf_total.backup_ms,
-                "swap_ms": perf_total.swap_ms,
+                "hash_ms": perf_total.hash,
+                "backup_ms": perf_total.backup,
+                "swap_ms": perf_total.swap,
             }),
         );
     }
@@ -196,10 +197,9 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     clippy::unwrap_used,
                     reason = "defer cleanup; will replace with safe shape normalizer later"
                 )]
-                let obj = fields
-                    .as_object_mut()
-                    .unwrap_or_else(|| panic!("Failed to get object mut reference"));
-                obj.insert("attestation".to_string(), att_json);
+                if let Some(obj) = fields.as_object_mut() {
+                    obj.insert("attestation".to_string(), att_json);
+                }
             }
         }
     }

@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Switchyard library crate (monorepo skeleton)"
 license = "Apache-2.0 OR MIT"
+repository = "https://github.com/veighnsche/oxidizr-arch"
+keywords = ["filesystem", "atomic", "swap", "reversible"]
+categories = ["filesystem"]
 
 [lib]
 name = "switchyard"

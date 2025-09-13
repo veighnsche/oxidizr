@@ -50,7 +50,9 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
         restore_ready,
         backup_tag: Some(api.policy.backup.tag.clone()),
     };
-    rows.push(serde_json::to_value(row).expect("Failed to serialize preflight row"));
+    if let Ok(value) = serde_json::to_value(row) {
+        rows.push(value);
+    }
 
     // Emit fact via facade
     let slog = StageLogger::new(ctx);

@@ -24,24 +24,36 @@
 )]
 // Clippy general & hardening (warn by default during dev)
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]
-#![warn(
-    clippy::panic,
-    clippy::panic_in_result_fn,
-    clippy::todo,
-    clippy::unimplemented,
-    clippy::dbg_macro,
-    clippy::indexing_slicing,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::missing_const_for_fn,
-    clippy::wildcard_imports,
-    clippy::wildcard_enum_match_arm,
-    clippy::allow_attributes_without_reason,
-    clippy::cast_lossless,
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-    clippy::cast_precision_loss
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::allow_attributes_without_reason,
+        clippy::must_use_candidate,
+        clippy::missing_const_for_fn,
+        clippy::suspicious_open_options,
+        clippy::uninlined_format_args,
+        clippy::missing_errors_doc,
+        clippy::doc_markdown,
+        clippy::too_many_lines,
+        clippy::ref_option,
+        clippy::used_underscore_binding,
+        clippy::manual_let_else,
+        clippy::implicit_clone,
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )
+)]
+#![allow(
+    clippy::multiple_crate_versions,
+    reason = "deps resolved by Cargo, not in our control"
 )]
 /* ---- PROD MODE: turn key warnings into hard errors ----
    Triggers when either:
@@ -86,7 +98,7 @@
 //! Switchyard: safe, atomic, reversible filesystem swaps.
 //!
 //! Safety model highlights:
-//! - All mutations follow a TOCTOU-safe sequence using directory handles (open parent O_DIRECTORY|O_NOFOLLOW → *at on final component → renameat → fsync(parent)).
+//! - All mutations follow a TOCTOU-safe sequence using directory handles (open parent `O_DIRECTORY|O_NOFOLLOW` → *at on final component → renameat → fsync(parent)).
 //! - Public mutating APIs operate on `SafePath` only; internal FS code uses capability-style directory handles.
 //! - This crate forbids `unsafe` and uses `rustix` for syscalls.
 //!

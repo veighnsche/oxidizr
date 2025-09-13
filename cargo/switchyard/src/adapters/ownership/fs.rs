@@ -15,7 +15,7 @@ impl OwnershipOracle for FsOwnershipOracle {
             use std::os::unix::fs::MetadataExt;
             let md = std::fs::symlink_metadata(path.as_path()).map_err(|e| Error {
                 kind: ErrorKind::Io,
-                msg: format!("metadata: {}", e),
+                msg: format!("metadata: {e}"),
             })?;
             Ok(OwnershipInfo {
                 uid: md.uid(),
