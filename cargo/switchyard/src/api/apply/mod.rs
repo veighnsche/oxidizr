@@ -32,7 +32,6 @@ use perf::PerfAgg;
 
 // PerfAgg moved to perf.rs; lock backend helper and acquisition moved to util.rs and lock.rs
 
-#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,

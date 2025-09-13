@@ -51,7 +51,6 @@ pub fn restore_file_prev(
 /// # Errors
 ///
 /// Returns an IO error if the backup file cannot be restored.
-#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub fn restore_impl(
     target: &SafePath,
     sel: SnapshotSel,

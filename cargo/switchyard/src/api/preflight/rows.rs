@@ -7,10 +7,6 @@ use crate::types::{Action, Plan, PreflightRow};
 use crate::logging::audit::AuditCtx;
 
 /// Helper to push a preflight row into the rows vec and emit the corresponding fact.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Required for preflight row emission with full context"
-)]
 pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     plan: &Plan,

@@ -17,7 +17,6 @@ use crate::logging::StageLogger;
 
 /// Handle an `EnsureSymlink` action: perform the operation and emit per-action facts.
 /// Returns (`executed_action_if_success`, `error_message_if_failure`).
-#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     tctx: &AuditCtx<'_>,
@@ -157,7 +156,6 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
 
 /// Handle a `RestoreFromBackup` action: perform restore and emit per-action facts.
 /// Returns (`executed_action_if_success`, `error_message_if_failure`).
-#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     tctx: &AuditCtx<'_>,

@@ -26,7 +26,6 @@ impl LockInfo {
     }
 }
 
-#[allow(clippy::too_many_lines, reason = "deferred refactoring")]
 pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     t0: Instant,
