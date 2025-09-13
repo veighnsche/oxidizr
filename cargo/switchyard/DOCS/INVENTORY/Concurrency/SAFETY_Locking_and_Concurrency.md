@@ -113,6 +113,7 @@ Test Coverage Map
 - [ ] Security considerations reviewed; redaction masks adequate
 - [ ] Licensing impact considered (deps changed? update licensing inventory)
 - [x] Maturity rating reassessed and justified if changed
+
 ## Gaps and Risks
 
 - Only file-backed lock provided; no per-target granularity.

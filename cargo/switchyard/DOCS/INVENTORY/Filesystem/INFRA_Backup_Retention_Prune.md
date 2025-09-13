@@ -102,6 +102,7 @@ Test Coverage Map
 - [ ] Goldens added/updated and CI gates green
 - [ ] Security considerations reviewed; safe deletion preview available
 - [ ] Licensing impact considered (deps changed? update licensing inventory)
+
 ## Gaps and Risks
 
 - Potential off-by-one in count semantics and age parsing; lack of tests.

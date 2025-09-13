@@ -103,6 +103,7 @@ Test Coverage Map
 | Silver (current) | Dirfd TOCTOU-safe sequence; degraded path policy-gated; perf fields | Fail-closed on policy; recorded degraded; perf tracked | Unit+integration; emit fields validated | Inventory entry | Additive |
 | Gold | Goldens for EXDEV path; failure injection; perf budgets characterized | Deterministic artifact/goldens; budget adherence | Goldens + CI gates | CI gates, perf alerts | Additive |
 | Platinum | Cross-FS robust strategy or verified invariants; platform matrix | Strong guarantees and multi-platform validation | Property/syscall model tests | Continuous compliance | Additive |
+
 ## Gaps and Risks
 
 - Cross-filesystem swap behavior limited to degraded unlink+symlink; no two-phase rename across mounts.

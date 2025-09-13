@@ -78,6 +78,7 @@ Test Coverage Map
 
 - [x] Code citations are accurate (paths and symbol names)
 - [ ] Goldens added/updated and CI gates green
+
 ## Gaps and Risks
 
 - No schema validation; not exercised by a CLI in this repo.

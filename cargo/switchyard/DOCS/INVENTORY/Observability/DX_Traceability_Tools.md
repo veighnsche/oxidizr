@@ -84,6 +84,7 @@ Test Coverage Map
 
 - [x] Code citations are accurate (paths and symbol names)
 - [ ] CI job implemented and green
+
 ## Gaps and Risks
 
 - No CI job enforcing traceability completion.

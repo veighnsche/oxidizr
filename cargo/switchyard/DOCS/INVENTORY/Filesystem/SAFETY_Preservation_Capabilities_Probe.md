@@ -105,6 +105,7 @@ Test Coverage Map
 - [x] Error mapping and `exit_code` coverage verified
 - [x] Emitted facts fields listed and schema version up to date
 - [ ] Goldens added/updated and CI gates green
+
 ## Gaps and Risks
 
 - Probes are best-effort and environment-sensitive; lack of schema validation for these fields.

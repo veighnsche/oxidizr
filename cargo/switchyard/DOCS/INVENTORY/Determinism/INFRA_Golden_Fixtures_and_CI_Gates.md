@@ -98,6 +98,7 @@ Test Coverage Map
 - [ ] Golden set curated and documented
 - [ ] Diff artifact upload wired in CI
 - [x] Maturity rating reassessed and justified if changed
+
 ## Observations log
 
 - <YYYY-MM-DD> — <author> — <note>

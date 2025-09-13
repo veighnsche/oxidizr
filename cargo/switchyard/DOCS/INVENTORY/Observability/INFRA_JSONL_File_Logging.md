@@ -94,6 +94,7 @@ Test Coverage Map
 - [x] Emitted facts fields listed and schema linkage referenced
 - [ ] Tests added for basic append behavior
 - [ ] Rotation/retention plan documented or implemented
+
 ## Gaps and Risks
 
 - Lacks rotation/retention; no concurrency guarantees beyond file append.

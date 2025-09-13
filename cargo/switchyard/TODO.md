@@ -111,6 +111,7 @@ Note: This is not a separate checklist. The sections below are the single consol
 - [ ] Split `src/fs/restore.rs` into `restore/{mod,types,selector,idempotence,integrity,steps,engine}.rs`
 - [ ] Remove any internal re-exports of atoms at `fs/mod.rs`; prefer direct module use
 - Notes: backup split completed with module re-exports; restore split in progress.
+- Progress: created `restore/core.rs` with `restore_internal()` and updated `restore/engine.rs` wrappers (`restore_file`, `restore_file_prev`) to delegate to it. `cargo check -p switchyard` passes. Next: extract `idempotence`, `integrity`, and `steps` into dedicated modules per plan and remove legacy blocks.
 - [ ] Docs (execute end-to-end): `./zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md`
 - Bridging tasks:
   - Extract restore code into `restore/*` modules; wire `engine::restore_impl` behind public fns; update `fs/mod.rs` re‑exports.
