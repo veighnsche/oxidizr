@@ -11,6 +11,13 @@
 
 Optional emission of an attestation bundle after successful apply (non-dry-run), signed by an injected `Attestor` implementation.
 
+## Behaviors
+
+- On successful Commit (not DryRun), constructs a minimal bundle with `plan_id`, executed count, and `rolled_back`.
+- Calls `Attestor::sign()` to produce a signature; does nothing if no attestor is configured.
+- Emits `attestation` fields on `apply.result` summary: `sig_alg`, `signature` (base64), `bundle_hash` (sha256), `public_key_id`.
+- Never fails the apply stage on attestation errors; omission is allowed by design.
+
 ## Implementation
 
 - Trait: `cargo/switchyard/src/adapters/attest.rs::{Attestor, Signature}` provides an interface for signing bundles.

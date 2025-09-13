@@ -7,6 +7,14 @@
 
 Apply enforces a process lock by default in Commit. Missing `LockManager` yields `E_LOCKING` unless policy allows unlocked commits.
 
+## Behaviors
+
+- Attempts to acquire a process-wide lock before apply in Commit mode.
+- Emits `apply.attempt` with `lock_backend`, `lock_wait_ms`, and `lock_attempts`.
+- On lock failure: emits failure facts, maps to `E_LOCKING` (exit 30), and aborts stage.
+- When no manager is configured: fails-closed in Commit unless `allow_unlocked_commit` or `require_lock_manager=false`.
+- In DryRun or allowed policy: emits a warning and proceeds without a lock.
+
 ## Implementation
 
 - Adapter: `cargo/switchyard/src/adapters/lock/file.rs::FileLockManager` (fs2-based advisory file lock, bounded wait with `LOCK_POLL_MS`).

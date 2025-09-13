@@ -7,6 +7,13 @@
 
 `SafePath` ensures mutating APIs operate within a caller-provided root, preventing path traversal and root escape. Aligns with SPEC Reproducible v1.1: “SafePath for all mutating APIs”.
 
+## Behaviors
+
+- Rejects `..` (`ParentDir`) segments and normalizes `.` (`CurDir`).
+- Constrains all mutating operations to a caller-provided root via `SafePath::as_path()`.
+- Preserves a stable relative component with `SafePath::rel()` for observability.
+- Ensures API stages (`plan`, `preflight`, `apply`) and fs atoms accept `SafePath` targets, not raw `Path`.
+
 ## Implementation
 
 - Core type: `cargo/switchyard/src/types/safepath.rs::SafePath`

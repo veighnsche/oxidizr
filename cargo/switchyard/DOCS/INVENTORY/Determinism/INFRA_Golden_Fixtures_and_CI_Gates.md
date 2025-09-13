@@ -11,6 +11,13 @@
 
 Curate deterministic golden artifacts for key scenarios and gate CI on a selected set, uploading diffs on failure.
 
+## Behaviors
+
+- Generates deterministic artifacts in DryRun with redaction and stable IDs.
+- Stores curated golden outputs for representative scenarios.
+- Compares current outputs against goldens in CI; fails gate on mismatch (planned).
+- Uploads diffs for developer triage (planned).
+
 ## Implementation
 
 - Process: `cargo/switchyard/DOCS/GOLDEN_FIXTURES.md` documents golden generation using `GOLDEN_OUT_DIR` and redaction policy.

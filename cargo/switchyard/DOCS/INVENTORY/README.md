@@ -60,38 +60,50 @@ Document and maintain licensing information as a dedicated inventory entry to en
 
 ## Index (Quick Reference)
 
+- API Safety
+  - [SafePath (capability-scoped paths)](API_SAFETY/SAFETY_SafePath.md) — Silver
 
-- Safety
-  - [SafePath (capability-scoped paths)](SAFETY_SafePath.md) — Silver
-  - [Atomic symlink swap (TOCTOU-safe)](SAFETY_Atomic_Symlink_Swap.md) — Silver
-  - [Policy gating and preflight](SAFETY_Policy_Gating_and_Preflight.md) — Silver
-  - [Locking and concurrency](SAFETY_Locking_and_Concurrency.md) — Silver (with adapter)
-  - [Backup and sidecar](SAFETY_Backup_and_Sidecar.md) — Silver
-  - [Restore and rollback](SAFETY_Restore_and_Rollback.md) — Silver
-  - [Determinism and redaction](SAFETY_Determinism_and_Redaction.md) — Silver
-  - [Audit and logging](SAFETY_Audit_and_Logging.md) — Silver
-  - [Exit codes taxonomy](SAFETY_Exit_Codes.md) — Silver
-  - [Ownership and provenance](SAFETY_Ownership_and_Provenance.md) — Silver
-  - [Attestation](SAFETY_Attestation.md) — Bronze
-  - [Facts schema validation](SAFETY_Facts_Schema_Validation.md) — Bronze
-  - [Node hazards: SUID/SGID and hardlinks](SAFETY_Node_Hazards_SUID_SGID_and_Hardlinks.md) — Silver
-  - [Preservation capabilities probe](SAFETY_Preservation_Capabilities_Probe.md) — Silver
+- Filesystem
+  - [Atomic symlink swap (TOCTOU-safe)](Filesystem/SAFETY_Atomic_Symlink_Swap.md) — Silver
+  - [Backup and sidecar](Filesystem/SAFETY_Backup_and_Sidecar.md) — Silver
+  - [Restore and rollback](Filesystem/SAFETY_Restore_and_Rollback.md) — Silver
+  - [Preservation capabilities probe](Filesystem/SAFETY_Preservation_Capabilities_Probe.md) — Silver
+  - [Mount checks (rw+exec)](Filesystem/INFRA_Mount_Checks.md) — Silver
+  - [Backup retention and prune](Filesystem/INFRA_Backup_Retention_Prune.md) — Bronze
 
-- UX / DX
-  - [Preflight YAML exporter](UX_Preflight_YAML.md) — Bronze
-  - [Adapters and extensibility](DX_Adapters_and_Extensibility.md) — Bronze
-  - [Developer ergonomics](DX_Dev_Ergonomics.md) — Silver
-  - [Traceability tools](DX_Traceability_Tools.md) — Bronze
-  - [Best-effort conventions and catalog](DX_Best_Effort_Conventions.md) — Bronze
+- Policy
+  - [Policy gating and preflight](Policy/SAFETY_Policy_Gating_and_Preflight.md) — Silver
+  - [Ownership and provenance](Policy/SAFETY_Ownership_and_Provenance.md) — Silver
+  - [Node hazards: SUID/SGID and hardlinks](Policy/SAFETY_Node_Hazards_SUID_SGID_and_Hardlinks.md) — Silver
+  - [Rescue profile verification](Policy/INFRA_Rescue_Profile_Verification.md) — Silver
+  - [Exit codes taxonomy](Policy/SAFETY_Exit_Codes.md) — Silver
 
-- Infra / Ops
-  - [Rescue profile verification](INFRA_Rescue_Profile_Verification.md) — Silver
-  - [Mount checks (rw+exec)](INFRA_Mount_Checks.md) — Silver
-  - [Backup retention and prune](INFRA_Backup_Retention_Prune.md) — Bronze
-  - [JSONL file logging sink](INFRA_JSONL_File_Logging.md) — Bronze
-  - [Smoke tests and auto-rollback](INFRA_Smoke_Tests_Auto_Rollback.md) — Silver
-  - [Operational bounds](INFRA_Operational_Bounds.md) — Bronze
-  - [Golden fixtures and CI gates](INFRA_Golden_Fixtures_and_CI_Gates.md) — Bronze
+- Concurrency
+  - [Locking and concurrency](Concurrency/SAFETY_Locking_and_Concurrency.md) — Silver (with adapter)
+
+- Determinism
+  - [Determinism and redaction](Determinism/SAFETY_Determinism_and_Redaction.md) — Silver
+  - [Golden fixtures and CI gates](Determinism/INFRA_Golden_Fixtures_and_CI_Gates.md) — Bronze
+
+- Observability
+  - [Audit and logging](Observability/SAFETY_Audit_and_Logging.md) — Silver
+  - [Facts schema validation](Observability/SAFETY_Facts_Schema_Validation.md) — Bronze
+  - [JSONL file logging sink](Observability/INFRA_JSONL_File_Logging.md) — Bronze
+  - [Preflight YAML exporter](Observability/UX_Preflight_YAML.md) — Bronze
+  - [Traceability tools](Observability/DX_Traceability_Tools.md) — Bronze
+
+- Recovery
+  - [Smoke tests and auto-rollback](Recovery/INFRA_Smoke_Tests_Auto_Rollback.md) — Silver
+
+- Attestation
+  - [Attestation](Attestation/SAFETY_Attestation.md) — Bronze
+
+- Tooling
+  - [Adapters and extensibility](Tooling/DX_Adapters_and_Extensibility.md) — Bronze
+  - [Developer ergonomics](Tooling/DX_Dev_Ergonomics.md) — Silver
+
+- Performance
+  - [Operational bounds](Performance/INFRA_Operational_Bounds.md) — Bronze
 
 Conventions:
 
