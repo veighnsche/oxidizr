@@ -1,319 +1,435 @@
-# Switchyard CLIPPY Remediation — Ultimate TODO (Holistic, Minimal-Churn)
+# Switchyard CLIPPY Remediation — Step‑by‑Step Implementation Guide (Verified)
 
 Date: 2025-09-13
-Scope: Consolidate 01–09 plans plus upstream/downstream code review into a single streamlined refactor plan with the fewest moving parts while preserving behavior and telemetry shapes.
-
-## Objective
-
-Bring long functions under Clippy thresholds without mere helper-splitting by introducing a few coherent, shared abstractions that reduce duplication across apply, preflight, policy gating, restore, and logging — while keeping public surfaces and emitted JSON facts byte-for-byte identical per SPEC v1.1.
-
-## Findings from upstream/downstream review
-
-- __Inline JSON assembly causes length and drift__
-  - Files: `src/api/apply/{mod.rs,handlers.rs,lock.rs}`, `src/api/preflight/{mod.rs,rows.rs}`
-  - Root cause: repeated manual `json!` + field merges for perf, error_id, exit_code, attestation.
-  - Remedy: StageLogger `EventBuilder` fluent helpers for perf/error/action simplify emissions and stabilize shape.
-
-- __Handlers blend orchestration + FS ops + telemetry__
-  - Files: `src/api/apply/handlers.rs`
-  - Root cause: per-action branching and telemetry inside monolithic functions.
-  - Remedy: per-action `ActionExecutor` with a thin orchestrator dispatch in `apply::run`.
-
-- __Lock acquisition mixes policy, metrics, facts__
-  - Files: `src/api/apply/lock.rs`
-  - Root cause: lifecycle + failure tri-emission + early report formatting combined.
-  - Remedy: `LockOrchestrator` facade with stable output fields; keep thin wrapper for `acquire(...)` to limit churn.
-
-- __Preflight row construction has argument sprawl__
-  - Files: `src/api/preflight/{mod.rs,rows.rs}`
-  - Root cause: `push_row_emit` 14-arg surface; stringly `current_kind`/`planned_kind`.
-  - Remedy: typed `PreflightRowArgs` + `Kind` enum + `RowEmitter` that both pushes rows and emits facts.
-
-- __Policy gating duplicates checks and strings__
-  - Files: `src/policy/gating.rs`, `src/preflight/checks/`
-  - Root cause: repeated calls and message text mapping per action.
-  - Remedy: small “Checklist” pipeline of typed checks feeding `Evaluation` with preserved wording and order.
-
-- __Restore engine intermixes selection, integrity, execution__
-  - Files: `src/fs/restore/engine.rs`
-  - Root cause: selection + integrity + execution in one function.
-  - Remedy: `RestorePlanner` (plan→execute) returning an enum action for a tiny executor to run.
-
-- __Proc parsing and libc usage leak into reliability surface__
-  - Files: `src/fs/mount.rs`, `src/fs/meta.rs`, `src/logging/audit.rs` (feature `envmeta`)
-  - Root cause: `/proc` string parsing and `unsafe` libc calls.
-  - Remedy: migrate to `rustix::{process,fs::statfs}`; keep public surfaces stable to avoid churn.
-
-## Cross-cutting invariants (must hold)
-
-- __Telemetry shape parity__: exact fields, names, decision ordering, and `summary_error_ids` behavior.
-- __Behavior parity__: idempotence, dry-run zeros, best-effort restore, bounded lock wait, error-id mapping.
-- __Public surfaces stable__: adapters (`AuditSink`, `FactsEmitter`, lock traits), policy types, and emitted JSON schema.
-
-## Streamlined plan (with minimal churn)
-
-### A) Logging/Audit primitives
-
-- [ ] Add fluent helpers to `src/logging/audit.rs::EventBuilder`:
-  - [ ] `fn perf(self, hash_ms: u64, backup_ms: u64, swap_ms: u64) -> Self`
-  - [ ] `fn error_id(self, id: crate::api::errors::ErrorId) -> Self`
-  - [ ] `fn exit_code_for(self, id: crate::api::errors::ErrorId) -> Self`
-  - [ ] `fn action_id(self, aid: impl Into<String>) -> Self` (wrapper around `.action()`)
-- [ ] Replace ad-hoc merges in apply/preflight/lock with fluent calls (no field changes).
-- [ ] Defer rustix/envmeta migration to stream G to avoid rebase churn.
-  
-  Initial adoption targets (no field changes):
-  - `src/api/apply/{mod.rs,lock.rs,policy_gate.rs,rollback.rs}`
-  - `src/api/preflight/{rows.rs,mod.rs}`
-  - `src/api/plan.rs`
-  - `src/api/mod.rs::prune_backups`
-
-  References: `CLIPPY/01-apply-handlers-handle_ensure_symlink.md`, `CLIPPY/03-apply-lock-acquire.md`, `CLIPPY/04-apply-run.md`, `CLIPPY/08-preflight-rows-push_row_emit.md`.
-
-  Granular steps:
-  - Add helper methods in `src/logging/audit.rs` within `impl EventBuilder<'_>`:
-    - `perf(...)` inserts `perf.hash_ms/backup_ms/swap_ms`.
-    - `error_id(...)` inserts normalized `error_id` string via `errors::id_str`.
-    - `exit_code_for(...)` inserts `exit_code` via `errors::exit_code_for`.
-    - `action_id(...)` delegates to `.action(...)` to keep one call-site.
-  - Update call sites to replace inline `.merge(json!({"error_id":...,"exit_code":...}))` with fluent helpers:
-    - `src/api/apply/lock.rs::acquire()` attempt/result/summary failure emissions.
-    - `src/api/apply/policy_gate.rs::enforce()` per-action failures + summary.
-    - `src/api/apply/rollback.rs::{do_rollback,emit_summary}` per-action and summary.
-    - `src/api/preflight/rows.rs::push_row_emit()` where applicable (only add fields present today).
-    - `src/api/plan.rs::build()` use `.action_id()`.
-    - `src/api/mod.rs::prune_backups()` success/failure mapping.
-  - Keep emitted fields byte-for-byte identical; do not add or rename fields.
-
-### B) Apply: ActionExecutor pattern
-
-- [ ] Create `src/api/apply/executors/mod.rs` exporting:
-  - [ ] `pub(crate) trait ActionExecutor<E: FactsEmitter, A: AuditSink> { fn execute(&self, api: &super::super::Switchyard<E,A>, tctx: &AuditCtx<'_>, pid: &Uuid, act: &Action, idx: usize, dry: bool) -> (Option<Action>, Option<String>, PerfAgg); }`
-  - [ ] Lightweight `ApplyCtx` struct if parameter fanout persists.
-- [ ] Implement `EnsureSymlinkExec` in `executors/ensure_symlink.rs`:
-  - [ ] Factor tiny private helpers: `map_swap_error`, `after_kind`, `compute_hashes`.
-  - [ ] Use fluent helpers for perf/error/action_id.
-- [ ] Implement `RestoreFromBackupExec` in `executors/restore.rs`:
-  - [ ] Precompute integrity verification; preserve fallback from `restore_file_prev` → `restore_file`.
-- [ ] In `apply::run`, dispatch by action kind; keep `handlers::handle_*` as thin adapters initially.
-
-  References: `CLIPPY/01-apply-handlers-handle_ensure_symlink.md`, `CLIPPY/02-apply-handlers-handle_restore.md`, `CLIPPY/04-apply-run.md`.
-
-  Granular steps:
-  - Create directory `src/api/apply/executors/` with `mod.rs` exporting trait and executors.
-  - Implement trait in `mod.rs`:
-    - `pub(crate) trait ActionExecutor<E: FactsEmitter, A: AuditSink> { fn execute(...) -> (Option<Action>, Option<String>, PerfAgg); }`.
-  - Port EnsureSymlink flow into `executors/ensure_symlink.rs`:
-    - Extract `compute_hashes(source: &SafePath, target: &SafePath) -> (before_hash, after_hash, hash_ms)`.
-    - Extract `map_swap_error(e: &io::Error) -> ErrorId` (EXDEV mapping preserved).
-    - Build attempt/result via `StageLogger` using fluent helpers; set `degraded` flags exactly as today.
-    - Return `(exec, err, PerfAgg)` identical to handlers.
-  - Port RestoreFromBackup flow into `executors/restore.rs`:
-    - Capture optional previous snapshot timing (`backup_ms`) when policy requires.
-    - Precompute `integrity_verified` (best effort) using current sidecar logic.
-    - Execute `restore_file_prev` then fallback to `restore_file` on NotFound; emit attempt/result using helpers.
-  - Thin adapters in `src/api/apply/handlers.rs` call into the corresponding executor (temporary shim to limit churn).
-  - Wire `apply::run` match arms to call executors; aggregate `PerfAgg` exactly as before.
-
-### C) Locking orchestration
-
-- [ ] Add `LockOrchestrator` (can live in `src/api/apply/lock.rs` to minimize moves):
-  - [ ] `acquire(...) -> LockOutcome { backend, wait_ms, approx_attempts, guard }`
-  - [ ] `emit_failure(...)` to produce attempt/result parity with E_LOCKING and summary line.
-  - [ ] `early_report(...) -> ApplyReport` for failure path.
-- [ ] Keep a thin `acquire(...)` wrapper returning `LockInfo` to avoid touching external call sites.
-
-  References: `CLIPPY/03-apply-lock-acquire.md`, `CLIPPY/04-apply-run.md`.
-
-  Granular steps:
-  - In `src/api/apply/lock.rs`:
-    - Add `struct LockOutcome { backend: String, wait_ms: Option<u64>, approx_attempts: u64, guard: Option<Box<dyn LockGuard>> }`.
-    - Add `struct LockOrchestrator;` with:
-      - `fn acquire<E,A>(api,&Switchyard<E,A>, mode: ApplyMode) -> LockOutcome` (compute `approx_attempts` like today).
-      - `fn emit_failure(slog: &StageLogger<'_>, backend: &str, wait_ms: Option<u64>, attempts: u64)` that emits attempt and result (and summary parity line) using fluent helpers.
-      - `fn early_report(pid: Uuid, t0: Instant, error_msg: &str) -> ApplyReport` with same shape.
-    - Keep existing `acquire(...)` as wrapper building `LockInfo` from `LockOutcome`, preserving return type.
-  - In `apply::run`, keep usage unchanged short-term; later migrate to `LockOutcome` directly.
-
-### D) Apply summary
-
-- [ ] Add `src/api/apply/summary.rs` with `ApplySummary` builder:
-  - [ ] `new(lock_backend, lock_wait_ms)` → chain `.perf(...)`, `.errors(&Vec<String>)`, `.smoke_or_policy_mapping(...)`, optional `.attestation(...)`.
-  - [ ] Emit via `StageLogger` with `.apply_result()`.
-- [ ] Replace manual summary assembly in `apply::run` with builder (fields identical).
-
-  References: `CLIPPY/04-apply-run.md`.
-
-  Granular steps:
-  - Create `src/api/apply/summary.rs` with `ApplySummary { fields: serde_json::Value }`.
-  - Implement:
-    - `new(lock_backend: String, lock_wait_ms: Option<u64>) -> Self`.
-    - `perf(self, total: PerfAgg) -> Self` inserts hash_ms/backup_ms/swap_ms.
-    - `errors(self, errors: &Vec<String>) -> Self` adds `summary_error_ids` via `errors::infer_summary_error_ids`.
-    - `smoke_or_policy_mapping(self, errors: &Vec<String>) -> Self` sets E_SMOKE or default E_POLICY (only on failure).
-    - `attestation(self, api, pid, executed_len, rolled_back)` builds bundle when applicable.
-    - `emit(self, slog: &StageLogger<'_>, decision: &str)` outputs the event.
-  - Replace manual JSON assembly in `src/api/apply/mod.rs::run` with builder chaining; keep decision logic unchanged.
-
-### E) Preflight rows and kind typing
-
-- [ ] Define `enum Kind { File, Symlink, Dir, None, Unknown, RestoreFromBackup }` with serde/Display mapping identical to current literals.
-- [ ] Introduce `PreflightRowArgs` (path, current_kind, planned_kind, policy_ok, provenance, notes, preservation, preservation_supported, restore_ready).
-- [ ] Create `RowEmitter` that pushes a typed `PreflightRow` into `rows` and emits the corresponding fact via StageLogger.
-- [ ] Refactor `preflight::run` and `preflight::rows::push_row_emit` to use `RowEmitter` and typed `Kind`.
-- [ ] Preserve serialized row shape by reusing `src/types/preflight.rs::PreflightRow` (serialize-only data type).
-
-  References: `CLIPPY/05-preflight-run.md`, `CLIPPY/08-preflight-rows-push_row_emit.md`.
-
-  Granular steps:
-
-- Add `enum Kind` with serde/Display mapping preserving strings: "file", "symlink", "dir", "none", "unknown", "restore_from_backup".
-- Add `struct PreflightRowArgs { path, current_kind, planned_kind, policy_ok, provenance, notes, preservation, preservation_supported, restore_ready }` with builder setters.
-- Add `struct RowEmitter;` with `fn emit_row<E,A>(api: &Switchyard<E,A>, rows: &mut Vec<Value>, slog: &StageLogger<'_>, aid: &str, args: &PreflightRowArgs, kind_current: Kind, kind_planned: Kind)` that pushes `PreflightRow` and emits fact.
-- Update `preflight/rows.rs::push_row_emit` to delegate to `RowEmitter` (or deprecate after migrating callers).
-- Update `preflight/mod.rs::run` to construct `PreflightRowArgs` and call `RowEmitter` for both action kinds.
-
-### F) Restore engine (plan → execute)
-
-- [ ] Add `RestorePlanner` in `src/fs/restore/engine.rs` returning `(backup_opt, sidecar_opt, RestoreAction)` where `RestoreAction` ∈ {`Noop`, `FileRename{..}`, `SymlinkTo{..}`, `EnsureAbsent`, `LegacyRename{..}`}.
-- [ ] Map `RestoreAction` to existing `steps::*` in a tiny executor; keep `restore_file(_prev)` behavior identical.
-- [ ] Call planner from `RestoreFromBackupExec` (B) to keep handlers slim.
-
-  References: `CLIPPY/06-fs-restore-restore_impl.md`, `CLIPPY/02-apply-handlers-handle_restore.md`.
-
-  Granular steps:
-  - Define `enum RestoreAction { Noop, FileRename { backup: PathBuf, mode: Option<u32> }, SymlinkTo { dest: PathBuf, cleanup_backup: bool }, EnsureAbsent, LegacyRename { backup: PathBuf } }`.
-  - Add `struct RestorePlanner;` with `fn plan(target: &Path, sel: SnapshotSel, opts: &RestoreOptions) -> io::Result<(Option<PathBuf>, Option<Sidecar>, RestoreAction)>` selecting latest/previous, reading sidecar, idempotence, integrity checks.
-  - Add `fn execute(action: RestoreAction)` mapping to `steps::{restore_file_bytes, restore_symlink_to, legacy_rename, ensure_absent}`.
-  - Refactor `restore_impl` to `plan` + `execute` pattern while preserving dry-run and best-effort behavior.
-
-### G) Dependency hardening (rustix)
-
-- [ ] Cargo: `rustix = { version = "0.38", features = ["fs","process"] }`.
-- [ ] `fs/meta.rs`: replace `effective_uid_is_root()` `/proc/self/status` parse with `rustix::process::geteuid().as_raw() == 0`.
-- [ ] `logging/audit.rs` (`envmeta`): replace libc `getppid/geteuid/getegid` with rustix; remove unsafe blocks.
-- [ ] `api/apply/handlers.rs`: EXDEV mapping via `ErrorKind::CrossesDevices` (add MSRV guard; fallback to `raw_os_error()==libc::EXDEV` in a tiny shim if needed).
-- [ ] `fs/mount.rs`: keep `ProcStatfsInspector` API; implement via `rustix::fs::statfs()` flag mapping; retire `/proc/self/mounts` parsing.
-- [ ] Optional: `adapters/lock/file.rs` migrate `fs2` → `fd-lock` under the same trait; keep `.truncate(true)` removal.
-- [ ] `fs/{atomic.rs,backup/snapshot.rs,restore/steps.rs,swap.rs}`: centralize errno→io bridging in a tiny compat helper (wrapping `from_raw_os_error(e.raw_os_error())`) to keep callers concise and consistent.
-
-  References: `CLIPPY/09-dependency-hardening-rustix-process-statfs.md`.
-
-  Granular steps:
-
-- Add dependency in `Cargo.toml`: `rustix = { version = "0.38", features = ["fs","process"] }`.
-- Replace libc envmeta calls in `logging/audit.rs` (feature `envmeta`) with `rustix::process::{getppid, geteuid, getegid}`.
-- Replace `/proc/self/status` parsing in `fs/meta.rs` with `geteuid().as_raw()==0`.
-- Replace `/proc/self/mounts` parsing in `fs/mount.rs` with `statfs()` and map flags to `MountFlags`.
-- Create `fs/errno.rs` (or similar) providing `fn io_from_errno(e: rustix::io::Errno) -> io::Error` and helpers; update call sites.
-- For EXDEV detection inside executors, prefer `ErrorKind::CrossesDevices` with MSRV fallback to raw errno comparison behind a tiny shim.
-
-### H) Policy gating as a checklist
-
-- [ ] Add `policy/gating/checks.rs` with:
-  - [ ] `struct CheckOutput { stop: Option<String>, note: Option<String> }`
-  - [ ] `trait GateCheck { fn run(&self) -> CheckOutput }`
-  - [ ] Concrete check wrappers: `MountRwExecCheck`, `ImmutableCheck`, `HardlinkRiskCheck`, `SuidSgidRiskCheck`, `SourceTrustCheck`, `ScopeCheck`, and strict ownership inline.
-- [ ] In `gating::evaluate_action`, assemble per-action pipelines using these checks; fold outputs preserving wording and order.
-
-  References: `CLIPPY/07-policy-gating-evaluate_action.md`.
-
-  Granular steps:
-  - Create `src/policy/gating/checks.rs` with `CheckOutput` and `GateCheck`.
-  - Implement wrappers over existing `preflight::checks`:
-    - `MountRwExecCheck { path }`, `ImmutableCheck { path }`, `HardlinkRiskCheck { policy, path }`, `SuidSgidRiskCheck { policy, path }`, `SourceTrustCheck { policy, source }`, `ScopeCheck { policy, target }`.
-  - In `evaluate_action`, build vectors of `Box<dyn GateCheck>` per action and run; convert outputs to `Evaluation { policy_ok, stops, notes }`.
-  - Preserve exact wording, order, and stop/note mapping.
-
-### I) Small error mapping facade (optional, low churn)
-
-- [ ] Add `api/errors/map.rs` with helpers: `map_restore_error_kind(kind: std::io::ErrorKind) -> ErrorId`, `map_swap_error(e: &io::Error) -> ErrorId`.
-- [ ] Use in executors; keep `ErrorId` mapping identical.
-
-  References: `CLIPPY/01-apply-handlers-handle_ensure_symlink.md`, `CLIPPY/02-apply-handlers-handle_restore.md`.
-
-  Granular steps:
-  - Implement mapping helpers with exhaustive matches for current behavior (E_EXDEV vs E_ATOMIC_SWAP, E_BACKUP_MISSING vs E_RESTORE_FAILED, etc.).
-  - Update executors to call the helpers; keep any special-cases (e.g., sidecar write failed → E_POLICY) intact.
-
-### J) Tests & verification
-
-- [ ] Unit tests:
-  - [ ] `LockOrchestrator::approx_attempts` calculations.
-  - [ ] `map_swap_error` EXDEV vs non-EXDEV.
-  - [ ] `RestorePlanner` plan cases (file/symlink/none; integrity mismatch; best-effort).
-  - [ ] `fs/mount.rs` flag mapping and `ensure_rw_exec()`.
-- [ ] Integration tests:
-  - [ ] `apply::run` success, policy stop, action failure + rollback, smoke failure with/without auto rollback — compare summary JSON before/after.
-  - [ ] Preflight rows ordering and field parity across both action kinds.
-  - [ ] Plan stage: per-action `plan` facts unchanged for mixed link/restore inputs.
-  - [ ] Prune stage: `prune.result` success and failure shapes unchanged.
-- [ ] Grep diff: ensure no loss of fields; CI runs `cargo clippy -p switchyard` clean for targeted functions.
-
-  References: all CLIPPY docs 01–09; this test plan enforces telemetry and behavior parity.
-
-  Granular steps:
-  - Add snapshot tests (or golden JSON compare) for per-action apply facts (symlink/restore) and final summary under success/failure/smoke.
-  - Add preflight rows parity tests (length/order/kinds/optional fields present when expected).
-  - Add prune success/failure parity tests.
-  - Add lock parity tests to ensure attempt/result/summary emissions on failure remain identical (existing tests cover much of this).
-  - Run `cargo clippy -p switchyard` and confirm targeted functions no longer violate `too_many_lines`/`too_many_arguments`.
-
-## CLIPPY doc and code map (quick reference)
-
-- 01 → `apply/handlers.rs::handle_ensure_symlink` → Executors (B), StageLogger helpers (A), Error mapping (I)
-- 02 → `apply/handlers.rs::handle_restore` → Executors (B), RestorePlanner (F), StageLogger helpers (A), Error mapping (I)
-- 03 → `apply/lock.rs::acquire` → LockOrchestrator (C), StageLogger helpers (A)
-- 04 → `apply/mod.rs::run` → ApplySummary (D), Executors dispatch (B), StageLogger helpers (A)
-- 05 → `api/preflight/mod.rs::run` → RowEmitter/Kind/Args (E), StageLogger helpers (A)
-- 06 → `fs/restore/engine.rs::restore_impl` → RestorePlanner (F)
-- 07 → `policy/gating.rs::evaluate_action` → Checklist pipeline (H)
-- 08 → `api/preflight/rows.rs::push_row_emit` → RowEmitter/Kind/Args (E), StageLogger helpers (A)
-- 09 → `logging/audit.rs` envmeta, `fs/meta.rs`, `fs/mount.rs` → rustix migration (G)
-
-## Extended codebase coverage (from docs 11 & 12)
-
-- __Apply stage__
-  - `src/api/apply/{mod.rs,handlers.rs,lock.rs,policy_gate.rs,rollback.rs}` — adopt StageLogger helpers; introduce executors, LockOrchestrator, ApplySummary; keep thin adapters initially.
-
-- __Preflight stage__
-  - `src/api/preflight/{mod.rs,rows.rs}` — adopt RowEmitter + Kind + Args; keep `types/preflight.rs` as the serialized row type.
-
-- __Plan and prune__
-  - `src/api/plan.rs` — use `.action_id()` helper in plan facts.
-  - `src/api/mod.rs::prune_backups` — use fluent helpers for success/failure; keep field names identical.
-
-- __Filesystem + logging infrastructure__
-  - `src/logging/audit.rs` — add fluent helpers; later migrate envmeta off libc.
-  - `src/fs/{meta.rs,mount.rs}` — migrate euid and mount flags to rustix.
-  - `src/fs/{atomic.rs,backup/snapshot.rs,restore/steps.rs,swap.rs}` — consolidate errno bridging; leave public behavior unchanged.
-  - `src/adapters/lock/file.rs` — optional `fd-lock` migration behind existing trait.
-
-## Implementation order (minimize churn)
-
-1) A: StageLogger fluent helpers
-2) B: ActionExecutor + EnsureSymlinkExec + RestoreFromBackupExec; dispatch in `apply::run` (temporary wrappers retained)
-3) C: LockOrchestrator integrated into `apply::run` (keep `acquire(...)` wrapper)
-4) D: ApplySummary builder to replace manual summary assembly
-5) E: Preflight RowEmitter + Kind enum; refactor `preflight` emitters
-6) F: RestorePlanner; call from restore executor
-7) G: rustix migration (envmeta, euid, statfs, EXDEV shim); optional fd-lock under adapter
-8) H: Gating checklist pipeline; preserve strings/order
-9) I: Optional error mapping facade tidy-up
-10) J: Tests pass; clippy clean for targeted items; telemetry snapshot diffs are identical
-
-## Churn control tactics
-
-- Keep function names and modules; add new ones alongside and route via thin wrappers.
-- Re-export new modules where needed; avoid moving public types.
-- Maintain field names/values exactly; add helpers but not new fields.
-- Gate rustix EXDEV via MSRV check + fallback; drop libc fully only after migration.
-
-## Open items / notes
-
-- Confirm MSRV for `ErrorKind::CrossesDevices`; if older MSRV, temporarily keep libc-based EXDEV under a small shim.
-- Verify `ProcStatfsInspector` callers (preflight checks) require no signature changes.
-- Keep attestation emission payload and presence conditions unchanged.
+Audience: New Rust developers joining Switchyard
+Scope: Replace the prior “Ultimate TODO” with a clear, PR‑sized, sequential plan. Every item below was verified against the current code in `cargo/switchyard/src/` and cites concrete files/symbols.
+
+## Execution Mode: One Big PR (breaking allowed)
+
+- We will deliver this as a single, comprehensive PR, structured into clearly labeled internal commits (Commit 1..10 below).
+- Backward compatibility is NOT required. Where cleaner designs demand it, we will:
+  - Remove transitional wrappers and shims once their replacements are wired.
+  - Rename/move internal modules and types for clarity.
+  - Evolve internal APIs and JSON field shapes if there is clear value. Tests, examples, and docs will be updated in lockstep.
+- If a change is purely mechanical and parity is trivial to keep, we will prefer keeping shapes to minimize diff noise.
+
+## 0) Objectives and Non‑Negotiable Invariants
+
+- Telemetry shape parity (must hold)
+  - All emitted JSON fields, names, event ordering, and summary `error_id` / `exit_code` / `summary_error_ids` must remain identical to today. Redaction behavior must not change.
+- Behavior parity (must hold)
+  - Idempotence, dry‑run timestamp zeroing, bounded lock wait, policy gating behavior, smoke post‑checks and auto‑rollback rules remain the same.
+- Public surfaces stable (must hold)
+  - Keep adapter traits (e.g., `FactsEmitter`, `AuditSink`, lock/smoke/ownership adapters) and API entrypoints stable. New helpers are internal only.
+
+References for current behavior:
+
+- Logging facade: `src/logging/audit.rs::StageLogger`, `src/logging/redact.rs`, `src/logging/facts.rs`
+- Apply orchestrator: `src/api/apply/{mod.rs,handlers.rs,lock.rs,rollback.rs}`
+- Preflight: `src/api/preflight/{mod.rs,rows.rs}` and checks: `src/preflight/checks.rs`
+- Restore engine: `src/fs/restore/{engine.rs,steps.rs,idempotence.rs,integrity.rs,selector.rs}`
+- Policy gating: `src/policy/gating.rs` (uses `preflight::checks`)
 
 ---
-This TODO consolidates CLIPPY 01–09 with upstream/downstream code realities for a coherent, low-churn refactor that addresses fundamentals rather than superficial helper splits.
+
+## 1) Reality check — what exists today (verified)
+
+- Logging facade is already centralized
+  - ✅ `StageLogger` and `EventBuilder` exist and are used across stages (`plan`, `preflight`, `apply.*`, `rollback.*`, `prune.result`). See `src/logging/audit.rs` and call sites in `src/api/*`.
+  - ❌ Fluent helpers for `perf(...)`, `error_id(...)`, `exit_code_for(...)`, `action_id(...)` do not exist yet; call sites merge ad‑hoc `json!` objects.
+
+- Apply handlers contain orchestration+IO+telemetry
+  - ✅ `handle_ensure_symlink()` and `handle_restore()` live in `src/api/apply/handlers.rs` and compute hashes, map errors, and emit attempt/result.
+  - ❌ There is no executor trait; logic is inline and long.
+
+- Lock acquisition telemetry is verbose at call site
+  - ✅ `src/api/apply/lock.rs::acquire()` handles lock manager variance and emits per‑attempt/result/summary
+  - ❌ No `LockOrchestrator` facade; approx attempts + summary emissions are inlined.
+
+- Preflight emits per‑row facts and a summary
+  - ✅ `src/api/preflight/rows.rs::push_row_emit()` serializes `types::preflight::PreflightRow` and emits a fact.
+  - ❌ No typed `Kind` or `PreflightRowArgs`/`RowEmitter` to shrink argument sprawl.
+
+- Restore engine intermixes selection/integrity/execute
+  - ✅ `src/fs/restore/engine.rs::restore_impl()` selects latest/previous, reads sidecar, checks idempotence/integrity, executes through `steps.rs`.
+  - ❌ Not yet split into `RestorePlanner { plan -> action }` + tiny executor.
+
+- Mount and envmeta plumbing
+  - ⚠️ `src/fs/mount.rs` parses `/proc/self/mounts`. `src/fs/meta.rs::effective_uid_is_root()` parses `/proc/self/status`. `src/logging/audit.rs` uses `libc` in the `envmeta` feature.
+  - ✅ `Cargo.toml` already has `rustix = { version = "0.38", features = ["fs"] }`.
+  - ❌ `process` feature not enabled; rustix replacements not yet wired.
+
+Conclusion: the “A–I” plan is compatible with the current code; most items are additive refactors preserving surfaces.
+
+---
+
+## 2) Single‑PR internal commit plan and order of operations
+
+We will implement all steps within one PR as separate commits to preserve reviewability. Run “Verification” after each commit locally and before pushing the next.
+
+1) Logging fluent helpers (A)
+2) Apply executors (B)
+3) Lock orchestrator (C)
+4) Apply summary builder (D)
+5) Preflight typed row emitter (E)
+6) Restore planner (F)
+7) Dependency hardening with rustix (G)
+8) Policy gating checklist wrappers (H)
+9) Optional error mapping facade (I)
+10) Parity tests + clippy budget (J)
+
+---
+
+## 3) Step‑by‑step instructions (granular)
+
+### PR1 — Logging fluent helpers (A)
+
+Goal: Remove ad‑hoc `json!` merges for common fields by adding fluent helpers to `EventBuilder`.
+
+Files to change:
+
+- `src/logging/audit.rs` (only)
+
+Edits:
+
+- In `impl EventBuilder<'_>` add methods:
+  - `fn perf(self, hash_ms: u64, backup_ms: u64, swap_ms: u64) -> Self`
+    - Insert object `{"perf": {"hash_ms":..., "backup_ms":..., "swap_ms":...}}`
+  - `fn error_id(self, id: crate::api::errors::ErrorId) -> Self`
+    - Insert `error_id: crate::api::errors::id_str(id)`
+  - `fn exit_code_for(self, id: crate::api::errors::ErrorId) -> Self`
+    - Insert `exit_code: crate::api::errors::exit_code_for(id)`
+  - `fn action_id(self, aid: impl Into<String>) -> Self`
+    - Thin wrapper over existing `.action(...)`
+
+Adoption (limited, no shape change):
+
+- Replace inline merges only where those exact fields are being set today:
+  - `src/api/apply/lock.rs` — attempt/result/summary emissions
+  - `src/api/apply/mod.rs` — final apply summary (use `.perf(...)`)
+  - `src/api/plan.rs` — use `.action_id(...)` and `.path(...)`
+  - `src/api/preflight/rows.rs` — keep as‑is or optionally `.action_id(...)`
+
+Verification:
+
+- Build and run unit tests
+- Visual compare the emitted JSON by running a representative dry‑run (see “Smoke test recipe” at bottom) and ensuring no field deltas
+- `cargo clippy -p switchyard`
+
+Acceptance:
+
+- No field additions/renames; purely a call‑site cleanup
+
+### PR2 — Apply executors (B)
+
+Goal: Move per‑action logic out of handlers into small executors to reduce function length and clarify responsibilities.
+
+Files to add:
+
+- `src/api/apply/executors/mod.rs`
+- `src/api/apply/executors/ensure_symlink.rs`
+- `src/api/apply/executors/restore.rs`
+
+Files to change:
+
+- `src/api/apply/handlers.rs` (becomes thin adapters)
+- `src/api/apply/mod.rs` (dispatch through executors)
+
+Edits:
+
+- Define trait in `executors/mod.rs`:
+
+  ```rust
+  pub(crate) trait ActionExecutor<E: FactsEmitter, A: AuditSink> {
+      fn execute(
+          &self,
+          api: &super::super::Switchyard<E, A>,
+          tctx: &crate::logging::audit::AuditCtx<'_>,
+          pid: &uuid::Uuid,
+          act: &crate::types::Action,
+          idx: usize,
+          dry: bool,
+      ) -> (Option<crate::types::Action>, Option<String>, super::perf::PerfAgg);
+  }
+  ```
+
+- `EnsureSymlinkExec` port: lift hashing (`fs::meta::{resolve_symlink_target, sha256_hex_of}`), EXDEV mapping (preserve libc::EXDEV mapping used today), perf accumulation, and attempt/result events. Use fluent helpers from PR1.
+- `RestoreFromBackupExec` port: preserve snapshot‑before‑restore behavior when `capture_restore_snapshot=true`, precompute best‑effort `integrity_verified`, attempt fallback from `restore_file_prev()` → `restore_file()` on NotFound.
+- `handlers.rs`: keep function signatures but forward to the appropriate executor implementation.
+- `apply::run`: dispatch using `match` to the executors; aggregation logic remains unchanged.
+
+Verification:
+
+- Run apply on a plan that includes both actions and verify per‑action facts unchanged (dry‑run and commit in a temp tree)
+- `cargo clippy -p switchyard`
+
+Acceptance:
+
+- No changes to external API or telemetry fields; only internal structure
+
+### PR3 — Lock orchestrator (C)
+
+Goal: Centralize lock acquisition bookkeeping and emissions into a facade.
+
+Files to change:
+
+- `src/api/apply/lock.rs`
+
+Edits:
+
+- Add:
+  - `struct LockOutcome { backend: String, wait_ms: Option<u64>, approx_attempts: u64, guard: Option<Box<dyn LockGuard>> }`
+  - `struct LockOrchestrator;` with:
+    - `fn acquire<E,A>(api: &Switchyard<E,A>, mode: ApplyMode) -> LockOutcome`
+    - `fn emit_failure(slog: &StageLogger<'_>, backend: &str, wait_ms: Option<u64>, attempts: u64)` — emits attempt and result failures with `E_LOCKING`
+    - `fn early_report(pid: Uuid, t0: Instant, error_msg: &str) -> ApplyReport`
+- Keep `pub(crate) fn acquire(...) -> LockInfo` as today, implemented via `LockOrchestrator`, to avoid touching call sites.
+
+Verification:
+
+- Simulate: (1) no lock manager + Commit with `LockingPolicy::Required` and (2) failing FileLockManager timeout (see `adapters/lock/file.rs` tests for guidance). Ensure emitted events match prior behavior.
+
+Acceptance:
+
+- Same events and fields; `approx_attempts` math unchanged
+
+### PR4 — Apply summary builder (D)
+
+Goal: Replace manual summary JSON in `apply::run` with a builder.
+
+Files to add:
+
+- `src/api/apply/summary.rs`
+
+Files to change:
+
+- `src/api/apply/mod.rs`
+
+Edits:
+
+- Implement `ApplySummary` with:
+  - `new(lock_backend: String, lock_wait_ms: Option<u64>)`
+  - `perf(self, total: PerfAgg) -> Self`
+  - `errors(self, errors: &Vec<String>) -> Self` (adds `summary_error_ids` using `errors::infer_summary_error_ids`)
+  - `smoke_or_policy_mapping(self, errors: &Vec<String>) -> Self` (summary‑level `E_SMOKE` override else default `E_POLICY` on failure)
+  - `attestation(self, api, pid, executed_len, rolled_back)` (only when success & Commit)
+  - `emit(self, slog: &StageLogger<'_>, decision: &str)`
+- Swap the inline summary assembly in `apply::run` with the builder calls; decision logic unchanged.
+
+Verification:
+
+- Run plans that produce: success, policy‑stop, smoke‑failure with/without auto‑rollback. Compare final `apply.result` summary JSON to baseline.
+
+Acceptance:
+
+- Byte‑for‑byte identical summary fields
+
+### PR5 — Preflight typed row emitter (E)
+
+Goal: Reduce argument sprawl and centralize serialization.
+
+Files to add:
+
+- `src/api/preflight/row_emitter.rs` (or extend `rows.rs`)
+
+Files to change:
+
+- `src/api/preflight/{mod.rs,rows.rs}`
+- (No change) `src/types/preflight.rs` remains the serialized data type
+
+Edits:
+
+- Define `PreflightRowArgs` builder struct holding: path, current_kind, planned_kind, policy_ok, provenance, notes, preservation, preservation_supported, restore_ready.
+- Add `RowEmitter::emit_row(...)` that:
+  - Converts `PreflightRowArgs` → `types::preflight::PreflightRow` and pushes into `rows`
+  - Emits a `preflight` fact via `StageLogger` with the corresponding fields
+- Update `preflight::run` call sites to construct `PreflightRowArgs` and delegate to `RowEmitter`.
+
+Verification:
+
+- Compare per‑action preflight facts and the `rows` content (order, keys) against baseline on a mixed plan (link + restore)
+
+Acceptance:
+
+- Fields and ordering preserved
+
+### PR6 — Restore planner (F)
+
+Goal: Split restore selection/integrity/execute into plan → execute to shrink function size and clarify branches.
+
+Files to change:
+
+- `src/fs/restore/engine.rs`
+- (No change) `src/fs/restore/steps.rs` keeps I/O primitives
+
+Edits:
+
+- Introduce:
+  - `enum RestoreAction { Noop, FileRename { backup: PathBuf, mode: Option<u32> }, SymlinkTo { dest: PathBuf, cleanup_backup: bool }, EnsureAbsent, LegacyRename { backup: PathBuf } }`
+  - `struct RestorePlanner;`
+    - `fn plan(target: &Path, sel: SnapshotSel, opts: &RestoreOptions) -> io::Result<(Option<PathBuf>, Option<Sidecar>, RestoreAction)>`
+    - `fn execute(action: RestoreAction) -> io::Result<()>` mapping to `steps::{restore_file_bytes, restore_symlink_to, legacy_rename, ensure_absent}`
+- Refactor `restore_impl` to: `let (backup_opt, sidecar_opt, action) = plan(...)?; if opts.dry_run { return Ok(()) } execute(action)` preserving best‑effort rules.
+
+Verification:
+
+- Existing unit tests in `steps.rs` continue to pass; add targeted tests for planner cases (file/symlink/none; integrity mismatch; previous vs latest selection)
+
+Acceptance:
+
+- Public functions `restore_file`/`restore_file_prev` retain signatures/behavior
+
+### PR7 — Dependency hardening with rustix (G)
+
+Goal: Replace ad‑hoc `/proc` parsing and `libc` calls with `rustix` where safe, without changing public behavior.
+
+Files to change:
+
+- `Cargo.toml` — add `process` feature to rustix: `rustix = { version = "0.38", features = ["fs","process"] }`
+- `src/fs/meta.rs` — replace `effective_uid_is_root()` implementation with `rustix::process::geteuid().as_raw() == 0`
+- `src/logging/audit.rs` (guarded by `#[cfg(feature = "envmeta")]`)
+  - Replace `libc::getppid/geteuid/getegid` with `rustix::process::{getppid, geteuid, getegid}`
+- `src/fs/mount.rs`
+  - Keep the `ProcStatfsInspector` API but implement using `rustix::fs::statfs()` mapping to `types::mount::MountFlags` (fallback to `/proc/self/mounts` parsing if needed)
+- Optional: create small `fs/errno.rs` for `rustix::io::Errno -> std::io::Error` bridging (helper already in `fs/atomic.rs` as `errno_to_io` — reuse or centralize)
+
+Verification:
+
+- Unit tests for `mount.rs` still pass; add tests for the `statfs` mapping if implemented
+- `--features envmeta`: ensure `StageLogger` events still contain process/actor fields
+
+Acceptance:
+
+- No public API changes; behavior and fields preserved
+
+### PR8 — Policy gating checklist wrappers (H)
+
+Goal: Make `policy/gating.rs::evaluate_action` read as a small pipeline of typed checks while preserving strings/order.
+
+Files to add:
+
+- `src/policy/gating/checks.rs`
+
+Files to change:
+
+- `src/policy/gating.rs`
+
+Edits:
+
+- In `checks.rs` add:
+  - `struct CheckOutput { stop: Option<String>, note: Option<String> }`
+  - `trait GateCheck { fn run(&self) -> CheckOutput }`
+  - Lightweight wrappers that delegate to existing `preflight::checks`: mount rw/exec, immutable, hardlink hazard, suid/sgid risk, source trust, scope allow/forbid, and strict ownership.
+- In `evaluate_action`, assemble `Vec<Box<dyn GateCheck>>` per action and fold into `Evaluation { policy_ok, stops, notes }` using existing wording.
+
+Verification:
+
+- Preflight/Apply behavior identical on plans that hit STOP and WARN paths; strings and order preserved
+
+Acceptance:
+
+- No change in returned `Evaluation` shape or messages
+
+### PR9 — Optional error mapping facade (I)
+
+Goal: Centralize small error‑to‑`ErrorId` helpers used inside executors.
+
+Files to add:
+
+- `src/api/errors/map.rs`
+
+Edits:
+
+- Implement `map_swap_error(&io::Error) -> ErrorId` and `map_restore_error_kind(std::io::ErrorKind) -> ErrorId` with matches identical to today (`E_EXDEV` vs `E_ATOMIC_SWAP`, `E_BACKUP_MISSING` vs `E_RESTORE_FAILED`).
+- Use inside executors only; no external changes.
+
+Verification:
+
+- Unit tests for mapping functions; executor behavior/telemetry unchanged
+
+Acceptance:
+
+- Pure internal tidy‑up
+
+### PR10 — Parity tests and clippy budget (J)
+
+Goal: Lock in behavior/telemetry parity and keep functions under clippy thresholds via refactors above, not superficial splits.
+
+Tests to add:
+
+- Unit tests
+  - `map_swap_error` EXDEV vs other
+  - `LockOrchestrator` approx attempts math
+  - `RestorePlanner` plan matrix
+  - `fs/mount.rs` flag mapping (if switched to `statfs`)
+- Integration / snapshot tests
+  - Preflight rows: count, order by `(path, action_id)`, and keys
+  - Apply success / policy stop / smoke failure (+ auto‑rollback) — compare `apply.result` summary JSON via `redact_event(...)`
+  - Plan stage: per‑action `plan` facts unchanged
+  - Prune stage: `prune.result` success/failure fields unchanged (`api::prune_backups`)
+
+Developer recipe:
+
+```bash
+# From cargo/switchyard/
+cargo test -p switchyard
+cargo clippy -p switchyard -- -D warnings
+```
+
+Acceptance:
+
+- Tests pass and emit identical JSON after redaction; targeted functions no longer trigger `too_many_lines` / `too_many_arguments` for clippy
+
+---
+
+## 4) Traceability matrix — where each step applies
+
+- PR1 (A): `src/logging/audit.rs` plus small call‑site cleanups in `src/api/{apply,plan}`
+- PR2 (B): `src/api/apply/{executors/*,handlers.rs,mod.rs}`
+- PR3 (C): `src/api/apply/lock.rs`
+- PR4 (D): `src/api/apply/summary.rs`, `src/api/apply/mod.rs`
+- PR5 (E): `src/api/preflight/{mod.rs,rows.rs}` (+ new `row_emitter.rs`)
+- PR6 (F): `src/fs/restore/engine.rs` (+ uses of `steps.rs`)
+- PR7 (G): `Cargo.toml`, `src/fs/{meta.rs,mount.rs}`, `src/logging/audit.rs` (`envmeta`)
+- PR8 (H): `src/policy/{gating.rs,gating/checks.rs}`
+- PR9 (I): `src/api/errors/map.rs` (internal)
+- PR10 (J): `tests` in existing files and/or `tests/` module as needed
+
+---
+
+## 5) Risk and rollback
+
+- Single‑PR with purposeful breaking changes: temporary wrappers and shims added early in the series will be removed in later commits of the same PR.
+- Where parity is easy, we keep it to reduce diff size; where it blocks clarity, we intentionally break and update tests/docs in the same PR.
+- Rustix migration remains isolated behind `envmeta` where applicable; libc and `/proc` usage are removed by the end of the PR.
+
+---
+
+## 6) Quick “smoke test” you can run locally
+
+```bash
+# Create a temp root and a simple plan (one link, one restore)
+python - <<'PY'
+import json, os, tempfile, pathlib
+root = pathlib.Path(tempfile.mkdtemp())
+(src, tgt) = (root/"bin-new", root/"usr/bin/app")
+os.makedirs(tgt.parent, exist_ok=True)
+(src).write_text("new")
+plan = {
+  "link": [{"source": str(src), "target": str(tgt)}],
+  "restore": [{"target": str(tgt)}]
+}
+print(json.dumps(plan))
+print("ROOT=", root)
+PY
+```
+
+Then in a small harness, construct `SafePath`s under that `root`, build a `Plan` and call `preflight()` and `apply(Commit)` using `JsonlSink` for both facts and audit. Compare emitted JSON before/after refactors with `redact_event(...)` to confirm parity.
+
+---
+
+## 7) What success looks like
+
+- Clippy no longer flags targeted functions for “too long/too many args” because logic moved into composable helpers/traits.
+- Behavior and telemetry remain identical; only internal structure improved.
+- New contributors can navigate by small, single‑purpose modules with focused unit tests.
