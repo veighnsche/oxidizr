@@ -18,8 +18,3 @@ pub mod preflight;
 pub mod types;
 
 pub use api::*;
-#[deprecated(
-    note = "Deprecated facade re-export: use `switchyard::policy::rescue` instead. This top-level alias will be removed in 0.2."
-)]
-/// deprecated shim — remove in 0.2; use switchyard::policy::rescue
-pub use policy::rescue; // compatibility re-export

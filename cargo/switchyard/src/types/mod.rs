@@ -4,6 +4,7 @@ pub mod plan;
 pub mod report;
 pub mod safepath;
 pub mod ownership;
+pub mod preflight;
 
 pub use errors::*;
 pub use ids::*;
@@ -11,3 +12,4 @@ pub use plan::*;
 pub use report::*;
 pub use safepath::*;
 pub use ownership::*;
+pub use preflight::*;

@@ -3,7 +3,7 @@
 
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
 use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
-use crate::logging::{AuditSink, FactsEmitter};
+use crate::logging::{AuditSink, FactsEmitter, StageLogger};
 use serde_json::json;
 use uuid::Uuid;
 use crate::policy::Policy;
@@ -12,6 +12,7 @@ use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 // Internal API submodules (idiomatic; directory module)
 mod apply;
 pub mod errors;
+mod builder;
 mod plan;
 mod preflight;
 mod rollback;
@@ -115,32 +116,24 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             age_limit,
         ) {
             Ok(res) => {
-                crate::logging::audit::emit_prune_result(
-                    &tctx,
-                    "success",
-                    json!({
-                        "path": target.as_path().display().to_string(),
-                        "backup_tag": self.policy.backup_tag,
-                        "retention_count_limit": count_limit,
-                        "retention_age_limit_ms": age_limit.map(|d| d.as_millis() as u64),
-                        "pruned_count": res.pruned_count,
-                        "retained_count": res.retained_count,
-                    }),
-                );
+                StageLogger::new(&tctx).prune_result().merge(json!({
+                    "path": target.as_path().display().to_string(),
+                    "backup_tag": self.policy.backup_tag,
+                    "retention_count_limit": count_limit,
+                    "retention_age_limit_ms": age_limit.map(|d| d.as_millis() as u64),
+                    "pruned_count": res.pruned_count,
+                    "retained_count": res.retained_count,
+                })).emit_success();
                 Ok(res)
             }
             Err(e) => {
-                crate::logging::audit::emit_prune_result(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "path": target.as_path().display().to_string(),
-                        "backup_tag": self.policy.backup_tag,
-                        "error": e.to_string(),
-                        "error_id": crate::api::errors::id_str(crate::api::errors::ErrorId::E_GENERIC),
-                        "exit_code": crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_GENERIC),
-                    }),
-                );
+                StageLogger::new(&tctx).prune_result().merge(json!({
+                    "path": target.as_path().display().to_string(),
+                    "backup_tag": self.policy.backup_tag,
+                    "error": e.to_string(),
+                    "error_id": crate::api::errors::id_str(crate::api::errors::ErrorId::E_GENERIC),
+                    "exit_code": crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_GENERIC),
+                })).emit_failure();
                 Err(errors::ApiError::FilesystemError(e.to_string()))
             }
         }

@@ -1,6 +1,7 @@
 // Default OwnershipOracle implementation using OS metadata (Unix-only)
 
-use crate::adapters::{OwnershipInfo, OwnershipOracle};
+use crate::adapters::OwnershipOracle;
+use crate::types::OwnershipInfo;
 use crate::types::errors::{Error, ErrorKind, Result};
 use crate::types::safepath::SafePath;
 

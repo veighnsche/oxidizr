@@ -21,9 +21,8 @@ use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 use log::Level;
 
 use super::errors::{exit_code_for, ErrorId};
-use crate::logging::audit::{
-    emit_apply_attempt, emit_apply_result, emit_rollback_step, AuditCtx, AuditMode,
-};
+use crate::logging::audit::{AuditCtx, AuditMode};
+use crate::logging::StageLogger;
 use crate::policy::gating;
 mod audit_fields;
 mod handlers;
@@ -74,6 +73,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             redact: dry,
         },
     );
+    let slog = StageLogger::new(&tctx);
 
     // Locking (required by default in Commit): acquire process lock with bounded wait; emit telemetry via apply.attempt
     api.audit.log(Level::Info, "apply: starting");
@@ -90,38 +90,26 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             Err(e) => {
                 lock_wait_ms = Some(lt0.elapsed().as_millis() as u64);
                 let approx_attempts = lock_wait_ms.map(|ms| 1 + (ms / LOCK_POLL_MS)).unwrap_or(1);
-                emit_apply_attempt(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "lock_backend": lock_backend,
-                        "lock_wait_ms": lock_wait_ms,
-                        "lock_attempts": approx_attempts,
-                        "error_id": "E_LOCKING",
-                        "exit_code": 30,
-                    }),
-                );
-                emit_apply_result(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "lock_backend": lock_backend,
-                        "lock_wait_ms": lock_wait_ms,
-                        "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-                        "error": e.to_string(),
-                        "error_id": "E_LOCKING",
-                        "exit_code": 30
-                    }),
-                );
+                slog.apply_attempt().merge(json!({
+                    "lock_backend": lock_backend,
+                    "lock_wait_ms": lock_wait_ms,
+                    "lock_attempts": approx_attempts,
+                    "error_id": "E_LOCKING",
+                    "exit_code": 30,
+                })).emit_failure();
+                slog.apply_result().merge(json!({
+                    "lock_backend": lock_backend,
+                    "lock_wait_ms": lock_wait_ms,
+                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
+                    "error": e.to_string(),
+                    "error_id": "E_LOCKING",
+                    "exit_code": 30
+                })).emit_failure();
                 // Stage parity: also emit a summary apply.result failure for locking errors
-                emit_apply_result(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
-                        "exit_code": exit_code_for(ErrorId::E_LOCKING),
-                    }),
-                );
+                slog.apply_result().merge(json!({
+                    "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
+                    "exit_code": exit_code_for(ErrorId::E_LOCKING),
+                })).emit_failure();
                 let duration_ms = t0.elapsed().as_millis() as u64;
                 api.audit
                     .log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
@@ -140,27 +128,19 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             // Enforce by default unless explicitly allowed through policy, or when require_lock_manager is set.
             let must_fail = api.policy.require_lock_manager || !api.policy.allow_unlocked_commit;
             if must_fail {
-                emit_apply_attempt(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "lock_backend": "none",
-                        "lock_attempts": 0u64,
-                        "error_id": "E_LOCKING",
-                        "exit_code": 30,
-                    }),
-                );
+                slog.apply_attempt().merge(json!({
+                    "lock_backend": "none",
+                    "lock_attempts": 0u64,
+                    "error_id": "E_LOCKING",
+                    "exit_code": 30,
+                })).emit_failure();
                 // Stage parity: also emit a summary apply.result failure for locking errors
-                emit_apply_result(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "lock_backend": "none",
-                        "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-                        "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
-                        "exit_code": exit_code_for(ErrorId::E_LOCKING),
-                    }),
-                );
+                slog.apply_result().merge(json!({
+                    "lock_backend": "none",
+                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
+                    "error_id": crate::api::errors::id_str(ErrorId::E_LOCKING),
+                    "exit_code": exit_code_for(ErrorId::E_LOCKING),
+                })).emit_failure();
                 let duration_ms = t0.elapsed().as_millis() as u64;
                 return ApplyReport {
                     executed,
@@ -171,40 +151,28 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     rollback_errors,
                 };
             } else {
-                emit_apply_attempt(
-                    &tctx,
-                    "warn",
-                    json!({
-                        "lock_backend": "none",
-                        "no_lock_manager": true,
-                        "lock_attempts": 0u64,
-                    }),
-                );
-            }
-        } else {
-            emit_apply_attempt(
-                &tctx,
-                "warn",
-                json!({
+                slog.apply_attempt().merge(json!({
                     "lock_backend": "none",
                     "no_lock_manager": true,
                     "lock_attempts": 0u64,
-                }),
-            );
+                })).emit_warn();
+            }
+        } else {
+            slog.apply_attempt().merge(json!({
+                "lock_backend": "none",
+                "no_lock_manager": true,
+                "lock_attempts": 0u64,
+            })).emit_warn();
         }
     }
 
     // Minimal Facts v1: apply attempt summary (include lock_wait_ms when present)
     let approx_attempts = lock_wait_ms.map(|ms| 1 + (ms / LOCK_POLL_MS)).unwrap_or_else(|| if api.lock.is_some() { 1 } else { 0 });
-    emit_apply_attempt(
-        &tctx,
-        "success",
-        json!({
-            "lock_backend": lock_backend,
-            "lock_wait_ms": lock_wait_ms,
-            "lock_attempts": approx_attempts,
-        }),
-    );
+    slog.apply_attempt().merge(json!({
+        "lock_backend": lock_backend,
+        "lock_wait_ms": lock_wait_ms,
+        "lock_attempts": approx_attempts,
+    })).emit_success();
 
     // BEGIN REMOVE BLOCK — duplicate policy gating; centralize in policy::gating::evaluate_action
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
@@ -221,26 +189,18 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                     Action::EnsureSymlink { target, .. } => target.as_path().display().to_string(),
                     Action::RestoreFromBackup { target } => target.as_path().display().to_string(),
                 };
-                emit_apply_result(
-                    &tctx,
-                    "failure",
-                    json!({
-                        "action_id": aid,
-                        "path": path,
-                        "error_id": "E_POLICY",
-                        "exit_code": ec,
-                    }),
-                );
-            }
-            emit_apply_result(
-                &tctx,
-                "failure",
-                json!({
+                slog.apply_result().merge(json!({
+                    "action_id": aid,
+                    "path": path,
                     "error_id": "E_POLICY",
                     "exit_code": ec,
-                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-                }),
-            );
+                })).emit_failure();
+            }
+            slog.apply_result().merge(json!({
+                "error_id": "E_POLICY",
+                "exit_code": ec,
+                "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
+            })).emit_failure();
             let duration_ms = t0.elapsed().as_millis() as u64;
             return ApplyReport {
                 executed,
@@ -302,11 +262,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                 &api.policy.backup_tag,
                             ) {
                                 Ok(()) => {
-                                    emit_rollback_step(
-                                        &tctx,
-                                        "success",
-                                        &target.as_path().display().to_string(),
-                                    );
+                                    slog.rollback().path(target.as_path().display().to_string()).emit_success();
                                 }
                                 Err(e) => {
                                     rollback_errors.push(format!(
@@ -314,11 +270,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                         target.as_path().display(),
                                         e
                                     ));
-                                    emit_rollback_step(
-                                        &tctx,
-                                        "failure",
-                                        &target.as_path().display().to_string(),
-                                    );
+                                    slog.rollback().path(target.as_path().display().to_string()).emit_failure();
                                 }
                             }
                         }
@@ -328,7 +280,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                                 "rollback of RestoreFromBackup not supported (no prior state)"
                                     .to_string(),
                             );
-                            emit_rollback_step(&tctx, "failure", "");
+                            slog.rollback().emit_failure();
                         }
                     }
                 }
@@ -351,7 +303,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                         );
                     }
                 }
-                crate::logging::audit::emit_summary_extra(&tctx, "rollback.summary", rb_decision, rb_extra);
+                if rb_decision == "failure" {
+                    slog.rollback_summary().merge(rb_extra).emit_failure();
+                } else {
+                    slog.rollback_summary().merge(rb_extra).emit_success();
+                }
             }
             break;
         }
@@ -458,20 +414,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 "rolled_back": rolled_back,
             });
             let bundle: Vec<u8> = serde_json::to_vec(&bundle_json).unwrap_or_default();
-            if let Ok(sig) = att.sign(&bundle) {
-                let sig_b64 = base64::engine::general_purpose::STANDARD.encode(sig.0.clone());
-                // Compute sha256 of bundle for bundle_hash
-                let mut hasher = sha2::Sha256::new();
-                use sha2::Digest as _;
-                hasher.update(&bundle);
-                let bundle_hash = hex::encode(hasher.finalize());
-                let att_json = json!({
-                    "sig_alg": att.algorithm(),
-                    "signature": sig_b64,
-                    "bundle_hash": bundle_hash,
-                    "public_key_id": att.key_id(),
-                });
-                // Merge attestation into fields
+            if let Some(att_json) = crate::adapters::attest::build_attestation_fields(&**att, &bundle) {
                 let obj = fields.as_object_mut().unwrap();
                 obj.insert("attestation".to_string(), att_json);
             }
@@ -502,7 +445,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             obj.insert("summary_error_ids".to_string(), json!(chain));
         }
     }
-    emit_apply_result(&tctx, decision, fields);
+    if decision == "failure" {
+        slog.apply_result().merge(fields).emit_failure();
+    } else {
+        slog.apply_result().merge(fields).emit_success();
+    }
     api.audit.log(Level::Info, "apply: finished");
 
     // Compute total duration

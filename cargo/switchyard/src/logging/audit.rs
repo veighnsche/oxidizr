@@ -92,7 +92,7 @@ pub struct StageLogger<'a> {
 }
 
 impl<'a> StageLogger<'a> {
-    pub fn new(ctx: &'a AuditCtx<'a>) -> Self { Self { ctx } }
+    pub(crate) fn new(ctx: &'a AuditCtx<'a>) -> Self { Self { ctx } }
 
     pub fn plan(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Plan) }
     pub fn preflight(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Preflight) }
@@ -142,6 +142,8 @@ impl<'a> EventBuilder<'a> {
 
     pub fn emit(self, decision: Decision) {
         let mut fields = Value::Object(self.fields);
+        // Ensure provenance object present by default
+        ensure_provenance(&mut fields);
         if let Some(obj) = fields.as_object_mut() {
             obj.entry("decision").or_insert(json!(decision.as_str()));
         }
