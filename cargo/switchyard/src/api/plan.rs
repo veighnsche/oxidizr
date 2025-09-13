@@ -4,7 +4,8 @@ use crate::logging::FactsEmitter;
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, Plan, PlanInput};
 
-use crate::logging::audit::{emit_plan_fact, AuditCtx, AuditMode};
+use crate::logging::audit::{AuditCtx, AuditMode};
+use crate::logging::StageLogger;
 
 /// Build a deterministic plan from input and emit per-action plan facts.
 pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
@@ -43,7 +44,7 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     });
     let plan = Plan { actions };
 
-    // Emit per-action plan facts using telemetry helper
+    // Emit per-action plan facts using the logging facade
     let pid_uuid = plan_id(&plan);
     let pid = pid_uuid.to_string();
     let tctx = AuditCtx::new(
@@ -55,13 +56,18 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
             redact: true,
         },
     );
+    let slog = StageLogger::new(&tctx);
     for (idx, act) in plan.actions.iter().enumerate() {
         let aid = action_id(&pid_uuid, act, idx).to_string();
         let path = match act {
             Action::EnsureSymlink { target, .. } => Some(target.as_path().display().to_string()),
             Action::RestoreFromBackup { target } => Some(target.as_path().display().to_string()),
         };
-        emit_plan_fact(&tctx, &aid, path.as_deref());
+        if let Some(p) = path {
+            slog.plan().action(aid).path(p).emit_success();
+        } else {
+            slog.plan().action(aid).emit_success();
+        }
     }
 
     plan

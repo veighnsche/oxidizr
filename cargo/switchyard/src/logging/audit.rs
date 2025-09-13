@@ -42,6 +42,117 @@ impl<'a> AuditCtx<'a> {
     }
 }
 
+/// Stage for typed audit emission.
+#[derive(Clone, Copy, Debug)]
+pub enum Stage {
+    Plan,
+    Preflight,
+    ApplyAttempt,
+    ApplyResult,
+    Rollback,
+    RollbackSummary,
+    PruneResult,
+}
+
+impl Stage {
+    fn as_event(&self) -> &'static str {
+        match self {
+            Stage::Plan => "plan",
+            Stage::Preflight => "preflight",
+            Stage::ApplyAttempt => "apply.attempt",
+            Stage::ApplyResult => "apply.result",
+            Stage::Rollback => "rollback",
+            Stage::RollbackSummary => "rollback.summary",
+            Stage::PruneResult => "prune.result",
+        }
+    }
+}
+
+/// Decision severity for audit events.
+#[derive(Clone, Copy, Debug)]
+pub enum Decision {
+    Success,
+    Failure,
+    Warn,
+}
+
+impl Decision {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Decision::Success => "success",
+            Decision::Failure => "failure",
+            Decision::Warn => "warn",
+        }
+    }
+}
+
+/// Builder facade over audit emission with centralized envelope+redaction.
+pub struct StageLogger<'a> {
+    ctx: &'a AuditCtx<'a>,
+}
+
+impl<'a> StageLogger<'a> {
+    pub fn new(ctx: &'a AuditCtx<'a>) -> Self { Self { ctx } }
+
+    pub fn plan(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Plan) }
+    pub fn preflight(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Preflight) }
+    pub fn apply_attempt(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyAttempt) }
+    pub fn apply_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyResult) }
+    pub fn rollback(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Rollback) }
+    pub fn rollback_summary(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::RollbackSummary) }
+    pub fn prune_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PruneResult) }
+}
+
+pub struct EventBuilder<'a> {
+    ctx: &'a AuditCtx<'a>,
+    stage: Stage,
+    fields: serde_json::Map<String, Value>,
+}
+
+impl<'a> EventBuilder<'a> {
+    fn new(ctx: &'a AuditCtx<'a>, stage: Stage) -> Self {
+        let mut fields = serde_json::Map::new();
+        fields.insert("stage".to_string(), json!(stage.as_event()));
+        Self { ctx, stage, fields }
+    }
+
+    pub fn action(mut self, action_id: impl Into<String>) -> Self {
+        self.fields.insert("action_id".into(), json!(action_id.into()));
+        self
+    }
+
+    pub fn path(mut self, path: impl Into<String>) -> Self {
+        self.fields.insert("path".into(), json!(path.into()));
+        self
+    }
+
+    pub fn field(mut self, key: &str, value: Value) -> Self {
+        self.fields.insert(key.to_string(), value);
+        self
+    }
+
+    pub fn merge(mut self, extra: Value) -> Self {
+        if let Some(obj) = extra.as_object() {
+            for (k, v) in obj.iter() {
+                self.fields.insert(k.clone(), v.clone());
+            }
+        }
+        self
+    }
+
+    pub fn emit(self, decision: Decision) {
+        let mut fields = Value::Object(self.fields);
+        if let Some(obj) = fields.as_object_mut() {
+            obj.entry("decision").or_insert(json!(decision.as_str()));
+        }
+        redact_and_emit(self.ctx, "switchyard", self.stage.as_event(), decision.as_str(), fields);
+    }
+
+    pub fn emit_success(self) { self.emit(Decision::Success) }
+    pub fn emit_failure(self) { self.emit(Decision::Failure) }
+    pub fn emit_warn(self) { self.emit(Decision::Warn) }
+}
+
 fn redact_and_emit(
     ctx: &AuditCtx,
     subsystem: &str,
