@@ -41,7 +41,6 @@ tempfile = "3.12"
 
 [workspace]
 members = [
-  "cargo/bdd-runner",
 ]
 resolver = "2"
 
