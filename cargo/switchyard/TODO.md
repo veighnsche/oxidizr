@@ -35,6 +35,7 @@ Note: This is not a separate checklist. The sections below are the single consol
 - [x] Make `src/api` directory module fully idiomatic; remove any lingering `#[path]`
 - [x] Remove legacy adapters shim (`adapters::lock_file`), ensure imports use `adapters::lock::file::*`
 - [x] Tighten fs atoms visibility; no re-exports at `src/fs/mod.rs`
+- [x] Move `src/preflight.rs` -> `src/preflight/mod.rs`; drop `#[path]` includes and use standard `mod` declarations
 - Notes: low-level FS atoms are internal-only (`pub(crate)`), satisfying trybuild compile-fail expectations.
 - [ ] Docs (execute end-to-end): `./zrefactor/idiomatic_todo.INSTRUCTIONS.md`
 - Bridging tasks:
@@ -117,7 +118,7 @@ Note: This is not a separate checklist. The sections below are the single consol
   - [x] Extract restore code into `restore/*` modules; wire `engine::restore_impl` behind public fns; update `fs/mod.rs` re‑exports.
   - [x] Update API/handlers call sites to new module paths; move and add unit tests for selector/idempotence/integrity/steps.
   - [x] Remove public re‑exports of low‑level atoms from `fs/mod.rs`; ensure internal callers use `fs::atomic` directly.
-  - [ ] Sweep removals: delete transitional `src/fs/restore/core.rs` (unused) and confirm no references to `src/fs/restore.rs` remain.
+  - [x] Sweep removals: delete transitional `src/fs/restore/core.rs` (unused) and confirm no references to `src/fs/restore.rs` remain.
 
 ## 8) Tests reorganization (crate + repo e2e)
   
