@@ -108,7 +108,7 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
 
         let count_limit = self.policy.retention_count_limit;
         let age_limit = self.policy.retention_age_limit;
-        match crate::fs::backup::prune_backups(
+        match crate::fs::backup::prune::prune_backups(
             &target.as_path(),
             &self.policy.backup.tag,
             count_limit,

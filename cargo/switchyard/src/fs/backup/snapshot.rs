@@ -6,8 +6,24 @@ use std::fs;
 use std::os::unix;
 use std::os::unix::fs::PermissionsExt as _;
 
-use super::index::backup_path_with_tag;
 use super::sidecar::{write_sidecar, BackupSidecar};
+
+/// Generate a unique backup path for a target file (includes a timestamp).
+/// Public so callers (preflight/tests) can compute expected names.
+pub fn backup_path_with_tag(target: &Path, tag: &str) -> std::path::PathBuf {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::path::{Path, PathBuf};
+    let name = target
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("backup");
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    parent.join(format!(".{}.{}.{}.bak", name, tag, ts))
+}
 
 /// Create a snapshot (backup payload and sidecar) of the current target state.
 /// - If target is a regular file: copy bytes to a timestamped backup and record mode in sidecar.
@@ -138,11 +154,21 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Public helper for preflight/tests: check if there are backup artifacts (payload and/or sidecar)
+/// for the given target and tag.
+pub fn has_backup_artifacts(target: &Path, tag: &str) -> bool {
+    if let Some((payload, sc)) = super::index::find_latest_backup_and_sidecar(target, tag) {
+        payload.is_some() || sc.exists()
+    } else {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::constants::DEFAULT_BACKUP_TAG;
-    use crate::fs::backup::sidecar;
+    use crate::fs::backup::index;
 
     fn tmp() -> tempfile::TempDir {
         tempfile::tempdir().unwrap()
@@ -155,7 +181,7 @@ mod tests {
         let tgt = root.join("file.txt");
         std::fs::write(&tgt, b"hello").unwrap();
         create_snapshot(&tgt, DEFAULT_BACKUP_TAG).unwrap();
-        let pair = sidecar::find_latest_backup_and_sidecar(&tgt, DEFAULT_BACKUP_TAG).expect("pair");
+        let pair = index::find_latest_backup_and_sidecar(&tgt, DEFAULT_BACKUP_TAG).expect("pair");
         assert!(pair.0.is_some(), "payload present");
         assert!(pair.1.exists(), "sidecar exists");
     }
@@ -170,7 +196,7 @@ mod tests {
         std::fs::create_dir_all(link.parent().unwrap()).unwrap();
         let _ = std::os::unix::fs::symlink("../../bin", &link); // relative symlink
         create_snapshot(&link, DEFAULT_BACKUP_TAG).unwrap();
-        let pair = sidecar::find_latest_backup_and_sidecar(&link, DEFAULT_BACKUP_TAG).expect("pair");
+        let pair = index::find_latest_backup_and_sidecar(&link, DEFAULT_BACKUP_TAG).expect("pair");
         assert!(pair.1.exists(), "sidecar exists");
     }
 
@@ -181,7 +207,7 @@ mod tests {
         let tgt = root.join("missing");
         assert!(!tgt.exists());
         create_snapshot(&tgt, DEFAULT_BACKUP_TAG).unwrap();
-        let pair = sidecar::find_latest_backup_and_sidecar(&tgt, DEFAULT_BACKUP_TAG).expect("pair");
+        let pair = index::find_latest_backup_and_sidecar(&tgt, DEFAULT_BACKUP_TAG).expect("pair");
         assert!(pair.1.exists(), "sidecar exists");
     }
 }
