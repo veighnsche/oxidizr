@@ -7,6 +7,19 @@
 
 Deterministic IDs and ordering with stable timestamps in DryRun, plus redaction of volatile fields to enable golden tests and reproducible logs.
 
+Pros & Cons
+
+| Pros | Proof (code/tests) |
+| --- | --- |
+| Stable IDs (UUIDv5) for reproducibility | `cargo/switchyard/src/types/ids.rs::{plan_id, action_id}` |
+| Deterministic ordering of outputs | Preflight rows sorted by `(path, action_id)` |
+| Redaction yields golden-friendly artifacts | `logging/redact.rs::{TS_ZERO, redact_event}` applied in helpers |
+
+| Cons | Notes |
+| --- | --- |
+| Requires disciplined use of helpers | Facts must go through `logging/audit.rs` to ensure redaction |
+| Some fields remain environment-sensitive | Paths and filesystem metadata may vary across hosts |
+
 ## Behaviors
 
 - Generates stable `plan_id`/`action_id` using UUIDv5 from content and a fixed namespace.
@@ -29,6 +42,68 @@ Deterministic IDs and ordering with stable timestamps in DryRun, plus redaction 
 ## Evidence and Proof
 
 - Tests for `redact_event` and facts presence in `api.rs::tests`.
+
+## Feature Analytics
+
+- Complexity: Low. Helper functions and stable IDs.
+- Risk & Blast Radius: Medium; incorrect use of helpers can leak non-determinism into goldens.
+- Performance Budget: Negligible overhead for redaction and UUIDv5.
+- Observability: All emitted facts carry redacted timestamps in DryRun; schema planned.
+- Test Coverage: Unit tests for redaction; gaps: property tests for UUID stability and cross-run determinism.
+- Determinism & Redaction: Core purpose; DryRun forces `TS_ZERO`.
+- Policy Knobs: None directly; determinism interacts with DryRun mode.
+- Exit Codes & Error Mapping: N/A; determinism does not map to exit codes.
+- Concurrency/Locking: Independent.
+- Cross-FS/Degraded: N/A.
+- Platform Notes: None specific; relies on standard library.
+- DX Ergonomics: Centralized helpers reduce caller burden.
+
+Policy Controls Matrix
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| N/A | — | Determinism/redaction controlled by stage mode (DryRun/Commit) and helper usage |
+
+Exit Reasons / Error → Exit Code Map
+
+| Error ID | Exit Code | Where mapped |
+| --- | --- | --- |
+| N/A | — | No direct mapping |
+
+Observability Map
+
+| Fact | Fields (subset) | Schema |
+| --- | --- | --- |
+| All stage events | `schema_version`, `ts` (zero in DryRun), `plan_id`, `path`, `dry_run` | Minimal Facts v1 (planned validation) |
+
+Test Coverage Map
+
+| Path | Test name | Proves |
+| --- | --- | --- |
+| `src/logging/redact.rs` | redact tests | zeroed timestamps; field masking |
+| `src/api.rs` | facts presence tests | envelope fields present |
+
+## Maturity & Upgrade Path
+
+| Tier | Capabilities | Required Guarantees | Tests/Proofs | Ops/Tooling | Relationship to Previous Tier |
+| --- | --- | --- | --- | --- | --- |
+| Bronze | Redaction helpers and stable IDs exist | DryRun timestamps zeroed | Unit tests | None | Additive |
+| Silver (current) | Deterministic sorting; enforced helper usage in stages | Stable outputs; redaction applied | Unit + integration | Inventory docs | Additive |
+| Gold | Schema validation + goldens for determinism | Validated redaction and IDs across runs | Goldens + CI gates | CI gates | Additive |
+| Platinum | Formalized determinism properties | Proved invariants, platform stability | Property tests | Continuous compliance |
+
+## Maintenance Checklist
+
+- [x] Code citations are accurate (paths and symbol names)
+- [ ] Policy knobs documented reflect current `policy::Policy` (N/A)
+- [x] Error mapping and `exit_code` coverage verified (N/A)
+- [x] Emitted facts fields listed and schema version up to date
+- [ ] Determinism parity (DryRun vs Commit) verified in tests
+- [ ] Goldens added/updated and CI gates green
+- [x] Preflight YAML or JSON Schema validated (planned) (where applicable)
+- [ ] Cross-filesystem or degraded-mode notes reviewed (if applicable)
+- [ ] Security considerations reviewed; redaction masks adequate
+- [ ] Licensing impact considered (deps changed? update licensing inventory)
 
 ## Gaps and Risks
 

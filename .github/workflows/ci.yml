@@ -64,6 +64,49 @@ jobs:
 
           echo "Guardrails passed"
 
+      - name: Guardrails (switchyard crate)
+        run: |
+          set -euo pipefail
+          cd cargo/switchyard
+
+          echo "Checking no #[path] under src/api/"
+          if grep -R --line-number "#[path]" src/api; then
+            echo "ERROR: #[path] found under cargo/switchyard/src/api" >&2
+            exit 1
+          fi
+
+          echo "Checking no deprecated adapters::lock_file shim"
+          if grep -R --line-number "adapters::lock_file::" src tests; then
+            echo "ERROR: adapters::lock_file:: usage found" >&2
+            exit 1
+          fi
+
+          echo "Checking no legacy audit::emit_* calls outside src/logging/"
+          if grep -R --line-number "audit::emit_" src | grep -v "^src/logging/"; then
+            echo "ERROR: legacy audit::emit_* used outside src/logging/" >&2
+            exit 1
+          fi
+
+          echo "Checking no direct FactsEmitter::emit outside src/logging/"
+          if grep -R --line-number "FactsEmitter::emit" src | grep -v "^src/logging/"; then
+            echo "ERROR: direct FactsEmitter::emit used outside src/logging/" >&2
+            exit 1
+          fi
+
+          echo "Checking no public re-exports of low-level fs atoms"
+          if grep -R --line-number -E "^[[:space:]]*pub[[:space:]]+use[[:space:]]+atomic::" src/fs/mod.rs; then
+            echo "ERROR: public fs atoms re-exported at src/fs/mod.rs" >&2
+            exit 1
+          fi
+
+          echo "Checking top-level rescue alias not used by consumers"
+          if grep -R --line-number -E "\\buse[[:space:]]+switchyard::rescue\\b" src tests; then
+            echo "ERROR: 'use switchyard::rescue' found; import from switchyard::policy::rescue instead" >&2
+            exit 1
+          fi
+
+          echo "Switchyard guardrails passed"
+
       - name: Hermetic tests guard (no absolute system paths under switchyard tests)
         run: |
           set -euo pipefail
