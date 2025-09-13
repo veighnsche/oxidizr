@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -25,14 +25,11 @@ impl FactsEmitter for TestEmitter {
 }
 
 // Mock smoke runner that always fails
+#[derive(Debug)]
 struct FailingSmokeRunner;
 impl switchyard::adapters::SmokeTestRunner for FailingSmokeRunner {
     fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::SmokeFailure> {
-        Err(switchyard::adapters::SmokeFailure::CommandFailed { 
-            command: "mock".to_string(), 
-            exit_code: 1, 
-            stderr: "mock failure".to_string() 
-        })
+        Err(switchyard::adapters::SmokeFailure)
     }
 }
 
@@ -44,7 +41,7 @@ fn smoke_invariants() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.apply.smoke = switchyard::policy::types::SmokePolicy::Require; // Require smoke tests
+    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true }; // Require smoke tests
     policy.governance.allow_unlocked_commit = true; // Allow commit without lock manager
     
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)

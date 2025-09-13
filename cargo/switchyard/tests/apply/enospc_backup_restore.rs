@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -53,7 +53,7 @@ fn e2e_apply_014_enospc_during_backup_restore_path() {
     let plan = api.plan(input);
     
     // Apply should succeed in normal conditions
-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
+    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
     
     // Check that we got the appropriate apply events
     let redacted: Vec<Value> = facts

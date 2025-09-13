@@ -297,7 +297,7 @@ fn redact_and_emit(
             // process
             if let Entry::Vacant(e) = obj.entry("process".to_string()) {
                 let process_id = std::process::id();
-                let parent_process_id = rustix::process::getppid().as_raw();
+                let parent_process_id = rustix::process::Pid::as_raw(rustix::process::getppid());
                 e.insert(json!({"pid": process_id, "ppid": parent_process_id}));
             }
             // actor (effective ids)

@@ -3,7 +3,7 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter;
 impl FactsEmitter for TestEmitter {
     fn emit(&self, _subsystem: &str, _event: &str, _decision: &str, _fields: serde_json::Value) {}
@@ -23,7 +23,7 @@ fn preflight_stops_when_preservation_required_and_unsupported() {
     std::fs::create_dir_all(root.join("usr/bin")).unwrap();
     // Intentionally do NOT create the target path, so preservation_supported=false
 
-    let api = switchyard::Switchyard::new(facts, audit, policy);
+    let _api = switchyard::Switchyard::new(facts, audit, policy);
 
     let src = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();

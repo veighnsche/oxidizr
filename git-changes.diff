@@ -1,0 +1,1103 @@
+diff --git a/cargo/switchyard/src/logging/audit.rs b/cargo/switchyard/src/logging/audit.rs
+index 1be015a..adc66a2 100644
+--- a/cargo/switchyard/src/logging/audit.rs
++++ b/cargo/switchyard/src/logging/audit.rs
+@@ -297,7 +297,7 @@ fn redact_and_emit(
+             // process
+             if let Entry::Vacant(e) = obj.entry("process".to_string()) {
+                 let process_id = std::process::id();
+-                let parent_process_id = rustix::process::getppid().as_raw();
++                let parent_process_id = rustix::process::Pid::as_raw(rustix::process::getppid());
+                 e.insert(json!({"pid": process_id, "ppid": parent_process_id}));
+             }
+             // actor (effective ids)
+diff --git a/cargo/switchyard/src/types/plan.rs b/cargo/switchyard/src/types/plan.rs
+index 8e7452d..6d50f4d 100644
+--- a/cargo/switchyard/src/types/plan.rs
++++ b/cargo/switchyard/src/types/plan.rs
+@@ -24,7 +24,7 @@ pub struct PlanInput {
+     pub restore: Vec<RestoreRequest>,
+ }
+ 
+-#[derive(Clone, Debug)]
++#[derive(Clone, Debug, PartialEq)]
+ pub enum Action {
+     EnsureSymlink { source: SafePath, target: SafePath },
+     RestoreFromBackup { target: SafePath },
+diff --git a/cargo/switchyard/tests/apply/attestation_apply_success.rs b/cargo/switchyard/tests/apply/attestation_apply_success.rs
+index 4875dcd..342d549 100644
+--- a/cargo/switchyard/tests/apply/attestation_apply_success.rs
++++ b/cargo/switchyard/tests/apply/attestation_apply_success.rs
+@@ -6,7 +6,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/attestation_error_tolerated.rs b/cargo/switchyard/tests/apply/attestation_error_tolerated.rs
+index 98f7088..0b74ab3 100644
+--- a/cargo/switchyard/tests/apply/attestation_error_tolerated.rs
++++ b/cargo/switchyard/tests/apply/attestation_error_tolerated.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/best_effort_restore_ok.rs b/cargo/switchyard/tests/apply/best_effort_restore_ok.rs
+index 0e244ff..b7f3ec5 100644
+--- a/cargo/switchyard/tests/apply/best_effort_restore_ok.rs
++++ b/cargo/switchyard/tests/apply/best_effort_restore_ok.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{PlanInput, RestoreRequest};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/commit_happy.rs b/cargo/switchyard/tests/apply/commit_happy.rs
+index 4ef23a3..6b15c8b 100644
+--- a/cargo/switchyard/tests/apply/commit_happy.rs
++++ b/cargo/switchyard/tests/apply/commit_happy.rs
+@@ -9,7 +9,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/crash_between_backup_rename.rs b/cargo/switchyard/tests/apply/crash_between_backup_rename.rs
+index 6fe7c24..f63bf37 100644
+--- a/cargo/switchyard/tests/apply/crash_between_backup_rename.rs
++++ b/cargo/switchyard/tests/apply/crash_between_backup_rename.rs
+@@ -36,7 +36,7 @@ fn e2e_apply_022_crash_between_backup_and_rename() {
+     let plan = api.plan(input);
+     
+     // Apply should succeed in normal conditions
+-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
++    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
+     
+     // Verify no temporary artifacts remain after successful apply
+     let temp_files: Vec<std::path::PathBuf> = std::fs::read_dir(root)
+diff --git a/cargo/switchyard/tests/apply/dryrun_ignores_smoke.rs b/cargo/switchyard/tests/apply/dryrun_ignores_smoke.rs
+index 3a1d387..2e989a0 100644
+--- a/cargo/switchyard/tests/apply/dryrun_ignores_smoke.rs
++++ b/cargo/switchyard/tests/apply/dryrun_ignores_smoke.rs
+@@ -7,7 +7,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/dryrun_symlink.rs b/cargo/switchyard/tests/apply/dryrun_symlink.rs
+index fc7ce38..15aba1c 100644
+--- a/cargo/switchyard/tests/apply/dryrun_symlink.rs
++++ b/cargo/switchyard/tests/apply/dryrun_symlink.rs
+@@ -10,7 +10,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/enospc_backup_restore.rs b/cargo/switchyard/tests/apply/enospc_backup_restore.rs
+index e980e4d..ace6e36 100644
+--- a/cargo/switchyard/tests/apply/enospc_backup_restore.rs
++++ b/cargo/switchyard/tests/apply/enospc_backup_restore.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -53,7 +53,7 @@ fn e2e_apply_014_enospc_during_backup_restore_path() {
+     let plan = api.plan(input);
+     
+     // Apply should succeed in normal conditions
+-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
++    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
+     
+     // Check that we got the appropriate apply events
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/apply/error_atomic_swap.rs b/cargo/switchyard/tests/apply/error_atomic_swap.rs
+index f20148d..c7aeafb 100644
+--- a/cargo/switchyard/tests/apply/error_atomic_swap.rs
++++ b/cargo/switchyard/tests/apply/error_atomic_swap.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/error_exdev.rs b/cargo/switchyard/tests/apply/error_exdev.rs
+index f632d8b..d383716 100644
+--- a/cargo/switchyard/tests/apply/error_exdev.rs
++++ b/cargo/switchyard/tests/apply/error_exdev.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/error_policy.rs b/cargo/switchyard/tests/apply/error_policy.rs
+index 57f5ab2..ac4dff7 100644
+--- a/cargo/switchyard/tests/apply/error_policy.rs
++++ b/cargo/switchyard/tests/apply/error_policy.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/error_restore_failed.rs b/cargo/switchyard/tests/apply/error_restore_failed.rs
+index 9c4bed2..41944a8 100644
+--- a/cargo/switchyard/tests/apply/error_restore_failed.rs
++++ b/cargo/switchyard/tests/apply/error_restore_failed.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{PlanInput, RestoreRequest};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/exdev_degraded.rs b/cargo/switchyard/tests/apply/exdev_degraded.rs
+index 56cc61d..43495e4 100644
+--- a/cargo/switchyard/tests/apply/exdev_degraded.rs
++++ b/cargo/switchyard/tests/apply/exdev_degraded.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/lock_contention_timeout.rs b/cargo/switchyard/tests/apply/lock_contention_timeout.rs
+index 8ece187..9144026 100644
+--- a/cargo/switchyard/tests/apply/lock_contention_timeout.rs
++++ b/cargo/switchyard/tests/apply/lock_contention_timeout.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -31,8 +31,8 @@ fn e2e_apply_015_lock_contention_timeout() {
+     let audit = JsonlSink::default();
+     let mut policy = Policy::default();
+     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
+-    policy.lock_timeout_ms = 500; // 500ms timeout
+-    let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
++    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
++        .with_lock_timeout_ms(500); // 500ms timeout
+     
+     // Layout under temp root
+     let td = tempfile::tempdir().unwrap();
+diff --git a/cargo/switchyard/tests/apply/lock_timeout_high.rs b/cargo/switchyard/tests/apply/lock_timeout_high.rs
+index b01b020..7861f67 100644
+--- a/cargo/switchyard/tests/apply/lock_timeout_high.rs
++++ b/cargo/switchyard/tests/apply/lock_timeout_high.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -31,8 +31,8 @@ fn e2e_apply_010_lock_timeout_high() {
+     let audit = JsonlSink::default();
+     let mut policy = Policy::default();
+     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
+-    policy.lock_timeout_ms = 1000; // 1 second timeout
+-    let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
++    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
++        .with_lock_timeout_ms(1000); // 1 second timeout
+     
+     // Layout under temp root
+     let td = tempfile::tempdir().unwrap();
+diff --git a/cargo/switchyard/tests/apply/ownership_strict_gates.rs b/cargo/switchyard/tests/apply/ownership_strict_gates.rs
+index 3665fbc..e73aeff 100644
+--- a/cargo/switchyard/tests/apply/ownership_strict_gates.rs
++++ b/cargo/switchyard/tests/apply/ownership_strict_gates.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/ownership_strict_with_oracle.rs b/cargo/switchyard/tests/apply/ownership_strict_with_oracle.rs
+index 874f309..18a57b8 100644
+--- a/cargo/switchyard/tests/apply/ownership_strict_with_oracle.rs
++++ b/cargo/switchyard/tests/apply/ownership_strict_with_oracle.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -55,7 +55,7 @@ fn e2e_apply_017_ownership_strict_with_oracle_present() {
+     let plan = api.plan(input);
+     
+     // Apply should succeed with ownership oracle present
+-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
++    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
+     
+     // Check that we got the appropriate apply events with provenance
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/apply/perf_aggregation.rs b/cargo/switchyard/tests/apply/perf_aggregation.rs
+index 48e5317..eadf39e 100644
+--- a/cargo/switchyard/tests/apply/perf_aggregation.rs
++++ b/cargo/switchyard/tests/apply/perf_aggregation.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/sidecar_integrity_disabled.rs b/cargo/switchyard/tests/apply/sidecar_integrity_disabled.rs
+index 6739210..1e0f452 100644
+--- a/cargo/switchyard/tests/apply/sidecar_integrity_disabled.rs
++++ b/cargo/switchyard/tests/apply/sidecar_integrity_disabled.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -55,7 +55,7 @@ fn e2e_apply_020_sidecar_integrity_disabled_tolerates_tamper() {
+     let _ = api.preflight(&plan).unwrap();
+     
+     // Apply should succeed even with sidecar integrity disabled
+-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
++    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
+     
+     // Check that we got the appropriate apply events
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/apply/smoke_ok.rs b/cargo/switchyard/tests/apply/smoke_ok.rs
+index 0e79876..850bc85 100644
+--- a/cargo/switchyard/tests/apply/smoke_ok.rs
++++ b/cargo/switchyard/tests/apply/smoke_ok.rs
+@@ -7,7 +7,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/smoke_required.rs b/cargo/switchyard/tests/apply/smoke_required.rs
+index c2d63f9..095060c 100644
+--- a/cargo/switchyard/tests/apply/smoke_required.rs
++++ b/cargo/switchyard/tests/apply/smoke_required.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/apply/smoke_rollback.rs b/cargo/switchyard/tests/apply/smoke_rollback.rs
+index a87d107..bb1f4ff 100644
+--- a/cargo/switchyard/tests/apply/smoke_rollback.rs
++++ b/cargo/switchyard/tests/apply/smoke_rollback.rs
+@@ -6,7 +6,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/audit/audit_schema.rs b/cargo/switchyard/tests/audit/audit_schema.rs
+index 4136c00..c79c1dc 100644
+--- a/cargo/switchyard/tests/audit/audit_schema.rs
++++ b/cargo/switchyard/tests/audit/audit_schema.rs
+@@ -6,7 +6,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/audit/envelope_v2_1.rs b/cargo/switchyard/tests/audit/envelope_v2_1.rs
+index 75ac119..f1fedfc 100644
+--- a/cargo/switchyard/tests/audit/envelope_v2_1.rs
++++ b/cargo/switchyard/tests/audit/envelope_v2_1.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/audit/preflight_summary_error_id.rs b/cargo/switchyard/tests/audit/preflight_summary_error_id.rs
+index add71d6..f2d7e37 100644
+--- a/cargo/switchyard/tests/audit/preflight_summary_error_id.rs
++++ b/cargo/switchyard/tests/audit/preflight_summary_error_id.rs
+@@ -4,7 +4,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/audit/provenance_presence.rs b/cargo/switchyard/tests/audit/provenance_presence.rs
+index 1656b08..53d233c 100644
+--- a/cargo/switchyard/tests/audit/provenance_presence.rs
++++ b/cargo/switchyard/tests/audit/provenance_presence.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/audit/summary_error_ids_ownership.rs b/cargo/switchyard/tests/audit/summary_error_ids_ownership.rs
+index 51c09bc..d028d09 100644
+--- a/cargo/switchyard/tests/audit/summary_error_ids_ownership.rs
++++ b/cargo/switchyard/tests/audit/summary_error_ids_ownership.rs
+@@ -4,7 +4,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/combinatorial/three_wise_generator.rs b/cargo/switchyard/tests/combinatorial/three_wise_generator.rs
+index 3531094..95eed6a 100644
+--- a/cargo/switchyard/tests/combinatorial/three_wise_generator.rs
++++ b/cargo/switchyard/tests/combinatorial/three_wise_generator.rs
+@@ -16,7 +16,7 @@ fn three_wise_generator_high_risk_axes() {
+     // Test with different policy configurations that represent high-risk axes
+     let mut policy = Policy::default();
+     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
+-    policy.apply.smoke = switchyard::policy::types::SmokePolicy::Require;
++    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: false };
+     policy.risks.ownership_strict = true;
+     
+     let api = switchyard::Switchyard::new(facts, audit, policy);
+diff --git a/cargo/switchyard/tests/fs/prune_backups.rs b/cargo/switchyard/tests/fs/prune_backups.rs
+index 0b82920..8892097 100644
+--- a/cargo/switchyard/tests/fs/prune_backups.rs
++++ b/cargo/switchyard/tests/fs/prune_backups.rs
+@@ -4,7 +4,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::safepath::SafePath;
+ use switchyard::constants::DEFAULT_BACKUP_TAG;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>> ,
+ }
+diff --git a/cargo/switchyard/tests/fs/restore_invertible_roundtrip.rs b/cargo/switchyard/tests/fs/restore_invertible_roundtrip.rs
+index 4901d1b..ad84b60 100644
+--- a/cargo/switchyard/tests/fs/restore_invertible_roundtrip.rs
++++ b/cargo/switchyard/tests/fs/restore_invertible_roundtrip.rs
+@@ -5,7 +5,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput, RestoreRequest};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/helpers/rival_lock_holder.rs b/cargo/switchyard/tests/helpers/rival_lock_holder.rs
+index 1f893ef..df9b0ce 100644
+--- a/cargo/switchyard/tests/helpers/rival_lock_holder.rs
++++ b/cargo/switchyard/tests/helpers/rival_lock_holder.rs
+@@ -16,8 +16,8 @@ fn helper_rival_lock_holder() {
+     let audit = JsonlSink::default();
+     let mut policy = Policy::default();
+     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
+-    policy.lock_timeout_ms = 1000; // 1 second timeout
+-    let api = switchyard::Switchyard::new(facts, audit, policy);
++    let api = switchyard::Switchyard::new(facts, audit, policy)
++        .with_lock_timeout_ms(1000); // 1 second timeout
+     
+     // Use temp directory
+     let td = tempfile::tempdir().unwrap();
+diff --git a/cargo/switchyard/tests/locking/lock_attempts.rs b/cargo/switchyard/tests/locking/lock_attempts.rs
+index 63049da..a64661e 100644
+--- a/cargo/switchyard/tests/locking/lock_attempts.rs
++++ b/cargo/switchyard/tests/locking/lock_attempts.rs
+@@ -7,7 +7,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/locking/lock_timeout_high_ok.rs b/cargo/switchyard/tests/locking/lock_timeout_high_ok.rs
+index 860543b..33ff091 100644
+--- a/cargo/switchyard/tests/locking/lock_timeout_high_ok.rs
++++ b/cargo/switchyard/tests/locking/lock_timeout_high_ok.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/locking/lock_wait_fact.rs b/cargo/switchyard/tests/locking/lock_wait_fact.rs
+index 2d4e677..364739b 100644
+--- a/cargo/switchyard/tests/locking/lock_wait_fact.rs
++++ b/cargo/switchyard/tests/locking/lock_wait_fact.rs
+@@ -7,7 +7,7 @@ use switchyard::types::plan::PlanInput;
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/locking/locking_required.rs b/cargo/switchyard/tests/locking/locking_required.rs
+index 9a6f6ab..a9b3e63 100644
+--- a/cargo/switchyard/tests/locking/locking_required.rs
++++ b/cargo/switchyard/tests/locking/locking_required.rs
+@@ -4,7 +4,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::PlanInput;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/locking/locking_stage_parity.rs b/cargo/switchyard/tests/locking/locking_stage_parity.rs
+index 62e04b5..6bd69b6 100644
+--- a/cargo/switchyard/tests/locking/locking_stage_parity.rs
++++ b/cargo/switchyard/tests/locking/locking_stage_parity.rs
+@@ -6,7 +6,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/locking/locking_timeout.rs b/cargo/switchyard/tests/locking/locking_timeout.rs
+index f3f0e66..6efcecb 100644
+--- a/cargo/switchyard/tests/locking/locking_timeout.rs
++++ b/cargo/switchyard/tests/locking/locking_timeout.rs
+@@ -5,7 +5,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::PlanInput;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -24,6 +24,7 @@ impl FactsEmitter for TestEmitter {
+ struct TimeoutGuard;
+ impl switchyard::adapters::LockGuard for TimeoutGuard {}
+ 
++#[derive(Debug)]
+ struct TimeoutLock;
+ impl switchyard::adapters::LockManager for TimeoutLock {
+     fn acquire_process_lock(
+diff --git a/cargo/switchyard/tests/locking/optional_no_manager_warn.rs b/cargo/switchyard/tests/locking/optional_no_manager_warn.rs
+index 8023dda..419e62b 100644
+--- a/cargo/switchyard/tests/locking/optional_no_manager_warn.rs
++++ b/cargo/switchyard/tests/locking/optional_no_manager_warn.rs
+@@ -7,7 +7,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/oracles/apply_facts_emission.rs b/cargo/switchyard/tests/oracles/apply_facts_emission.rs
+index 4fc50e8..32bb4fc 100644
+--- a/cargo/switchyard/tests/oracles/apply_facts_emission.rs
++++ b/cargo/switchyard/tests/oracles/apply_facts_emission.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/oracles/bounds_recording.rs b/cargo/switchyard/tests/oracles/bounds_recording.rs
+index 446d2fd..801990b 100644
+--- a/cargo/switchyard/tests/oracles/bounds_recording.rs
++++ b/cargo/switchyard/tests/oracles/bounds_recording.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -58,7 +58,7 @@ fn bounds_recording() {
+     };
+     
+     let plan = api.plan(input);
+-    let apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
++    let _apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+     
+     // Check that we got the appropriate apply events
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/oracles/exdev_invariants.rs b/cargo/switchyard/tests/oracles/exdev_invariants.rs
+index 41a5849..6dcca86 100644
+--- a/cargo/switchyard/tests/oracles/exdev_invariants.rs
++++ b/cargo/switchyard/tests/oracles/exdev_invariants.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -61,7 +61,7 @@ fn exdev_invariants() {
+     let _ = api.preflight(&plan).unwrap();
+     
+     // Apply with EXDEV policy should succeed in dry run mode
+-    let apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
++    let _apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+     
+     // Check that we got the appropriate apply events
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/oracles/locking_invariant.rs b/cargo/switchyard/tests/oracles/locking_invariant.rs
+index 062a909..eb44a0b 100644
+--- a/cargo/switchyard/tests/oracles/locking_invariant.rs
++++ b/cargo/switchyard/tests/oracles/locking_invariant.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/oracles/plan_sorting.rs b/cargo/switchyard/tests/oracles/plan_sorting.rs
+index 352ebc1..2217e27 100644
+--- a/cargo/switchyard/tests/oracles/plan_sorting.rs
++++ b/cargo/switchyard/tests/oracles/plan_sorting.rs
+@@ -49,7 +49,7 @@ fn plan_deterministic_sorting() {
+     let plan = api.plan(input);
+     
+     // Verify sorted by kind (EnsureSymlink) then by target.rel lexicographically
+-    let mut last_kind = 0u8; // 0 for link
++    let last_kind = 0u8; // 0 for link
+     let mut last_t = String::new();
+     for act in plan.actions.iter() {
+         match act {
+@@ -65,5 +65,6 @@ fn plan_deterministic_sorting() {
+     
+     // Verify action_id is stable (UUIDv5 derivation)
+     // Plan ID should be deterministic based on inputs
+-    assert!(!plan.plan_id.is_empty(), "plan_id should be present");
++    let plan_uuid = switchyard::types::ids::plan_id(&plan);
++    assert!(!plan_uuid.to_string().is_empty(), "plan_id should be present");
+ }
+diff --git a/cargo/switchyard/tests/oracles/preflight_rows_sorting.rs b/cargo/switchyard/tests/oracles/preflight_rows_sorting.rs
+index 096ecad..2dbdb06 100644
+--- a/cargo/switchyard/tests/oracles/preflight_rows_sorting.rs
++++ b/cargo/switchyard/tests/oracles/preflight_rows_sorting.rs
+@@ -53,8 +53,8 @@ fn preflight_rows_sorting() {
+     let mut last_path = String::new();
+     let mut last_action_id = String::new();
+     for row in pf.rows.iter() {
+-        let path = row.path.to_string_lossy().to_string();
+-        let action_id = row.action_id.clone();
++        let path = row.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string();
++        let action_id = row.get("action_id").and_then(|a| a.as_str()).unwrap_or("").to_string();
+         
+         // Check path ordering
+         assert!(path >= last_path, "rows should be sorted by path: {} >= {}", path, last_path);
+diff --git a/cargo/switchyard/tests/oracles/prune_invariants.rs b/cargo/switchyard/tests/oracles/prune_invariants.rs
+index b4c9518..34f9044 100644
+--- a/cargo/switchyard/tests/oracles/prune_invariants.rs
++++ b/cargo/switchyard/tests/oracles/prune_invariants.rs
+@@ -13,7 +13,7 @@ fn prune_invariants() {
+     let facts = JsonlSink::default();
+     let audit = JsonlSink::default();
+     let policy = Policy::default();
+-    let api = switchyard::Switchyard::new(facts, audit, policy);
++    let _api = switchyard::Switchyard::new(facts, audit, policy);
+     
+     // Use temp directory
+     let td = tempfile::tempdir().unwrap();
+diff --git a/cargo/switchyard/tests/oracles/redaction_invariant.rs b/cargo/switchyard/tests/oracles/redaction_invariant.rs
+index aa7dfd7..6fe6a95 100644
+--- a/cargo/switchyard/tests/oracles/redaction_invariant.rs
++++ b/cargo/switchyard/tests/oracles/redaction_invariant.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -60,7 +60,7 @@ fn redaction_invariant() {
+     let _ = api.preflight(&plan).unwrap();
+     
+     // Apply in dry run mode
+-    let dryrun_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
++    let _dryrun_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+     
+     // Check that dry run facts have TS_ZERO timestamps
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/oracles/rollback_pure_function.rs b/cargo/switchyard/tests/oracles/rollback_pure_function.rs
+index 65ab763..1b25819 100644
+--- a/cargo/switchyard/tests/oracles/rollback_pure_function.rs
++++ b/cargo/switchyard/tests/oracles/rollback_pure_function.rs
+@@ -53,7 +53,9 @@ fn rollback_pure_function() {
+     let rollback_plan2 = api.plan_rollback_of(&apply_result);
+     
+     // Both rollback plans should be identical
+-    assert_eq!(rollback_plan.plan_id, rollback_plan2.plan_id, "rollback plan ID should be deterministic");
++    let rollback_plan_id = switchyard::types::ids::plan_id(&rollback_plan);
++    let rollback_plan2_id = switchyard::types::ids::plan_id(&rollback_plan2);
++    assert_eq!(rollback_plan_id, rollback_plan2_id, "rollback plan ID should be deterministic");
+     assert_eq!(rollback_plan.actions.len(), rollback_plan2.actions.len(), "rollback plans should have same number of actions");
+     
+     // Verify rollback plan content
+diff --git a/cargo/switchyard/tests/oracles/smoke_invariants.rs b/cargo/switchyard/tests/oracles/smoke_invariants.rs
+index e11dd8d..f929ef8 100644
+--- a/cargo/switchyard/tests/oracles/smoke_invariants.rs
++++ b/cargo/switchyard/tests/oracles/smoke_invariants.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -25,14 +25,11 @@ impl FactsEmitter for TestEmitter {
+ }
+ 
+ // Mock smoke runner that always fails
++#[derive(Debug)]
+ struct FailingSmokeRunner;
+ impl switchyard::adapters::SmokeTestRunner for FailingSmokeRunner {
+     fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::SmokeFailure> {
+-        Err(switchyard::adapters::SmokeFailure::CommandFailed { 
+-            command: "mock".to_string(), 
+-            exit_code: 1, 
+-            stderr: "mock failure".to_string() 
+-        })
++        Err(switchyard::adapters::SmokeFailure)
+     }
+ }
+ 
+@@ -44,7 +41,7 @@ fn smoke_invariants() {
+     let facts = TestEmitter::default();
+     let audit = JsonlSink::default();
+     let mut policy = Policy::default();
+-    policy.apply.smoke = switchyard::policy::types::SmokePolicy::Require; // Require smoke tests
++    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true }; // Require smoke tests
+     policy.governance.allow_unlocked_commit = true; // Allow commit without lock manager
+     
+     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+diff --git a/cargo/switchyard/tests/plan/huge.rs b/cargo/switchyard/tests/plan/huge.rs
+index 0dbec89..4e06160 100644
+--- a/cargo/switchyard/tests/plan/huge.rs
++++ b/cargo/switchyard/tests/plan/huge.rs
+@@ -39,7 +39,7 @@ fn e2e_plan_004_huge_plan_performance_and_determinism() {
+     assert_eq!(plan.actions.len(), 1000, "expected 1000 actions in huge plan");
+     
+     // Verify sorted by kind (EnsureSymlink) then by target.rel lexicographically
+-    let mut last_kind = 0u8; // 0 for link
++    let last_kind = 0u8; // 0 for link
+     let mut last_t = String::new();
+     for act in plan.actions.iter() {
+         match act {
+diff --git a/cargo/switchyard/tests/preflight/baseline_ok.rs b/cargo/switchyard/tests/preflight/baseline_ok.rs
+index 3e281ad..97caa78 100644
+--- a/cargo/switchyard/tests/preflight/baseline_ok.rs
++++ b/cargo/switchyard/tests/preflight/baseline_ok.rs
+@@ -16,7 +16,7 @@ fn make_plan() -> (switchyard::Switchyard<JsonlSink, JsonlSink>, std::path::Path
+     let api = switchyard::Switchyard::new(facts, audit, Policy::default());
+ 
+     let td = tempfile::tempdir().unwrap();
+-    let root = td.into_path();
++    let root = td.keep();
+     std::fs::create_dir_all(root.join("bin")).unwrap();
+     std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+     std::fs::write(root.join("bin/new"), b"n").unwrap();
+@@ -38,14 +38,14 @@ fn e2e_preflight_004_rescue_not_required_ok() {
+ 
+ #[test]
+ fn e2e_preflight_010_exec_check_disabled_ok() {
+-    let (mut api, root) = {
++    let (api, root) = {
+         let facts = JsonlSink::default();
+         let audit = JsonlSink::default();
+         let mut policy = Policy::default();
+         policy.rescue.exec_check = false;
+         let api = switchyard::Switchyard::new(facts, audit, policy);
+         let td = tempfile::tempdir().unwrap();
+-        let root = td.into_path();
++        let root = td.keep();
+         std::fs::create_dir_all(root.join("bin")).unwrap();
+         std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+         std::fs::write(root.join("bin/new"), b"n").unwrap();
+diff --git a/cargo/switchyard/tests/preflight/extra_mount_checks_five.rs b/cargo/switchyard/tests/preflight/extra_mount_checks_five.rs
+index 76f27ae..d2aa22d 100644
+--- a/cargo/switchyard/tests/preflight/extra_mount_checks_five.rs
++++ b/cargo/switchyard/tests/preflight/extra_mount_checks_five.rs
+@@ -13,11 +13,11 @@ fn e2e_preflight_006_extra_mount_checks_five() {
+     let mut policy = Policy::default();
+     // Set 5 extra mount checks
+     policy.apply.extra_mount_checks = vec![
+-        "/tmp".to_string(),
+-        "/var".to_string(),
+-        "/home".to_string(),
+-        "/opt".to_string(),
+-        "/usr/local".to_string(),
++        "/tmp".to_string().into(),
++        "/var".to_string().into(),
++        "/home".to_string().into(),
++        "/opt".to_string().into(),
++        "/usr/local".to_string().into(),
+     ];
+     let api = switchyard::Switchyard::new(facts, audit, policy);
+     
+@@ -36,7 +36,11 @@ fn e2e_preflight_006_extra_mount_checks_five() {
+     // Check that extra mount checks are present in the notes
+     assert!(pf.rows.len() > 0, "preflight should have rows");
+     let has_mount_notes = pf.rows.iter().any(|row| {
+-        row.notes.iter().any(|note| note.contains("mount"))
++        row.get("notes").and_then(|notes| notes.as_array()).map_or(false, |notes| {
++            notes.iter().any(|note| {
++                note.as_str().map_or(false, |note_str| note_str.contains("mount"))
++            })
++        })
+     });
+     assert!(has_mount_notes, "preflight rows should contain mount check notes");
+ }
+diff --git a/cargo/switchyard/tests/preflight/ownership_strict_without_oracle.rs b/cargo/switchyard/tests/preflight/ownership_strict_without_oracle.rs
+index 98a1b41..2f96cf6 100644
+--- a/cargo/switchyard/tests/preflight/ownership_strict_without_oracle.rs
++++ b/cargo/switchyard/tests/preflight/ownership_strict_without_oracle.rs
+@@ -7,7 +7,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>> ,
+ }
+diff --git a/cargo/switchyard/tests/preflight/preflight_preservation_required.rs b/cargo/switchyard/tests/preflight/preflight_preservation_required.rs
+index 61844d4..8e1012f 100644
+--- a/cargo/switchyard/tests/preflight/preflight_preservation_required.rs
++++ b/cargo/switchyard/tests/preflight/preflight_preservation_required.rs
+@@ -3,7 +3,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter;
+ impl FactsEmitter for TestEmitter {
+     fn emit(&self, _subsystem: &str, _event: &str, _decision: &str, _fields: serde_json::Value) {}
+@@ -23,7 +23,7 @@ fn preflight_stops_when_preservation_required_and_unsupported() {
+     std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+     // Intentionally do NOT create the target path, so preservation_supported=false
+ 
+-    let api = switchyard::Switchyard::new(facts, audit, policy);
++    let _api = switchyard::Switchyard::new(facts, audit, policy);
+ 
+     let src = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
+     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
+diff --git a/cargo/switchyard/tests/preflight/preflight_yaml_golden.rs b/cargo/switchyard/tests/preflight/preflight_yaml_golden.rs
+index 1c74d73..c7e0a02 100644
+--- a/cargo/switchyard/tests/preflight/preflight_yaml_golden.rs
++++ b/cargo/switchyard/tests/preflight/preflight_yaml_golden.rs
+@@ -3,7 +3,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter;
+ impl FactsEmitter for TestEmitter {
+     fn emit(&self, _subsystem: &str, _event: &str, _decision: &str, _fields: serde_json::Value) {}
+diff --git a/cargo/switchyard/tests/preflight/rescue_exec_min_count.rs b/cargo/switchyard/tests/preflight/rescue_exec_min_count.rs
+index 26f871a..aba9ec0 100644
+--- a/cargo/switchyard/tests/preflight/rescue_exec_min_count.rs
++++ b/cargo/switchyard/tests/preflight/rescue_exec_min_count.rs
+@@ -6,7 +6,7 @@ use switchyard::policy::Policy;
+ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter;
+ impl FactsEmitter for TestEmitter {
+     fn emit(&self, _subsystem: &str, _event: &str, _decision: &str, _fields: serde_json::Value) {}
+diff --git a/cargo/switchyard/tests/requirements/backup_sidecar_integrity.rs b/cargo/switchyard/tests/requirements/backup_sidecar_integrity.rs
+index b9e7b50..3e9f776 100644
+--- a/cargo/switchyard/tests/requirements/backup_sidecar_integrity.rs
++++ b/cargo/switchyard/tests/requirements/backup_sidecar_integrity.rs
+@@ -43,7 +43,7 @@ fn req_s6_backup_sidecar_integrity() {
+         restore: vec![] 
+     };
+     
+-    let plan = api.plan(input);
++    let plan = api.plan(input.clone());
+     let apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+     
+     // No errors should occur in dry run mode
+diff --git a/cargo/switchyard/tests/requirements/dry_run_facts_identical.rs b/cargo/switchyard/tests/requirements/dry_run_facts_identical.rs
+index 8ab57d0..7747187 100644
+--- a/cargo/switchyard/tests/requirements/dry_run_facts_identical.rs
++++ b/cargo/switchyard/tests/requirements/dry_run_facts_identical.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+@@ -60,7 +60,7 @@ fn req_o2_dry_run_facts_identical() {
+     let plan = api.plan(input);
+     
+     // Apply in dry run mode
+-    let dryrun_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
++    let _dryrun_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+     
+     // Check that dry run facts have TS_ZERO timestamps
+     let redacted: Vec<Value> = facts
+diff --git a/cargo/switchyard/tests/requirements/idempotent_rollback.rs b/cargo/switchyard/tests/requirements/idempotent_rollback.rs
+index e27df7d..bd124f7 100644
+--- a/cargo/switchyard/tests/requirements/idempotent_rollback.rs
++++ b/cargo/switchyard/tests/requirements/idempotent_rollback.rs
+@@ -50,8 +50,9 @@ fn req_r3_idempotent_rollback() {
+     let rollback_plan2 = api.plan_rollback_of(&apply_result);
+     
+     // Both rollback plans should be identical (idempotent)
+-    assert_eq!(rollback_plan.plan_id, rollback_plan2.plan_id, "rollback plans should be idempotent");
+     assert_eq!(rollback_plan.actions.len(), rollback_plan2.actions.len(), "rollback plans should have same actions");
++    // Compare the actual actions to ensure idempotency
++    assert_eq!(rollback_plan.actions, rollback_plan2.actions, "rollback plans should have identical actions");
+     
+     // In dry run mode, we can't actually verify convergence, but we can check planning consistency
+ }
+diff --git a/cargo/switchyard/tests/requirements/lockmanager_required_production.rs b/cargo/switchyard/tests/requirements/lockmanager_required_production.rs
+index 1a35a39..8769ba5 100644
+--- a/cargo/switchyard/tests/requirements/lockmanager_required_production.rs
++++ b/cargo/switchyard/tests/requirements/lockmanager_required_production.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/requirements/partial_restoration_facts.rs b/cargo/switchyard/tests/requirements/partial_restoration_facts.rs
+index be65f8d..8c5a1f3 100644
+--- a/cargo/switchyard/tests/requirements/partial_restoration_facts.rs
++++ b/cargo/switchyard/tests/requirements/partial_restoration_facts.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/requirements/provenance_completeness.rs b/cargo/switchyard/tests/requirements/provenance_completeness.rs
+index 92d0114..269a9e9 100644
+--- a/cargo/switchyard/tests/requirements/provenance_completeness.rs
++++ b/cargo/switchyard/tests/requirements/provenance_completeness.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/requirements/secret_masking.rs b/cargo/switchyard/tests/requirements/secret_masking.rs
+index 3f05ed5..bedc13d 100644
+--- a/cargo/switchyard/tests/requirements/secret_masking.rs
++++ b/cargo/switchyard/tests/requirements/secret_masking.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/requirements/signed_attestations.rs b/cargo/switchyard/tests/requirements/signed_attestations.rs
+index e5bf1d0..79e76ad 100644
+--- a/cargo/switchyard/tests/requirements/signed_attestations.rs
++++ b/cargo/switchyard/tests/requirements/signed_attestations.rs
+@@ -8,19 +8,25 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+ 
++impl FactsEmitter for TestEmitter {
++    fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
++        self.events.lock().unwrap().push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
++    }
++}
++
+ // Mock attestor that always succeeds
++#[derive(Debug)]
+ struct MockAttestor;
+ impl switchyard::adapters::Attestor for MockAttestor {
+     fn sign(&self, _bundle: &[u8]) -> Result<switchyard::adapters::Signature, switchyard::adapters::AttestationError> {
+-        Ok(switchyard::adapters::Signature {
+-            key_id: "mock-key".to_string(),
+-            signature: "mock-signature".to_string(),
+-        })
++        Ok(switchyard::adapters::Signature(
++            "mock-signature".to_string().into_bytes()
++        ))
+     }
+     
+     fn key_id(&self) -> String {
+diff --git a/cargo/switchyard/tests/requirements/warn_no_lock_manager.rs b/cargo/switchyard/tests/requirements/warn_no_lock_manager.rs
+index ba96353..7003b01 100644
+--- a/cargo/switchyard/tests/requirements/warn_no_lock_manager.rs
++++ b/cargo/switchyard/tests/requirements/warn_no_lock_manager.rs
+@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
+ use switchyard::types::safepath::SafePath;
+ use switchyard::types::ApplyMode;
+ 
+-#[derive(Default, Clone)]
++#[derive(Default, Clone, Debug)]
+ struct TestEmitter {
+     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+ }
+diff --git a/cargo/switchyard/tests/safepath/basic.rs b/cargo/switchyard/tests/safepath/basic.rs
+index d5b4e15..f19f463 100644
+--- a/cargo/switchyard/tests/safepath/basic.rs
++++ b/cargo/switchyard/tests/safepath/basic.rs
+@@ -65,7 +65,7 @@ fn e2e_safepath_007_unsupported_component_invalid() {
+     let root = tempfile::tempdir().unwrap();
+     let r = root.path();
+     // Use a Windows-style prefix to trigger unsupported component on Unix paths
+-    let candidate = std::path::Path::new("C:\\windows");
++    let _candidate = std::path::Path::new("C:\\windows");
+     // On Unix, this is treated as normal components; instead, simulate by including a root prefix
+     // like //server/share which becomes Prefix component on Windows; cross-platform: use path with parent of root
+     // We'll fallback to checking when path has a component that is not CurDir/Normal/ParentDir by creating a path
+diff --git a/cargo/switchyard/tests/safepath/huge_path.rs b/cargo/switchyard/tests/safepath/huge_path.rs
+index c2e60ad..71bd0cb 100644
+--- a/cargo/switchyard/tests/safepath/huge_path.rs
++++ b/cargo/switchyard/tests/safepath/huge_path.rs
+@@ -11,7 +11,8 @@ fn e2e_safepath_012_huge_path_4096_bytes() {
+     
+     // Create a huge path (4096 bytes)
+     let huge_segment = "a".repeat(2000); // 2000 characters
+-    let candidate = std::path::Path::new(&format!("usr/{}/bin/{}", huge_segment, huge_segment));
++    let path_str = format!("usr/{}/bin/{}", huge_segment, huge_segment);
++    let candidate = std::path::Path::new(&path_str);
+     
+     let sp = SafePath::from_rooted(r, candidate);
+     // This should either succeed or fail with a documented error
+diff --git a/cargo/switchyard/tests/safepath/long_path.rs b/cargo/switchyard/tests/safepath/long_path.rs
+index ae3ce50..15e6a80 100644
+--- a/cargo/switchyard/tests/safepath/long_path.rs
++++ b/cargo/switchyard/tests/safepath/long_path.rs
+@@ -11,7 +11,8 @@ fn e2e_safepath_011_long_path_255_bytes() {
+     
+     // Create a long path (255 bytes)
+     let long_segment = "a".repeat(100); // 100 characters
+-    let candidate = std::path::Path::new(&format!("usr/{}/bin/{}", long_segment, long_segment));
++    let path_str = format!("usr/{}/bin/{}", long_segment, long_segment);
++    let candidate = std::path::Path::new(&path_str);
+     
+     let sp = SafePath::from_rooted(r, candidate);
+     // This should succeed as long paths are supported

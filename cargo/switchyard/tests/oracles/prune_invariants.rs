@@ -13,7 +13,7 @@ fn prune_invariants() {
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();
     let policy = Policy::default();
-    let api = switchyard::Switchyard::new(facts, audit, policy);
+    let _api = switchyard::Switchyard::new(facts, audit, policy);
     
     // Use temp directory
     let td = tempfile::tempdir().unwrap();

@@ -4,7 +4,7 @@ use switchyard::policy::Policy;
 use switchyard::types::safepath::SafePath;
 use switchyard::constants::DEFAULT_BACKUP_TAG;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>> ,
 }

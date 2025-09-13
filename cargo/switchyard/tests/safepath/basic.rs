@@ -65,7 +65,7 @@ fn e2e_safepath_007_unsupported_component_invalid() {
     let root = tempfile::tempdir().unwrap();
     let r = root.path();
     // Use a Windows-style prefix to trigger unsupported component on Unix paths
-    let candidate = std::path::Path::new("C:\\windows");
+    let _candidate = std::path::Path::new("C:\\windows");
     // On Unix, this is treated as normal components; instead, simulate by including a root prefix
     // like //server/share which becomes Prefix component on Windows; cross-platform: use path with parent of root
     // We'll fallback to checking when path has a component that is not CurDir/Normal/ParentDir by creating a path

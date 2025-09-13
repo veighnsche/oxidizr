@@ -5,7 +5,7 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::PlanInput;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -24,6 +24,7 @@ impl FactsEmitter for TestEmitter {
 struct TimeoutGuard;
 impl switchyard::adapters::LockGuard for TimeoutGuard {}
 
+#[derive(Debug)]
 struct TimeoutLock;
 impl switchyard::adapters::LockManager for TimeoutLock {
     fn acquire_process_lock(

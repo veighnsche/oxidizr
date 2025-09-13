@@ -24,7 +24,7 @@ pub struct PlanInput {
     pub restore: Vec<RestoreRequest>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Action {
     EnsureSymlink { source: SafePath, target: SafePath },
     RestoreFromBackup { target: SafePath },

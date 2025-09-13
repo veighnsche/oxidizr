@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -31,8 +31,8 @@ fn e2e_apply_010_lock_timeout_high() {
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
-    policy.lock_timeout_ms = 1000; // 1 second timeout
-    let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
+    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_lock_timeout_ms(1000); // 1 second timeout
     
     // Layout under temp root
     let td = tempfile::tempdir().unwrap();

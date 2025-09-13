@@ -8,19 +8,25 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
 
+impl FactsEmitter for TestEmitter {
+    fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
+        self.events.lock().unwrap().push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
+    }
+}
+
 // Mock attestor that always succeeds
+#[derive(Debug)]
 struct MockAttestor;
 impl switchyard::adapters::Attestor for MockAttestor {
     fn sign(&self, _bundle: &[u8]) -> Result<switchyard::adapters::Signature, switchyard::adapters::AttestationError> {
-        Ok(switchyard::adapters::Signature {
-            key_id: "mock-key".to_string(),
-            signature: "mock-signature".to_string(),
-        })
+        Ok(switchyard::adapters::Signature(
+            "mock-signature".to_string().into_bytes()
+        ))
     }
     
     fn key_id(&self) -> String {

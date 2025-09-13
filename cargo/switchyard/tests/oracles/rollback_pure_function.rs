@@ -53,7 +53,9 @@ fn rollback_pure_function() {
     let rollback_plan2 = api.plan_rollback_of(&apply_result);
     
     // Both rollback plans should be identical
-    assert_eq!(rollback_plan.plan_id, rollback_plan2.plan_id, "rollback plan ID should be deterministic");
+    let rollback_plan_id = switchyard::types::ids::plan_id(&rollback_plan);
+    let rollback_plan2_id = switchyard::types::ids::plan_id(&rollback_plan2);
+    assert_eq!(rollback_plan_id, rollback_plan2_id, "rollback plan ID should be deterministic");
     assert_eq!(rollback_plan.actions.len(), rollback_plan2.actions.len(), "rollback plans should have same number of actions");
     
     // Verify rollback plan content

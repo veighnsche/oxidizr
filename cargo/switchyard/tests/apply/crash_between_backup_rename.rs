@@ -36,7 +36,7 @@ fn e2e_apply_022_crash_between_backup_and_rename() {
     let plan = api.plan(input);
     
     // Apply should succeed in normal conditions
-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
+    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
     
     // Verify no temporary artifacts remain after successful apply
     let temp_files: Vec<std::path::PathBuf> = std::fs::read_dir(root)

@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -61,7 +61,7 @@ fn exdev_invariants() {
     let _ = api.preflight(&plan).unwrap();
     
     // Apply with EXDEV policy should succeed in dry run mode
-    let apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+    let _apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
     
     // Check that we got the appropriate apply events
     let redacted: Vec<Value> = facts

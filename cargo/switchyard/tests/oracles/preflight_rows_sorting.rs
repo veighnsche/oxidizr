@@ -53,8 +53,8 @@ fn preflight_rows_sorting() {
     let mut last_path = String::new();
     let mut last_action_id = String::new();
     for row in pf.rows.iter() {
-        let path = row.path.to_string_lossy().to_string();
-        let action_id = row.action_id.clone();
+        let path = row.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string();
+        let action_id = row.get("action_id").and_then(|a| a.as_str()).unwrap_or("").to_string();
         
         // Check path ordering
         assert!(path >= last_path, "rows should be sorted by path: {} >= {}", path, last_path);

@@ -16,8 +16,8 @@ fn helper_rival_lock_holder() {
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
-    policy.lock_timeout_ms = 1000; // 1 second timeout
-    let api = switchyard::Switchyard::new(facts, audit, policy);
+    let api = switchyard::Switchyard::new(facts, audit, policy)
+        .with_lock_timeout_ms(1000); // 1 second timeout
     
     // Use temp directory
     let td = tempfile::tempdir().unwrap();

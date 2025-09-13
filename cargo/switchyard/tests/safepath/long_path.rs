@@ -11,7 +11,8 @@ fn e2e_safepath_011_long_path_255_bytes() {
     
     // Create a long path (255 bytes)
     let long_segment = "a".repeat(100); // 100 characters
-    let candidate = std::path::Path::new(&format!("usr/{}/bin/{}", long_segment, long_segment));
+    let path_str = format!("usr/{}/bin/{}", long_segment, long_segment);
+    let candidate = std::path::Path::new(&path_str);
     
     let sp = SafePath::from_rooted(r, candidate);
     // This should succeed as long paths are supported

@@ -39,7 +39,7 @@ fn e2e_plan_004_huge_plan_performance_and_determinism() {
     assert_eq!(plan.actions.len(), 1000, "expected 1000 actions in huge plan");
     
     // Verify sorted by kind (EnsureSymlink) then by target.rel lexicographically
-    let mut last_kind = 0u8; // 0 for link
+    let last_kind = 0u8; // 0 for link
     let mut last_t = String::new();
     for act in plan.actions.iter() {
         match act {

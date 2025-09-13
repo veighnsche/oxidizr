@@ -13,11 +13,11 @@ fn e2e_preflight_006_extra_mount_checks_five() {
     let mut policy = Policy::default();
     // Set 5 extra mount checks
     policy.apply.extra_mount_checks = vec![
-        "/tmp".to_string(),
-        "/var".to_string(),
-        "/home".to_string(),
-        "/opt".to_string(),
-        "/usr/local".to_string(),
+        "/tmp".to_string().into(),
+        "/var".to_string().into(),
+        "/home".to_string().into(),
+        "/opt".to_string().into(),
+        "/usr/local".to_string().into(),
     ];
     let api = switchyard::Switchyard::new(facts, audit, policy);
     
@@ -36,7 +36,11 @@ fn e2e_preflight_006_extra_mount_checks_five() {
     // Check that extra mount checks are present in the notes
     assert!(pf.rows.len() > 0, "preflight should have rows");
     let has_mount_notes = pf.rows.iter().any(|row| {
-        row.notes.iter().any(|note| note.contains("mount"))
+        row.get("notes").and_then(|notes| notes.as_array()).map_or(false, |notes| {
+            notes.iter().any(|note| {
+                note.as_str().map_or(false, |note_str| note_str.contains("mount"))
+            })
+        })
     });
     assert!(has_mount_notes, "preflight rows should contain mount check notes");
 }

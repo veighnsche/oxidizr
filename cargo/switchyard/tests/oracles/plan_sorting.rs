@@ -49,7 +49,7 @@ fn plan_deterministic_sorting() {
     let plan = api.plan(input);
     
     // Verify sorted by kind (EnsureSymlink) then by target.rel lexicographically
-    let mut last_kind = 0u8; // 0 for link
+    let last_kind = 0u8; // 0 for link
     let mut last_t = String::new();
     for act in plan.actions.iter() {
         match act {
@@ -65,5 +65,6 @@ fn plan_deterministic_sorting() {
     
     // Verify action_id is stable (UUIDv5 derivation)
     // Plan ID should be deterministic based on inputs
-    assert!(!plan.plan_id.is_empty(), "plan_id should be present");
+    let plan_uuid = switchyard::types::ids::plan_id(&plan);
+    assert!(!plan_uuid.to_string().is_empty(), "plan_id should be present");
 }

@@ -50,8 +50,9 @@ fn req_r3_idempotent_rollback() {
     let rollback_plan2 = api.plan_rollback_of(&apply_result);
     
     // Both rollback plans should be identical (idempotent)
-    assert_eq!(rollback_plan.plan_id, rollback_plan2.plan_id, "rollback plans should be idempotent");
     assert_eq!(rollback_plan.actions.len(), rollback_plan2.actions.len(), "rollback plans should have same actions");
+    // Compare the actual actions to ensure idempotency
+    assert_eq!(rollback_plan.actions, rollback_plan2.actions, "rollback plans should have identical actions");
     
     // In dry run mode, we can't actually verify convergence, but we can check planning consistency
 }

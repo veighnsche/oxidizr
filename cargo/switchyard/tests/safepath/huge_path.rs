@@ -11,7 +11,8 @@ fn e2e_safepath_012_huge_path_4096_bytes() {
     
     // Create a huge path (4096 bytes)
     let huge_segment = "a".repeat(2000); // 2000 characters
-    let candidate = std::path::Path::new(&format!("usr/{}/bin/{}", huge_segment, huge_segment));
+    let path_str = format!("usr/{}/bin/{}", huge_segment, huge_segment);
+    let candidate = std::path::Path::new(&path_str);
     
     let sp = SafePath::from_rooted(r, candidate);
     // This should either succeed or fail with a documented error

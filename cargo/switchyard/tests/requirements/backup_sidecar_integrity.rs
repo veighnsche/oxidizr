@@ -43,7 +43,7 @@ fn req_s6_backup_sidecar_integrity() {
         restore: vec![] 
     };
     
-    let plan = api.plan(input);
+    let plan = api.plan(input.clone());
     let apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
     
     // No errors should occur in dry run mode

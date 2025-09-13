@@ -8,7 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -60,7 +60,7 @@ fn redaction_invariant() {
     let _ = api.preflight(&plan).unwrap();
     
     // Apply in dry run mode
-    let dryrun_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
+    let _dryrun_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
     
     // Check that dry run facts have TS_ZERO timestamps
     let redacted: Vec<Value> = facts

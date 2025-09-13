@@ -16,7 +16,7 @@ fn make_plan() -> (switchyard::Switchyard<JsonlSink, JsonlSink>, std::path::Path
     let api = switchyard::Switchyard::new(facts, audit, Policy::default());
 
     let td = tempfile::tempdir().unwrap();
-    let root = td.into_path();
+    let root = td.keep();
     std::fs::create_dir_all(root.join("bin")).unwrap();
     std::fs::create_dir_all(root.join("usr/bin")).unwrap();
     std::fs::write(root.join("bin/new"), b"n").unwrap();
@@ -38,14 +38,14 @@ fn e2e_preflight_004_rescue_not_required_ok() {
 
 #[test]
 fn e2e_preflight_010_exec_check_disabled_ok() {
-    let (mut api, root) = {
+    let (api, root) = {
         let facts = JsonlSink::default();
         let audit = JsonlSink::default();
         let mut policy = Policy::default();
         policy.rescue.exec_check = false;
         let api = switchyard::Switchyard::new(facts, audit, policy);
         let td = tempfile::tempdir().unwrap();
-        let root = td.into_path();
+        let root = td.keep();
         std::fs::create_dir_all(root.join("bin")).unwrap();
         std::fs::create_dir_all(root.join("usr/bin")).unwrap();
         std::fs::write(root.join("bin/new"), b"n").unwrap();

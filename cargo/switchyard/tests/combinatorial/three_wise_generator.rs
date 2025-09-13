@@ -16,7 +16,7 @@ fn three_wise_generator_high_risk_axes() {
     // Test with different policy configurations that represent high-risk axes
     let mut policy = Policy::default();
     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
-    policy.apply.smoke = switchyard::policy::types::SmokePolicy::Require;
+    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: false };
     policy.risks.ownership_strict = true;
     
     let api = switchyard::Switchyard::new(facts, audit, policy);
