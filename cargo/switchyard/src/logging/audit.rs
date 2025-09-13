@@ -164,9 +164,47 @@ impl<'a> EventBuilder<'a> {
         self
     }
 
+    /// Thin wrapper for `.action(...)` to improve readability at call sites.
+    #[must_use]
+    pub fn action_id(self, aid: impl Into<String>) -> Self {
+        self.action(aid)
+    }
+
     #[must_use]
     pub fn path(mut self, path: impl Into<String>) -> Self {
         self.fields.insert("path".into(), json!(path.into()));
+        self
+    }
+
+    /// Attach a nested perf object with hash/backup/swap timings in milliseconds.
+    #[must_use]
+    pub fn perf(mut self, hash_ms: u64, backup_ms: u64, swap_ms: u64) -> Self {
+        self.fields.insert(
+            "perf".to_string(),
+            json!({
+                "hash_ms": hash_ms,
+                "backup_ms": backup_ms,
+                "swap_ms": swap_ms,
+            }),
+        );
+        self
+    }
+
+    /// Set a stable error identifier as defined in `crate::api::errors`.
+    #[must_use]
+    pub fn error_id(mut self, id: crate::api::errors::ErrorId) -> Self {
+        self.fields
+            .insert("error_id".to_string(), json!(crate::api::errors::id_str(id)));
+        self
+    }
+
+    /// Set an exit code derived from the given error id.
+    #[must_use]
+    pub fn exit_code_for(mut self, id: crate::api::errors::ErrorId) -> Self {
+        self.fields.insert(
+            "exit_code".to_string(),
+            json!(crate::api::errors::exit_code_for(id)),
+        );
         self
     }
 

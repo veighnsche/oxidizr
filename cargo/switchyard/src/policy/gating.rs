@@ -13,6 +13,7 @@ pub(crate) struct Evaluation {
 }
 
 /// Evaluate policy gating for a single action.
+#[allow(clippy::too_many_lines, reason = "Will be decomposed into typed checks in PR8")]
 pub(crate) fn evaluate_action(
     policy: &Policy,
     owner: Option<&dyn DebugOwnershipOracle>,

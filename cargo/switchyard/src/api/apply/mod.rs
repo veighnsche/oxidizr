@@ -18,12 +18,14 @@ use crate::types::ids::plan_id;
 use crate::types::{Action, ApplyMode, ApplyReport, Plan};
 use log::Level;
 
-use super::errors::{exit_code_for, ErrorId};
+use crate::api::Switchyard;
 use crate::logging::audit::{AuditCtx, AuditMode};
 use crate::logging::StageLogger;
 mod audit_fields;
 mod handlers;
+mod executors;
 mod lock;
+mod summary;
 mod perf;
 mod policy_gate;
 mod rollback;
@@ -32,8 +34,9 @@ use perf::PerfAgg;
 
 // PerfAgg moved to perf.rs; lock backend helper and acquisition moved to util.rs and lock.rs
 
+#[allow(clippy::too_many_lines, reason = "Will be split further in PR6/PR8; keeping parity now")]
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
-    api: &super::Switchyard<E, A>,
+    api: &Switchyard<E, A>,
     plan: &Plan,
     mode: ApplyMode,
 ) -> ApplyReport {
@@ -164,75 +167,19 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     } else {
         "failure"
     };
-    let mut fields = json!({
-        "lock_backend": linfo.lock_backend,
-        "lock_wait_ms": linfo.lock_wait_ms,
-    });
-    // Attach perf aggregate (best-effort, zeros in DryRun may be redacted)
-    if let Some(obj) = fields.as_object_mut() {
-        obj.insert(
-            "perf".to_string(),
-            json!({
-                "hash_ms": perf_total.hash,
-                "backup_ms": perf_total.backup,
-                "swap_ms": perf_total.swap,
-            }),
-        );
-    }
+    // Build summary via helper
+    let mut builder = summary::ApplySummary::new(&linfo.lock_backend, linfo.lock_wait_ms);
     // Optional attestation on success, non-dry-run
     if errors.is_empty() && !dry {
-        if let Some(att) = &api.attest {
-            // Construct a minimal attestation bundle with plan_id and executed actions count
-            let bundle_json = json!({
-                "plan_id": pid.to_string(),
-                "executed": executed.len(),
-                "rolled_back": rolled_back,
-            });
-            let bundle: Vec<u8> = serde_json::to_vec(&bundle_json).unwrap_or_default();
-            if let Some(att_json) =
-                crate::adapters::attest::build_attestation_fields(&**att, &bundle)
-            {
-                #[allow(
-                    clippy::unwrap_used,
-                    reason = "defer cleanup; will replace with safe shape normalizer later"
-                )]
-                if let Some(obj) = fields.as_object_mut() {
-                    obj.insert("attestation".to_string(), att_json);
-                }
-            }
-        }
+        builder = builder.attestation(api, pid, executed.len(), rolled_back);
     }
 
     // we already include ts/stage in helper
     // If we failed post-apply due to smoke, emit E_SMOKE at summary level; otherwise include a best-effort E_POLICY
     if decision == "failure" {
-        if let Some(obj) = fields.as_object_mut() {
-            if errors.iter().any(|e| e.contains("smoke")) {
-                obj.insert(
-                    "error_id".to_string(),
-                    json!(crate::api::errors::id_str(ErrorId::E_SMOKE)),
-                );
-                obj.insert(
-                    "exit_code".to_string(),
-                    json!(exit_code_for(ErrorId::E_SMOKE)),
-                );
-            } else {
-                // Default summary mapping for non-smoke failures
-                obj.entry("error_id")
-                    .or_insert(json!(crate::api::errors::id_str(ErrorId::E_POLICY)));
-                obj.entry("exit_code")
-                    .or_insert(json!(exit_code_for(ErrorId::E_POLICY)));
-            }
-            // Compute chain best-effort from collected error messages
-            let chain = crate::api::errors::infer_summary_error_ids(&errors);
-            obj.insert("summary_error_ids".to_string(), json!(chain));
-        }
+        builder = builder.errors(&errors).smoke_or_policy_mapping(&errors);
     }
-    if decision == "failure" {
-        slog.apply_result().merge(&fields).emit_failure();
-    } else {
-        slog.apply_result().merge(&fields).emit_success();
-    }
+    builder.perf(perf_total).emit(&slog, decision);
     api.audit.log(Level::Info, "apply: finished");
 
     // Compute total duration

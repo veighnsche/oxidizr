@@ -67,9 +67,9 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
             }
         };
         if let Some(p) = path {
-            slog.plan().action(aid).path(p).emit_success();
+            slog.plan().action_id(aid).path(p).emit_success();
         } else {
-            slog.plan().action(aid).emit_success();
+            slog.plan().action_id(aid).emit_success();
         }
     }
 

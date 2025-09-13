@@ -82,7 +82,7 @@ We will implement all steps within one PR as separate commits to preserve review
 
 ## 3) Step‑by‑step instructions (granular)
 
-### PR1 — Logging fluent helpers (A)
+### PR1 — Logging fluent helpers (A) — [DONE]
 
 Goal: Remove ad‑hoc `json!` merges for common fields by adding fluent helpers to `EventBuilder`.
 
@@ -119,8 +119,9 @@ Verification:
 Acceptance:
 
 - No field additions/renames; purely a call‑site cleanup
+- DONE: Implemented fluent helpers (`perf`, `error_id`, `exit_code_for`, `action_id`) in `src/logging/audit.rs` and adopted in `apply::lock`, `apply::run` summary, `plan`, and `preflight` rows. `cargo test -p switchyard` passes with telemetry parity.
 
-### PR2 — Apply executors (B)
+### PR2 — Apply executors (B) — [DONE]
 
 Goal: Move per‑action logic out of handlers into small executors to reduce function length and clarify responsibilities.
 
@@ -166,8 +167,9 @@ Verification:
 Acceptance:
 
 - No changes to external API or telemetry fields; only internal structure
+- DONE: Added `src/api/apply/executors/{mod,ensure_symlink,restore}.rs`, moved per-action logic, and delegated from `handlers.rs`. All apply/preflight tests pass with telemetry parity.
 
-### PR3 — Lock orchestrator (C)
+### PR3 — Lock orchestrator (C) — [DONE]
 
 Goal: Centralize lock acquisition bookkeeping and emissions into a facade.
 
@@ -192,8 +194,9 @@ Verification:
 Acceptance:
 
 - Same events and fields; `approx_attempts` math unchanged
+- DONE: Introduced `LockOrchestrator` and `LockOutcome` in `apply/lock.rs`, refactored `acquire()` to use it, and preserved event parity including the historical minimal `apply.result` failure emission.
 
-### PR4 — Apply summary builder (D)
+### PR4 — Apply summary builder (D) — [DONE]
 
 Goal: Replace manual summary JSON in `apply::run` with a builder.
 
@@ -223,8 +226,9 @@ Verification:
 Acceptance:
 
 - Byte‑for‑byte identical summary fields
+- DONE: Implemented `ApplySummary` in `src/api/apply/summary.rs` and replaced inline summary construction in `apply::run`. Tests including `rollback_summary.rs` and acceptance suite pass with identical fields.
 
-### PR5 — Preflight typed row emitter (E)
+### PR5 — Preflight typed row emitter (E) — [DONE]
 
 Goal: Reduce argument sprawl and centralize serialization.
 
@@ -252,6 +256,7 @@ Verification:
 Acceptance:
 
 - Fields and ordering preserved
+- DONE: Added `row_emitter.rs` with `PreflightRowArgs` and `RowEmitter::emit_row`, updated `preflight::run` to use it, and shimmed `rows.rs`. Ordering and schema confirmed by existing tests.
 
 ### PR6 — Restore planner (F)
 

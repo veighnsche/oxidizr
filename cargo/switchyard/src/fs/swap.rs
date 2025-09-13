@@ -143,6 +143,7 @@ mod tests {
     use crate::constants::DEFAULT_BACKUP_TAG;
     use crate::fs::restore::restore_file;
     use crate::types::safepath::SafePath;
+    use std::io::Write;
 
     fn tmpdir() -> tempfile::TempDir {
         tempfile::tempdir().unwrap_or_else(|_| panic!("Failed to create tempdir"))

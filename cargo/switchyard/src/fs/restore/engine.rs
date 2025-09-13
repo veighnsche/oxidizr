@@ -51,6 +51,7 @@ pub fn restore_file_prev(
 /// # Errors
 ///
 /// Returns an IO error if the backup file cannot be restored.
+#[allow(clippy::too_many_lines, reason = "Will split into RestorePlanner plan/execute in PR6")]
 pub fn restore_impl(
     target: &SafePath,
     sel: SnapshotSel,

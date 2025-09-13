@@ -17,8 +17,10 @@ use serde_json::json;
 use crate::fs::meta::{detect_preservation_capabilities, kind_of};
 use crate::logging::audit::{AuditCtx, AuditMode};
 use crate::policy::gating;
-mod rows;
+mod row_emitter;
+use row_emitter::{PreflightRowArgs, RowEmitter};
 
+#[allow(clippy::too_many_lines, reason = "Will be split in PR8; keeping behavior parity now")]
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,
@@ -49,6 +51,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         stops.push("rescue profile unavailable".to_string());
     }
 
+    let emitter = RowEmitter { api, plan };
     for act in &plan.actions {
         match act {
             Action::EnsureSymlink { target, .. } => {
@@ -84,25 +87,21 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     stops.push("preservation unsupported for target".to_string());
                 }
                 let current_kind = kind_of(&target.as_path());
-                rows::push_row_emit(
-                    api,
-                    plan,
-                    act,
+                emitter.emit_row(
                     &mut rows,
                     &ctx,
-                    target.as_path().display().to_string(),
-                    &current_kind,
-                    "symlink",
-                    Some(eval.policy_ok),
-                    prov,
-                    if eval.notes.is_empty() {
-                        None
-                    } else {
-                        Some(eval.notes)
+                    act,
+                    PreflightRowArgs {
+                        path: target.as_path().display().to_string(),
+                        current_kind,
+                        planned_kind: "symlink".to_string(),
+                        policy_ok: Some(eval.policy_ok),
+                        provenance: prov,
+                        notes: if eval.notes.is_empty() { None } else { Some(eval.notes) },
+                        preservation: Some(preservation),
+                        preservation_supported: Some(preservation_supported),
+                        restore_ready: None,
                     },
-                    Some(preservation),
-                    Some(preservation_supported),
-                    None,
                 );
             }
             Action::RestoreFromBackup { target } => {
@@ -126,25 +125,21 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 if api.policy.rescue.require && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
                 }
-                rows::push_row_emit(
-                    api,
-                    plan,
-                    act,
+                emitter.emit_row(
                     &mut rows,
                     &ctx,
-                    target.as_path().display().to_string(),
-                    "unknown",
-                    "restore_from_backup",
-                    Some(eval.policy_ok),
-                    None,
-                    if eval.notes.is_empty() {
-                        None
-                    } else {
-                        Some(eval.notes)
+                    act,
+                    PreflightRowArgs {
+                        path: target.as_path().display().to_string(),
+                        current_kind: "unknown".to_string(),
+                        planned_kind: "restore_from_backup".to_string(),
+                        policy_ok: Some(eval.policy_ok),
+                        provenance: None,
+                        notes: if eval.notes.is_empty() { None } else { Some(eval.notes) },
+                        preservation: Some(preservation),
+                        preservation_supported: Some(preservation_supported),
+                        restore_ready: Some(backup_present),
                     },
-                    Some(preservation),
-                    Some(preservation_supported),
-                    Some(backup_present),
                 );
             }
         }
