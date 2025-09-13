@@ -20,4 +20,6 @@ pub struct PreflightRow {
     pub preservation_supported: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub restore_ready: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_tag: Option<String>,
 }

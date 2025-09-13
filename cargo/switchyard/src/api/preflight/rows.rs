@@ -44,6 +44,7 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
         preservation: preservation.clone(),
         preservation_supported,
         restore_ready,
+        backup_tag: Some(_api.policy.backup.tag.clone()),
     };
     rows.push(serde_json::to_value(row).unwrap());
 
@@ -60,5 +61,7 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     if let Some(n) = notes { evt = evt.field("notes", json!(n)); }
     if let Some(p) = preservation { evt = evt.field("preservation", p); }
     if let Some(ps) = preservation_supported { evt = evt.field("preservation_supported", json!(ps)); }
+    // Carry backup tag for traceability per TESTPLAN (long/coreutils/empty tag cases)
+    evt = evt.field("backup_tag", json!(_api.policy.backup.tag.clone()));
     evt.emit_success();
 }
