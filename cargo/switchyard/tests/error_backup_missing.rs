@@ -22,8 +22,8 @@ impl FactsEmitter for TestEmitter {
 
 #[test]
 fn restore_emits_e_backup_missing_when_no_backup_exists() {
-    let facts = TestEmitter;
-    let audit = JsonlSink;
+    let facts = TestEmitter::default();
+    let audit = JsonlSink::default();
     let mut policy = Policy::default();
     policy.apply.best_effort_restore = false; // enforce failure when missing
     policy.apply.capture_restore_snapshot = false; // do not create snapshot pre-restore in this test

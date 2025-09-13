@@ -50,8 +50,8 @@ fn plan_one(root: &std::path::Path) -> (PlanInput, std::path::PathBuf, std::path
 }
 
 fn run_and_get_events(require_durable: bool) -> Vec<(String, String, String, Value)> {
-    let facts = TestEmitter;
-    let audit = TestAudit;
+    let facts = TestEmitter::default();
+    let audit = TestAudit::default();
     let mut policy = Policy::default();
     policy.governance.allow_unlocked_commit = true;
     policy.durability.backup_durability = require_durable;

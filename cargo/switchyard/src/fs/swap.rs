@@ -1,6 +1,7 @@
 //! Symlink swap orchestration that coordinates backup/snapshot and atomic swap.
 
 use std::fs;
+use std::io::Write;
 
 use rustix::fs::{unlinkat, AtFlags};
 
