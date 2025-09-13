@@ -1,29 +1,148 @@
 # Switchyard Spec Traceability Report
 
 ## Summary
-Total requirements: 44
-MUST/MUST_NOT: 43
-Covered MUST/MUST_NOT: 43
+
+Total requirements: 55
+MUST/MUST_NOT: 53
+Covered MUST/MUST_NOT: 53
 Uncovered MUST/MUST_NOT: 0
 
+## Lint Errors
+
+- atomicity.feature: step not covered by contract: 'Given a plan with a single symlink replacement action' (kind=Given)
+- atomicity.feature: step not covered by contract: 'And the target path currently resolves to providerA/ls' (kind=Given)
+- atomicity.feature: step not covered by contract: 'When I apply the plan in Commit mode' (kind=When)
+- atomicity.feature: step not covered by contract: 'Then the target path resolves to providerB/ls without any intermediate missing path visible' (kind=Then)
+- atomicity.feature: step not covered by contract: 'And if a crash is simulated immediately after rename, recovery yields a valid link' (kind=Then)
+- atomicity.feature: step not covered by contract: 'Given a plan with two actions where the second will fail' (kind=Given)
+- atomicity.feature: step not covered by contract: 'When I apply the plan in Commit mode' (kind=When)
+- atomicity.feature: step not covered by contract: 'Then the engine performs reverse-order rollback of any executed actions' (kind=Then)
+- atomicity.feature: step not covered by contract: 'And no visible mutations remain on the filesystem' (kind=Then)
+- conservatism_modes.feature: step not covered by contract: 'Given a newly constructed Switchyard' (kind=Given)
+- conservatism_modes.feature: step not covered by contract: 'When I execute without explicit commit approval' (kind=When)
+- conservatism_modes.feature: step not covered by contract: 'Then side effects are not performed (DryRun is default)' (kind=Then)
+- conservatism_modes.feature: step not covered by contract: 'Given a policy requiring strict ownership and unsupported preservation' (kind=Given)
+- conservatism_modes.feature: step not covered by contract: 'When I run preflight and apply in Commit mode' (kind=When)
+- conservatism_modes.feature: step not covered by contract: 'Then the operation fails closed unless an explicit policy override is set' (kind=Then)
+- determinism.feature: step not covered by contract: 'Given a plan built from a stable set of inputs' (kind=Given)
+- determinism.feature: step not covered by contract: 'When I compute plan_id and action_id' (kind=When)
+- determinism.feature: step not covered by contract: 'Then they are deterministic UUIDv5 values under the project namespace' (kind=Then)
+- determinism.feature: step not covered by contract: 'When I run in DryRun and Commit modes' (kind=When)
+- determinism.feature: step not covered by contract: 'Then facts are byte-identical after timestamp redaction' (kind=Then)
+- error_taxonomy.feature: step not covered by contract: 'Given failures during preflight or apply' (kind=Given)
+- error_taxonomy.feature: step not covered by contract: 'When facts are emitted' (kind=When)
+- error_taxonomy.feature: step not covered by contract: 'Then error identifiers such as E_POLICY or E_LOCKING are stable strings' (kind=Then)
+- error_taxonomy.feature: step not covered by contract: 'Given preflight STOP conditions are present' (kind=Given)
+- error_taxonomy.feature: step not covered by contract: 'When I compute the process exit' (kind=When)
+- error_taxonomy.feature: step not covered by contract: 'Then preflight summary carries error_id=E_POLICY and exit_code=10' (kind=Then)
+- filesystems_degraded.feature: step not covered by contract: 'Given staging and target parents reside on different filesystems (EXDEV)' (kind=Given)
+- filesystems_degraded.feature: step not covered by contract: 'And policy allow_degraded_fs is true' (kind=Given)
+- filesystems_degraded.feature: step not covered by contract: 'When I apply a symlink replacement plan' (kind=When)
+- filesystems_degraded.feature: step not covered by contract: 'Then the operation completes via safe copy + fsync + rename preserving atomic visibility' (kind=Then)
+- filesystems_degraded.feature: step not covered by contract: 'And emitted facts record degraded=true with degraded_reason="exdev_fallback"' (kind=Then)
+- filesystems_degraded.feature: step not covered by contract: 'Given EXDEV conditions' (kind=Given)
+- filesystems_degraded.feature: step not covered by contract: 'And policy allow_degraded_fs is false' (kind=Given)
+- filesystems_degraded.feature: step not covered by contract: 'When I apply a symlink replacement plan' (kind=When)
+- filesystems_degraded.feature: step not covered by contract: 'Then the apply fails with error_id=E_EXDEV and exit_code=50' (kind=Then)
+- filesystems_degraded.feature: step not covered by contract: 'And emitted facts include degraded=false with degraded_reason="exdev_fallback"' (kind=Then)
+- filesystems_degraded.feature: step not covered by contract: 'Given an environment matrix with ext4, xfs, btrfs, and tmpfs' (kind=Given)
+- filesystems_degraded.feature: step not covered by contract: 'When I run acceptance tests' (kind=When)
+- filesystems_degraded.feature: step not covered by contract: 'Then semantics for rename and degraded path are verified per filesystem' (kind=Then)
+- health_verification.feature: step not covered by contract: 'Given a Switchyard with SmokePolicy Require' (kind=Given)
+- health_verification.feature: step not covered by contract: 'And a configured SmokeTestRunner' (kind=Given)
+- health_verification.feature: step not covered by contract: 'When I apply a plan in Commit mode' (kind=When)
+- health_verification.feature: step not covered by contract: 'Then the minimal smoke suite runs after apply' (kind=Then)
+- health_verification.feature: step not covered by contract: 'Given a failing SmokeTestRunner' (kind=Given)
+- health_verification.feature: step not covered by contract: 'And auto_rollback is enabled' (kind=Given)
+- health_verification.feature: step not covered by contract: 'When I apply a plan in Commit mode' (kind=When)
+- health_verification.feature: step not covered by contract: 'Then apply fails with error_id=E_SMOKE and exit_code=80' (kind=Then)
+- health_verification.feature: step not covered by contract: 'And executed actions are rolled back automatically' (kind=Then)
+- locking.feature: step not covered by contract: 'Given a Switchyard built with a LockManager' (kind=Given)
+- locking.feature: step not covered by contract: 'And two apply() operations targeting overlapping paths' (kind=Given)
+- locking.feature: step not covered by contract: 'When both apply() are started in Commit mode' (kind=When)
+- locking.feature: step not covered by contract: 'Then only one mutator proceeds at a time' (kind=Then)
+- locking.feature: step not covered by contract: 'Given a Switchyard without a LockManager' (kind=Given)
+- locking.feature: step not covered by contract: 'When I apply a plan in Commit mode' (kind=When)
+- locking.feature: step not covered by contract: 'Then a WARN fact is emitted stating concurrent apply is unsupported' (kind=Then)
+- locking.feature: step not covered by contract: 'Given a LockManager configured with a short timeout' (kind=Given)
+- locking.feature: step not covered by contract: 'And another process holds the lock' (kind=Given)
+- locking.feature: step not covered by contract: 'When I attempt apply in Commit mode' (kind=When)
+- locking.feature: step not covered by contract: 'Then the stage fails with error_id=E_LOCKING and exit_code=30' (kind=Then)
+- locking.feature: step not covered by contract: 'And apply.attempt includes lock_wait_ms' (kind=Then)
+- locking.feature: step not covered by contract: 'Given a contended lock with retries' (kind=Given)
+- locking.feature: step not covered by contract: 'When I apply a plan in Commit mode' (kind=When)
+- locking.feature: step not covered by contract: 'Then apply.attempt includes lock_attempts approximating retry count' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'When I run in Commit mode' (kind=When)
+- observability_audit.feature: step not covered by contract: 'Then each stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'When I run in DryRun and Commit modes' (kind=When)
+- observability_audit.feature: step not covered by contract: 'Then emitted facts are byte-identical after timestamp redaction' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'Then apply.result includes hash_alg=sha256 and both before_hash and after_hash' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'Given environment-derived sensitive values might appear in facts' (kind=Given)
+- observability_audit.feature: step not covered by contract: 'Then no unmasked secret values appear in any emitted fact or sink' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'Given a failing preflight or apply stage' (kind=Given)
+- observability_audit.feature: step not covered by contract: 'When I inspect summary events' (kind=When)
+- observability_audit.feature: step not covered by contract: 'Then summary_error_ids is present and ordered from specific to general' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'Given an attestor is configured and apply succeeds in Commit mode' (kind=Given)
+- observability_audit.feature: step not covered by contract: 'When I inspect apply.result' (kind=When)
+- observability_audit.feature: step not covered by contract: 'Then attestation fields (sig_alg, signature, bundle_hash, public_key_id) are present' (kind=Then)
+- observability_audit.feature: step not covered by contract: 'When I run preflight in DryRun and Commit modes' (kind=When)
+- observability_audit.feature: step not covered by contract: 'Then the exported preflight YAML rows are byte-identical between runs' (kind=Then)
+- rescue.feature: step not covered by contract: 'Given a system with configured rescue profile' (kind=Given)
+- rescue.feature: step not covered by contract: 'When I inspect preflight and emitted facts' (kind=When)
+- rescue.feature: step not covered by contract: 'Then the presence of a rescue symlink set is recorded' (kind=Then)
+- rescue.feature: step not covered by contract: 'Given no BusyBox but GNU core utilities are present on PATH' (kind=Given)
+- rescue.feature: step not covered by contract: 'Then preflight verifies at least one functional fallback path is executable' (kind=Then)
+- retention_prune.feature: step not covered by contract: 'Given a target with multiple backup artifacts' (kind=Given)
+- retention_prune.feature: step not covered by contract: 'When I prune backups under policy' (kind=When)
+- retention_prune.feature: step not covered by contract: 'Then the newest backup is never deleted' (kind=Then)
+- retention_prune.feature: step not covered by contract: 'Given eligible backups older than retention limits' (kind=Given)
+- retention_prune.feature: step not covered by contract: 'When I prune backups under policy' (kind=When)
+- retention_prune.feature: step not covered by contract: 'Then deletions remove payload and sidecar pairs and fsync the parent directory' (kind=Then)
+- retention_prune.feature: step not covered by contract: 'Given a prune operation completed' (kind=Given)
+- retention_prune.feature: step not covered by contract: 'When I inspect emitted facts' (kind=When)
+- retention_prune.feature: step not covered by contract: 'Then a prune.result event includes path, policy_used, pruned_count, and retained_count' (kind=Then)
+- rollback.feature: step not covered by contract: 'Given a plan with three actions A, B, C where B will fail' (kind=Given)
+- rollback.feature: step not covered by contract: 'When I apply the plan in Commit mode' (kind=When)
+- rollback.feature: step not covered by contract: 'Then the engine rolls back A in reverse order automatically' (kind=Then)
+- rollback.feature: step not covered by contract: 'And emitted facts include partial restoration state if any rollback step fails' (kind=Then)
+- rollback.feature: step not covered by contract: 'Given a plan that replaces a symlink then restores it' (kind=Given)
+- rollback.feature: step not covered by contract: 'When I apply the plan and then apply a rollback plan twice' (kind=When)
+- rollback.feature: step not covered by contract: 'Then the final link/file topology is identical to the prior state' (kind=Then)
+- safety_preconditions.feature: step not covered by contract: 'Given a backup sidecar v2 with payload present' (kind=Given)
+- safety_preconditions.feature: step not covered by contract: 'When I restore under policy requiring sidecar integrity' (kind=When)
+- safety_preconditions.feature: step not covered by contract: 'Then the engine verifies the payload hash and fails restore on mismatch' (kind=Then)
+- thread_safety.feature: step not covered by contract: 'Given the Switchyard core types' (kind=Given)
+- thread_safety.feature: step not covered by contract: 'Then they are Send + Sync for safe use across threads' (kind=Then)
+- thread_safety.feature: step not covered by contract: 'Given two threads invoking apply() concurrently' (kind=Given)
+- thread_safety.feature: step not covered by contract: 'And a LockManager is configured' (kind=Given)
+- thread_safety.feature: step not covered by contract: 'When both apply() calls run' (kind=When)
+- thread_safety.feature: step not covered by contract: 'Then only one mutator proceeds at a time under the lock' (kind=Then)
+
 ## Uncovered MUST/MUST_NOT Requirements
+
 - None
 
 ## Coverage Matrix (Requirement → Scenarios)
+
 - REQ-A1 — Atomic crash-safety
   - atomic_swap.feature :: Enable and rollback
+  - atomicity.feature :: Enable And Rollback Remains Atomic And Visible
 - REQ-A2 — No broken or missing path visible
   - atomic_swap.feature :: Enable and rollback
+  - atomicity.feature :: Enable And Rollback Remains Atomic And Visible
 - REQ-A3 — All-or-nothing per plan
   - atomic_swap.feature :: Automatic rollback on mid-plan failure
+  - atomicity.feature :: All-Or-Nothing Per Plan
 - REQ-API1 — SafePath-only for mutating APIs
   - api_toctou.feature :: Mutating public APIs require SafePath
 - REQ-BND1 — fsync within 50ms of rename
   - operational_bounds.feature :: fsync within 50ms after rename
 - REQ-C1 — Dry-run by default
   - conservatism_ci.feature :: Dry-run is the default mode
+  - conservatism_modes.feature :: Dry-Run Is Default Mode
 - REQ-C2 — Fail-closed on critical violations
   - conservatism_ci.feature :: Fail-closed on critical violations
+  - conservatism_modes.feature :: Fail-Closed On Critical Violations Unless Overridden
 - REQ-CI1 — Golden fixtures existence
   - conservatism_ci.feature :: CI gates for golden fixtures and zero-SKIP
 - REQ-CI2 — Zero-SKIP gate
@@ -31,59 +150,103 @@ Uncovered MUST/MUST_NOT: 0
 - REQ-CI3 — Golden diff gate
   - conservatism_ci.feature :: CI gates for golden fixtures and zero-SKIP
 - REQ-D1 — Deterministic IDs
+  - determinism.feature :: Deterministic IDs Are UUIDv5 Over Normalized Inputs
   - determinism_attestation.feature :: Deterministic UUIDv5 plan and action IDs
 - REQ-D2 — Redaction-pinned dry-run
+  - determinism.feature :: Dry-Run Facts Byte-Identical After Redaction
   - observability.feature :: Dry-run facts are byte-identical to real-run facts after redaction
+  - observability_audit.feature :: Dry-Run Facts Byte-Identical To Real-Run After Redaction
+- REQ-E1 — Stable error identifiers in facts
+  - error_taxonomy.feature :: Stable Error Identifiers Emitted In Facts
+- REQ-E2 — Preflight summary exit-code mapping
+  - error_taxonomy.feature :: Preflight Summary Maps To Policy Exit Code
 - REQ-F1 — EXDEV fallback preserves atomic visibility
   - atomic_swap.feature :: Cross-filesystem EXDEV fallback
+  - filesystems_degraded.feature :: Degraded Fallback When Policy Allows
+  - filesystems_degraded.feature :: Disallowed Degraded Fallback Fails With Classification
 - REQ-F2 — Degraded mode policy & telemetry
   - atomic_swap.feature :: Cross-filesystem EXDEV fallback
+  - filesystems_degraded.feature :: Degraded Fallback When Policy Allows
+  - filesystems_degraded.feature :: Disallowed Degraded Fallback Fails With Classification
 - REQ-F3 — Supported filesystems verified in acceptance tests
-  - (no scenarios)
+  - filesystems_degraded.feature :: Supported Filesystems Verified
 - REQ-H1 — Minimal smoke suite
   - atomic_swap.feature :: Smoke test failure triggers rollback
+  - health_verification.feature :: Minimal Smoke Suite Runs In Commit
 - REQ-H2 — Auto-rollback on smoke failure
   - atomic_swap.feature :: Smoke test failure triggers rollback
+  - health_verification.feature :: Smoke Failure Triggers Auto-Rollback
 - REQ-H3 — Health verification is part of commit
   - atomic_swap.feature :: Smoke test failure triggers rollback
+  - health_verification.feature :: Minimal Smoke Suite Runs In Commit
 - REQ-L1 — Single mutator
+  - locking.feature :: Single Mutator Enforced In Commit
   - locking_rescue.feature :: Bounded locking in production
 - REQ-L2 — Warn when no lock manager
+  - locking.feature :: Warn Fact When No Lock Manager
   - locking_rescue.feature :: No LockManager in dev/test emits WARN
 - REQ-L3 — Bounded lock wait with timeout
+  - locking.feature :: Bounded Lock Wait Emits Timeout And Metrics
   - locking_rescue.feature :: Bounded locking in production
 - REQ-L4 — LockManager required in production
+  - locking.feature :: Single Mutator Enforced In Commit
   - locking_rescue.feature :: Bounded locking in production
+- REQ-L5 — Lock attempts metric
+  - locking.feature :: Lock Attempts Included In Apply Attempt
 - REQ-O1 — Structured fact for every step
-  - observability.feature :: Every step emits a structured fact conforming to schema v1
+  - observability.feature :: Every step emits a structured fact conforming to schema v2
+  - observability_audit.feature :: Every Step Emits Schema V2 Facts
 - REQ-O2 — Dry-run facts identical to real-run
   - observability.feature :: Dry-run facts are byte-identical to real-run facts after redaction
+  - observability_audit.feature :: Dry-Run Facts Byte-Identical To Real-Run After Redaction
 - REQ-O3 — Versioned, stable facts schema
-  - observability.feature :: Every step emits a structured fact conforming to schema v1
+  - observability.feature :: Every step emits a structured fact conforming to schema v2
+  - observability_audit.feature :: Every Step Emits Schema V2 Facts
 - REQ-O4 — Signed attestations per apply bundle
   - determinism_attestation.feature :: Signed attestation per apply bundle
+  - observability_audit.feature :: Attestation Emitted On Apply Success
 - REQ-O5 — Before/after hashes for each mutated file
   - observability.feature :: Before/after hashes are recorded for mutated files
+  - observability_audit.feature :: Before And After Hashes Recorded For Mutations
 - REQ-O6 — Secret masking across all sinks
   - observability.feature :: Secret masking is enforced across all sinks
+  - observability_audit.feature :: Secret Masking Enforced Across Sinks
 - REQ-O7 — Provenance completeness
   - observability.feature :: Provenance fields are complete
+- REQ-O8 — Summary error chain
+  - observability_audit.feature :: Summary Error Chain Present On Failures
+- REQ-PF1 — Preflight YAML dry-run parity
+  - observability_audit.feature :: Preflight YAML Dry-Run Byte-Identical To Real
+- REQ-PN1 — Newest backup retained
+  - retention_prune.feature :: Prune Retains Newest Backup
+- REQ-PN2 — Prune deletes both payload and sidecar and fsyncs parent
+  - retention_prune.feature :: Prune Deletes Payload And Sidecar And Fsyncs Parent
+- REQ-PN3 — Prune emits result summary event
+  - retention_prune.feature :: Prune Emits Result Summary Event
 - REQ-R1 — Rollback reversibility
   - atomic_swap.feature :: Enable and rollback
+  - rollback.feature :: Automatic Reverse-Order Rollback On Failure
 - REQ-R2 — Restore exact topology
   - atomic_swap.feature :: Enable and rollback
+  - rollback.feature :: Idempotent Rollback Restores Exact Topology
 - REQ-R3 — Idempotent rollback
   - atomic_swap.feature :: Enable and rollback
+  - rollback.feature :: Idempotent Rollback Restores Exact Topology
 - REQ-R4 — Auto reverse-order rollback on failure
   - atomic_swap.feature :: Automatic rollback on mid-plan failure
+  - rollback.feature :: Automatic Reverse-Order Rollback On Failure
 - REQ-R5 — Partial restoration facts on rollback error
   - atomic_swap.feature :: Automatic rollback on mid-plan failure
+  - rollback.feature :: Automatic Reverse-Order Rollback On Failure
 - REQ-RC1 — Rescue profile available
   - locking_rescue.feature :: Rescue profile and fallback toolset verified
+  - rescue.feature :: Rescue Profile Always Available
 - REQ-RC2 — Verify fallback path
   - locking_rescue.feature :: Rescue profile and fallback toolset verified
+  - rescue.feature :: Preflight Verifies At Least One Fallback Path
 - REQ-RC3 — Fallback toolset on PATH
   - locking_rescue.feature :: Rescue profile and fallback toolset verified
+  - rescue.feature :: Preflight Verifies At Least One Fallback Path
 - REQ-S1 — Safe paths only
   - safety_preconditions.feature :: SafePath rejects escaping paths
 - REQ-S2 — Reject unsupported filesystem states
@@ -94,8 +257,14 @@ Uncovered MUST/MUST_NOT: 0
   - safety_preconditions.feature :: Strict package ownership for targets
 - REQ-S5 — Preservation capability gating
   - safety_preconditions.feature :: Preservation capability gating in preflight
+- REQ-S6 — Backup sidecar integrity
+  - safety_preconditions.feature :: Backup Sidecar Payload Hash And Verification
+- REQ-T1 — Core types are Send + Sync
+  - thread_safety.feature :: Core Types Are Send And Sync
+- REQ-T2 — Single mutator under lock across threads
+  - thread_safety.feature :: Only One Mutator Proceeds Under Lock
 - REQ-TOCTOU1 — TOCTOU-safe syscall sequence
   - api_toctou.feature :: TOCTOU-safe syscall sequence is normative
 - REQ-VERS1 — Facts carry schema_version
-  - observability.feature :: Every step emits a structured fact conforming to schema v1
-
+  - observability.feature :: Every step emits a structured fact conforming to schema v2
+  - observability_audit.feature :: Every Step Emits Schema V2 Facts

@@ -18,6 +18,7 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - Rescue profile always available; at least one fallback toolset (GNU/BusyBox) present on PATH.
 - Auditable, tamper-evident facts (schema v2): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance. Envelope includes `event_id`, `run_id`, `switchyard_version`, `redaction`, and `seq`.
 - Apply summary includes a perf object aggregating timing signals (hash_ms, backup_ms, swap_ms) for observability.
+- Backup durability is enforced: backup payloads and sidecars are synced to disk, and the parent directory is fsynced after artifact creation/rename to survive crashes.
 - Conservative by default: dry-run mode; fail-closed on critical compatibility differences unless policy overrides.
 - Health verification required: minimal smoke suite runs post-apply; failure triggers auto-rollback (unless explicitly disabled).
 - Cross-filesystem safety: EXDEV fallback with degraded-mode policy and telemetry. When degraded fallback is disallowed and EXDEV occurs, apply fails with `exdev_fallback_failed` and facts include `degraded=false` with a stable reason marker.
@@ -72,6 +73,8 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - REQ-RC1: A rescue profile (backup symlink set) **MUST** always remain available.
 - REQ-RC2: Preflight **MUST** verify at least one functional fallback path.
 - REQ-RC3: At least one fallback binary set (GNU or BusyBox) **MUST** remain executable and present on `PATH` for recovery.
+
+Policy guidance: Deployments MAY set a `require_rescue` policy knob. When `require_rescue=true`, preflight verifies that a functional fallback exists; failing this check causes preflight to STOP (fail‑closed) unless explicitly overridden. Minimal verification guidance: PASS when `busybox` is present on PATH; otherwise require a deterministic subset of GNU tools (cp, mv, rm, ln, stat, readlink, sha256sum, sort, date, ls) with a threshold (e.g., ≥6/10) without executing external commands during preflight.
 
 ### 2.7 Determinism
 
@@ -175,6 +178,8 @@ items:
 
  Dry-run output must match real-run preflight rows byte-for-byte.
 
+ Rows are deterministically ordered by (`path`, `action_id`) to ensure stable diffs and goldens across environments.
+
 ---
 
 ## 5. Audit Facts (JSON Schema v2)
@@ -221,7 +226,7 @@ smoke_test_failed = 80
 
 Errors are emitted in facts as stable identifiers (e.g. `E_POLICY`, `E_LOCKING`). Preflight summary emits `error_id=E_POLICY` and `exit_code=10` when any STOP conditions are present.
 
-On summary failures, `summary_error_ids` provides a best-effort chain of identifiers for analytics and routing. For example, a smoke failure may populate `["E_SMOKE","E_POLICY"]` while a locking timeout would surface `["E_LOCKING","E_POLICY"]`.
+On summary failures, `summary_error_ids` provides a best-effort chain of identifiers for analytics and routing. For example, a smoke failure may populate `["E_SMOKE","E_POLICY"]` while a locking timeout would surface `["E_LOCKING","E_POLICY"]`. Ownership-related checks may co‑emit `E_OWNERSHIP` alongside the top‑level classification to aid routing.
 
 ---
 
@@ -275,6 +280,8 @@ Feature: Atomic swap
 
 ## 10. Filesystems & Degraded Mode
 
+Clarification (symlink replacement): For cross‑filesystem symlink replacement where atomic copy+rename on the link itself is not possible, the engine uses an unlink+`symlinkat` best‑effort degraded fallback when `allow_degraded_fs=true`. When `allow_degraded_fs=false`, the operation fails with `exdev_fallback_failed` and performs no visible change. Facts record `degraded=true|false` and a stable `degraded_reason` (e.g., "exdev_fallback").
+
 Supported filesystems (tested):
 
 - ext4 — native rename semantics
@@ -282,7 +289,7 @@ Supported filesystems (tested):
 - btrfs — native rename semantics
 - tmpfs — native rename semantics
 
-EXDEV path is explicitly exercised: when staging and target parents are on different filesystems, the engine MUST fall back to a safe copy+fsync+rename strategy. A policy flag `allow_degraded_fs` controls acceptance:
+EXDEV path is explicitly exercised: when staging and target parents are on different filesystems, the engine MUST fall back to a safe copy+fsync+rename strategy where applicable. For symlink replacement specifically, the engine uses an unlink+`symlinkat` best‑effort degraded fallback under policy. A policy flag `allow_degraded_fs` controls acceptance:
 
 - When `allow_degraded_fs=true`, facts MUST include `degraded=true` and the operation proceeds, with `degraded_reason="exdev_fallback"`.
 - When `allow_degraded_fs=false`, the apply MUST fail with `exdev_fallback_failed`; facts MUST include `degraded=false` and `degraded_reason="exdev_fallback"` for analytics consistency.
@@ -333,5 +340,13 @@ Core types (e.g., `Plan`, apply engine) are `Send + Sync`. `apply()` MAY be call
 - Audit facts schema v2 with SHA-256 before/after hashes; signed attestation bundles; strict secret masking; complete provenance.
 - Preflight Diff schema with stable ordering and keys.
 - Cross-filesystem EXDEV fallback with degraded-mode policy and telemetry.
+
+## 16. CLI Integration Guidance (SafePath)
+
+Integrations that expose a CLI front-end SHOULD enforce SafePath at boundaries:
+
+- Validate inputs by constructing `SafePath::from_rooted(root, candidate)` and reject on error.
+- Avoid accepting raw `PathBuf` for mutating operations. Convert to `SafePath` immediately where unavoidable.
+- Document error handling for path validation and show safe examples that do not reference non-existent APIs.
 - Minimal smoke suite with exact args; failure → auto-rollback unless explicitly disabled.
 - Golden fixtures and zero-SKIP CI gate.
