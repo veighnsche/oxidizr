@@ -17,5 +17,6 @@
 pub mod config;
 pub mod gating;
 pub mod rescue;
+pub mod types;
 
 pub use config::Policy;

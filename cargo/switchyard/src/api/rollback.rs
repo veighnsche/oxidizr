@@ -16,7 +16,7 @@ pub(crate) fn inverse_with_policy(policy: &crate::policy::Policy, report: &Apply
                 });
             }
             Action::RestoreFromBackup { target } => {
-                if policy.capture_restore_snapshot {
+                if policy.apply.capture_restore_snapshot {
                     // Invert restore to restore, leveraging the latest pre-restore snapshot
                     actions.push(Action::RestoreFromBackup {
                         target: target.clone(),

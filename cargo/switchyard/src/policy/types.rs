@@ -13,6 +13,10 @@ pub enum ExdevPolicy {
     DegradedFallback,
 }
 
+impl Default for ExdevPolicy {
+    fn default() -> Self { ExdevPolicy::Fail }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum LockingPolicy {
     Required,
@@ -25,7 +29,7 @@ pub enum PreservationPolicy {
     RequireBasic,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceTrustPolicy {
     RequireTrusted,
     WarnOnUntrusted,

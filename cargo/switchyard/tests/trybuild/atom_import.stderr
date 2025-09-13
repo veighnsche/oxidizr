@@ -1,15 +1,5 @@
-error[E0603]: function `atomic_symlink_swap` is private
- --> tests/trybuild/atom_import.rs:3:21
+error[E0432]: unresolved import `switchyard::fs::atomic_symlink_swap`
+ --> tests/trybuild/atom_import.rs:3:5
   |
 3 | use switchyard::fs::atomic_symlink_swap;
-  |                     ^^^^^^^^^^^^^^^^^^^ private function
-  |
-note: the function `atomic_symlink_swap` is defined here
- --> src/fs/mod.rs
-  |
-  | pub(crate) use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
-  |                         ^^^^^^^^^^^^^^^^^^^
-help: import `atomic_symlink_swap` directly
-  |
-3 | use switchyard::fs::atomic::atomic_symlink_swap;
-  |                           ++++++++
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `atomic_symlink_swap` in `fs`

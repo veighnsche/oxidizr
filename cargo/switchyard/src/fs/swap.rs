@@ -136,7 +136,7 @@ pub fn replace_file_with_symlink(
 mod tests {
     use super::*;
     use crate::constants::DEFAULT_BACKUP_TAG;
-    use crate::fs::restore_file;
+    use crate::fs::restore::restore_file;
     use crate::types::safepath::SafePath;
 
     fn tmpdir() -> tempfile::TempDir {

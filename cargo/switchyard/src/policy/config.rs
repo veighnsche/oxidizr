@@ -2,145 +2,43 @@ use crate::constants::DEFAULT_BACKUP_TAG;
 use crate::constants::RESCUE_MIN_COUNT as DEFAULT_RESCUE_MIN_COUNT;
 use std::path::PathBuf;
 
+use super::types::{
+    ApplyFlow, Backup, Durability, ExdevPolicy, Governance, LockingPolicy, PreservationPolicy,
+    Rescue, RiskLevel, Risks, Scope, SmokePolicy, SourceTrustPolicy,
+};
+
 /// Policy governs preflight gates, apply behavior, and production hardening for Switchyard.
 ///
-/// Highlights:
-/// - Production commits should enable: `require_lock_manager`, `require_smoke_in_commit`,
-///   and `require_rescue` (with `rescue_exec_check`) for safe rollouts.
-/// - Use `allow_degraded_fs` to permit EXDEV degraded fallback (unlink+symlink) on cross-FS symlink
-///   swaps; set to `false` for critical system paths to fail closed on `E_EXDEV`.
-/// - Scope mutations via `allow_roots` and block sensitive paths with `forbid_paths`.
-/// - See presets: [`Policy::production_preset`], [`Policy::coreutils_switch_preset`].
+/// Grouped fields provide clearer ownership and ergonomics.
 #[derive(Clone, Debug)]
 pub struct Policy {
-    /// Paths under which mutations are allowed. Targets must start with one of these roots
-    /// to pass preflight/apply gating. See checks in `src/api/preflight.rs` and `src/api/apply.rs`.
-    pub allow_roots: Vec<PathBuf>,
-    /// Paths that are explicitly forbidden. If a target starts with any of these prefixes,
-    /// preflight/apply will STOP. See checks in `src/api/preflight.rs` and `src/api/apply.rs`.
-    pub forbid_paths: Vec<PathBuf>,
-    /// When true, require a valid `OwnershipOracle` and enforce target ownership constraints
-    /// during preflight (`strict_ownership` checks in `src/api/preflight.rs`).
-    pub strict_ownership: bool,
-    /// When true, allow untrusted sources (e.g., world-writable or non-root owned) to pass
-    /// preflight source trust checks as warnings instead of STOP. See `check_source_trust` usage
-    /// in `src/api/preflight.rs` and `src/api/apply.rs`.
-    pub force_untrusted_source: bool,
-    /// When true, `restore_file()` is allowed to succeed without a backup payload present
-    /// (best-effort). When false, missing backup yields `E_BACKUP_MISSING` and stops.
-    /// Propagated from here to `apply.rs` → `fs::restore_file()`.
-    pub force_restore_best_effort: bool,
-    /// When true, allow degraded, non-atomic fallback on EXDEV during symlink replacement
-    /// (implemented as unlink+symlink within the parent). When false, cross-filesystem swaps
-    /// fail with `E_EXDEV` and no mutation is performed. Leave false for critical system paths
-    /// (e.g., coreutils) to avoid windows of inconsistency.
-    pub allow_degraded_fs: bool,
-    /// When true, auto-rollback on post-apply smoke failure is disabled. See rollback flow
-    /// in `src/api/apply.rs` (smoke failure path).
-    pub disable_auto_rollback: bool,
-    /// Logical tag used for naming backup artifacts and sidecar files. See `backup_path_with_tag()`
-    /// and sidecar creation in `src/fs/symlink.rs`.
-    pub backup_tag: String,
-    /// When true, apply() proceeds even if preflight has policy_ok=false rows.
-    /// Default is false (fail-closed). See gating in `src/api/apply.rs` and PLAN/45-preflight.md.
-    pub override_preflight: bool,
-    /// Require filesystem preservation capabilities (owner/mode/timestamps/xattrs/acl/caps).
-    /// When true and the target path lacks support, preflight MUST STOP (unless override_preflight).
-    /// See `detect_preservation_capabilities()` in `src/api/fs_meta.rs` and checks in preflight.
-    pub require_preservation: bool,
-    /// Require a rescue profile and toolset to be available (e.g., BusyBox or GNU core tools on PATH).
-    /// When true and unavailable, preflight/apply MUST STOP (unless override_preflight).
-    /// Verified via `rescue::verify_rescue_tools_with_exec()` in `src/api/preflight.rs` and gated in apply.
-    pub require_rescue: bool,
-    /// Allow mutating targets that have the SUID or SGID bit set. When false (default),
-    /// preflight/apply MUST STOP when a target is detected with SUID/SGID set (unless
-    /// override_preflight). When true, the risk is downgraded to a warning in preflight
-    /// and allowed to proceed in apply.
-    pub allow_suid_sgid_mutation: bool,
-    /// Allow proceeding when a target has multiple hardlinks (nlink>1). When false (default),
-    /// preflight/apply MUST STOP on hardlink hazard unless explicitly allowed.
-    pub allow_hardlink_breakage: bool,
-    /// When true (default), snapshot paths perform durability syncs (fsync) to parent
-    /// directories to ensure on-disk persistence. When false, durability fsyncs may be
-    /// skipped; facts should record `backup_durable=false` for analytics.
-    pub require_backup_durability: bool,
-    /// When true (default), restore verifies payload hashes recorded in sidecar v2 and
-    /// stops on mismatch. When false, integrity verification may be skipped and is treated
-    /// as best-effort.
-    pub require_sidecar_integrity: bool,
-    /// Retention policy: keep at most this many backup generations (newest retained).
-    /// When None, count-based retention is disabled.
+    pub scope: Scope,
+    pub rescue: Rescue,
+    pub risks: Risks,
+    pub durability: Durability,
+    pub apply: ApplyFlow,
+    pub governance: Governance,
+    pub backup: Backup,
+    // Retention knobs remain top-level for prune API
     pub retention_count_limit: Option<usize>,
-    /// Retention policy: delete backups older than this duration. When None, age-based
-    /// retention is disabled.
     pub retention_age_limit: Option<std::time::Duration>,
-    /// Minimum number of GNU rescue tools required when BusyBox is not present.
-    /// Default is `RESCUE_MIN_COUNT` from `constants.rs`.
-    pub rescue_min_count: usize,
-    /// Require a LockManager to be present in Commit mode. When true and no lock manager is
-    /// configured, apply() MUST fail early with E_LOCKING (exit code 30) without mutating state.
-    /// Enforced at the top of `src/api/apply.rs`.
-    pub require_lock_manager: bool,
-    /// Allow Commit mode to proceed without a LockManager. Defaults to true for development
-    /// ergonomics; set to false in hardened environments to fail-closed unless a lock manager
-    /// is configured. If both `require_lock_manager` and `allow_unlocked_commit` are set, the
-    /// requirement takes precedence and missing lock will fail.
-    pub allow_unlocked_commit: bool,
-    /// In Commit mode, require that a SmokeTestRunner is configured and passes. When true and
-    /// no runner is configured, apply() MUST fail with E_SMOKE and auto-rollback unless disabled.
-    /// Enforced in the post-apply smoke section of `src/api/apply.rs`.
-    pub require_smoke_in_commit: bool,
-    /// When verifying rescue profile/tooling, also attempt an executability check (e.g., X_OK
-    /// or spawning "--help" with a very small timeout). Typically enabled in production only.
-    /// See `rescue::verify_rescue_tools_with_exec(exec_check)`.
-    pub rescue_exec_check: bool,
-    /// Additional mount roots to verify for rw+exec during preflight/gating.
-    ///
-    /// This replaces ad hoc checks like hard-coded "/usr". When non-empty,
-    /// preflight and gating will iterate these paths and ensure their mounts
-    /// are read-write and executable; ambiguity fails closed.
-    pub extra_mount_checks: Vec<PathBuf>,
-    /// When true, the engine captures a snapshot (backup + sidecar) of the target's
-    /// current state before performing a RestoreFromBackup action. This makes restore
-    /// invertible: the inverse plan of a restore is another restore using the freshly
-    /// captured snapshot.
-    pub capture_restore_snapshot: bool,
-    /// When true, immutable-bit detection may fall back to unreliable methods without STOP.
-    /// When false (default), inconclusive immutable checks still proceed but we record notes;
-    /// only explicit immutable detection (via ioctl/lsattr) yields STOP.
+    // Advanced toggles not yet grouped
     pub allow_unreliable_immutable_check: bool,
-    /// Preservation tier preference for sidecar capture and restore application.
-    /// This is advisory; current implementation captures extended fields best-effort.
     pub preservation_tier: PreservationTier,
 }
 
 impl Default for Policy {
     fn default() -> Self {
         Self {
-            allow_roots: Vec::new(),
-            forbid_paths: Vec::new(),
-            strict_ownership: false,
-            force_untrusted_source: false,
-            force_restore_best_effort: false,
-            allow_degraded_fs: false,
-            disable_auto_rollback: false,
-            backup_tag: DEFAULT_BACKUP_TAG.to_string(),
-            override_preflight: false,
-            require_preservation: false,
-            require_rescue: false,
-            allow_suid_sgid_mutation: false,
-            allow_hardlink_breakage: false,
-            require_backup_durability: true,
-            require_sidecar_integrity: true,
+            scope: Scope::default(),
+            rescue: Rescue { require: false, exec_check: false, min_count: DEFAULT_RESCUE_MIN_COUNT },
+            risks: Risks { suid_sgid: RiskLevel::Stop, hardlinks: RiskLevel::Stop, source_trust: SourceTrustPolicy::RequireTrusted, ownership_strict: false },
+            durability: Durability { backup_durability: true, sidecar_integrity: true, preservation: PreservationPolicy::Off },
+            apply: ApplyFlow { exdev: ExdevPolicy::Fail, override_preflight: false, best_effort_restore: false, extra_mount_checks: Vec::new(), capture_restore_snapshot: true },
+            governance: Governance { locking: LockingPolicy::Optional, smoke: SmokePolicy::Off, allow_unlocked_commit: false },
+            backup: Backup { tag: DEFAULT_BACKUP_TAG.to_string() },
             retention_count_limit: None,
             retention_age_limit: None,
-            rescue_min_count: DEFAULT_RESCUE_MIN_COUNT,
-            require_lock_manager: false,
-            require_smoke_in_commit: false,
-            rescue_exec_check: false,
-            allow_unlocked_commit: false,
-            extra_mount_checks: Vec::new(),
-            capture_restore_snapshot: true,
             allow_unreliable_immutable_check: false,
             preservation_tier: PreservationTier::Basic,
         }
@@ -186,19 +84,19 @@ impl Policy {
     /// ```
     pub fn production_preset() -> Self {
         let mut p = Self::default();
-        p.require_rescue = true;
-        p.rescue_exec_check = true;
-        p.require_lock_manager = true;
-        p.require_smoke_in_commit = true;
+        p.rescue.require = true;
+        p.rescue.exec_check = true;
+        p.governance.locking = LockingPolicy::Required;
+        p.governance.smoke = SmokePolicy::Require { auto_rollback: true };
         p
     }
 
     /// Mutate this Policy to apply the recommended **production defaults**.
     pub fn apply_production_preset(&mut self) -> &mut Self {
-        self.require_rescue = true;
-        self.rescue_exec_check = true;
-        self.require_lock_manager = true;
-        self.require_smoke_in_commit = true;
+        self.rescue.require = true;
+        self.rescue.exec_check = true;
+        self.governance.locking = LockingPolicy::Required;
+        self.governance.smoke = SmokePolicy::Require { auto_rollback: true };
         self
     }
 
@@ -232,17 +130,15 @@ impl Policy {
     pub fn coreutils_switch_preset() -> Self {
         let mut p = Self::production_preset();
 
-        // Tighten core behaviors for a critical switch
-        p.allow_degraded_fs = false;
-        p.strict_ownership = true;
-        p.require_preservation = true;
-        p.override_preflight = false;
-        p.force_untrusted_source = false;
-        p.force_restore_best_effort = false;
-        p.backup_tag = "coreutils".to_string();
+        p.apply.exdev = ExdevPolicy::Fail;
+        p.risks.ownership_strict = true;
+        p.durability.preservation = PreservationPolicy::RequireBasic;
+        p.apply.override_preflight = false;
+        p.risks.source_trust = SourceTrustPolicy::RequireTrusted;
+        p.apply.best_effort_restore = false;
+        p.backup.tag = "coreutils".to_string();
 
-        // Extra safety: ensure typical tool mount points are rw+exec
-        p.extra_mount_checks = vec![
+        p.apply.extra_mount_checks = vec![
             PathBuf::from("/usr"),
             PathBuf::from("/bin"),
             PathBuf::from("/sbin"),
@@ -250,48 +146,40 @@ impl Policy {
             PathBuf::from("/usr/sbin"),
         ];
 
-        // Conservative forbids to avoid accidents during the switch
-        p.forbid_paths = vec![
+        p.scope.forbid_paths = vec![
             PathBuf::from("/proc"),
             PathBuf::from("/sys"),
             PathBuf::from("/dev"),
             PathBuf::from("/run"),
             PathBuf::from("/tmp"),
         ];
-
-        // Note: caller MUST still populate `allow_roots` precisely.
         p
     }
 
     /// Mutate this Policy to apply the **coreutils switch** preset; see `coreutils_switch_preset()`.
     pub fn apply_coreutils_switch_preset(&mut self) -> &mut Self {
         self.apply_production_preset();
-
-        self.allow_degraded_fs = false;
-        self.strict_ownership = true;
-        self.require_preservation = true;
-        self.override_preflight = false;
-        self.force_untrusted_source = false;
-        self.force_restore_best_effort = false;
-        self.backup_tag = "coreutils".to_string();
-
-        // Apply the same conservative guardrails
-        self.extra_mount_checks = vec![
+        self.apply.exdev = ExdevPolicy::Fail;
+        self.risks.ownership_strict = true;
+        self.durability.preservation = PreservationPolicy::RequireBasic;
+        self.apply.override_preflight = false;
+        self.risks.source_trust = SourceTrustPolicy::RequireTrusted;
+        self.apply.best_effort_restore = false;
+        self.backup.tag = "coreutils".to_string();
+        self.apply.extra_mount_checks = vec![
             PathBuf::from("/usr"),
             PathBuf::from("/bin"),
             PathBuf::from("/sbin"),
             PathBuf::from("/usr/bin"),
             PathBuf::from("/usr/sbin"),
         ];
-        self.forbid_paths = vec![
+        self.scope.forbid_paths = vec![
             PathBuf::from("/proc"),
             PathBuf::from("/sys"),
             PathBuf::from("/dev"),
             PathBuf::from("/run"),
             PathBuf::from("/tmp"),
         ];
-
-        // Caller still needs to set allow_roots explicitly.
         self
     }
 }

@@ -1,5 +1,6 @@
 use crate::adapters::OwnershipOracle;
 use crate::policy::Policy;
+use crate::policy::types::{RiskLevel, SourceTrustPolicy};
 use crate::types::{Action, Plan};
 
 /// Centralized evaluation result for a single action under a given Policy.
@@ -22,7 +23,7 @@ pub(crate) fn evaluate_action(
     match act {
         Action::EnsureSymlink { source, target } => {
             // Policy-driven extra mount checks (replaces any hard-coded paths)
-            for p in &policy.extra_mount_checks {
+            for p in &policy.apply.extra_mount_checks {
                 if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                     stops.push(format!("{} not rw+exec: {}", p.display(), e));
                     notes.push(format!("{} not rw+exec", p.display()));
@@ -46,34 +47,40 @@ pub(crate) fn evaluate_action(
             }
             if let Ok(hard) = crate::preflight::checks::check_hardlink_hazard(&target.as_path()) {
                 if hard {
-                    if policy.allow_hardlink_breakage {
-                        notes.push("hardlink risk allowed by policy".to_string());
-                    } else {
-                        stops.push("hardlink risk".to_string());
-                        notes.push("hardlink risk".to_string());
+                    match policy.risks.hardlinks {
+                        RiskLevel::Stop => {
+                            stops.push("hardlink risk".to_string());
+                            notes.push("hardlink risk".to_string());
+                        }
+                        RiskLevel::Warn | RiskLevel::Allow => {
+                            notes.push("hardlink risk allowed by policy".to_string());
+                        }
                     }
                 }
             }
             if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path()) {
                 if risk {
-                    if policy.allow_suid_sgid_mutation {
-                        notes.push("suid/sgid risk allowed by policy".to_string());
-                    } else {
-                        stops.push(format!(
-                            "suid/sgid risk: {}",
-                            target.as_path().display()
-                        ));
-                        notes.push("suid/sgid risk".to_string());
+                    match policy.risks.suid_sgid {
+                        RiskLevel::Stop => {
+                            stops.push(format!(
+                                "suid/sgid risk: {}",
+                                target.as_path().display()
+                            ));
+                            notes.push("suid/sgid risk".to_string());
+                        }
+                        RiskLevel::Warn | RiskLevel::Allow => {
+                            notes.push("suid/sgid risk allowed by policy".to_string());
+                        }
                     }
                 }
             }
             match crate::preflight::checks::check_source_trust(
                 &source.as_path(),
-                policy.force_untrusted_source,
+                policy.risks.source_trust != SourceTrustPolicy::RequireTrusted,
             ) {
                 Ok(()) => {}
                 Err(e) => {
-                    if policy.force_untrusted_source {
+                    if policy.risks.source_trust != SourceTrustPolicy::RequireTrusted {
                         notes.push(format!("untrusted source allowed by policy: {}", e));
                     } else {
                         stops.push(format!("untrusted source: {}", e));
@@ -81,7 +88,7 @@ pub(crate) fn evaluate_action(
                     }
                 }
             }
-            if policy.strict_ownership {
+            if policy.risks.ownership_strict {
                 match owner {
                     Some(oracle) => {
                         if let Err(e) = oracle.owner_of(target) {
@@ -95,9 +102,13 @@ pub(crate) fn evaluate_action(
                     }
                 }
             }
-            if !policy.allow_roots.is_empty() {
+            if !policy.scope.allow_roots.is_empty() {
                 let target_abs = target.as_path();
-                let in_allowed = policy.allow_roots.iter().any(|r| target_abs.starts_with(r));
+                let in_allowed = policy
+                    .scope
+                    .allow_roots
+                    .iter()
+                    .any(|r| target_abs.starts_with(r));
                 if !in_allowed {
                     stops.push(format!(
                         "target outside allowed roots: {}",
@@ -107,6 +118,7 @@ pub(crate) fn evaluate_action(
                 }
             }
             if policy
+                .scope
                 .forbid_paths
                 .iter()
                 .any(|f| target.as_path().starts_with(f))
@@ -119,7 +131,7 @@ pub(crate) fn evaluate_action(
             }
         }
         Action::RestoreFromBackup { target } => {
-            for p in &policy.extra_mount_checks {
+            for p in &policy.apply.extra_mount_checks {
                 if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                     stops.push(format!("{} not rw+exec: {}", p.display(), e));
                     notes.push(format!("{} not rw+exec", p.display()));
@@ -143,17 +155,24 @@ pub(crate) fn evaluate_action(
             }
             if let Ok(risk) = crate::preflight::checks::check_suid_sgid_risk(&target.as_path()) {
                 if risk {
-                    if policy.allow_suid_sgid_mutation {
-                        notes.push("suid/sgid risk allowed by policy".to_string());
-                    } else {
-                        stops.push("suid/sgid risk".to_string());
-                        notes.push("suid/sgid risk".to_string());
+                    match policy.risks.suid_sgid {
+                        RiskLevel::Stop => {
+                            stops.push("suid/sgid risk".to_string());
+                            notes.push("suid/sgid risk".to_string());
+                        }
+                        RiskLevel::Warn | RiskLevel::Allow => {
+                            notes.push("suid/sgid risk allowed by policy".to_string());
+                        }
                     }
                 }
             }
-            if !policy.allow_roots.is_empty() {
+            if !policy.scope.allow_roots.is_empty() {
                 let target_abs = target.as_path();
-                let in_allowed = policy.allow_roots.iter().any(|r| target_abs.starts_with(r));
+                let in_allowed = policy
+                    .scope
+                    .allow_roots
+                    .iter()
+                    .any(|r| target_abs.starts_with(r));
                 if !in_allowed {
                     stops.push(format!(
                         "target outside allowed roots: {}",
@@ -163,6 +182,7 @@ pub(crate) fn evaluate_action(
                 }
             }
             if policy
+                .scope
                 .forbid_paths
                 .iter()
                 .any(|f| target.as_path().starts_with(f))
@@ -189,10 +209,10 @@ pub(crate) fn gating_errors(
     let mut errs: Vec<String> = Vec::new();
 
     // Global rescue verification: if required by policy, STOP when unavailable.
-    if policy.require_rescue
+    if policy.rescue.require
         && !crate::policy::rescue::verify_rescue_tools_with_exec_min(
-            policy.rescue_exec_check,
-            policy.rescue_min_count,
+            policy.rescue.exec_check,
+            policy.rescue.min_count,
         )
     {
         errs.push("rescue profile unavailable".to_string());

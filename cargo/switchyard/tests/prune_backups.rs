@@ -21,7 +21,7 @@ impl FactsEmitter for TestEmitter {
 
 fn make_snapshots(tgt: &std::path::Path, tag: &str, n: usize) {
     for _ in 0..n {
-        let _ = switchyard::fs::create_snapshot(tgt, tag);
+        let _ = switchyard::fs::backup::create_snapshot(tgt, tag);
         std::thread::sleep(std::time::Duration::from_millis(3));
     }
 }

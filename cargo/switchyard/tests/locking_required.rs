@@ -25,7 +25,7 @@ fn commit_requires_lock_manager_when_policy_enforced() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.require_lock_manager = true;
+    policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
 

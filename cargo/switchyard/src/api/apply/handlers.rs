@@ -36,7 +36,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             "action_id": _aid.to_string(),
             "path": target.as_path().display().to_string(),
             "safepath_validation": "success",
-            "backup_durable": api.policy.require_backup_durability,
+            "backup_durable": api.policy.durability.backup_durability,
         })).emit_success();
     }
 
@@ -51,12 +51,12 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     };
     let after_hash = sha256_hex_of(&source.as_path());
     let hash_ms = th0.elapsed().as_millis() as u64;
-    match crate::fs::replace_file_with_symlink(
+    match crate::fs::swap::replace_file_with_symlink(
         &source,
         &target,
         dry,
-        api.policy.allow_degraded_fs,
-        &api.policy.backup_tag,
+        matches!(api.policy.apply.exdev, crate::policy::types::ExdevPolicy::DegradedFallback),
+        &api.policy.backup.tag,
     ) {
         Ok((d, ms)) => {
             degraded_used = d;
@@ -110,7 +110,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         "duration_ms": fsync_ms,
         "before_kind": before_kind,
         "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
-        "backup_durable": api.policy.require_backup_durability,
+        "backup_durable": api.policy.durability.backup_durability,
     });
     ensure_provenance(&mut extra);
     insert_hashes(&mut extra, &before_hash, &after_hash);
@@ -140,26 +140,26 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         "action_id": _aid.to_string(),
         "path": target.as_path().display().to_string(),
         "safepath_validation": "success",
-        "backup_durable": api.policy.require_backup_durability,
+        "backup_durable": api.policy.durability.backup_durability,
     })).emit_success();
 
     let before_kind = kind_of(&target.as_path());
     let mut used_prev = false;
     let mut backup_ms = 0u64;
-    if !dry && api.policy.capture_restore_snapshot {
+    if !dry && api.policy.apply.capture_restore_snapshot {
         let tb0 = Instant::now();
-        let _ = crate::fs::create_snapshot(&target.as_path(), &api.policy.backup_tag);
+        let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
         backup_ms = tb0.elapsed().as_millis() as u64;
         used_prev = true;
     }
-    let force = api.policy.force_restore_best_effort || !api.policy.require_sidecar_integrity;
+    let force = api.policy.apply.best_effort_restore || !api.policy.durability.sidecar_integrity;
     // Pre-compute sidecar integrity verification (best-effort) before restore
     let th0 = Instant::now();
     let integrity_verified = (|| {
         let pair = if used_prev {
-            crate::fs::backup::find_previous_backup_and_sidecar(&target.as_path(), &api.policy.backup_tag)
+            crate::fs::backup::find_previous_backup_and_sidecar(&target.as_path(), &api.policy.backup.tag)
         } else {
-            crate::fs::backup::find_latest_backup_and_sidecar(&target.as_path(), &api.policy.backup_tag)
+            crate::fs::backup::find_latest_backup_and_sidecar(&target.as_path(), &api.policy.backup.tag)
         }?;
         let (backup_opt, sc_path) = pair;
         let sc = crate::fs::backup::read_sidecar(&sc_path).ok()?;
@@ -170,12 +170,12 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             None
         }
     })();
-    let mut hash_ms = th0.elapsed().as_millis() as u64;
+    let hash_ms = th0.elapsed().as_millis() as u64;
 
     let restore_res = if used_prev {
-        crate::fs::restore_file_prev(&target, dry, force, &api.policy.backup_tag)
+        crate::fs::restore::restore_file_prev(&target, dry, force, &api.policy.backup.tag)
     } else {
-        crate::fs::restore_file(&target, dry, force, &api.policy.backup_tag)
+        crate::fs::restore::restore_file(&target, dry, force, &api.policy.backup.tag)
     };
     match restore_res {
         Ok(()) => {
@@ -185,7 +185,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             // If we tried previous and it was NotFound (no previous), fall back to latest
             if used_prev && e.kind() == std::io::ErrorKind::NotFound {
                 if let Err(e2) =
-                    crate::fs::restore_file(&target, dry, force, &api.policy.backup_tag)
+                    crate::fs::restore::restore_file(&target, dry, force, &api.policy.backup.tag)
                 {
                     e = e2;
                 } else {
@@ -234,7 +234,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         "path": target.as_path().display().to_string(),
         "before_kind": before_kind,
         "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
-        "backup_durable": api.policy.require_backup_durability,
+        "backup_durable": api.policy.durability.backup_durability,
     });
     if let Some(iv) = integrity_verified {
         if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }

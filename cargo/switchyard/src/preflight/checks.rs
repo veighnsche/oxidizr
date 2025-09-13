@@ -6,7 +6,7 @@ use std::path::Path;
 /// Returns Ok(()) if suitable; Err(String) with a human message otherwise.
 pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
     // Delegate to fs::mount inspector; fail closed on ambiguity.
-    match crate::fs::ensure_rw_exec(&crate::fs::ProcStatfsInspector, path) {
+    match crate::fs::mount::ensure_rw_exec(&crate::fs::mount::ProcStatfsInspector, path) {
         Ok(()) => Ok(()),
         Err(_) => Err(format!(
             "Filesystem at '{}' not suitable or ambiguous (requires rw and exec)",

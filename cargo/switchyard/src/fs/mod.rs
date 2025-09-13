@@ -2,8 +2,8 @@
 //!
 //! This module provides low-level, TOCTOU-safe filesystem operations used by the
 //! higher-level API stages. Consumers should prefer calling public API stages in
-//! `switchyard::api` rather than these atoms. Some re-exports below are kept for
-//! backwards compatibility and are deprecated.
+//! `switchyard::api` rather than these atoms. Low-level atoms are crate-private
+//! and are not re-exported at the module root.
 
 pub mod atomic;
 pub mod backup;
@@ -12,15 +12,3 @@ pub mod mount;
 pub mod paths;
 pub mod restore;
 pub mod swap;
-
-/// BEGIN REMOVE BLOCK — deprecated public re-exports of low-level atoms
-/// Internal-only visibility preserved for crate tests and diagnostics
-pub(crate) use atomic::{atomic_symlink_swap, fsync_parent_dir, open_dir_nofollow};
-/// END REMOVE BLOCK
-
-pub use backup::{backup_path_with_tag, create_snapshot, has_backup_artifacts};
-pub use meta::{detect_preservation_capabilities, kind_of, resolve_symlink_target, sha256_hex_of};
-pub use mount::{ensure_rw_exec, ProcStatfsInspector};
-pub use paths::is_safe_path;
-pub use restore::{restore_file, restore_file_prev};
-pub use swap::replace_file_with_symlink;

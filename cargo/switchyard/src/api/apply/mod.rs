@@ -9,7 +9,6 @@
 
 use std::time::Instant;
 
-use base64::Engine;
 use serde_json::json;
 
 use crate::fs;
@@ -126,7 +125,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     } else {
         if !dry {
             // Enforce by default unless explicitly allowed through policy, or when require_lock_manager is set.
-            let must_fail = api.policy.require_lock_manager || !api.policy.allow_unlocked_commit;
+            let must_fail = matches!(api.policy.governance.locking, crate::policy::types::LockingPolicy::Required)
+                || !api.policy.governance.allow_unlocked_commit;
             if must_fail {
                 slog.apply_attempt().merge(json!({
                     "lock_backend": "none",
@@ -176,7 +176,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 
     // BEGIN REMOVE BLOCK — duplicate policy gating; centralize in policy::gating::evaluate_action
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
-    if !api.policy.override_preflight && !dry {
+    if !api.policy.apply.override_preflight && !dry {
         let gating_errors = gating::gating_errors(&api.policy, api.owner.as_deref(), plan);
         if !gating_errors.is_empty() {
             api.audit
@@ -255,11 +255,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                             source: _source,
                             target,
                         } => {
-                            match fs::restore_file(
+                            match fs::restore::restore_file(
                                 &target,
                                 dry,
-                                api.policy.force_restore_best_effort,
-                                &api.policy.backup_tag,
+                                api.policy.apply.best_effort_restore,
+                                &api.policy.backup.tag,
                             ) {
                                 Ok(()) => {
                                     slog.rollback().path(target.as_path().display().to_string()).emit_success();
@@ -318,16 +318,17 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if let Some(smoke) = &api.smoke {
             if smoke.run(plan).is_err() {
                 errors.push("smoke tests failed".to_string());
-                if !api.policy.disable_auto_rollback {
+                let auto_rb = match api.policy.governance.smoke { crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback, crate::policy::types::SmokePolicy::Off => true };
+                if auto_rb {
                     rolled_back = true;
                     for prev in executed.iter().rev() {
                         match prev {
                             Action::EnsureSymlink { source: _s, target } => {
-                                let _ = fs::restore_file(
+                                let _ = fs::restore::restore_file(
                                     &target,
                                     dry,
-                                    api.policy.force_restore_best_effort,
-                                    &api.policy.backup_tag,
+                                    api.policy.apply.best_effort_restore,
+                                    &api.policy.backup.tag,
                                 )
                                 .map_err(|e| {
                                     rollback_errors.push(format!(
@@ -349,18 +350,19 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
         } else {
             // H3: Missing smoke runner when required
-            if api.policy.require_smoke_in_commit {
+            if matches!(api.policy.governance.smoke, crate::policy::types::SmokePolicy::Require { .. }) {
                 errors.push("smoke runner missing".to_string());
-                if !api.policy.disable_auto_rollback {
+                let auto_rb = match api.policy.governance.smoke { crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback, crate::policy::types::SmokePolicy::Off => true };
+                if auto_rb {
                     rolled_back = true;
                     for prev in executed.iter().rev() {
                         match prev {
                             Action::EnsureSymlink { source: _s, target } => {
-                                let _ = fs::restore_file(
+                                let _ = fs::restore::restore_file(
                                     &target,
                                     dry,
-                                    api.policy.force_restore_best_effort,
-                                    &api.policy.backup_tag,
+                                    api.policy.apply.best_effort_restore,
+                                    &api.policy.backup.tag,
                                 )
                                 .map_err(|e| {
                                     rollback_errors.push(format!(

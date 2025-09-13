@@ -39,10 +39,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
 
     // Global rescue verification: if required by policy, STOP when unavailable.
     let rescue_ok = crate::policy::rescue::verify_rescue_tools_with_exec_min(
-        api.policy.rescue_exec_check,
-        api.policy.rescue_min_count,
+        api.policy.rescue.exec_check,
+        api.policy.rescue.min_count,
     );
-    if api.policy.require_rescue && !rescue_ok {
+    if api.policy.rescue.require && !rescue_ok {
         stops.push("rescue profile unavailable".to_string());
     }
 
@@ -72,7 +72,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 };
                 let (preservation, preservation_supported) =
                     detect_preservation_capabilities(&target.as_path());
-                if api.policy.require_preservation && !preservation_supported {
+                if matches!(api.policy.durability.preservation, crate::policy::types::PreservationPolicy::RequireBasic) && !preservation_supported {
                     stops.push("preservation unsupported for target".to_string());
                 }
                 let current_kind = kind_of(&target.as_path());
@@ -109,8 +109,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     detect_preservation_capabilities(&target.as_path());
                 // Annotate whether backup artifacts are present (payload and/or sidecar)
                 let backup_present =
-                    crate::fs::has_backup_artifacts(&target.as_path(), &api.policy.backup_tag);
-                if api.policy.require_rescue && !backup_present {
+                    crate::fs::backup::has_backup_artifacts(&target.as_path(), &api.policy.backup.tag);
+                if api.policy.rescue.require && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
                 }
                 rows::push_row_emit(
