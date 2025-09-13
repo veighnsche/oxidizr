@@ -1,9 +1,9 @@
 // Default OwnershipOracle implementation using OS metadata (Unix-only)
 
 use crate::adapters::OwnershipOracle;
-use crate::types::OwnershipInfo;
 use crate::types::errors::{Error, ErrorKind, Result};
 use crate::types::safepath::SafePath;
+use crate::types::OwnershipInfo;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct FsOwnershipOracle;

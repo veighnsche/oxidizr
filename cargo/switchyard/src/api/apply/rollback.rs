@@ -24,7 +24,9 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                     &api.policy.backup.tag,
                 ) {
                     Ok(()) => {
-                        slog.rollback().path(target.as_path().display().to_string()).emit_success();
+                        slog.rollback()
+                            .path(target.as_path().display().to_string())
+                            .emit_success();
                     }
                     Err(e) => {
                         rollback_errors.push(format!(
@@ -32,7 +34,9 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                             target.as_path().display(),
                             e
                         ));
-                        slog.rollback().path(target.as_path().display().to_string()).emit_failure();
+                        slog.rollback()
+                            .path(target.as_path().display().to_string())
+                            .emit_failure();
                     }
                 }
             }
@@ -48,17 +52,25 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
 }
 
 pub(crate) fn emit_summary(slog: &StageLogger<'_>, rollback_errors: &[String]) {
-    let rb_decision = if rollback_errors.is_empty() { "success" } else { "failure" };
+    let rb_decision = if rollback_errors.is_empty() {
+        "success"
+    } else {
+        "failure"
+    };
     let mut rb_extra = json!({});
     if rb_decision == "failure" {
         if let Some(obj) = rb_extra.as_object_mut() {
             obj.insert(
                 "error_id".to_string(),
-                json!(crate::api::errors::id_str(crate::api::errors::ErrorId::E_RESTORE_FAILED)),
+                json!(crate::api::errors::id_str(
+                    crate::api::errors::ErrorId::E_RESTORE_FAILED
+                )),
             );
             obj.insert(
                 "exit_code".to_string(),
-                json!(crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_RESTORE_FAILED)),
+                json!(crate::api::errors::exit_code_for(
+                    crate::api::errors::ErrorId::E_RESTORE_FAILED
+                )),
             );
             obj.insert(
                 "summary_error_ids".to_string(),

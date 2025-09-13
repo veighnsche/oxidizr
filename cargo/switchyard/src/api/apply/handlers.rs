@@ -8,11 +8,11 @@ use crate::types::Action;
 
 use super::audit_fields::{insert_hashes, maybe_warn_fsync};
 use super::perf::PerfAgg;
-use std::time::Instant;
 use crate::api::errors::{exit_code_for, id_str, ErrorId};
 use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
 use crate::logging::audit::{ensure_provenance, AuditCtx};
 use crate::logging::StageLogger;
+use std::time::Instant;
 
 /// Handle an EnsureSymlink action: perform the operation and emit per-action facts.
 /// Returns (executed_action_if_success, error_message_if_failure).
@@ -34,12 +34,14 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     // Attempt fact
     {
         let slog = StageLogger::new(tctx);
-        slog.apply_attempt().merge(&json!({
-            "action_id": _aid.to_string(),
-            "path": target.as_path().display().to_string(),
-            "safepath_validation": "success",
-            "backup_durable": api.policy.durability.backup_durability,
-        })).emit_success();
+        slog.apply_attempt()
+            .merge(&json!({
+                "action_id": _aid.to_string(),
+                "path": target.as_path().display().to_string(),
+                "safepath_validation": "success",
+                "backup_durable": api.policy.durability.backup_durability,
+            }))
+            .emit_success();
     }
 
     let degraded_used: bool;
@@ -57,7 +59,10 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
         &source,
         &target,
         dry,
-        matches!(api.policy.apply.exdev, crate::policy::types::ExdevPolicy::DegradedFallback),
+        matches!(
+            api.policy.apply.exdev,
+            crate::policy::types::ExdevPolicy::DegradedFallback
+        ),
         &api.policy.backup.tag,
     ) {
         Ok((d, ms)) => {
@@ -98,8 +103,19 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             let obj = extra.as_object_mut().unwrap();
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
-            StageLogger::new(tctx).apply_result().merge(&extra).emit_failure();
-            return (None, Some(msg), PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms });
+            StageLogger::new(tctx)
+                .apply_result()
+                .merge(&extra)
+                .emit_failure();
+            return (
+                None,
+                Some(msg),
+                PerfAgg {
+                    hash_ms,
+                    backup_ms: 0,
+                    swap_ms: fsync_ms,
+                },
+            );
         }
     }
 
@@ -117,9 +133,20 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     ensure_provenance(&mut extra);
     insert_hashes(&mut extra, &before_hash, &after_hash);
     maybe_warn_fsync(&mut extra, fsync_ms, FSYNC_WARN_MS);
-    StageLogger::new(tctx).apply_result().merge(&extra).emit_success();
+    StageLogger::new(tctx)
+        .apply_result()
+        .merge(&extra)
+        .emit_success();
 
-    (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms })
+    (
+        Some(act.clone()),
+        None,
+        PerfAgg {
+            hash_ms,
+            backup_ms: 0,
+            swap_ms: fsync_ms,
+        },
+    )
 }
 
 /// Handle a RestoreFromBackup action: perform restore and emit per-action facts.
@@ -139,12 +166,15 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     };
     let _aid = action_id(pid, act, idx);
 
-    StageLogger::new(tctx).apply_attempt().merge(&json!({
-        "action_id": _aid.to_string(),
-        "path": target.as_path().display().to_string(),
-        "safepath_validation": "success",
-        "backup_durable": api.policy.durability.backup_durability,
-    })).emit_success();
+    StageLogger::new(tctx)
+        .apply_attempt()
+        .merge(&json!({
+            "action_id": _aid.to_string(),
+            "path": target.as_path().display().to_string(),
+            "safepath_validation": "success",
+            "backup_durable": api.policy.durability.backup_durability,
+        }))
+        .emit_success();
 
     let before_kind = kind_of(&target.as_path());
     let mut used_prev = false;
@@ -160,9 +190,15 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     let th0 = Instant::now();
     let integrity_verified = (|| {
         let pair = if used_prev {
-            crate::fs::backup::find_previous_backup_and_sidecar(&target.as_path(), &api.policy.backup.tag)
+            crate::fs::backup::find_previous_backup_and_sidecar(
+                &target.as_path(),
+                &api.policy.backup.tag,
+            )
         } else {
-            crate::fs::backup::find_latest_backup_and_sidecar(&target.as_path(), &api.policy.backup.tag)
+            crate::fs::backup::find_latest_backup_and_sidecar(
+                &target.as_path(),
+                &api.policy.backup.tag,
+            )
         }?;
         let (backup_opt, sc_path) = pair;
         let sc = crate::fs::backup::read_sidecar(&sc_path).ok()?;
@@ -200,11 +236,24 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                         "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
                     });
                     if let Some(iv) = integrity_verified {
-                        if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
+                        if let Some(obj) = extra.as_object_mut() {
+                            obj.insert("sidecar_integrity_verified".into(), json!(iv));
+                        }
                     }
                     ensure_provenance(&mut extra);
-                    StageLogger::new(tctx).apply_result().merge(&extra).emit_success();
-                    return (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
+                    StageLogger::new(tctx)
+                        .apply_result()
+                        .merge(&extra)
+                        .emit_success();
+                    return (
+                        Some(act.clone()),
+                        None,
+                        PerfAgg {
+                            hash_ms,
+                            backup_ms,
+                            swap_ms: 0,
+                        },
+                    );
                 }
             }
             use std::io::ErrorKind;
@@ -220,14 +269,27 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                 "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
             });
             if let Some(iv) = integrity_verified {
-                if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
+                if let Some(obj) = extra.as_object_mut() {
+                    obj.insert("sidecar_integrity_verified".into(), json!(iv));
+                }
             }
             ensure_provenance(&mut extra);
             let obj = extra.as_object_mut().unwrap();
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
-            StageLogger::new(tctx).apply_result().merge(&extra).emit_failure();
-            return (None, Some(msg), PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
+            StageLogger::new(tctx)
+                .apply_result()
+                .merge(&extra)
+                .emit_failure();
+            return (
+                None,
+                Some(msg),
+                PerfAgg {
+                    hash_ms,
+                    backup_ms,
+                    swap_ms: 0,
+                },
+            );
         }
     }
 
@@ -240,10 +302,23 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         "backup_durable": api.policy.durability.backup_durability,
     });
     if let Some(iv) = integrity_verified {
-        if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
+        if let Some(obj) = extra.as_object_mut() {
+            obj.insert("sidecar_integrity_verified".into(), json!(iv));
+        }
     }
     ensure_provenance(&mut extra);
-    StageLogger::new(tctx).apply_result().merge(&extra).emit_success();
+    StageLogger::new(tctx)
+        .apply_result()
+        .merge(&extra)
+        .emit_success();
 
-    (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms, swap_ms: 0 })
+    (
+        Some(act.clone()),
+        None,
+        PerfAgg {
+            hash_ms,
+            backup_ms,
+            swap_ms: 0,
+        },
+    )
 }

@@ -1,10 +1,10 @@
+use log::Level;
 use serde_json::Value;
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 use switchyard::{logging::AuditSink, logging::FactsEmitter, Switchyard};
-use log::Level;
 
 #[derive(Default, Clone)]
 struct TestEmitter {
@@ -37,7 +37,13 @@ fn plan_one(root: &std::path::Path) -> (PlanInput, std::path::PathBuf, std::path
     let sp_src = SafePath::from_rooted(root, &src).unwrap();
     let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
     (
-        PlanInput { link: vec![LinkRequest { source: sp_src, target: sp_tgt }], restore: vec![] },
+        PlanInput {
+            link: vec![LinkRequest {
+                source: sp_src,
+                target: sp_tgt,
+            }],
+            restore: vec![],
+        },
         src,
         tgt,
     )
@@ -67,13 +73,17 @@ fn run_and_get_events(require_durable: bool) -> Vec<(String, String, String, Val
 #[test]
 fn backup_durable_flag_true_when_required() {
     let evs = run_and_get_events(true);
-    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.attempt" && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(true)));
-    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.result" && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(true)));
+    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.attempt"
+        && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(true)));
+    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.result"
+        && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(true)));
 }
 
 #[test]
 fn backup_durable_flag_false_when_not_required() {
     let evs = run_and_get_events(false);
-    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.attempt" && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(false)));
-    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.result" && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(false)));
+    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.attempt"
+        && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(false)));
+    assert!(evs.iter().any(|(_, event, _, f)| event == "apply.result"
+        && f.get("backup_durable").and_then(|v| v.as_bool()) == Some(false)));
 }

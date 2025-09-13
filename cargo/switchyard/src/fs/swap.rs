@@ -183,30 +183,37 @@ mod tests {
         // Create source and target files
         fs::write(&src, b"new").unwrap_or_else(|e| panic!("Failed to write source file: {e}"));
         {
-            let mut f = fs::File::create(&tgt).unwrap_or_else(|e| panic!("Failed to create target file: {e}"));
+            let mut f = fs::File::create(&tgt)
+                .unwrap_or_else(|e| panic!("Failed to create target file: {e}"));
             writeln!(f, "old").unwrap_or_else(|e| panic!("Failed to write to target file: {e}"));
         }
 
-        let sp_src = SafePath::from_rooted(root, &src).unwrap_or_else(|e| panic!("Failed to create source SafePath: {e}"));
-        let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap_or_else(|e| panic!("Failed to create target SafePath: {e}"));
+        let sp_src = SafePath::from_rooted(root, &src)
+            .unwrap_or_else(|e| panic!("Failed to create source SafePath: {e}"));
+        let sp_tgt = SafePath::from_rooted(root, &tgt)
+            .unwrap_or_else(|e| panic!("Failed to create target SafePath: {e}"));
 
         // Replace target with symlink to source; backup should be created
         let _ = replace_file_with_symlink(&sp_src, &sp_tgt, false, false, DEFAULT_BACKUP_TAG)
             .unwrap_or_else(|e| panic!("Failed to replace file with symlink: {e}"));
-        let md = fs::symlink_metadata(&tgt).unwrap_or_else(|e| panic!("Failed to get symlink metadata: {e}"));
+        let md = fs::symlink_metadata(&tgt)
+            .unwrap_or_else(|e| panic!("Failed to get symlink metadata: {e}"));
         assert!(
             md.file_type().is_symlink(),
             "target should be a symlink after replace"
         );
 
         // Restore from backup; target should be a regular file again with prior content prefix
-        restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG).unwrap_or_else(|e| panic!("Failed to restore file: {e}"));
-        let md2 = fs::symlink_metadata(&tgt).unwrap_or_else(|e| panic!("Failed to get symlink metadata: {e}"));
+        restore_file(&sp_tgt, false, false, DEFAULT_BACKUP_TAG)
+            .unwrap_or_else(|e| panic!("Failed to restore file: {e}"));
+        let md2 = fs::symlink_metadata(&tgt)
+            .unwrap_or_else(|e| panic!("Failed to get symlink metadata: {e}"));
         assert!(
             md2.file_type().is_file(),
             "target should be a regular file after restore"
         );
-        let content = fs::read_to_string(&tgt).unwrap_or_else(|e| panic!("Failed to read target file: {e}"));
+        let content =
+            fs::read_to_string(&tgt).unwrap_or_else(|e| panic!("Failed to read target file: {e}"));
         assert!(content.starts_with("old"));
     }
 }

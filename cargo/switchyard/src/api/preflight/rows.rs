@@ -7,7 +7,10 @@ use crate::types::{Action, Plan, PreflightRow};
 use crate::logging::audit::AuditCtx;
 
 /// Helper to push a preflight row into the rows vec and emit the corresponding fact.
-#[allow(clippy::too_many_arguments, reason = "Required for preflight row emission with full context")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Required for preflight row emission with full context"
+)]
 pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     plan: &Plan,
@@ -57,11 +60,21 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
         .path(path)
         .field("current_kind", json!(current_kind))
         .field("planned_kind", json!(planned_kind));
-    if let Some(ok) = policy_ok { evt = evt.field("policy_ok", json!(ok)); }
-    if let Some(p) = provenance { evt = evt.field("provenance", p); }
-    if let Some(n) = notes { evt = evt.field("notes", json!(n)); }
-    if let Some(p) = preservation { evt = evt.field("preservation", p); }
-    if let Some(ps) = preservation_supported { evt = evt.field("preservation_supported", json!(ps)); }
+    if let Some(ok) = policy_ok {
+        evt = evt.field("policy_ok", json!(ok));
+    }
+    if let Some(p) = provenance {
+        evt = evt.field("provenance", p);
+    }
+    if let Some(n) = notes {
+        evt = evt.field("notes", json!(n));
+    }
+    if let Some(p) = preservation {
+        evt = evt.field("preservation", p);
+    }
+    if let Some(ps) = preservation_supported {
+        evt = evt.field("preservation_supported", json!(ps));
+    }
     // Carry backup tag for traceability per TESTPLAN (long/coreutils/empty tag cases)
     evt = evt.field("backup_tag", json!(api.policy.backup.tag.clone()));
     evt.emit_success();

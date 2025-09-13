@@ -9,8 +9,8 @@
 //! - `SWITCHYARD_FORCE_RESCUE_OK=1|0` forces the result for testing.
 //!
 use crate::constants::{RESCUE_MIN_COUNT, RESCUE_MUST_HAVE};
-use std::env;
 use crate::types::{RescueError, RescueStatus};
+use std::env;
 
 /// Verify that at least one rescue toolset is available on PATH (`BusyBox` or GNU core utilities).
 /// Wrapper that does not enforce executability checks.

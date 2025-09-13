@@ -82,7 +82,10 @@ pub fn check_immutable(path: &Path) -> Result<(), String> {
     let Ok(output) = std::process::Command::new("lsattr")
         .arg("-d")
         .arg(path) // avoid lossy UTF-8 conversion
-        .output() else { return Ok(()) };
+        .output()
+    else {
+        return Ok(());
+    };
 
     if !output.status.success() {
         return Ok(()); // non-zero exit from lsattr -> treat as inconclusive

@@ -95,9 +95,15 @@ mod tests {
         assert!(out.get("before_hash").is_none());
         assert!(out.get("after_hash").is_none());
         assert!(out.get("hash_alg").is_none());
-        let prov = out.get("provenance").and_then(|v| v.as_object()).unwrap_or_else(|| panic!("provenance should be an object"));
+        let prov = out
+            .get("provenance")
+            .and_then(|v| v.as_object())
+            .unwrap_or_else(|| panic!("provenance should be an object"));
         assert_eq!(prov.get("helper").and_then(|v| v.as_str()), Some("***"));
-        let att = out.get("attestation").and_then(|v| v.as_object()).unwrap_or_else(|| panic!("attestation should be an object"));
+        let att = out
+            .get("attestation")
+            .and_then(|v| v.as_object())
+            .unwrap_or_else(|| panic!("attestation should be an object"));
         assert_eq!(att.get("signature").and_then(|v| v.as_str()), Some("***"));
         assert_eq!(att.get("bundle_hash").and_then(|v| v.as_str()), Some("***"));
         assert_eq!(

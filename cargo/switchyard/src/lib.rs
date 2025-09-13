@@ -1,10 +1,8 @@
 #![deny(unsafe_code)]
-
 /* ---- unwrap/expect policy ---- */
 // Warn everywhere (incl. tests), but deny in non-test builds.
 #![warn(clippy::unwrap_used, clippy::expect_used)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
-
 /* ---- dev defaults: useful warnings, not blocking ---- */
 #![warn(
     // Rustc groups
@@ -24,7 +22,6 @@
     rustdoc::broken_intra_doc_links,
     rustdoc::private_intra_doc_links
 )]
-
 // Clippy general & hardening (warn by default during dev)
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]
 #![warn(
@@ -46,7 +43,6 @@
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
-
 /* ---- PROD MODE: turn key warnings into hard errors ----
    Triggers when either:
    - feature "prod" is enabled, or

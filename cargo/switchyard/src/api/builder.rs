@@ -1,7 +1,7 @@
 use crate::api::{DebugAttestor, DebugLockManager, DebugOwnershipOracle, DebugSmokeTestRunner};
+use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 use crate::logging::{AuditSink, FactsEmitter};
 use crate::policy::Policy;
-use crate::constants::DEFAULT_LOCK_TIMEOUT_MS;
 
 /// Builder for constructing a Switchyard with ergonomic chaining.
 /// Mirrors `Switchyard::new(...).with_*` but avoids duplication at call sites.
@@ -11,13 +11,13 @@ pub struct ApiBuilder<E: FactsEmitter, A: AuditSink> {
     audit: A,
     policy: Policy,
     // Optional adapters/handles
-    lock: Option<Box<dyn DebugLockManager>>,              // None in dev/test; required in production
-    owner: Option<Box<dyn DebugOwnershipOracle>>,         // strict ownership gating
-    attest: Option<Box<dyn DebugAttestor>>,               // final summary attestation
-    smoke: Option<Box<dyn DebugSmokeTestRunner>>,         // post-apply health verification
+    lock: Option<Box<dyn DebugLockManager>>, // None in dev/test; required in production
+    owner: Option<Box<dyn DebugOwnershipOracle>>, // strict ownership gating
+    attest: Option<Box<dyn DebugAttestor>>,  // final summary attestation
+    smoke: Option<Box<dyn DebugSmokeTestRunner>>, // post-apply health verification
     lock_timeout_ms: Option<u64>,
 }
-    
+
 impl<E: FactsEmitter, A: AuditSink> ApiBuilder<E, A> {
     pub fn new(facts: E, audit: A, policy: Policy) -> Self {
         Self {
@@ -58,10 +58,18 @@ impl<E: FactsEmitter, A: AuditSink> ApiBuilder<E, A> {
             smoke: None,
             lock_timeout_ms: self.lock_timeout_ms.unwrap_or(DEFAULT_LOCK_TIMEOUT_MS),
         };
-        if let Some(lock) = self.lock { api.lock = Some(lock); }
-        if let Some(owner) = self.owner { api.owner = Some(owner); }
-        if let Some(att) = self.attest { api.attest = Some(att); }
-        if let Some(smoke) = self.smoke { api.smoke = Some(smoke); }
+        if let Some(lock) = self.lock {
+            api.lock = Some(lock);
+        }
+        if let Some(owner) = self.owner {
+            api.owner = Some(owner);
+        }
+        if let Some(att) = self.attest {
+            api.attest = Some(att);
+        }
+        if let Some(smoke) = self.smoke {
+            api.smoke = Some(smoke);
+        }
         api
     }
 

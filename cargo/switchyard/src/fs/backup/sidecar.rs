@@ -25,8 +25,7 @@ pub(crate) fn write_sidecar(backup: &Path, sc: &BackupSidecar) -> std::io::Resul
         std::fs::create_dir_all(parent)?;
     }
     let f = std::fs::File::create(&sc_path)?;
-    serde_json::to_writer_pretty(&f, sc)
-        .map_err(std::io::Error::other)?;
+    serde_json::to_writer_pretty(&f, sc).map_err(std::io::Error::other)?;
     // Ensure sidecar durability as well
     let _ = f.sync_all();
     let _ = crate::fs::atomic::fsync_parent_dir(&sc_path);

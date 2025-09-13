@@ -1,7 +1,7 @@
 //! Filesystem mount inspection and policy helpers.
 
-use std::path::{Path, PathBuf};
 use crate::types::{MountError, MountFlags};
+use std::path::{Path, PathBuf};
 
 pub trait MountInspector {
     /// Get mount flags for a path.
@@ -30,7 +30,10 @@ impl ProcStatfsInspector {
             }
             let mnt = parts.get(1).map(PathBuf::from).ok_or(MountError::Unknown)?;
             if p.starts_with(&mnt) {
-                let opts = parts.get(3).ok_or(MountError::Unknown)?.to_ascii_lowercase();
+                let opts = parts
+                    .get(3)
+                    .ok_or(MountError::Unknown)?
+                    .to_ascii_lowercase();
                 match &best {
                     None => best = Some((mnt, opts)),
                     Some((b, _)) => {

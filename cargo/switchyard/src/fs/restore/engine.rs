@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
 
+use super::{
+    idempotence, integrity, selector, steps,
+    types::{RestoreOptions, SnapshotSel},
+};
 use crate::fs::backup::sidecar::read_sidecar;
 use crate::types::safepath::SafePath;
-use super::{idempotence, integrity, steps, selector, types::{SnapshotSel, RestoreOptions}};
 
 /// Restore a file from its backup. When no backup exists, return an error unless `force_best_effort` is true.
 ///
@@ -43,13 +46,16 @@ pub fn restore_file_prev(
     restore_impl(target, SnapshotSel::Previous, &opts)
 }
 
-
 /// Engine entry that performs restore given a selector and options.
 ///
 /// # Errors
 ///
 /// Returns an IO error if the backup file cannot be restored.
-pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) -> std::io::Result<()> {
+pub fn restore_impl(
+    target: &SafePath,
+    sel: SnapshotSel,
+    opts: &RestoreOptions,
+) -> std::io::Result<()> {
     let target_path = target.as_path();
     // Locate backup payload and sidecar based on selector
     let pair = match sel {
@@ -60,7 +66,10 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
         p
     } else {
         if !opts.force_best_effort {
-            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "backup missing",
+            ));
         }
         return Ok(());
     };
@@ -68,7 +77,11 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
     let sc = read_sidecar(&sidecar_path).ok();
     if let Some(ref side) = sc {
         // Idempotence
-        if idempotence::is_idempotent(&target_path, side.prior_kind.as_str(), side.prior_dest.as_deref()) {
+        if idempotence::is_idempotent(
+            &target_path,
+            side.prior_kind.as_str(),
+            side.prior_dest.as_deref(),
+        ) {
             return Ok(());
         }
     }
@@ -81,16 +94,29 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
                 let backup: PathBuf = if let Some(p) = backup_opt {
                     p
                 } else {
-                    if opts.force_best_effort { return Ok(()); }
-                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                    if opts.force_best_effort {
+                        return Ok(());
+                    }
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "backup payload missing",
+                    ));
                 };
                 if let Some(ref expected) = side.payload_hash {
                     if !integrity::verify_payload_hash_ok(&backup, expected.as_str()) {
-                        if opts.force_best_effort { return Ok(()); }
-                        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload hash mismatch"));
+                        if opts.force_best_effort {
+                            return Ok(());
+                        }
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload hash mismatch",
+                        ));
                     }
                 }
-                let mode = side.mode.as_ref().and_then(|ms| u32::from_str_radix(ms, 8).ok());
+                let mode = side
+                    .mode
+                    .as_ref()
+                    .and_then(|ms| u32::from_str_radix(ms, 8).ok());
                 steps::restore_file_bytes(&target_path, &backup, mode)?;
             }
             "symlink" => {
@@ -102,7 +128,10 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
                 } else if let Some(backup) = backup_opt {
                     steps::legacy_rename(&target_path, &backup)?;
                 } else if !opts.force_best_effort {
-                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "backup payload missing",
+                    ));
                 }
             }
             "none" => {
@@ -115,7 +144,10 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
                 if let Some(backup) = backup_opt {
                     steps::legacy_rename(&target_path, &backup)?;
                 } else if !opts.force_best_effort {
-                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "backup payload missing",
+                    ));
                 }
             }
         }
@@ -123,11 +155,16 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
     }
     // No sidecar; legacy rename if backup exists
     if let Some(backup) = backup_opt {
-        if opts.dry_run { return Ok(()); }
+        if opts.dry_run {
+            return Ok(());
+        }
         steps::legacy_rename(&target_path, &backup)
     } else if opts.force_best_effort {
         Ok(())
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "backup missing",
+        ))
     }
 }

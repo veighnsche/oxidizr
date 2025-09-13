@@ -31,12 +31,37 @@ impl Default for Policy {
     fn default() -> Self {
         Self {
             scope: Scope::default(),
-            rescue: Rescue { require: false, exec_check: false, min_count: DEFAULT_RESCUE_MIN_COUNT },
-            risks: Risks { suid_sgid: RiskLevel::Stop, hardlinks: RiskLevel::Stop, source_trust: SourceTrustPolicy::RequireTrusted, ownership_strict: false },
-            durability: Durability { backup_durability: true, sidecar_integrity: true, preservation: PreservationPolicy::Off },
-            apply: ApplyFlow { exdev: ExdevPolicy::Fail, override_preflight: false, best_effort_restore: false, extra_mount_checks: Vec::new(), capture_restore_snapshot: true },
-            governance: Governance { locking: LockingPolicy::Optional, smoke: SmokePolicy::Off, allow_unlocked_commit: false },
-            backup: Backup { tag: DEFAULT_BACKUP_TAG.to_string() },
+            rescue: Rescue {
+                require: false,
+                exec_check: false,
+                min_count: DEFAULT_RESCUE_MIN_COUNT,
+            },
+            risks: Risks {
+                suid_sgid: RiskLevel::Stop,
+                hardlinks: RiskLevel::Stop,
+                source_trust: SourceTrustPolicy::RequireTrusted,
+                ownership_strict: false,
+            },
+            durability: Durability {
+                backup_durability: true,
+                sidecar_integrity: true,
+                preservation: PreservationPolicy::Off,
+            },
+            apply: ApplyFlow {
+                exdev: ExdevPolicy::Fail,
+                override_preflight: false,
+                best_effort_restore: false,
+                extra_mount_checks: Vec::new(),
+                capture_restore_snapshot: true,
+            },
+            governance: Governance {
+                locking: LockingPolicy::Optional,
+                smoke: SmokePolicy::Off,
+                allow_unlocked_commit: false,
+            },
+            backup: Backup {
+                tag: DEFAULT_BACKUP_TAG.to_string(),
+            },
             retention_count_limit: None,
             retention_age_limit: None,
             allow_unreliable_immutable_check: false,
@@ -88,7 +113,9 @@ impl Policy {
         p.rescue.require = true;
         p.rescue.exec_check = true;
         p.governance.locking = LockingPolicy::Required;
-        p.governance.smoke = SmokePolicy::Require { auto_rollback: true };
+        p.governance.smoke = SmokePolicy::Require {
+            auto_rollback: true,
+        };
         p
     }
 
@@ -97,7 +124,9 @@ impl Policy {
         self.rescue.require = true;
         self.rescue.exec_check = true;
         self.governance.locking = LockingPolicy::Required;
-        self.governance.smoke = SmokePolicy::Require { auto_rollback: true };
+        self.governance.smoke = SmokePolicy::Require {
+            auto_rollback: true,
+        };
         self
     }
 

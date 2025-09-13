@@ -4,7 +4,7 @@ use crate::logging::FactsEmitter;
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, Plan, PlanInput};
 
-use crate::logging::audit::{AuditCtx, AuditMode, new_run_id};
+use crate::logging::audit::{new_run_id, AuditCtx, AuditMode};
 use crate::logging::StageLogger;
 
 /// Build a deterministic plan from input and emit per-action plan facts.
@@ -62,7 +62,9 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     for (idx, act) in plan.actions.iter().enumerate() {
         let aid = action_id(&pid_uuid, act, idx).to_string();
         let path = match act {
-            Action::EnsureSymlink { target, .. } | Action::RestoreFromBackup { target } => Some(target.as_path().display().to_string()),
+            Action::EnsureSymlink { target, .. } | Action::RestoreFromBackup { target } => {
+                Some(target.as_path().display().to_string())
+            }
         };
         if let Some(p) = path {
             slog.plan().action(aid).path(p).emit_success();

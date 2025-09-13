@@ -53,7 +53,9 @@ pub fn is_idempotent(target_path: &Path, prior_kind: &str, prior_dest: Option<&s
 mod tests {
     use super::*;
 
-    fn td() -> tempfile::TempDir { tempfile::tempdir().unwrap() }
+    fn td() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
 
     #[test]
     fn idempotent_when_file_and_prior_file() {

@@ -7,7 +7,6 @@ pub enum ApplyMode {
     Commit,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct LinkRequest {
     pub source: SafePath,

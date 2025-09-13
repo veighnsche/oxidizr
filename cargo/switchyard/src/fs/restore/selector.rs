@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use crate::fs::backup::index::{find_latest_backup_and_sidecar, find_previous_backup_and_sidecar};
+use std::path::{Path, PathBuf};
 
 /// Return (`backup_path_if_present`, `sidecar_path`) for the latest timestamped pair.
 #[must_use]

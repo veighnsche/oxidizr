@@ -9,8 +9,7 @@ pub trait AuditSink {
     fn log(&self, level: Level, msg: &str);
 }
 
-#[derive(Default)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct JsonlSink;
 
 impl FactsEmitter for JsonlSink {
@@ -59,10 +58,15 @@ impl FactsEmitter for FileJsonlSink {
                 m.entry("subsystem".to_string())
                     .or_insert(Value::from(subsystem));
                 m.entry("event".to_string()).or_insert(Value::from(event));
-                m.entry("decision".to_string()).or_insert(Value::from(decision));
+                m.entry("decision".to_string())
+                    .or_insert(Value::from(decision));
                 Value::Object(m)
             }
-            other @ (Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Array(_)) => serde_json::json!({
+            other @ (Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Array(_)) => serde_json::json!({
                 "subsystem": subsystem,
                 "event": event,
                 "decision": decision,

@@ -14,16 +14,16 @@
 //! ```
 
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
-use crate::logging::{AuditSink, FactsEmitter, StageLogger};
-use serde_json::json;
 use crate::logging::audit::new_run_id;
+use crate::logging::{AuditSink, FactsEmitter, StageLogger};
 use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
+use serde_json::json;
 
 // Internal API submodules (idiomatic; directory module)
 mod apply;
-pub mod errors;
 mod builder;
+pub mod errors;
 mod plan;
 mod preflight;
 mod rollback;
@@ -159,7 +159,8 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             "switchyard.prune_backups",
             path = %target.as_path().display(),
             tag = %self.policy.backup.tag
-        ).entered();
+        )
+        .entered();
         // Synthesize a stable plan-like ID for pruning based on target path and tag.
         let plan_like = format!(
             "prune:{}:{}",
@@ -199,13 +200,16 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                 Ok(res)
             }
             Err(e) => {
-                StageLogger::new(&tctx).prune_result().merge(&json!({
-                    "path": target.as_path().display().to_string(),
-                    "backup_tag": self.policy.backup.tag,
-                    "error": e.to_string(),
-                    "error_id": errors::id_str(errors::ErrorId::E_GENERIC),
-                    "exit_code": errors::exit_code_for(errors::ErrorId::E_GENERIC),
-                })).emit_failure();
+                StageLogger::new(&tctx)
+                    .prune_result()
+                    .merge(&json!({
+                        "path": target.as_path().display().to_string(),
+                        "backup_tag": self.policy.backup.tag,
+                        "error": e.to_string(),
+                        "error_id": errors::id_str(errors::ErrorId::E_GENERIC),
+                        "exit_code": errors::exit_code_for(errors::ErrorId::E_GENERIC),
+                    }))
+                    .emit_failure();
                 Err(errors::ApiError::FilesystemError(e.to_string()))
             }
         }

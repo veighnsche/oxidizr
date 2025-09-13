@@ -1,4 +1,8 @@
-use std::{collections::HashSet, fs, path::{Path, PathBuf}};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use super::sidecar::sidecar_path_for_backup;
 
@@ -20,15 +24,21 @@ pub(crate) fn find_latest_backup_and_sidecar(
         let Some(s) = fname.to_str() else { continue }; // skip non-UTF-8
 
         // Must start with the prefix
-        let Some(rest) = s.strip_prefix(&prefix) else { continue };
+        let Some(rest) = s.strip_prefix(&prefix) else {
+            continue;
+        };
 
         // Accept ".bak" or ".bak.meta.json"
         let Some(num_s) = rest
             .strip_suffix(".bak")
             .or_else(|| rest.strip_suffix(".bak.meta.json"))
-        else { continue };
+        else {
+            continue;
+        };
 
-        let Ok(ts) = num_s.parse::<u128>() else { continue };
+        let Ok(ts) = num_s.parse::<u128>() else {
+            continue;
+        };
 
         // If this timestamp is newer, keep it
         let is_better = best.as_ref().is_none_or(|(cur, _)| ts > *cur);
@@ -57,14 +67,16 @@ pub(crate) fn find_previous_backup_and_sidecar(
     let mut seen = HashSet::<u128>::new();
 
     // Collect unique (timestamp, base_path) pairs
-    let mut stamps: Vec<(u128, PathBuf)> = fs::read_dir(parent).ok()?
+    let mut stamps: Vec<(u128, PathBuf)> = fs::read_dir(parent)
+        .ok()?
         .filter_map(Result::ok)
         .filter_map(|e| e.file_name().into_string().ok())
         .filter_map(|s| {
             // Guard: must start with prefix
             let rest = s.strip_prefix(&prefix)?;
             // Accept either ".bak" or ".bak.meta.json"
-            let num_s = rest.strip_suffix(".bak")
+            let num_s = rest
+                .strip_suffix(".bak")
                 .or_else(|| rest.strip_suffix(".bak.meta.json"))?;
             let num: u128 = num_s.parse().ok()?;
             // Deduplicate timestamps

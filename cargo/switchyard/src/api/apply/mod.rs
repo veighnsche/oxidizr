@@ -9,8 +9,8 @@
 
 use std::time::Instant;
 
-use serde_json::json;
 use crate::logging::audit::new_run_id;
+use serde_json::json;
 
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
@@ -23,11 +23,11 @@ use crate::logging::audit::{AuditCtx, AuditMode};
 use crate::logging::StageLogger;
 mod audit_fields;
 mod handlers;
-mod perf;
-mod util;
 mod lock;
+mod perf;
 mod policy_gate;
 mod rollback;
+mod util;
 use perf::PerfAgg;
 
 // PerfAgg moved to perf.rs; lock backend helper and acquisition moved to util.rs and lock.rs
@@ -70,15 +70,18 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 
     // Audit v2: apply attempt summary (include lock_wait_ms when present)
     let approx_attempts = linfo.approx_attempts;
-    slog.apply_attempt().merge(&json!({
-        "lock_backend": linfo.lock_backend,
-        "lock_wait_ms": linfo.lock_wait_ms,
-        "lock_attempts": approx_attempts,
-    })).emit_success();
-    
+    slog.apply_attempt()
+        .merge(&json!({
+            "lock_backend": linfo.lock_backend,
+            "lock_wait_ms": linfo.lock_wait_ms,
+            "lock_attempts": approx_attempts,
+        }))
+        .emit_success();
+
     // Policy gating: refuse to proceed when preflight would STOP, unless override is set.
-    if let Some(report) = policy_gate::enforce(api, plan, pid, dry, t0, &slog) { return report; }
-    
+    if let Some(report) = policy_gate::enforce(api, plan, pid, dry, t0, &slog) {
+        return report;
+    }
 
     let mut perf_total = PerfAgg::default();
     for (idx, act) in plan.actions.iter().enumerate() {
@@ -127,7 +130,10 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if let Some(smoke) = &api.smoke {
             if smoke.run(plan).is_err() {
                 errors.push("smoke tests failed".to_string());
-                let auto_rb = match api.policy.governance.smoke { crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback, crate::policy::types::SmokePolicy::Off => true };
+                let auto_rb = match api.policy.governance.smoke {
+                    crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback,
+                    crate::policy::types::SmokePolicy::Off => true,
+                };
                 if auto_rb {
                     rolled_back = true;
                     rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
@@ -135,9 +141,15 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
         } else {
             // H3: Missing smoke runner when required
-            if matches!(api.policy.governance.smoke, crate::policy::types::SmokePolicy::Require { .. }) {
+            if matches!(
+                api.policy.governance.smoke,
+                crate::policy::types::SmokePolicy::Require { .. }
+            ) {
                 errors.push("smoke runner missing".to_string());
-                let auto_rb = match api.policy.governance.smoke { crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback, crate::policy::types::SmokePolicy::Off => true };
+                let auto_rb = match api.policy.governance.smoke {
+                    crate::policy::types::SmokePolicy::Require { auto_rollback } => auto_rollback,
+                    crate::policy::types::SmokePolicy::Off => true,
+                };
                 if auto_rb {
                     rolled_back = true;
                     rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
@@ -177,9 +189,16 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 "rolled_back": rolled_back,
             });
             let bundle: Vec<u8> = serde_json::to_vec(&bundle_json).unwrap_or_default();
-            if let Some(att_json) = crate::adapters::attest::build_attestation_fields(&**att, &bundle) {
-                #[allow(clippy::unwrap_used, reason = "defer cleanup; will replace with safe shape normalizer later")]
-                let obj = fields.as_object_mut().unwrap_or_else(|| panic!("Failed to get object mut reference"));
+            if let Some(att_json) =
+                crate::adapters::attest::build_attestation_fields(&**att, &bundle)
+            {
+                #[allow(
+                    clippy::unwrap_used,
+                    reason = "defer cleanup; will replace with safe shape normalizer later"
+                )]
+                let obj = fields
+                    .as_object_mut()
+                    .unwrap_or_else(|| panic!("Failed to get object mut reference"));
                 obj.insert("attestation".to_string(), att_json);
             }
         }

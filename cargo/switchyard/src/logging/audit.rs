@@ -9,11 +9,11 @@
 //
 // See `SPEC/SPEC.md` for field semantics and Minimal Facts v1 schema.
 use crate::logging::{redact_event, FactsEmitter};
+use serde_json::{json, Map, Value};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-use serde_json::{json, Map, Value};
 
 pub(crate) const SCHEMA_VERSION: i64 = 2;
 
@@ -105,24 +105,42 @@ pub struct StageLogger<'a> {
 }
 
 impl<'a> StageLogger<'a> {
-    pub(crate) const fn new(ctx: &'a AuditCtx<'a>) -> Self { Self { ctx } }
+    pub(crate) const fn new(ctx: &'a AuditCtx<'a>) -> Self {
+        Self { ctx }
+    }
 
     #[must_use]
-    pub fn plan(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Plan) }
+    pub fn plan(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::Plan)
+    }
     #[must_use]
-    pub fn preflight(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Preflight) }
+    pub fn preflight(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::Preflight)
+    }
     #[must_use]
-    pub fn preflight_summary(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PreflightSummary) }
+    pub fn preflight_summary(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::PreflightSummary)
+    }
     #[must_use]
-    pub fn apply_attempt(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyAttempt) }
+    pub fn apply_attempt(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::ApplyAttempt)
+    }
     #[must_use]
-    pub fn apply_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyResult) }
+    pub fn apply_result(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::ApplyResult)
+    }
     #[must_use]
-    pub fn rollback(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Rollback) }
+    pub fn rollback(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::Rollback)
+    }
     #[must_use]
-    pub fn rollback_summary(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::RollbackSummary) }
+    pub fn rollback_summary(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::RollbackSummary)
+    }
     #[must_use]
-    pub fn prune_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PruneResult) }
+    pub fn prune_result(&'a self) -> EventBuilder<'a> {
+        EventBuilder::new(self.ctx, Stage::PruneResult)
+    }
 }
 
 #[derive(Debug)]
@@ -141,7 +159,8 @@ impl<'a> EventBuilder<'a> {
 
     #[must_use]
     pub fn action(mut self, action_id: impl Into<String>) -> Self {
-        self.fields.insert("action_id".into(), json!(action_id.into()));
+        self.fields
+            .insert("action_id".into(), json!(action_id.into()));
         self
     }
 
@@ -174,12 +193,24 @@ impl<'a> EventBuilder<'a> {
         if let Some(obj) = fields.as_object_mut() {
             obj.entry("decision").or_insert(json!(decision.as_str()));
         }
-        redact_and_emit(self.ctx, "switchyard", self.stage.as_event(), decision.as_str(), fields);
+        redact_and_emit(
+            self.ctx,
+            "switchyard",
+            self.stage.as_event(),
+            decision.as_str(),
+            fields,
+        );
     }
 
-    pub fn emit_success(self) { self.emit(Decision::Success) }
-    pub fn emit_failure(self) { self.emit(Decision::Failure) }
-    pub fn emit_warn(self) { self.emit(Decision::Warn) }
+    pub fn emit_success(self) {
+        self.emit(Decision::Success)
+    }
+    pub fn emit_failure(self) {
+        self.emit(Decision::Failure)
+    }
+    pub fn emit_warn(self) {
+        self.emit(Decision::Warn)
+    }
 }
 
 fn redact_and_emit(
@@ -196,11 +227,13 @@ fn redact_and_emit(
         obj.entry("plan_id").or_insert(json!(ctx.plan_id));
         obj.entry("run_id").or_insert(json!(ctx.run_id));
         obj.entry("event_id").or_insert(json!(new_event_id()));
-        obj.entry("switchyard_version").or_insert(json!(env!("CARGO_PKG_VERSION")));
+        obj.entry("switchyard_version")
+            .or_insert(json!(env!("CARGO_PKG_VERSION")));
         // Redaction metadata (lightweight)
         obj.entry("redacted").or_insert(json!(ctx.mode.redact));
-        obj.entry("redaction").or_insert(json!({"applied": ctx.mode.redact}));
-        
+        obj.entry("redaction")
+            .or_insert(json!({"applied": ctx.mode.redact}));
+
         // Optional envmeta (host/process/actor/build)
         #[cfg(feature = "envmeta")]
         {
@@ -211,7 +244,9 @@ fn redact_and_emit(
                 let os = Some(std::env::consts::OS.to_string());
                 let arch = Some(std::env::consts::ARCH.to_string());
                 // Kernel best-effort: read from /proc/version if present
-                let kernel = std::fs::read_to_string("/proc/version").ok().and_then(|s| s.split_whitespace().nth(2).map(ToString::to_string));
+                let kernel = std::fs::read_to_string("/proc/version")
+                    .ok()
+                    .and_then(|s| s.split_whitespace().nth(2).map(ToString::to_string));
                 e.insert(json!({
                     "hostname": hostname,
                     "os": os,

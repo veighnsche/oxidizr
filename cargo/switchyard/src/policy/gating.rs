@@ -1,7 +1,7 @@
 use crate::api::DebugOwnershipOracle;
-use crate::types::plan::Action;
-use crate::policy::Policy;
 use crate::policy::types::{RiskLevel, SourceTrustPolicy};
+use crate::policy::Policy;
+use crate::types::plan::Action;
 use crate::types::Plan;
 
 /// Centralized evaluation result for a single action under a given Policy.
@@ -63,10 +63,7 @@ pub(crate) fn evaluate_action(
                 if risk {
                     match policy.risks.suid_sgid {
                         RiskLevel::Stop => {
-                            stops.push(format!(
-                                "suid/sgid risk: {}",
-                                target.as_path().display()
-                            ));
+                            stops.push(format!("suid/sgid risk: {}", target.as_path().display()));
                             notes.push("suid/sgid risk".to_string());
                         }
                         RiskLevel::Warn | RiskLevel::Allow => {
@@ -194,7 +191,11 @@ pub(crate) fn evaluate_action(
         }
     }
 
-    Evaluation { policy_ok: stops.is_empty(), stops, notes }
+    Evaluation {
+        policy_ok: stops.is_empty(),
+        stops,
+        notes,
+    }
 }
 
 /// Compute policy gating errors for a given plan under the current Switchyard policy.

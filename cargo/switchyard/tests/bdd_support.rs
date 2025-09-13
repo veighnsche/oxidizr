@@ -1,6 +1,6 @@
-use std::sync::{Arc, Mutex};
 use log::Level;
 use serde_json::Value;
+use std::sync::{Arc, Mutex};
 
 use switchyard::logging::{AuditSink, FactsEmitter};
 

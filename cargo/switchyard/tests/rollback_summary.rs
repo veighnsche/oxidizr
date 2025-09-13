@@ -49,7 +49,8 @@ fn rollback_summary_emitted_when_action_failure_triggers_rollback() {
     std::fs::write(&src2, b"n2").unwrap();
     // Drop write bit on parent dir so unlink/rename fails
     let mut perms = std::fs::metadata(&denied_dir).unwrap().permissions();
-    #[cfg(unix)] {
+    #[cfg(unix)]
+    {
         use std::os::unix::fs::PermissionsExt;
         perms.set_mode(0o555);
     }
@@ -60,7 +61,19 @@ fn rollback_summary_emitted_when_action_failure_triggers_rollback() {
     let s2 = SafePath::from_rooted(root, &src2).unwrap();
     let t2 = SafePath::from_rooted(root, &tgt2).unwrap();
 
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s1, target: t1 }, LinkRequest { source: s2, target: t2 }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![
+            LinkRequest {
+                source: s1,
+                target: t1,
+            },
+            LinkRequest {
+                source: s2,
+                target: t2,
+            },
+        ],
+        restore: vec![],
+    });
 
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
     assert!(report.rolled_back, "expected rollback on failure");
@@ -73,6 +86,10 @@ fn rollback_summary_emitted_when_action_failure_triggers_rollback() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| e.get("stage") == Some(&Value::from("rollback.summary"))),
-            "expected rollback.summary event");
+    assert!(
+        redacted
+            .iter()
+            .any(|e| e.get("stage") == Some(&Value::from("rollback.summary"))),
+        "expected rollback.summary event"
+    );
 }

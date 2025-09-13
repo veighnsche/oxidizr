@@ -47,27 +47,34 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
             Err(e) => {
                 lock_wait_ms = Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
                 let approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
-                StageLogger::new(tctx).apply_attempt().merge(&json!({
-                    "lock_backend": lock_backend,
-                    "lock_wait_ms": lock_wait_ms,
-                    "lock_attempts": approx_attempts,
-                    "error_id": "E_LOCKING",
-                    "exit_code": 30,
-                })).emit_failure();
-                StageLogger::new(tctx).apply_result().merge(&json!({
-                    "lock_backend": lock_backend,
-                    "lock_wait_ms": lock_wait_ms,
-                    "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
-                    "error_id": "E_LOCKING",
-                    "summary_error_ids": ["E_LOCKING"],
-                    "exit_code": 30
-                })).emit_failure();
+                StageLogger::new(tctx)
+                    .apply_attempt()
+                    .merge(&json!({
+                        "lock_backend": lock_backend,
+                        "lock_wait_ms": lock_wait_ms,
+                        "lock_attempts": approx_attempts,
+                        "error_id": "E_LOCKING",
+                        "exit_code": 30,
+                    }))
+                    .emit_failure();
+                StageLogger::new(tctx)
+                    .apply_result()
+                    .merge(&json!({
+                        "lock_backend": lock_backend,
+                        "lock_wait_ms": lock_wait_ms,
+                        "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
+                        "error_id": "E_LOCKING",
+                        "summary_error_ids": ["E_LOCKING"],
+                        "exit_code": 30
+                    }))
+                    .emit_failure();
                 // Stage parity: also emit a summary apply.result failure for locking errors
                 StageLogger::new(tctx).apply_result().merge(&json!({
                     "error_id": crate::api::errors::id_str(crate::api::errors::ErrorId::E_LOCKING),
                     "exit_code": crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_LOCKING),
                 })).emit_failure();
-                api.audit.log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
+                api.audit
+                    .log(Level::Error, "apply: lock acquisition failed (E_LOCKING)");
                 let duration_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
                 return LockInfo {
                     lock_backend,
@@ -87,15 +94,20 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
         }
     } else if !dry {
         // Enforce by default unless explicitly allowed through policy, or when require_lock_manager is set.
-        let must_fail = matches!(api.policy.governance.locking, crate::policy::types::LockingPolicy::Required)
-            || !api.policy.governance.allow_unlocked_commit;
+        let must_fail = matches!(
+            api.policy.governance.locking,
+            crate::policy::types::LockingPolicy::Required
+        ) || !api.policy.governance.allow_unlocked_commit;
         if must_fail {
-            StageLogger::new(tctx).apply_attempt().merge(&json!({
-                "lock_backend": "none",
-                "lock_attempts": 0u64,
-                "error_id": "E_LOCKING",
-                "exit_code": 30,
-            })).emit_failure();
+            StageLogger::new(tctx)
+                .apply_attempt()
+                .merge(&json!({
+                    "lock_backend": "none",
+                    "lock_attempts": 0u64,
+                    "error_id": "E_LOCKING",
+                    "exit_code": 30,
+                }))
+                .emit_failure();
             // Stage parity: also emit a summary apply.result failure for locking errors
             StageLogger::new(tctx).apply_result().merge(&json!({
                 "lock_backend": "none",
@@ -121,6 +133,15 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
         }
     }
 
-    let approx_attempts = lock_wait_ms.map_or_else(|| u64::from(api.lock.is_some()), |ms| 1 + (ms / LOCK_POLL_MS));
-    LockInfo { lock_backend, lock_wait_ms, approx_attempts, guard, early_report: None }
+    let approx_attempts = lock_wait_ms.map_or_else(
+        || u64::from(api.lock.is_some()),
+        |ms| 1 + (ms / LOCK_POLL_MS),
+    );
+    LockInfo {
+        lock_backend,
+        lock_wait_ms,
+        approx_attempts,
+        guard,
+        early_report: None,
+    }
 }

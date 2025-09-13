@@ -8,11 +8,11 @@
 //! This module is the stage orchestrator. Low-level helper checks and the YAML
 //! exporter live under `crate::preflight::{checks,yaml}`.
 
+use crate::logging::audit::new_run_id;
 use crate::logging::{FactsEmitter, TS_ZERO};
 use crate::types::ids::plan_id;
 use crate::types::{Action, Plan, PreflightReport};
 use serde_json::json;
-use crate::logging::audit::new_run_id;
 
 use crate::fs::meta::{detect_preservation_capabilities, kind_of};
 use crate::logging::audit::{AuditCtx, AuditMode};
@@ -59,8 +59,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 }
                 // Warnings: promote policy-allowed notes as warnings
                 warnings.extend(
-                    eval
-                        .notes
+                    eval.notes
                         .iter()
                         .filter(|n| n.contains("allowed by policy"))
                         .cloned(),
@@ -68,14 +67,20 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 // Provenance best-effort
                 let prov = match &api.owner {
                     Some(oracle) => match oracle.owner_of(target) {
-                        Ok(info) => Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg})),
+                        Ok(info) => {
+                            Some(serde_json::json!({"uid":info.uid,"gid":info.gid,"pkg":info.pkg}))
+                        }
                         Err(_) => None,
                     },
                     None => None,
                 };
                 let (preservation, preservation_supported) =
                     detect_preservation_capabilities(&target.as_path());
-                if matches!(api.policy.durability.preservation, crate::policy::types::PreservationPolicy::RequireBasic) && !preservation_supported {
+                if matches!(
+                    api.policy.durability.preservation,
+                    crate::policy::types::PreservationPolicy::RequireBasic
+                ) && !preservation_supported
+                {
                     stops.push("preservation unsupported for target".to_string());
                 }
                 let current_kind = kind_of(&target.as_path());
@@ -90,7 +95,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     "symlink",
                     Some(eval.policy_ok),
                     prov,
-                    if eval.notes.is_empty() { None } else { Some(eval.notes) },
+                    if eval.notes.is_empty() {
+                        None
+                    } else {
+                        Some(eval.notes)
+                    },
                     Some(preservation),
                     Some(preservation_supported),
                     None,
@@ -102,8 +111,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     stops.extend(eval.stops.clone());
                 }
                 warnings.extend(
-                    eval
-                        .notes
+                    eval.notes
                         .iter()
                         .filter(|n| n.contains("allowed by policy"))
                         .cloned(),
@@ -111,8 +119,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let (preservation, preservation_supported) =
                     detect_preservation_capabilities(&target.as_path());
                 // Annotate whether backup artifacts are present (payload and/or sidecar)
-                let backup_present =
-                    crate::fs::backup::has_backup_artifacts(&target.as_path(), &api.policy.backup.tag);
+                let backup_present = crate::fs::backup::has_backup_artifacts(
+                    &target.as_path(),
+                    &api.policy.backup.tag,
+                );
                 if api.policy.rescue.require && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
                 }
@@ -127,7 +137,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     "restore_from_backup",
                     Some(eval.policy_ok),
                     None,
-                    if eval.notes.is_empty() { None } else { Some(eval.notes) },
+                    if eval.notes.is_empty() {
+                        None
+                    } else {
+                        Some(eval.notes)
+                    },
                     Some(preservation),
                     Some(preservation_supported),
                     Some(backup_present),
@@ -164,10 +178,14 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     crate::api::errors::ErrorId::E_POLICY
                 )),
             );
-            let mut chain = vec![crate::api::errors::id_str(crate::api::errors::ErrorId::E_POLICY)];
+            let mut chain = vec![crate::api::errors::id_str(
+                crate::api::errors::ErrorId::E_POLICY,
+            )];
             // Best-effort: co-emit E_OWNERSHIP if any stop references ownership
             if stops.iter().any(|s| s.to_lowercase().contains("ownership")) {
-                chain.push(crate::api::errors::id_str(crate::api::errors::ErrorId::E_OWNERSHIP));
+                chain.push(crate::api::errors::id_str(
+                    crate::api::errors::ErrorId::E_OWNERSHIP,
+                ));
             }
             obj.insert("summary_error_ids".to_string(), json!(chain));
         }

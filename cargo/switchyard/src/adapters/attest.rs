@@ -11,7 +11,6 @@ pub trait Attestor: Send + Sync {
     fn algorithm(&self) -> &'static str {
         "ed25519"
     }
-
 }
 
 /// Build a JSON object with attestation fields for emission given an attestor and a bundle.

@@ -56,11 +56,8 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
                 mode: None,
                 payload_hash: None,
             };
-            write_sidecar(&backup, &sc).map_err(|e| {
-                std::io::Error::other(
-                    format!("sidecar write failed: {e}"),
-                )
-            })?;
+            write_sidecar(&backup, &sc)
+                .map_err(|e| std::io::Error::other(format!("sidecar write failed: {e}")))?;
             // Durability: best-effort parent fsync
             let _ = crate::fs::atomic::fsync_parent_dir(target);
         }
@@ -116,17 +113,18 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
             let _ = dfile.sync_all();
             // Write sidecar
             let sc = BackupSidecar {
-                schema: if payload_hash.is_some() { "backup_meta.v2".to_string() } else { "backup_meta.v1".to_string() },
+                schema: if payload_hash.is_some() {
+                    "backup_meta.v2".to_string()
+                } else {
+                    "backup_meta.v1".to_string()
+                },
                 prior_kind: "file".to_string(),
                 prior_dest: None,
                 mode: Some(format!("{mode:o}")),
                 payload_hash,
             };
-            write_sidecar(&backup_pb, &sc).map_err(|e| {
-                std::io::Error::other(
-                    format!("sidecar write failed: {e}"),
-                )
-            })?;
+            write_sidecar(&backup_pb, &sc)
+                .map_err(|e| std::io::Error::other(format!("sidecar write failed: {e}")))?;
             // Durability: ensure parent dir sync
             let _ = crate::fs::atomic::fsync_parent_dir(target);
             return Ok(());
@@ -145,11 +143,8 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
         mode: None,
         payload_hash: None,
     };
-    write_sidecar(&backup, &sc).map_err(|e| {
-        std::io::Error::other(
-            format!("sidecar write failed: {e}"),
-        )
-    })?;
+    write_sidecar(&backup, &sc)
+        .map_err(|e| std::io::Error::other(format!("sidecar write failed: {e}")))?;
     // Durability: parent dir sync
     let _ = crate::fs::atomic::fsync_parent_dir(target);
     Ok(())

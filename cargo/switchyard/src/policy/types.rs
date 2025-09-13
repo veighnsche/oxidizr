@@ -14,7 +14,6 @@ pub enum ExdevPolicy {
     DegradedFallback,
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub enum LockingPolicy {
     Required,
@@ -53,7 +52,6 @@ pub struct Rescue {
     pub min_count: usize,
 }
 
-
 #[derive(Debug, Copy, Clone)]
 pub struct Risks {
     pub suid_sgid: RiskLevel,
@@ -64,7 +62,12 @@ pub struct Risks {
 
 impl Default for Risks {
     fn default() -> Self {
-        Self { suid_sgid: RiskLevel::Stop, hardlinks: RiskLevel::Stop, source_trust: SourceTrustPolicy::RequireTrusted, ownership_strict: false }
+        Self {
+            suid_sgid: RiskLevel::Stop,
+            hardlinks: RiskLevel::Stop,
+            source_trust: SourceTrustPolicy::RequireTrusted,
+            ownership_strict: false,
+        }
     }
 }
 
@@ -77,7 +80,11 @@ pub struct Durability {
 
 impl Default for Durability {
     fn default() -> Self {
-        Self { backup_durability: true, sidecar_integrity: true, preservation: PreservationPolicy::Off }
+        Self {
+            backup_durability: true,
+            sidecar_integrity: true,
+            preservation: PreservationPolicy::Off,
+        }
     }
 }
 
@@ -99,7 +106,11 @@ pub struct Governance {
 
 impl Default for Governance {
     fn default() -> Self {
-        Self { locking: LockingPolicy::Optional, smoke: SmokePolicy::Off, allow_unlocked_commit: true }
+        Self {
+            locking: LockingPolicy::Optional,
+            smoke: SmokePolicy::Off,
+            allow_unlocked_commit: true,
+        }
     }
 }
 

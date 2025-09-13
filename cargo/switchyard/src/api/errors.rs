@@ -53,9 +53,7 @@ pub fn infer_summary_error_ids(errors: &[String]) -> Vec<&'static str> {
     }
     // Deduplicate while preserving order
     let mut seen = std::collections::HashSet::new();
-    out.into_iter()
-        .filter(|id| seen.insert(*id))
-        .collect()
+    out.into_iter().filter(|id| seen.insert(*id)).collect()
 }
 
 impl From<crate::types::errors::Error> for ApiError {
@@ -70,7 +68,10 @@ impl From<crate::types::errors::Error> for ApiError {
 
 // Stable identifiers aligned with SPEC/error_codes.toml
 // We intentionally keep SCREAMING_SNAKE_CASE to match emitted IDs.
-#[allow(non_camel_case_types, reason = "Error IDs must match SPEC/error_codes.toml format")]
+#[allow(
+    non_camel_case_types,
+    reason = "Error IDs must match SPEC/error_codes.toml format"
+)]
 #[derive(Clone, Copy, Debug)]
 pub enum ErrorId {
     E_POLICY,

@@ -59,8 +59,9 @@ pub fn restore_file_bytes(
     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
     if let Some(m) = mode_octal {
-        let fname_c = std::ffi::CString::new(fname)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+        let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
         let tfd = openat(&dirfd, fname_c.as_c_str(), OFlags::RDONLY, Mode::empty())
             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
         let _ = fchmod(&tfd, Mode::from_bits_truncate(m));
@@ -81,8 +82,9 @@ pub fn ensure_absent(target_path: &Path) -> std::io::Result<()> {
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("target");
-        let fname_c = std::ffi::CString::new(fname)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+        let fname_c = std::ffi::CString::new(fname).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?;
         let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
     } else {
         let _ = std::fs::remove_file(target_path);
@@ -107,7 +109,9 @@ pub fn restore_symlink_to(target_path: &Path, dest: &Path) -> std::io::Result<()
 mod tests {
     use super::*;
 
-    fn td() -> tempfile::TempDir { tempfile::tempdir().unwrap() }
+    fn td() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
 
     #[test]
     fn legacy_rename_moves_backup_to_target() {
@@ -153,7 +157,10 @@ mod tests {
         let dest = root.join("bin");
         std::fs::create_dir_all(&dest).unwrap();
         restore_symlink_to(&tgt, &dest).unwrap();
-        assert!(std::fs::symlink_metadata(&tgt).unwrap().file_type().is_symlink());
+        assert!(std::fs::symlink_metadata(&tgt)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         let link = std::fs::read_link(&tgt).unwrap();
         // atomic_symlink_swap uses absolute dest
         assert!(link.ends_with("bin"));
