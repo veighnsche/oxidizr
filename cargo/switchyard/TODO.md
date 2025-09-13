@@ -1,210 +1,159 @@
-# Switchyard Refactor TODO (Order of Execution)
+# Audit Event v2.1 — Implementation TODO
 
-High-level, ordered plan to land refactors with minimal risk and conflict. Each item links to the detailed playbook in `./zrefactor/`. Pre-1.0, bundle large, fast-moving changes as needed; interleave additive feature work where noted. Run acceptance greps from each linked doc as you land items, and follow the Rulebook conventions.
+This checklist tracks all tasks required to implement and roll out audit event schema v2 in Switchyard.
 
-## 0) Baseline guardrails and checks
+Related docs:
 
-- [x] Add/verify CI grep guardrails and run local checks
-  - Docs: `./zrefactor/responsibility_cohesion_report.md`, `./zrefactor/backwards_compat_removals.md`
-  - Goal: Establish “tripwires” early (no public fs atoms, no #[path], no adapters::lock_file, no direct FactsEmitter::emit in API, etc.)
-  - Rulebook applies to all refactors: use standardized markers and sweep cadence.
-    - Doc: `./zrefactor/refactor_rulebook.INSTRUCTIONS.md`
-  - SPEC and Clean Code adherence gates (reject changes that drift from guarantees or cleanliness):
-    - Docs: `./SPEC/SPEC.md`, `../../docs/CLEAN_CODE.md`
-  - Add drift-check script to CI using the acceptance greps from the linked docs.
-  - Notes: Added CI checks to forbid `#[path]` under `src/api/`, any `adapters::lock_file::` usage, legacy `audit::emit_*` and direct `FactsEmitter::emit` outside `src/logging/`, and public re-exports of low-level fs atoms at `src/fs/mod.rs`. Also checked for disallowed top-level `use switchyard::rescue`.
-  - Update the code review checklist with: “SPEC/SPEC.md referenced”, “CLEAN_CODE adhered”, “Rulebook markers added”, “Acceptance greps pasted as evidence”, “Execution mandate acknowledged (full-doc execution; no cherry-picking)”.
-  - Rulebook quick rules (summary):
-    - Use standardized markers in code: `remove this file`, `move this file`, `replace this file`, `deprecated shim`, and `BEGIN/END REMOVE BLOCK`.
-    - Batch cadence (pre-1.0): A) Markers-only, B) Implement refactor, C) Sweep removals.
-    - Conventional commits; mark breaking changes with a short migration note in the body.
-  - Bridging tasks:
-    - Add CI grep script that aggregates acceptance greps from linked docs; wire it into `ci.yml`.
-    - Update the code review template with Rulebook and SPEC/CLEAN_CODE checkboxes.
-    - Seed `./zrefactor/removals_registry.md` with any files that cannot carry inline markers (schemas, generated assets).
-    - Replan checkpoint: confirm which optional additive proposals (schema v2, DX) will be scheduled post §12.
-
-## 1) Execution mandate and orchestrated order (MANDATORY)
-
-Execute every referenced document in `./zrefactor/` fully, end-to-end. No curated subsets or cherry-picking. For each document, follow all instructions in order, implement all required code/tests/docs, and paste acceptance greps/evidence per the Rulebook.
-
-Note: This is not a separate checklist. The sections below are the single consolidated plan. Execute each linked doc end‑to‑end when you reach its section, interleaving loose TODOs, bridging tasks, and replanning checkpoints as specified.
-
-## 2) Idiomatic module/layout cleanup
-  
-- [x] Make `src/api` directory module fully idiomatic; remove any lingering `#[path]`
-- [x] Remove legacy adapters shim (`adapters::lock_file`), ensure imports use `adapters::lock::file::*`
-- [x] Tighten fs atoms visibility; no re-exports at `src/fs/mod.rs`
-- [x] Move `src/preflight.rs` -> `src/preflight/mod.rs`; drop `#[path]` includes and use standard `mod` declarations
-- Notes: low-level FS atoms are internal-only (`pub(crate)`), satisfying trybuild compile-fail expectations.
-- [x] Docs (execute end-to-end): `./zrefactor/idiomatic_todo.INSTRUCTIONS.md`
-- Bridging tasks:
-  - Paste acceptance greps into the PR description; ensure CI gates for `#[path]` and `adapters::lock_file` are active.
-  - Update imports across the crate after moves; add/remove `mod` declarations as needed.
-  - Record file moves/removals in `./zrefactor/removals_registry.md`.
-  - Replan checkpoint: confirm next steps ordering between §4 Logging facade scaffolding and §3 Policy evaluator based on compile friction.
-
-## 3) Policy-owned gating (single evaluator)
-  
-- [x] Implement typed `policy::gating::evaluate_action(..)` and shared helpers
-- [x] Preflight: call evaluator per action; delete inlined checks and hard-coded mount paths (use `policy.extra_mount_checks`)
-- [x] Apply: call evaluator before mutation; enforce `override_preflight`
-- [ ] Define grouped policy types and profiles
-- Introduce enums/groups (e.g., `RiskLevel`, `ExdevPolicy`, `LockingPolicy`, `SmokePolicy`, `PreservationPolicy`) under `policy::types`.
-- Add curated `profiles` for common presets (e.g., production) and a `Policy::builder()` if needed.
-- [ ] Docs (execute end-to-end): `./zrefactor/policy_refactor.INSTRUCTIONS.md`, `./zrefactor/preflight_gating_refactor.INSTRUCTIONS.md`
-- Bridging tasks:
-  - Land grouped types and evaluator with unit tests; keep legacy flat fields compiling until API is migrated.
-  - Add CI grep to forbid duplicate gating logic outside `src/policy/gating.rs` once preflight/apply are migrated.
-  - Replan checkpoint: choose whether to migrate Preflight (§3→§4) or scaffold Logging facade (§4) first depending on call-site impact.
-
-## 4) Logging/Audit facade migration
-  
-- [x] Introduce `StageLogger`/`EventBuilder` facade under `src/logging/`
-- [x] Migrate API call sites (plan, preflight, apply, rollback, prune) to the facade
-- [x] Keep field parity with current emissions (lock_backend/attempts, perf, attestation, error_id/exit_code, restore_ready, prune fields)
-- Sub-migrations:
-- [x] Migrate `plan` to builder (replace `emit_plan_fact` usage with builder calls).
-- [x] Extract attestation bundle construction from `api/apply/mod.rs` into a helper under `adapters::attest` (typed struct), then attach via builder.
-- [x] Add CI guardrails: forbid `audit::emit_` and direct `FactsEmitter::emit` outside `src/logging/`.
-- [ ] Docs (execute end-to-end): `./zrefactor/logging_audit_refactor.INSTRUCTIONS.md`
-- Bridging tasks:
-  - Replace any remaining direct emissions in API with facade calls; update or add golden tests for emitted events.
-  - Ensure only `src/logging/` touches `FactsEmitter::emit`; add/verify CI greps.
-  - Replan checkpoint: confirm API DX/DW migration scope (§5) based on facade availability.
-
-## 5) API DX/DW alignment
-  
-- [x] Keep `Switchyard::new(facts, audit, policy)` and current fluent `.with_*` methods
-- [x] Add `ApiBuilder` that mirrors `.with_*` and delegates to avoid duplication
-- [x] Ensure API uses policy evaluator + logging facade consistently
-- [ ] Docs (execute end-to-end): `./zrefactor/api_refactor.INSTRUCTIONS.md`
-- Bridging tasks:
-  - Introduce/validate `ApiBuilder` examples in rustdoc; map error taxonomy to `ApiError` and ensure public signatures are stable.
-  - Verify evaluator is called in preflight/apply orchestrators; remove any ad‑hoc gating helpers.
-  - Replan checkpoint: decide whether to proceed to Types consolidation (§6) or FS split (§7) based on dependency surface.
-- Candidate feature docs to pull from (can be shipped in separate phases):
-  - `./zrefactor/library_consumer_dx.INSTRUCTIONS.md` (additive ergonomics)
-  - `./zrefactor/features_ux_refactor.PROPOSAL.md` (additive UX/features)
-  - `./zrefactor/audit_event_schema_overhaul.PROPOSAL.md` (schema v2; consider batching near a minor bump)
-
-## 6) Types and invariants consolidation (low-risk enablers)
-  
-- [ ] Docs (execute end-to-end): `./zrefactor/TYPES_AUDIT.md`
-- [x] Centralize data-only types under `src/types/` where beneficial
-- [x] Move `OwnershipInfo` to `src/types/ownership.rs` and re-export from `types/mod.rs`.
-- [x] Consider `RescueStatus`/`RescueError` → `src/types/rescue.rs`; `MountFlags`/`MountError` → `src/types/mount.rs` (keep traits/impls in their modules).
-- [x] Introduce a typed `PreflightRow` under `src/types/preflight.rs`
-  - [x] Refactor `api/preflight/rows.rs` to build `PreflightRow` and serialize for emission (after logging facade lands).
-- Acceptance
-  - `cargo check && cargo test` pass; imports updated across adapters/policy/preflight.
-  - `rg -n "struct OwnershipInfo" cargo/switchyard/src/adapters/ownership -S` returns 0; new `types/ownership.rs` exists.
-  - Preflight builds rows via the typed struct (no ad-hoc serde_json object assembly once facade is in place).
-  - Bridging tasks:
-    - Update imports across adapters/policy/preflight to new `types::*` paths; use `cargo fix` if helpful.
-    - Replace ad‑hoc `serde_json` row assembly with `PreflightRow` serialization; add unit tests around `Serialize` shape.
-    - Add brief module docs to new `types/*` files describing invariants and cross-layer usage.
-    - Replan checkpoint: choose §7 FS split next if compile surface is stable; otherwise finish any lingering type migrations first.
-
-## 7) FS backup/restore split (internal reorg)
-  
-- [x] Split `src/fs/backup.rs` into `backup/{mod,snapshot,sidecar,index,prune}.rs`
-- [x] Split `src/fs/restore.rs` into `restore/{mod,types,selector,idempotence,integrity,steps,engine}.rs`
-- [x] Remove any internal re-exports of atoms at `fs/mod.rs`; prefer direct module use
-- Notes: backup split completed; restore split completed. `engine.rs` is now a thin facade over `restore_impl` which composes `selector`, `idempotence`, `integrity`, and `steps` helpers.
-- Progress: added `restore/{idempotence,integrity,steps,selector,types}.rs`; trimmed `restore/engine.rs` to wrappers + `restore_impl`; moved `backup::prune_backups` into `backup/prune.rs` and updated `Switchyard::prune_backups` to delegate to it. Added unit tests for `restore::steps` and `restore::idempotence`. All tests pass.
-- [x] Docs (execute end-to-end): `./zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md`
-- Bridging tasks:
-  - [x] Extract restore code into `restore/*` modules; wire `engine::restore_impl` behind public fns; update `fs/mod.rs` re‑exports.
-  - [x] Update API/handlers call sites to new module paths; move and add unit tests for selector/idempotence/integrity/steps.
-  - [x] Remove public re‑exports of low‑level atoms from `fs/mod.rs`; ensure internal callers use `fs::atomic` directly.
-  - [x] Sweep removals: delete transitional `src/fs/restore/core.rs` (unused) and confirm no references to `src/fs/restore.rs` remain.
-
-## 8) Tests reorganization (crate + repo e2e)
-  
-- [x] Group crate integration tests under `tests/{locking,preflight,apply,fs,audit}/`; keep `tests/common.rs`
-- [ ] Ensure all test files `mod common;` and update `tests/README.md`
-- [ ] Maintain golden fixtures and trybuild tests
-- [x] Docs (execute end-to-end): `./zrefactor/tests_refactor.INSTRUCTIONS.md`
-- Acceptance greps (mirrored from doc):
-  - `rg -n "^mod common;" cargo/switchyard/tests/*.rs | wc -l` matches count of non-helper test files.
-  - No top-level test files remain outside `cargo/switchyard/tests/{locking,preflight,apply,fs,audit}/` (except `common.rs`, `trybuild.rs`, `README.md`, golden fixtures).
-- Bridging tasks:
-  - Create domain subdirectories and move files per `removals_registry.md`; ensure each imports `mod common;` at top.
-  - Update `tests/README.md` to document orchestration and new layout; adjust CI to collect domain paths.
-  - Replan checkpoint: consider scheduling a small E2E expansion after reorg to validate matrix resilience.
-
-## 9) Clean Code and Code Smell sweep (non-functional)
-  
-- [x] Run the combined smell/cleanliness audit; fix top offenders without changing behavior
-- [x] Docs (execute end-to-end): `./zrefactor/CODE_SMELL_AND_CLEAN_CODE_AUDIT.md`, `../../docs/CLEAN_CODE.md`
-- Grep aids (examples in the audit doc): no `unsafe`, production code avoids `.unwrap()`/`.expect()`, no stray `println!/dbg!/todo!`, no `tracing` in `src/`, etc.
-- Cohesion guardrails: avoid god functions; extract helpers where duplication exists; aim for submodules < ~800 LOC as noted in cohesion report.
-- Bridging tasks:
-  - [x] Run the provided grep suite and open small follow‑ups for any non‑blocking findings; tackle top offenders in this sweep.
-  - [x] Add optional lightweight `tracing` spans at API boundaries behind a feature if decided; keep emitted facts unchanged.
-  - [x] Replan checkpoint: verify readiness for removals sweep (§10).
-
-Notes: Grep suite clean (no unsafe/unwrap/expect/println!/dbg!/todo! in production). Added optional `tracing` feature and spans at API boundaries; clarified `prune_backups` retention semantics via doc comment. No behavior changes.
-
-## 10) Backwards-compat removals sweep
-  
-- [x] Remove deprecated shims and re-exports once their replacements are in place
-- [x] Verify acceptance greps (no adapters::lock_file, no top-level `pub use policy::rescue`, no stray fs atoms)
-- [x] Docs (execute end-to-end): `./zrefactor/backwards_compat_removals.md`, `./zrefactor/removals_registry.md`
-- Bridging tasks:
-  - Generate removal list from markers and registry; delete files per Rulebook PR C; ensure CI guards remain.
-  - Re-run `cargo test -p switchyard`; grep tree to confirm deprecated surfaces are gone.
-  - Replan checkpoint: confirm docs sync (§11) is the final blocking step before release prep.
-
-## 11) Documentation alignment (public docs + SPEC references)
-  
-- [ ] Follow the documentation plan to sync crate docs and guides to the code
-- [ ] Docs (execute end-to-end): `./zrefactor/documantation/documentation_plan.md`
-- Include a pass to verify and refresh `./zrefactor/FEATURES_CATALOG.md` against sources (paths cited remain accurate; emitted fields match code).
-- Bridging tasks:
-  - Add `#![deny(missing_docs)]` selectively and fix high‑value public items; ensure examples compile.
-  - Add or refresh `examples/` programs referenced by the plan (dry-run, commit with lock, rollback, audit/redaction, exdev).
-  - Replan checkpoint: decide which optional proposals to schedule for the next minor.
-
-## 12) Optional proposals (post‑refactor, later phases/releases)
-  
-- [ ] Audit Event Schema v2 (stage‑specific constraints, formats)
-- [ ] Doc (execute end-to-end when scheduled): `./zrefactor/audit_event_schema_overhaul.PROPOSAL.md`
-- [ ] Features UX refactor (additive, user‑facing docs/organization)
-- [ ] Doc (execute end-to-end when scheduled): `./zrefactor/features_ux_refactor.PROPOSAL.md`
-- [ ] Library consumer DX (additive ergonomics beyond `ApiBuilder` basics)
-- [ ] Doc (execute end-to-end when scheduled): `./zrefactor/library_consumer_dx.INSTRUCTIONS.md`
-- Bridging tasks:
-  - Convert proposals into backlog tickets with scope/acceptance; sequence behind a minor release.
-  - Add feature flags where appropriate (`serde-reports`, `jsonl-file-sink`, `tracing`, `test-utils`, etc.) and set up a feature matrix job in CI.
-  - Replan checkpoint: revisit SPEC and guardrails to ensure optional additions don’t regress safety posture.
+- Proposal: `zrefactor/audit_event_schema_overhaul.PROPOSAL.md`
+- Schema: `SPEC/audit_event.v2.schema.json`
+- Current schema v1: `SPEC/audit_event.schema.json`
+- Logging code: `src/logging/audit.rs`
 
 ---
 
-Notes
+## 1) Schema and Envelope (v2.1)
 
-- Prefer “one theme per change batch” with clear acceptance greps from the linked docs.
-- Run `cargo check && cargo test` for each step; keep changes behavior‑neutral except where the doc explicitly calls out new behavior.
-- Record any file moves/removals in `./zrefactor/removals_registry.md` as you go.
+- [x] Add JSON Schema file `SPEC/audit_event.v2.schema.json` (envelope + stage-specific constraints)
+- [ ] Switch default schema version in code
+  - [ ] Edit `src/logging/audit.rs`: set `pub(crate) const SCHEMA_VERSION: i64 = 2;`
+- [ ] Make envelope injection schema-aware and add v2.1 envelope fields
+  - [ ] Edit `src/logging/audit.rs::redact_and_emit(...)`
+    - [ ] Replace unconditional `obj.entry("path").or_insert(json!(""));` with:
+      - [ ] For v2: do NOT inject `path` at all; keep whatever fields caller provided
+      - [ ] For v1: preserve current behavior (inject empty string when absent)
+    - [ ] Ensure `dry_run` and `redacted` are set from `AuditCtx.mode` (already present; keep intact)
+  - [ ] Inject optional envelope fields (all best-effort, behind a small helper):
+    - [ ] `event_id` (UUIDv7) if not present — add `fn new_event_id()` in `logging/audit.rs`
+    - [ ] `run_id` — add to `AuditCtx` or compute once per `Switchyard` call; plumb from orchestrator entry
+    - [ ] `switchyard_version` — read from `CARGO_PKG_VERSION`
+    - [ ] Optional `build { git_sha, rustc }` — behind feature `envmeta` (read env vars / rustc_version)
+    - [ ] Optional `host { hostname, os, kernel, arch }` — behind `envmeta`
+    - [ ] Optional `process { pid, ppid }` — behind `envmeta`
+    - [ ] Optional `actor { euid, egid }` — behind `envmeta`
+    - [ ] Optional `redaction { applied, rules }` — derive from `AuditMode` and redaction policy
+    - [ ] Optional `seq` — monotonic counter per `plan_id`/`run_id` (store in `AuditCtx` and increment per emit)
+// Back-compat removed pre-v1: v2 is the only path; no env toggles or dual-write
 
-## Reassessment checkpoints (drift control)
+- [ ] Schema refinements (align with emitted fields)
+  - [ ] Edit `SPEC/audit_event.v2.schema.json` → add optional properties:
+    - [ ] `before_kind` (string), `after_kind` (string) — used in `api/apply/handlers.rs`
+    - [ ] `degraded_reason` (string) — used when EXDEV fallback in `handle_ensure_symlink`
+    - [ ] `sidecar_integrity_verified` (boolean|null) — used in `handle_restore`
+    - [ ] `backup_durable` (boolean) — recorded from policy in apply events
+  - [ ] Preflight summary handling:
+    - [ ] Option A (preferred): introduce `preflight.summary` stage
+      - [ ] Edit `src/logging/audit.rs::Stage` to add `PreflightSummary` → `as_event() => "preflight.summary"`
+      - [ ] Edit `src/logging/mod.rs` re-export if necessary
+      - [ ] Edit `src/api/preflight/mod.rs`: emit summary using `slog.preflight_summary()`
+      - [ ] Edit `SPEC/audit_event.v2.schema.json`: add `"preflight.summary"` to `stage` enum and remove preflight hard requirement for `path/current_kind/planned_kind` when stage is summary
+    - [ ] Option B: keep single `preflight` stage but gate requirements by `action_id`
+      - [ ] Edit `SPEC/audit_event.v2.schema.json`: for `stage==preflight` require `path/current_kind/planned_kind` only when `action_id` is present
+    - [ ] Choose one option and implement consistently in code and schema
 
-- After §0 Baseline guardrails:
-  - Ensure CI grep gates are active; SPEC and Clean Code docs linked in the review checklist.
-- After §3 Policy-owned gating:
-  - Grep for duplicate gating helpers and hard-coded mount paths; confirm `policy.extra_mount_checks` usage in preflight.
-  - Reconcile `./zrefactor/policy_refactor.INSTRUCTIONS.md` and `./zrefactor/preflight_gating_refactor.INSTRUCTIONS.md` with code.
-- After §4 Logging/Audit facade:
-  - Verify field parity for `apply.attempt`, `apply.result` (per-action and summary), `preflight` rows, and `prune.result`.
-  - Confirm no direct `FactsEmitter::emit` in API; update schema docs as needed.
-- After §5 API DX/DW:
-  - Check rustdoc public API map; error taxonomy alignment with SPEC; keep `Switchyard::new` + fluent `.with_*` working.
-- After §7 FS split:
-  - Confirm fs atoms are internal-only and no re-exports at `src/fs/mod.rs`; acceptance greps pass.
-- After §8 Tests reorg:
-  - Ensure all integration tests import `mod common;`; `tests/README.md` documents orchestration.
-- Before §10 Removals sweep:
-  - Generate removal list (markers + registry); ensure all targets are marked; then sweep.
-- Before release:
-  - Full SPEC and Clean Code pass; update CHANGELOG with breaking changes labeled per Rulebook.
+## 2) Stage-specific Emissions (API call sites)
+
+- [ ] `apply.attempt` (success + failure)
+  - [ ] File: `src/api/apply/mod.rs::run()` — success path
+    - [ ] Ensure event includes `lock_backend`, `lock_attempts`, `lock_wait_ms` (already present at call site: `slog.apply_attempt().merge(json!({ ... }))`)
+    - [ ] After v2 envelope change, confirm no `path` is injected (see §1)
+  - [ ] File: `src/api/apply/lock.rs::acquire()` — failure path
+    - [ ] Ensure failure event includes `lock_backend`, `lock_wait_ms`, `lock_attempts`, `error_id=E_LOCKING`, `exit_code`
+    - [ ] Confirm no `path` injected for v2
+
+- [ ] `apply.result` per-action
+  - [ ] File: `src/api/apply/handlers.rs::handle_ensure_symlink`
+    - [ ] Success: event already includes `before_kind/after_kind`, `degraded` and `duration_ms`
+    - [ ] Hashes: uses `apply/audit_fields.rs::insert_hashes` — confirm both `before_hash` and `after_hash` set `hash_alg="sha256"`
+    - [ ] Failure: ensure `error_id` + `exit_code` are set (present via `api/errors.rs` mapping)
+    - [ ] v2.1: add optional `error { kind, errno, message, remediation }` (see §5)
+  - [ ] File: `src/api/apply/handlers.rs::handle_restore`
+    - [ ] Success/failure: ensure `before_kind/after_kind`; on failure set `error_id` + `exit_code`
+    - [ ] Sidecar integrity: field `sidecar_integrity_verified` stays optional
+    - [ ] v2.1: add optional `error { kind, errno, message, remediation }` on failure
+
+- [ ] `apply.result` summary
+  - [ ] File: `src/api/apply/mod.rs::run()` — final summary block
+    - [ ] Ensure `fields` does NOT set `path` at all for v2
+    - [ ] Include `perf` aggregate (hash_ms, backup_ms, swap_ms)
+    - [ ] Optional `attestation` via `adapters::attest::build_attestation_fields`
+    - [ ] On failure: set `error_id`, `exit_code`, and `summary_error_ids` (via `api/errors::infer_summary_error_ids`)
+    - [ ] v2.1: include optional `resource` when available; propagate `event_id`, `run_id`, `seq`
+
+- [ ] `preflight` per-action rows
+  - [ ] File: `src/api/preflight/rows.rs::push_row_emit`
+    - [ ] Emit includes: `.path(path)`, `current_kind`, `planned_kind` (already present)
+    - [ ] Add `policy_ok` if present (already merged), `preservation`, `preservation_supported`, `provenance` best-effort
+  - [ ] File: `src/api/preflight/mod.rs::run()` — summary
+    - [ ] Keep `rescue_profile` and failure mapping to `E_POLICY`; may include `summary_error_ids`
+    - [ ] v2.1: emit `preflight.summary` stage; attach `run_id`, `seq`, and `redaction` info
+
+- [ ] `prune.result`
+  - [ ] File: `src/api/mod.rs::prune_backups`
+    - [ ] Ensure required: `path`, `pruned_count`, `retained_count` (already present)
+    - [ ] Optional: `backup_tag`, `retention_count_limit`, `retention_age_limit_ms`
+
+## 3) Tests and Golden Samples (v2.1)
+
+- [ ] Add a v2 schema validation test (parallel to v1 test)
+  - [ ] File: `tests/audit/audit_schema_v2.rs` (new)
+    - [ ] Prepare API (DryRun) → collect events via a test `FactsEmitter`
+    - [ ] Load `include_str!("../SPEC/audit_event.v2.schema.json")`
+    - [ ] Validate every emitted event using `jsonschema::JSONSchema`
+- [ ] Update/extend integration tests
+  - [ ] File: `tests/locking/locking_stage_parity.rs`
+    - [ ] Assert `apply.attempt` includes `lock_backend`/`lock_attempts` and no `path` under v2
+  - [ ] File: `tests/audit/provenance_presence.rs`
+    - [ ] Keep provenance present where expected; compatible with v2
+  - [ ] File: `tests/audit/preflight_summary_error_id.rs`
+    - [ ] Ensure summary mapping still includes `error_id=E_POLICY` on failure
+  - [ ] File: `tests/audit/summary_error_ids_ownership.rs`
+    - [ ] Ensure ownership-related stops emit `summary_error_ids` including `E_OWNERSHIP`
+- [ ] Add tests for v2.1 additions
+  - [ ] New: `tests/audit/envelope_v2_1.rs` — assert presence/shape of `event_id`, `run_id`, `redaction`, `seq`
+  - [ ] New: `tests/audit/resource_v2_1.rs` — assert optional `resource` object shape when available
+  - [ ] New: `tests/audit/error_object_v2_1.rs` — assert `error` object on representative failures
+  - [ ] New: `tests/audit/perf_expanded_v2_1.rs` — assert `perf.io_bytes_*` and `perf.timers.*` when measured
+  - [ ] New: `tests/audit/hashes_multi_alg_v2_1.rs` — if enabled, assert `hashes[]` structure
+- [ ] Golden examples under `tests/golden/`
+  - [ ] Add JSON samples for: `apply.attempt` success, `apply.result` per-action success, `apply.result` summary failure, `preflight` row, `prune.result`
+  - [ ] Optional: add a script/test to compare redacted vs non-redacted for DryRun parity
+
+
+## 4) CI and Rollout (v2.1 only)
+
+- [ ] CI job: validate JSON lines against v2 schema
+  - [ ] Add a small Rust tool or script to read emitted events and validate via `jsonschema`
+  - [ ] Wire into `.github/workflows/ci.yml` (new job or extend existing)
+- [ ] SPEC docs
+  - [ ] Update `SPEC/audit_event.v2.schema.json` (done) with v2.1 optional fields
+  - [ ] Add `SPEC/audit_event.v2.md` summarizing required fields per stage; formats; envelope flags; list v2.1 additions
+  - [ ] Link from `SPEC/SPEC.md` and crate README
+
+## 5) Documentation (update for v2.1)
+
+- [ ] Update `cargo/switchyard/README.md`: add schema v2 section; reference env toggles
+- [ ] Update `zrefactor/audit_event_schema_overhaul.PROPOSAL.md`: mark implemented items, keep examples in sync with code
+- [ ] Update acceptance greps in zrefactor docs to reflect v2 fields (lock, perf, attestation, summary behavior)
+- [ ] Add `SPEC/audit_event.v2.md` and wire into SPEC index (see §4)
+  - [ ] Include examples with `preflight.summary`, envelope fields, `resource`, expanded `perf`, `error` object
+
+## 6) Acceptance Criteria (v2.1)
+
+- [ ] `cargo test -p switchyard` passes with schema v2
+- [ ] Golden tests validate v2 events; schema validator test suite passes
+- [ ] No forced empty `path` on summary events; `path` omitted or `null` where applicable
+- [ ] CI includes schema validation
+
+---
+
+// Removed: no dual-write, no v1 mapping. v2 (with v2.1 additions) is the only supported schema pre-1.0.
+
+---
+
+## Notes / References
+
+- Error taxonomy and exit codes: `api/errors.rs`, `SPEC/error_codes.toml`
+- Logging facade: `src/logging/{audit.rs,mod.rs}`
+- Apply orchestrator and handlers: `src/api/apply/{mod.rs,handlers.rs}`
+- Preflight orchestrator: `src/api/preflight/mod.rs`
+- Prune path: `src/api/mod.rs::prune_backups`

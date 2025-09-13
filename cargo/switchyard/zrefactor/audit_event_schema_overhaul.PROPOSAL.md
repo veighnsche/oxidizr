@@ -135,15 +135,125 @@ Goal: Make the audit envelope precise, stage-aware, and forward-compatible. Intr
 ```
 
 Notes:
+
 - The above shows the shape and constraints; we can refine stage-specific requirements based on final field names.
 - Summary events use `path: null` and include `summary_error_ids`.
 
+## Representative example events (normative)
+
+apply.attempt (success)
+
+```json
+{
+  "schema_version": 2,
+  "ts": "2025-09-13T12:00:00Z",
+  "plan_id": "11111111-1111-5111-8111-111111111111",
+  "stage": "apply.attempt",
+  "decision": "success",
+  "lock_backend": "file",
+  "lock_wait_ms": 12,
+  "lock_attempts": 1,
+  "dry_run": false
+}
+```
+
+apply.result (per-action success)
+
+```json
+{
+  "schema_version": 2,
+  "ts": "2025-09-13T12:00:02Z",
+  "plan_id": "11111111-1111-5111-8111-111111111111",
+  "action_id": "22222222-2222-5222-8222-222222222222",
+  "stage": "apply.result",
+  "decision": "success",
+  "path": "/usr/bin/ls",
+  "before_kind": "file",
+  "after_kind": "symlink",
+  "hash_alg": "sha256",
+  "before_hash": "ab12...",
+  "after_hash": "cd34...",
+  "degraded": true,
+  "degraded_reason": "exdev_fallback",
+  "duration_ms": 4,
+  "backup_durable": true
+}
+```
+
+apply.result (summary failure with smoke and perf)
+
+```json
+{
+  "schema_version": 2,
+  "ts": "2025-09-13T12:00:03Z",
+  "plan_id": "11111111-1111-5111-8111-111111111111",
+  "stage": "apply.result",
+  "decision": "failure",
+  "path": null,
+  "perf": {"hash_ms": 3, "backup_ms": 1, "swap_ms": 5},
+  "error_id": "E_SMOKE",
+  "exit_code": 70,
+  "summary_error_ids": ["E_SMOKE","E_POLICY"]
+}
+```
+
+preflight (per-action row)
+
+```json
+{
+  "schema_version": 2,
+  "ts": "1970-01-01T00:00:00Z",
+  "plan_id": "11111111-1111-5111-8111-111111111111",
+  "action_id": "22222222-2222-5222-8222-222222222222",
+  "stage": "preflight",
+  "decision": "success",
+  "path": "/usr/bin/ls",
+  "current_kind": "file",
+  "planned_kind": "symlink",
+  "provenance": {"uid":0,"gid":0,"pkg":"coreutils"},
+  "preservation": {"owner":true,"mode":true,"timestamps":true,"xattrs":false,"acls":false,"caps":false},
+  "preservation_supported": true
+}
+```
+
+prune.result
+
+```json
+{
+  "schema_version": 2,
+  "ts": "2025-09-13T12:00:04Z",
+  "plan_id": "11111111-1111-5111-8111-111111111111",
+  "stage": "prune.result",
+  "decision": "success",
+  "path": "/usr/bin/ls",
+  "backup_tag": "oxidizr",
+  "pruned_count": 2,
+  "retained_count": 5,
+  "retention_count_limit": 10,
+  "retention_age_limit_ms": null
+}
+```
+
 ## Migration plan
 
-- v2 file: `SPEC/audit_event.v2.schema.json` alongside v1.
-- Make `src/logging/audit.rs` write v2 by default; keep a feature flag or env to dual-write v1 for a release.
-- Update schema tests to validate both `apply.attempt` and `apply.result` (per-action and summary) and `preflight` rows.
+- v2 file: `SPEC/audit_event.v2.schema.json` becomes the sole supported schema.
+- Update `src/logging/audit.rs` to emit `schema_version=2` universally.
+- Update tests to validate representative events (`apply.attempt`, `apply.result` per-action and summary, `preflight`, `prune.result`).
 - Add trybuild-type compile-time JSON examples under `tests/golden/`.
+
+## Implementation plan (code changes)
+
+- Add `SPEC/audit_event.v2.schema.json` (done).
+- Switch `src/logging/audit.rs` to `SCHEMA_VERSION = 2`.
+- Envelope injection: stop forcing `path: ""`; for v2, omit `path` by default and allow `path: null` in summaries.
+- Ensure `dry_run` and `redacted` envelope flags are set from `AuditMode` (already present).
+- Apply stage:
+  - `apply.attempt`: always include `lock_backend`, `lock_attempts`, and optional `lock_wait_ms`.
+  - `apply.result` per-action: include `hash_alg`, `before_hash`, `after_hash` when available; set `error_id`/`exit_code` on failures.
+  - `apply.result` summary: include `perf` and optional `attestation`; set `error_id`/`exit_code` based on failure cause; include `summary_error_ids` chain.
+- Preflight stage: per-action rows must include `current_kind` and `planned_kind` and preservation fields; summary includes `rescue_profile` and maps to `E_POLICY` on failure.
+- Prune stage: include `path`, `pruned_count`, `retained_count`; optional `backup_tag`, `retention_*`.
+- Provide override `SWITCHYARD_AUDIT_SCHEMA=v1|v2` for controlled rollouts.
 
 ## Acceptance checks
 
@@ -152,11 +262,12 @@ Notes:
 - `preflight` rows must specify `current_kind` and `planned_kind`.
 - `apply.attempt` must specify `lock_backend` and `lock_attempts`.
 - `prune.result` includes `path`, `pruned_count`, `retained_count` and may include `backup_tag`, `retention_count_limit`, `retention_age_limit_ms`.
+- No forced empty `path` values in summaries; `path` is either omitted or `null` when not applicable.
 
 ## Backwards compatibility
 
-- Keep v1 validation for one release cycle to avoid breaking downstream tools.
-- Provide a doc snippet in SPEC outlining v1→v2 differences (required fields by stage, added formats, new envelope flags).
+- None. Pre-v1, v2 replaces v1 immediately without dual-write.
+- Provide a doc snippet in SPEC outlining v1→v2 differences for integrators upgrading.
 
 ## Related
 

@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxidizr.dev/switchyard/audit_event.v2.schema.json",
+  "title": "SwitchyardAuditEventV2",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "ts", "plan_id", "stage", "decision"],
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [2] },
+    "ts": { "type": "string", "format": "date-time" },
+    "plan_id": { "$ref": "#/$defs/uuid" },
+    "action_id": { "$ref": "#/$defs/uuid" },
+    "event_id": { "$ref": "#/$defs/uuid" },
+    "run_id": { "type": "string" },
+    "switchyard_version": { "type": "string" },
+    "build": { "$ref": "#/$defs/build" },
+    "host": { "$ref": "#/$defs/host" },
+    "process": { "$ref": "#/$defs/process" },
+    "actor": { "$ref": "#/$defs/actor" },
+    "redaction": { "$ref": "#/$defs/redaction" },
+    "seq": { "type": "integer" },
+    "stage": { "enum": [
+      "plan",
+      "preflight",
+      "preflight.summary",
+      "apply.attempt",
+      "apply.result",
+      "rollback",
+      "rollback.summary",
+      "prune.result"
+    ] },
+    "decision": { "enum": ["success", "failure", "warn"] },
+    "severity": { "enum": ["info", "warn", "error"] },
+    "degraded": { "type": ["boolean", "null"] },
+    "degraded_reason": { "type": ["string", "null"] },
+    "dry_run": { "type": "boolean" },
+    "redacted": { "type": "boolean" },
+    "path": { "type": ["string", "null"] },
+    "resource": { "$ref": "#/$defs/resource" },
+    "current_kind": { "type": "string" },
+    "planned_kind": { "type": "string" },
+    "before_kind": { "type": "string" },
+    "after_kind": { "type": "string" },
+    "hash_alg": { "type": "string", "enum": ["sha256"] },
+    "before_hash": { "$ref": "#/$defs/hex" },
+    "after_hash": { "$ref": "#/$defs/hex" },
+    "hashes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hash" }
+    },
+    "attestation": { "$ref": "#/$defs/attestation" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "preservation": { "$ref": "#/$defs/preservation" },
+    "preservation_supported": { "type": ["boolean", "null"] },
+    "backup_durable": { "type": ["boolean", "null"] },
+    "sidecar_integrity_verified": { "type": ["boolean", "null"] },
+    "exit_code": { "type": ["integer", "null"] },
+    "duration_ms": { "type": ["integer", "null"] },
+    "lock_backend": { "type": "string" },
+    "lock_wait_ms": { "type": ["integer", "null"] },
+    "lock_attempts": { "type": "integer" },
+    "perf": { "$ref": "#/$defs/perf" },
+    "backup_tag": { "type": "string" },
+    "retention_count_limit": { "type": ["integer", "null"] },
+    "retention_age_limit_ms": { "type": ["integer", "null"] },
+    "pruned_count": { "type": "integer" },
+    "retained_count": { "type": "integer" },
+    "error_id": { "type": ["string", "null"] },
+    "error_detail": { "type": ["string", "null"] },
+    "error": { "$ref": "#/$defs/error" },
+    "summary_error_ids": { "type": ["array", "null"], "items": { "type": "string" } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "stage": { "const": "plan" } } },
+      "then": { "required": ["path"] }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "preflight" } } },
+      "then": { "required": ["path", "current_kind", "planned_kind"] }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "preflight.summary" } } },
+      "then": { }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "apply.attempt" } } },
+      "then": { "required": ["lock_backend", "lock_attempts"] }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "apply.result" } } },
+      "then": { }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "prune.result" } } },
+      "then": { "required": ["path", "pruned_count", "retained_count"] }
+    }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "hex": { "type": "string", "pattern": "^[a-f0-9]+$" },
+    "b64": { "type": "string", "contentEncoding": "base64" },
+    "build": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "git_sha": { "type": "string" },
+        "rustc": { "type": "string" }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hostname": { "type": "string" },
+        "os": { "type": "string" },
+        "kernel": { "type": "string" },
+        "arch": { "type": "string" }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pid": { "type": "integer" },
+        "ppid": { "type": "integer" }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "euid": { "type": "integer" },
+        "egid": { "type": "integer" }
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "applied": { "type": "boolean" },
+        "rules": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "path": { "type": "string" },
+        "rel": { "type": "string" },
+        "inode": { "type": "integer" },
+        "device": { "type": "string" },
+        "mount": { "type": "string" }
+      }
+    },
+    "hash": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "role": { "enum": ["before", "after"] },
+        "alg": { "type": "string" },
+        "value": { "$ref": "#/$defs/hex" },
+        "size": { "type": "integer" }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sig_alg": { "type": "string", "enum": ["ed25519"] },
+        "signature": { "$ref": "#/$defs/b64" },
+        "bundle_hash": { "$ref": "#/$defs/hex" },
+        "public_key_id": { "type": "string" },
+        "key_id": { "type": "string" },
+        "cert_chain": { "type": "array", "items": { "type": "string" } },
+        "signature_format": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "origin": { "enum": ["repo", "aur", "manual"] },
+        "helper": { "type": "string" },
+        "uid": { "type": "integer" },
+        "gid": { "type": "integer" },
+        "pkg": { "type": "string" },
+        "pkg_version": { "type": "string" },
+        "pkg_arch": { "type": "string" },
+        "sig_verified": { "type": ["boolean", "null"] },
+        "env_sanitized": { "type": "boolean" }
+      }
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "owner": { "type": "boolean" },
+        "mode": { "type": "boolean" },
+        "timestamps": { "type": "boolean" },
+        "xattrs": { "type": "boolean" },
+        "acls": { "type": "boolean" },
+        "caps": { "type": "boolean" }
+      }
+    },
+    "perf": {
+      "type": "object",
+      "properties": {
+        "hash_ms": { "type": "integer" },
+        "backup_ms": { "type": "integer" },
+        "swap_ms": { "type": "integer" },
+        "io_bytes_read": { "type": "integer" },
+        "io_bytes_written": { "type": "integer" },
+        "timers": { "type": "object", "additionalProperties": { "type": "integer" } }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "enum": ["io","policy","locking","integrity","smoke","unknown"] },
+        "errno": { "type": ["integer", "null"] },
+        "message": { "type": "string" },
+        "remediation": { "type": "string" }
+      }
+    }
+  }
+}
