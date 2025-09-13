@@ -47,3 +47,43 @@ pub fn is_idempotent(target_path: &Path, prior_kind: &str, prior_dest: Option<&s
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn td() -> tempfile::TempDir { tempfile::tempdir().unwrap() }
+
+    #[test]
+    fn idempotent_when_file_and_prior_file() {
+        let t = td();
+        let tgt = t.path().join("usr/bin/app");
+        std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
+        std::fs::write(&tgt, b"data").unwrap();
+        assert!(is_idempotent(&tgt, "file", None));
+    }
+
+    #[test]
+    fn idempotent_when_symlink_matches_prior_dest() {
+        let t = td();
+        let root = t.path();
+        let dest = root.join("bin");
+        std::fs::create_dir_all(&dest).unwrap();
+        let tgt = root.join("usr/bin/app");
+        std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
+        // absolute symlink to dest
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&dest, &tgt).unwrap();
+        }
+        let ok = is_idempotent(&tgt, "symlink", Some(dest.to_str().unwrap()));
+        assert!(ok);
+    }
+
+    #[test]
+    fn idempotent_when_none_and_target_missing() {
+        let t = td();
+        let tgt = t.path().join("usr/bin/missing");
+        assert!(is_idempotent(&tgt, "none", None));
+    }
+}

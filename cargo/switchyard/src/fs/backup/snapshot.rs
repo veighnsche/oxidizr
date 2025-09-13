@@ -12,12 +12,11 @@ use super::sidecar::{write_sidecar, BackupSidecar};
 /// Public so callers (preflight/tests) can compute expected names.
 pub fn backup_path_with_tag(target: &Path, tag: &str) -> std::path::PathBuf {
     use std::time::{SystemTime, UNIX_EPOCH};
-    use std::path::{Path, PathBuf};
     let name = target
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("backup");
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let parent = target.parent().unwrap_or_else(|| std::path::Path::new("."));
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

@@ -10,3 +10,26 @@ pub fn verify_payload_hash_ok(backup: &Path, expected: &str) -> bool {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn integrity_ok_when_hash_matches() {
+        let t = tempfile::tempdir().unwrap();
+        let f = t.path().join("payload");
+        std::fs::write(&f, b"abc").unwrap();
+        let h = crate::fs::meta::sha256_hex_of(&f).unwrap();
+        assert!(verify_payload_hash_ok(&f, &h));
+    }
+
+    #[test]
+    fn integrity_mismatch_detected() {
+        let t = tempfile::tempdir().unwrap();
+        let f = t.path().join("payload");
+        std::fs::write(&f, b"abc").unwrap();
+        let wrong = "deadbeef".to_string();
+        assert!(!verify_payload_hash_ok(&f, &wrong));
+    }
+}

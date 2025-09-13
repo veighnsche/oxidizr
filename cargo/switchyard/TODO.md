@@ -107,17 +107,17 @@ Note: This is not a separate checklist. The sections below are the single consol
 
 ## 7) FS backup/restore split (internal reorg)
   
-- [x] Split `src/fs/backup.rs` into `backup/{mod,snapshot,sidecar,index}.rs`
-- [ ] Split `src/fs/restore.rs` into `restore/{mod,types,selector,idempotence,integrity,steps,engine}.rs`
-- [ ] Remove any internal re-exports of atoms at `fs/mod.rs`; prefer direct module use
-- Notes: backup split completed with module re-exports; restore split in progress.
-- Progress: created `restore/core.rs` with `restore_internal()` and updated `restore/engine.rs` wrappers (`restore_file`, `restore_file_prev`) to delegate to it. `cargo check -p switchyard` passes. Next: extract `idempotence`, `integrity`, and `steps` into dedicated modules per plan and remove legacy blocks.
+- [x] Split `src/fs/backup.rs` into `backup/{mod,snapshot,sidecar,index,prune}.rs`
+- [x] Split `src/fs/restore.rs` into `restore/{mod,types,selector,idempotence,integrity,steps,engine}.rs`
+- [x] Remove any internal re-exports of atoms at `fs/mod.rs`; prefer direct module use
+- Notes: backup split completed; restore split completed. `engine.rs` is now a thin facade over `restore_impl` which composes `selector`, `idempotence`, `integrity`, and `steps` helpers.
+- Progress: added `restore/{idempotence,integrity,steps,selector,types}.rs`; trimmed `restore/engine.rs` to wrappers + `restore_impl`; moved `backup::prune_backups` into `backup/prune.rs` and updated `Switchyard::prune_backups` to delegate to it. Added unit tests for `restore::steps` and `restore::idempotence`. All tests pass.
 - [ ] Docs (execute end-to-end): `./zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md`
 - Bridging tasks:
-  - Extract restore code into `restore/*` modules; wire `engine::restore_impl` behind public fns; update `fs/mod.rs` re‑exports.
-  - Update API/handlers call sites to new module paths; move and add unit tests for selector/idempotence/integrity/steps.
-  - Remove public re‑exports of low‑level atoms from `fs/mod.rs`; ensure internal callers use `fs::atomic` directly.
-  - Replan checkpoint: if large diffs, consider splitting into PR B (implementation) and PR C (sweep removals) per Rulebook.
+  - [x] Extract restore code into `restore/*` modules; wire `engine::restore_impl` behind public fns; update `fs/mod.rs` re‑exports.
+  - [x] Update API/handlers call sites to new module paths; move and add unit tests for selector/idempotence/integrity/steps.
+  - [x] Remove public re‑exports of low‑level atoms from `fs/mod.rs`; ensure internal callers use `fs::atomic` directly.
+  - [ ] Sweep removals: delete transitional `src/fs/restore/core.rs` (unused) and confirm no references to `src/fs/restore.rs` remain.
 
 ## 8) Tests reorganization (crate + repo e2e)
   

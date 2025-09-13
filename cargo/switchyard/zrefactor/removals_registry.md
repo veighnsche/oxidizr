@@ -25,6 +25,9 @@ Planned entries
 - move: cargo/switchyard/src/api.rs -> cargo/switchyard/src/api/mod.rs — idiomatic module layout; drop #[path] includes
 - replace: cargo/switchyard/src/fs/backup.rs -> cargo/switchyard/src/fs/backup/{mod.rs,snapshot.rs,sidecar.rs,index.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
 - replace: cargo/switchyard/src/fs/restore.rs -> cargo/switchyard/src/fs/restore/{mod.rs,types.rs,selector.rs,idempotence.rs,integrity.rs,steps.rs,engine.rs} — split monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
+- remove: cargo/switchyard/src/fs/restore/core.rs.bak — merged into restore/{engine,idempotence,integrity,steps}.rs; transitional file left markers
+- remove: cargo/switchyard/src/fs/backup.rs.bak — legacy placeholder, superseded by backup directory module
+- remove: cargo/switchyard/src/fs/restore.rs.bak — legacy placeholder, superseded by restore directory module
 - replace: cargo/switchyard/src/logging/audit.rs -> cargo/switchyard/src/logging/audit.rs — StageLogger facade replaces emit_* helpers per zrefactor/logging_audit_refactor.INSTRUCTIONS.md
 - remove: cargo/switchyard/src/adapters/mod.rs::lock_file — deprecated shim; use switchyard::adapters::lock::file::*
 - remove: cargo/switchyard/src/lib.rs top-level `pub use policy::rescue` — deprecated facade alias; import from switchyard::policy::rescue instead

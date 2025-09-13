@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::fs::backup::read_sidecar;
+use crate::fs::backup::sidecar::read_sidecar;
 use crate::types::safepath::SafePath;
 use super::{idempotence, integrity, steps, selector, types::{SnapshotSel, RestoreOptions}};
 
@@ -76,7 +76,7 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
                     }
                 };
                 if let Some(ref expected) = side.payload_hash {
-                    if !integrity::verify_payload_hash_ok(&backup, expected) {
+                    if !integrity::verify_payload_hash_ok(&backup, expected.as_str()) {
                         if opts.force_best_effort { return Ok(()); }
                         return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload hash mismatch"));
                     }

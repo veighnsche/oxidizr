@@ -48,7 +48,6 @@ pub(crate) fn find_latest_backup_and_sidecar(
     Some((backup_present, sidecar))
 }
 
-
 /// Return the previous (second newest) backup pair if present.
 pub(crate) fn find_previous_backup_and_sidecar(
     target: &Path,
