@@ -20,7 +20,10 @@ use crate::policy::gating;
 mod row_emitter;
 use row_emitter::{PreflightRowArgs, RowEmitter};
 
-#[allow(clippy::too_many_lines, reason = "Will be split in PR8; keeping behavior parity now")]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Will be split in PR8; keeping behavior parity now"
+)]
 pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     api: &super::Switchyard<E, A>,
     plan: &Plan,
@@ -86,7 +89,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 {
                     stops.push("preservation unsupported for target".to_string());
                 }
-                let current_kind = kind_of(&target.as_path());
+                let current_kind = kind_of(&target.as_path()).to_string();
                 emitter.emit_row(
                     &mut rows,
                     &ctx,
@@ -97,7 +100,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                         planned_kind: "symlink".to_string(),
                         policy_ok: Some(eval.policy_ok),
                         provenance: prov,
-                        notes: if eval.notes.is_empty() { None } else { Some(eval.notes) },
+                        notes: if eval.notes.is_empty() {
+                            None
+                        } else {
+                            Some(eval.notes)
+                        },
                         preservation: Some(preservation),
                         preservation_supported: Some(preservation_supported),
                         restore_ready: None,
@@ -135,7 +142,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                         planned_kind: "restore_from_backup".to_string(),
                         policy_ok: Some(eval.policy_ok),
                         provenance: None,
-                        notes: if eval.notes.is_empty() { None } else { Some(eval.notes) },
+                        notes: if eval.notes.is_empty() {
+                            None
+                        } else {
+                            Some(eval.notes)
+                        },
                         preservation: Some(preservation),
                         preservation_supported: Some(preservation_supported),
                         restore_ready: Some(backup_present),

@@ -22,19 +22,22 @@ use crate::api::Switchyard;
 use crate::logging::audit::{AuditCtx, AuditMode};
 use crate::logging::StageLogger;
 mod audit_fields;
-mod handlers;
 mod executors;
+mod handlers;
 mod lock;
-mod summary;
 mod perf;
 mod policy_gate;
 mod rollback;
+mod summary;
 mod util;
 use perf::PerfAgg;
 
 // PerfAgg moved to perf.rs; lock backend helper and acquisition moved to util.rs and lock.rs
 
-#[allow(clippy::too_many_lines, reason = "Will be split further in PR6/PR8; keeping parity now")]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Will be split further in PR6/PR8; keeping parity now"
+)]
 pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     api: &Switchyard<E, A>,
     plan: &Plan,

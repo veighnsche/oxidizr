@@ -1,4 +1,5 @@
 use thiserror::Error;
+pub mod map;
 
 #[derive(Debug, Error)]
 pub enum ApiError {

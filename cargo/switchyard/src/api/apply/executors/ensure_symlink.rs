@@ -4,9 +4,10 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::apply::audit_fields::{insert_hashes, maybe_warn_fsync};
-use crate::api::Switchyard;
 use crate::api::apply::perf::PerfAgg;
+use crate::api::errors::map::map_swap_error;
 use crate::api::errors::{exit_code_for, id_str, ErrorId};
+use crate::api::Switchyard;
 use crate::constants::FSYNC_WARN_MS;
 use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
 use crate::fs::swap::replace_file_with_symlink;
@@ -20,7 +21,10 @@ use super::ActionExecutor;
 pub(crate) struct EnsureSymlinkExec;
 
 impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
-    #[allow(clippy::too_many_lines, reason = "Will be split further in PR6; executor remains verbose for parity")]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Will be split further in PR6; executor remains verbose for parity"
+    )]
     fn execute(
         &self,
         api: &Switchyard<E, A>,
@@ -78,16 +82,8 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
                 fsync_ms = ms;
             }
             Err(e) => {
-                // Map to Silver-tier error ids for atomic swap/exdev
-                let emsg = e.to_string();
-                let id = if emsg.contains("sidecar write failed") {
-                    ErrorId::E_POLICY
-                } else {
-                    match e.raw_os_error() {
-                        Some(code) if code == libc::EXDEV => ErrorId::E_EXDEV,
-                        _ => ErrorId::E_ATOMIC_SWAP,
-                    }
-                };
+                // Map to stable error id via facade
+                let id = map_swap_error(&e);
                 let msg = format!(
                     "symlink {} -> {} failed: {}",
                     source.as_path().display(),
@@ -104,7 +100,7 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
                     "error_detail": if matches!(id, ErrorId::E_EXDEV) { Some("exdev_fallback_failed") } else { None },
                     "duration_ms": fsync_ms,
                     "before_kind": before_kind,
-                    "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
+                    "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()).to_string() },
                 });
                 ensure_provenance(&mut extra);
                 insert_hashes(&mut extra, before_hash.as_ref(), after_hash.as_ref());
@@ -136,7 +132,7 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
             "degraded_reason": if degraded_used { Some("exdev_fallback") } else { None },
             "duration_ms": fsync_ms,
             "before_kind": before_kind,
-            "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()) },
+            "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()).to_string() },
             "backup_durable": api.policy.durability.backup_durability,
         });
         ensure_provenance(&mut extra);

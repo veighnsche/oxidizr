@@ -193,8 +193,10 @@ impl<'a> EventBuilder<'a> {
     /// Set a stable error identifier as defined in `crate::api::errors`.
     #[must_use]
     pub fn error_id(mut self, id: crate::api::errors::ErrorId) -> Self {
-        self.fields
-            .insert("error_id".to_string(), json!(crate::api::errors::id_str(id)));
+        self.fields.insert(
+            "error_id".to_string(),
+            json!(crate::api::errors::id_str(id)),
+        );
         self
     }
 
@@ -295,16 +297,13 @@ fn redact_and_emit(
             // process
             if let Entry::Vacant(e) = obj.entry("process".to_string()) {
                 let process_id = std::process::id();
-                #[allow(unsafe_code, reason = "libc::getppid() requires unsafe block")]
-                let parent_process_id = unsafe { libc::getppid() };
+                let parent_process_id = rustix::process::getppid().as_raw();
                 e.insert(json!({"pid": process_id, "ppid": parent_process_id}));
             }
             // actor (effective ids)
             if let Entry::Vacant(e) = obj.entry("actor".to_string()) {
-                #[allow(unsafe_code, reason = "libc::geteuid() requires unsafe block")]
-                let effective_user_id = unsafe { libc::geteuid() };
-                #[allow(unsafe_code, reason = "libc::getegid() requires unsafe block")]
-                let effective_group_id = unsafe { libc::getegid() };
+                let effective_user_id = rustix::process::geteuid().as_raw();
+                let effective_group_id = rustix::process::getegid().as_raw();
                 e.insert(json!({"euid": effective_user_id, "egid": effective_group_id}));
             }
             // build

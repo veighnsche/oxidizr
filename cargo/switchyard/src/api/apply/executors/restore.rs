@@ -5,8 +5,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::apply::perf::PerfAgg;
+use crate::api::errors::map::map_restore_error_kind;
+use crate::api::errors::{exit_code_for, id_str};
 use crate::api::Switchyard;
-use crate::api::errors::{exit_code_for, id_str, ErrorId};
 use crate::fs::meta::{kind_of, sha256_hex_of};
 use crate::logging::audit::{ensure_provenance, AuditCtx};
 use crate::logging::StageLogger;
@@ -18,7 +19,10 @@ use super::ActionExecutor;
 pub(crate) struct RestoreFromBackupExec;
 
 impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupExec {
-    #[allow(clippy::too_many_lines, reason = "Will be split in PR6; executor remains verbose for parity")]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Will be split in PR6; executor remains verbose for parity"
+    )]
     fn execute(
         &self,
         api: &Switchyard<E, A>,
@@ -56,7 +60,8 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             backup_ms = u64::try_from(tb0.elapsed().as_millis()).unwrap_or(u64::MAX);
             used_prev = true;
         }
-        let force = api.policy.apply.best_effort_restore || !api.policy.durability.sidecar_integrity;
+        let force =
+            api.policy.apply.best_effort_restore || !api.policy.durability.sidecar_integrity;
         // Pre-compute sidecar integrity verification (best-effort) before restore
         let th0 = Instant::now();
         let integrity_verified = (|| {
@@ -104,7 +109,7 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
                             "action_id": aid.to_string(),
                             "path": target.as_path().display().to_string(),
                             "before_kind": before_kind,
-                            "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
+                            "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
                         });
                         if let Some(iv) = integrity_verified {
                             if let Some(obj) = extra.as_object_mut() {
@@ -127,54 +132,13 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
                         );
                     }
                 }
-                let id = match e.kind() {
-                    ErrorKind::NotFound => ErrorId::E_BACKUP_MISSING,
-                    ErrorKind::PermissionDenied
-                    | ErrorKind::ConnectionRefused
-                    | ErrorKind::ConnectionReset
-                    | ErrorKind::HostUnreachable
-                    | ErrorKind::NetworkUnreachable
-                    | ErrorKind::ConnectionAborted
-                    | ErrorKind::NotConnected
-                    | ErrorKind::AddrInUse
-                    | ErrorKind::AddrNotAvailable
-                    | ErrorKind::NetworkDown
-                    | ErrorKind::BrokenPipe
-                    | ErrorKind::AlreadyExists
-                    | ErrorKind::WouldBlock
-                    | ErrorKind::NotADirectory
-                    | ErrorKind::IsADirectory
-                    | ErrorKind::DirectoryNotEmpty
-                    | ErrorKind::ReadOnlyFilesystem
-                    | ErrorKind::StaleNetworkFileHandle
-                    | ErrorKind::InvalidInput
-                    | ErrorKind::InvalidData
-                    | ErrorKind::TimedOut
-                    | ErrorKind::WriteZero
-                    | ErrorKind::StorageFull
-                    | ErrorKind::NotSeekable
-                    | ErrorKind::QuotaExceeded
-                    | ErrorKind::FileTooLarge
-                    | ErrorKind::ResourceBusy
-                    | ErrorKind::ExecutableFileBusy
-                    | ErrorKind::Deadlock
-                    | ErrorKind::CrossesDevices
-                    | ErrorKind::TooManyLinks
-                    | ErrorKind::InvalidFilename
-                    | ErrorKind::ArgumentListTooLong
-                    | ErrorKind::Interrupted
-                    | ErrorKind::Unsupported
-                    | ErrorKind::UnexpectedEof
-                    | ErrorKind::OutOfMemory
-                    | ErrorKind::Other
-                    | _ => ErrorId::E_RESTORE_FAILED,
-                };
+                let id = map_restore_error_kind(e.kind());
                 let msg = format!("restore {} failed: {}", target.as_path().display(), e);
                 let mut extra = json!({
                     "action_id": aid.to_string(),
                     "path": target.as_path().display().to_string(),
                     "before_kind": before_kind,
-                    "after_kind": if dry { before_kind.clone() } else { kind_of(&target.as_path()) },
+                    "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
                 });
                 if let Some(iv) = integrity_verified {
                     if let Some(obj) = extra.as_object_mut() {

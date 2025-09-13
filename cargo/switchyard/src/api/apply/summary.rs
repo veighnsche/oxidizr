@@ -48,7 +48,10 @@ impl ApplySummary {
         if let Some(obj) = self.fields.as_object_mut() {
             if errors.iter().any(|e| e.contains("smoke")) {
                 obj.insert("error_id".to_string(), json!(id_str(ErrorId::E_SMOKE)));
-                obj.insert("exit_code".to_string(), json!(exit_code_for(ErrorId::E_SMOKE)));
+                obj.insert(
+                    "exit_code".to_string(),
+                    json!(exit_code_for(ErrorId::E_SMOKE)),
+                );
             } else {
                 // Default summary mapping for non-smoke failures
                 obj.entry("error_id")
@@ -74,7 +77,9 @@ impl ApplySummary {
                 "rolled_back": rolled_back,
             });
             let bundle: Vec<u8> = serde_json::to_vec(&bundle_json).unwrap_or_default();
-            if let Some(att_json) = crate::adapters::attest::build_attestation_fields(&**att, &bundle) {
+            if let Some(att_json) =
+                crate::adapters::attest::build_attestation_fields(&**att, &bundle)
+            {
                 if let Some(obj) = self.fields.as_object_mut() {
                     obj.insert("attestation".to_string(), att_json);
                 }

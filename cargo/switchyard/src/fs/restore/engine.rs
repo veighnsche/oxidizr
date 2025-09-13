@@ -51,121 +51,187 @@ pub fn restore_file_prev(
 /// # Errors
 ///
 /// Returns an IO error if the backup file cannot be restored.
-#[allow(clippy::too_many_lines, reason = "Will split into RestorePlanner plan/execute in PR6")]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Will split into RestorePlanner plan/execute in PR6"
+)]
 pub fn restore_impl(
     target: &SafePath,
     sel: SnapshotSel,
     opts: &RestoreOptions,
 ) -> std::io::Result<()> {
     let target_path = target.as_path();
-    // Locate backup payload and sidecar based on selector
-    let pair = match sel {
-        SnapshotSel::Latest => selector::latest(&target_path, &opts.backup_tag),
-        SnapshotSel::Previous => selector::previous(&target_path, &opts.backup_tag),
-    };
-    let (backup_opt, sidecar_path): (Option<PathBuf>, PathBuf) = if let Some(p) = pair {
-        p
-    } else {
-        if !opts.force_best_effort {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "backup missing",
-            ));
-        }
-        return Ok(());
-    };
-    // Read sidecar if present
-    let sc = read_sidecar(&sidecar_path).ok();
-    if let Some(ref side) = sc {
-        // Idempotence
-        if idempotence::is_idempotent(
-            &target_path,
-            side.prior_kind.as_str(),
-            side.prior_dest.as_deref(),
-        ) {
-            return Ok(());
-        }
-    }
+    let (_backup_opt, _sidecar_opt, action) = RestorePlanner::plan(&target_path, sel, opts)?;
     if opts.dry_run {
         return Ok(());
     }
-    if let Some(side) = sc {
-        match side.prior_kind.as_str() {
-            "file" => {
-                let backup: PathBuf = if let Some(p) = backup_opt {
-                    p
-                } else {
-                    if opts.force_best_effort {
-                        return Ok(());
-                    }
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "backup payload missing",
-                    ));
-                };
-                if let Some(ref expected) = side.payload_hash {
-                    if !integrity::verify_payload_hash_ok(&backup, expected.as_str()) {
+    RestorePlanner::execute(&target_path, action)
+}
+
+/// Planned action for restore execution.
+#[derive(Debug, Clone)]
+pub enum RestoreAction {
+    Noop,
+    FileRename {
+        backup: PathBuf,
+        mode: Option<u32>,
+    },
+    SymlinkTo {
+        dest: PathBuf,
+        cleanup_backup: Option<PathBuf>,
+    },
+    EnsureAbsent {
+        cleanup_backup: Option<PathBuf>,
+    },
+    LegacyRename {
+        backup: PathBuf,
+    },
+}
+
+/// Planner facade that selects the correct restore action and validates integrity/idempotence.
+struct RestorePlanner;
+
+impl RestorePlanner {
+    fn plan(
+        target: &Path,
+        sel: SnapshotSel,
+        opts: &RestoreOptions,
+    ) -> std::io::Result<(
+        Option<PathBuf>,
+        Option<crate::fs::backup::sidecar::BackupSidecar>,
+        RestoreAction,
+    )> {
+        // Locate backup payload and sidecar based on selector
+        let pair = match sel {
+            SnapshotSel::Latest => selector::latest(target, &opts.backup_tag),
+            SnapshotSel::Previous => selector::previous(target, &opts.backup_tag),
+        };
+        let (backup_opt, sidecar_path): (Option<PathBuf>, PathBuf) = if let Some(p) = pair {
+            p
+        } else {
+            if !opts.force_best_effort {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "backup missing",
+                ));
+            }
+            return Ok((None, None, RestoreAction::Noop));
+        };
+        // Read sidecar if present
+        let sc = read_sidecar(&sidecar_path).ok();
+        if let Some(ref side) = sc {
+            // Idempotence
+            if idempotence::is_idempotent(
+                target,
+                side.prior_kind.as_str(),
+                side.prior_dest.as_deref(),
+            ) {
+                return Ok((backup_opt, sc, RestoreAction::Noop));
+            }
+        }
+        if let Some(side) = sc.clone() {
+            let action = match side.prior_kind.as_str() {
+                "file" => {
+                    let backup: PathBuf = if let Some(p) = backup_opt.clone() {
+                        p
+                    } else {
                         if opts.force_best_effort {
-                            return Ok(());
+                            return Ok((backup_opt, Some(side), RestoreAction::Noop));
                         }
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::NotFound,
-                            "backup payload hash mismatch",
+                            "backup payload missing",
+                        ));
+                    };
+                    if let Some(ref expected) = side.payload_hash {
+                        if !integrity::verify_payload_hash_ok(&backup, expected.as_str()) {
+                            if opts.force_best_effort {
+                                return Ok((backup_opt, Some(side), RestoreAction::Noop));
+                            }
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::NotFound,
+                                "backup payload hash mismatch",
+                            ));
+                        }
+                    }
+                    let mode = side
+                        .mode
+                        .as_ref()
+                        .and_then(|ms| u32::from_str_radix(ms, 8).ok());
+                    RestoreAction::FileRename { backup, mode }
+                }
+                "symlink" => {
+                    if let Some(dest) = side.prior_dest.as_ref() {
+                        RestoreAction::SymlinkTo {
+                            dest: PathBuf::from(dest),
+                            cleanup_backup: backup_opt.clone(),
+                        }
+                    } else if let Some(backup) = backup_opt.clone() {
+                        RestoreAction::LegacyRename { backup }
+                    } else if opts.force_best_effort {
+                        RestoreAction::Noop
+                    } else {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload missing",
                         ));
                     }
                 }
-                let mode = side
-                    .mode
-                    .as_ref()
-                    .and_then(|ms| u32::from_str_radix(ms, 8).ok());
-                steps::restore_file_bytes(&target_path, &backup, mode)?;
-            }
-            "symlink" => {
-                if let Some(dest) = side.prior_dest.as_ref() {
-                    steps::restore_symlink_to(&target_path, Path::new(dest))?;
-                    if let Some(b) = backup_opt.as_ref() {
-                        let _ = std::fs::remove_file(b);
+                "none" => RestoreAction::EnsureAbsent {
+                    cleanup_backup: backup_opt.clone(),
+                },
+                _ => {
+                    if let Some(backup) = backup_opt.clone() {
+                        RestoreAction::LegacyRename { backup }
+                    } else if opts.force_best_effort {
+                        RestoreAction::Noop
+                    } else {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "backup payload missing",
+                        ));
                     }
-                } else if let Some(backup) = backup_opt {
-                    steps::legacy_rename(&target_path, &backup)?;
-                } else if !opts.force_best_effort {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "backup payload missing",
-                    ));
                 }
+            };
+            return Ok((backup_opt, Some(side), action));
+        }
+        // No sidecar; legacy rename if backup exists
+        if let Some(backup) = backup_opt.clone() {
+            Ok((backup_opt, None, RestoreAction::LegacyRename { backup }))
+        } else if opts.force_best_effort {
+            Ok((None, None, RestoreAction::Noop))
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "backup missing",
+            ))
+        }
+    }
+
+    fn execute(target: &Path, action: RestoreAction) -> std::io::Result<()> {
+        match action {
+            RestoreAction::Noop => Ok(()),
+            RestoreAction::FileRename { backup, mode } => {
+                steps::restore_file_bytes(target, &backup, mode)
             }
-            "none" => {
-                steps::ensure_absent(&target_path)?;
-                if let Some(b) = backup_opt.as_ref() {
+            RestoreAction::SymlinkTo {
+                dest,
+                cleanup_backup,
+            } => {
+                steps::restore_symlink_to(target, &dest)?;
+                if let Some(b) = cleanup_backup {
                     let _ = std::fs::remove_file(b);
                 }
+                Ok(())
             }
-            _ => {
-                if let Some(backup) = backup_opt {
-                    steps::legacy_rename(&target_path, &backup)?;
-                } else if !opts.force_best_effort {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "backup payload missing",
-                    ));
+            RestoreAction::EnsureAbsent { cleanup_backup } => {
+                steps::ensure_absent(target)?;
+                if let Some(b) = cleanup_backup {
+                    let _ = std::fs::remove_file(b);
                 }
+                Ok(())
             }
+            RestoreAction::LegacyRename { backup } => steps::legacy_rename(target, &backup),
         }
-        return Ok(());
-    }
-    // No sidecar; legacy rename if backup exists
-    if let Some(backup) = backup_opt {
-        if opts.dry_run {
-            return Ok(());
-        }
-        steps::legacy_rename(&target_path, &backup)
-    } else if opts.force_best_effort {
-        Ok(())
-    } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "backup missing",
-        ))
     }
 }

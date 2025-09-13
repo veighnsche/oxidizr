@@ -4,11 +4,11 @@ use log::Level;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::api::errors::ErrorId;
+use crate::api::Switchyard;
 use crate::constants::LOCK_POLL_MS;
 use crate::logging::{AuditSink, FactsEmitter, StageLogger};
 use crate::types::{ApplyMode, ApplyReport};
-use crate::api::errors::ErrorId;
-use crate::api::Switchyard;
 
 use super::util::lock_backend_label;
 
@@ -97,7 +97,13 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
     }
     // Default when no lock used (DryRun or no manager and allowed)
     let approx_attempts = u64::from(api.lock.is_some());
-    LockInfo { lock_backend, lock_wait_ms: None, approx_attempts, guard: None, early_report: None }
+    LockInfo {
+        lock_backend,
+        lock_wait_ms: None,
+        approx_attempts,
+        guard: None,
+        early_report: None,
+    }
 }
 
 /// Facade for lock acquisition bookkeeping and telemetry.
@@ -111,35 +117,59 @@ struct LockOutcome {
 }
 
 impl LockOrchestrator {
-    fn acquire<E: FactsEmitter, A: AuditSink>(api: &Switchyard<E, A>, mode: ApplyMode) -> LockOutcome {
+    fn acquire<E: FactsEmitter, A: AuditSink>(
+        api: &Switchyard<E, A>,
+        mode: ApplyMode,
+    ) -> LockOutcome {
         if let Some(mgr) = &api.lock {
             let lt0 = Instant::now();
             match mgr.acquire_process_lock(api.lock_timeout_ms) {
                 Ok(g) => {
-                    let lock_wait_ms = Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
+                    let lock_wait_ms =
+                        Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
                     let approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
-                    LockOutcome { lock_wait_ms, approx_attempts, guard: Some(g), err_msg: None }
+                    LockOutcome {
+                        lock_wait_ms,
+                        approx_attempts,
+                        guard: Some(g),
+                        err_msg: None,
+                    }
                 }
                 Err(e) => {
-                    let lock_wait_ms = Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
+                    let lock_wait_ms =
+                        Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
                     let approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
-                    LockOutcome { lock_wait_ms, approx_attempts, guard: None, err_msg: Some(format!("lock: {e}")) }
+                    LockOutcome {
+                        lock_wait_ms,
+                        approx_attempts,
+                        guard: None,
+                        err_msg: Some(format!("lock: {e}")),
+                    }
                 }
             }
         } else {
             // No lock manager. In DryRun this is allowed; otherwise policy may require lock.
             let dry = matches!(mode, ApplyMode::DryRun);
             if dry {
-                LockOutcome { lock_wait_ms: None, approx_attempts: 0, guard: None, err_msg: None }
+                LockOutcome {
+                    lock_wait_ms: None,
+                    approx_attempts: 0,
+                    guard: None,
+                    err_msg: None,
+                }
             } else {
-                LockOutcome { lock_wait_ms: None, approx_attempts: 0, guard: None, err_msg: Some("lock manager required in Commit mode".to_string()) }
+                LockOutcome {
+                    lock_wait_ms: None,
+                    approx_attempts: 0,
+                    guard: None,
+                    err_msg: Some("lock manager required in Commit mode".to_string()),
+                }
             }
         }
     }
 
     fn emit_failure(slog: &StageLogger<'_>, backend: &str, wait_ms: Option<u64>, attempts: u64) {
-        slog
-            .apply_attempt()
+        slog.apply_attempt()
             .merge(&json!({
                 "lock_backend": backend,
                 "lock_wait_ms": wait_ms,
@@ -148,8 +178,7 @@ impl LockOrchestrator {
             .error_id(ErrorId::E_LOCKING)
             .exit_code_for(ErrorId::E_LOCKING)
             .emit_failure();
-        slog
-            .apply_result()
+        slog.apply_result()
             .merge(&json!({
                 "lock_backend": backend,
                 "lock_wait_ms": wait_ms,
@@ -160,8 +189,7 @@ impl LockOrchestrator {
             .exit_code_for(ErrorId::E_LOCKING)
             .emit_failure();
         // Historical parity: also emit a minimal apply.result failure with just error_id/exit_code
-        slog
-            .apply_result()
+        slog.apply_result()
             .error_id(ErrorId::E_LOCKING)
             .exit_code_for(ErrorId::E_LOCKING)
             .emit_failure();

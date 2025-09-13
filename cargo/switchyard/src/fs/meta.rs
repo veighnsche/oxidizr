@@ -19,49 +19,59 @@ use serde_json::json;
 /// Compute SHA-256 of a file at `path`, returning a lowercase hex string.
 #[must_use]
 pub fn sha256_hex_of(path: &Path) -> Option<String> {
-    let mut f = std::fs::File::open(path).ok()?;
+    let mut file = std::fs::File::open(path).ok()?;
+
     let mut hasher = Sha256::new();
-    std::io::copy(&mut f, &mut hasher).ok()?;
-    let out = hasher.finalize();
-    Some(hex::encode(out))
+    std::io::copy(&mut file, &mut hasher).ok()?;
+
+    Some(format!("{:x}", hasher.finalize()))
 }
 
 /// If `target` is a symlink, resolve its target to an absolute path.
-/// Relative links are resolved relative to the parent directory of `target`.
+/// Relative link targets are resolved relative to the parent directory of `target`.
 #[must_use]
 pub fn resolve_symlink_target(target: &Path) -> Option<PathBuf> {
-    if let Ok(md) = std::fs::symlink_metadata(target) {
-        if md.file_type().is_symlink() {
-            if let Ok(mut link) = std::fs::read_link(target) {
-                if link.is_relative() {
-                    if let Some(parent) = target.parent() {
-                        link = parent.join(link);
-                    }
-                }
-                return Some(link);
-            }
-        }
+    // Quick bail if not a symlink.
+    let md = std::fs::symlink_metadata(target).ok()?;
+    if !md.file_type().is_symlink() {
+        return None;
     }
-    None
+
+    // Read the raw link target (may be relative).
+    let link = std::fs::read_link(target).ok()?;
+    if link.is_absolute() {
+        return Some(link);
+    }
+
+    // Compute an absolute base dir for resolving the relative link.
+    // If `target` has no parent, use "." (current dir). Then absolutize that base.
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let base_abs = if parent.is_absolute() {
+        parent.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(parent)
+    };
+
+    Some(base_abs.join(link))
 }
 
 /// Return a string describing the kind of filesystem node at `path`.
 #[must_use]
-pub fn kind_of(path: &Path) -> String {
+pub fn kind_of(path: &Path) -> &'static str {
     match std::fs::symlink_metadata(path) {
         Ok(md) => {
             let ft = md.file_type();
             if ft.is_symlink() {
-                "symlink".to_string()
+                "symlink"
             } else if ft.is_file() {
-                "file".to_string()
+                "file"
             } else if ft.is_dir() {
-                "dir".to_string()
+                "dir"
             } else {
-                "unknown".to_string()
+                "unknown"
             }
         }
-        Err(_) => "missing".to_string(),
+        Err(_) => "missing",
     }
 }
 
@@ -77,23 +87,39 @@ pub fn kind_of(path: &Path) -> String {
 /// - caps (Linux file capabilities; report false unless libcap is present — we report false)
 #[must_use]
 pub fn detect_preservation_capabilities(path: &Path) -> (serde_json::Value, bool) {
+    // Defaults: everything false.
     let mut owner = false;
     let mut mode = false;
     let mut timestamps = false;
+
+    // xattrs varies by platform; start false and probe only where supported.
     let mut xattrs = false;
+
+    // Not (yet) probed in this crate; conservative false.
     let acls = false;
     let caps = false;
 
-    if let Ok(md) = std::fs::symlink_metadata(path) {
-        // mode: we can generally preserve permissions if file exists and we have write on parent
+    if std::fs::symlink_metadata(path).is_ok() {
+        // If we can stat the node, assume we can preserve mode & timestamps.
         mode = true;
-        // timestamps: if metadata is readable, assume we can set atime/mtime (utimensat)
         timestamps = true;
-        // owner: only root can chown arbitrarily; detect effective uid == 0 via /proc/self/status
+
+        // Root can chown arbitrarily; others generally cannot.
         owner = effective_uid_is_root();
-        // xattrs: probe availability by attempting to list extended attributes
-        xattrs = xattr::list(path).map(|_| true).unwrap_or(false);
-        let _ = md; // silence unused on non-unix targets
+
+        // Best-effort xattr probe: listing succeeds ⇒ likely supported.
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "macos",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            xattrs = xattr::list(path).map(|_| true).unwrap_or(false);
+        }
+        // Other targets: leave xattrs = false (conservative).
     }
 
     let preservation = json!({
@@ -104,30 +130,20 @@ pub fn detect_preservation_capabilities(path: &Path) -> (serde_json::Value, bool
         "acls": acls,
         "caps": caps,
     });
-    // preservation_supported if any dimension can be preserved
+
+    // Supported if any dimension is preservable.
     let supported = owner || mode || timestamps || xattrs || acls || caps;
+
     (preservation, supported)
 }
 
 fn effective_uid_is_root() -> bool {
-    // Parse /proc/self/status and read the second field of the `Uid:` line (effective UID).
-    // Fallback to false on any error for conservatism.
-    if let Ok(mut f) = std::fs::File::open("/proc/self/status") {
-        use std::io::Read as _;
-        let mut s = String::new();
-        if f.read_to_string(&mut s).is_ok() {
-            for line in s.lines() {
-                if line.starts_with("Uid:") {
-                    // Format: Uid:\t<real>\t<eff>\t<saved>\t<fs>
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if let Some(eff_str) = parts.get(2) {
-                        if let Ok(eff) = eff_str.parse::<u32>() {
-                            return eff == 0;
-                        }
-                    }
-                }
-            }
-        }
+    #[cfg(target_os = "linux")]
+    {
+        rustix::process::geteuid().as_raw() == 0
     }
-    false
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
 }

@@ -17,6 +17,18 @@ pub trait MountInspector {
 pub struct ProcStatfsInspector;
 
 impl ProcStatfsInspector {
+    fn flags_via_statvfs(path: &Path) -> Result<MountFlags, MountError> {
+        // Use rustix::fs::statvfs to query mount flags when available
+        match rustix::fs::statvfs(path) {
+            Ok(vfs) => {
+                let flags = vfs.f_flag;
+                let read_only = flags.contains(rustix::fs::StatVfsMountFlags::RDONLY);
+                let no_exec = flags.contains(rustix::fs::StatVfsMountFlags::NOEXEC);
+                Ok(MountFlags { read_only, no_exec })
+            }
+            Err(_) => Err(MountError::Unknown),
+        }
+    }
     fn parse_proc_mounts(path: &Path) -> Result<MountFlags, MountError> {
         // Canonicalize best-effort; if it fails, still proceed with the raw path
         let p = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -59,8 +71,8 @@ impl ProcStatfsInspector {
 
 impl MountInspector for ProcStatfsInspector {
     fn flags_for(&self, path: &Path) -> Result<MountFlags, MountError> {
-        // For now, rely on /proc/self/mounts. A future improvement can add rustix::fs::statfs mapping.
-        Self::parse_proc_mounts(path)
+        // Prefer kernel statvfs; fall back to /proc parsing on error
+        Self::flags_via_statvfs(path).or_else(|_| Self::parse_proc_mounts(path))
     }
 }
 
