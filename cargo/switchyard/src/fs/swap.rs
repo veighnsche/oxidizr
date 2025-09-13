@@ -24,6 +24,13 @@ pub fn replace_file_with_symlink(
     let source_path = source.as_path();
     let target_path = target.as_path();
 
+    // In DryRun, avoid any filesystem I/O and return immediately. This ensures
+    // that redacted, deterministic facts can be emitted without requiring the
+    // target directories to exist or be accessible.
+    if dry_run {
+        return Ok((false, 0));
+    }
+
     if source_path == target_path {
         return Ok((false, 0));
     }
@@ -44,9 +51,7 @@ pub fn replace_file_with_symlink(
         None
     };
 
-    if dry_run {
-        return Ok((false, 0));
-    }
+    // DryRun already handled above; proceed with real operations.
 
     if is_symlink {
         let desired = fs::canonicalize(&source_path).unwrap_or_else(|_| source_path.clone());
