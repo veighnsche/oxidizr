@@ -14,11 +14,15 @@ pub fn legacy_rename(target_path: &Path, backup: &Path) -> std::io::Result<()> {
     let fname = target_path
         .file_name()
         .and_then(|s| s.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "target_path has no file name"))?;
-    let bname = backup
-        .file_name()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "backup has no file name"))?;
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "target_path has no file name",
+            )
+        })?;
+    let bname = backup.file_name().and_then(|s| s.to_str()).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "backup has no file name")
+    })?;
     let _ = std::fs::remove_file(target_path);
     let dirfd = open_dir_nofollow(parent)?;
     let old_c = std::ffi::CString::new(bname)
@@ -45,11 +49,15 @@ pub fn restore_file_bytes(
     let fname = target_path
         .file_name()
         .and_then(|s| s.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "target_path has no file name"))?;
-    let bname = backup
-        .file_name()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "backup has no file name"))?;
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "target_path has no file name",
+            )
+        })?;
+    let bname = backup.file_name().and_then(|s| s.to_str()).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "backup has no file name")
+    })?;
     let dirfd = open_dir_nofollow(parent)?;
     let _ = std::fs::remove_file(target_path);
     let old_c = std::ffi::CString::new(bname)
@@ -81,7 +89,12 @@ pub fn ensure_absent(target_path: &Path) -> std::io::Result<()> {
         let fname = target_path
             .file_name()
             .and_then(|s| s.to_str())
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "target_path has no file name"))?;
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "target_path has no file name",
+                )
+            })?;
         let fname_c = std::ffi::CString::new(fname).map_err(|_| {
             std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
         })?;

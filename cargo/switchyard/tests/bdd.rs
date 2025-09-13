@@ -505,7 +505,8 @@ mod steps {
             if e.get("stage").and_then(|v| v.as_str()) == Some("apply.result")
                 && e.get("action_id").is_some()
                 && e.get("hash_alg").and_then(|v| v.as_str()) == Some("sha256")
-                && e.get("before_hash").is_some() && e.get("after_hash").is_some()
+                && e.get("before_hash").is_some()
+                && e.get("after_hash").is_some()
             {
                 ok = true;
                 break;
