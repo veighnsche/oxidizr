@@ -14,40 +14,40 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 
 ### plan()
 
-- [ ] (P0) Implement E2E-PLAN-001 — Plan empty inputs; expect `Plan.actions=[]` and redacted facts TS_ZERO (test_selection_matrix.md E2E-PLAN-001; api_option_inventory.md §plan; traceability.md plan.link_count=min:0, restore_count=min:0; env: Base-1). Verify stable ordering and zero actions.
-- [ ] (P1) Implement E2E-PLAN-002 — Deterministic sorting for mixed actions; random input order seed=42 (test_selection_matrix.md E2E-PLAN-002; api_option_inventory.md §plan; traceability.md plan.many:10, restore=one, input_order=random; env: Base-1). Assert sorted by kind then target.rel.
-- [ ] (P0) Implement E2E-PLAN-003 — Duplicate targets preserved (no dedupe) (test_selection_matrix.md E2E-PLAN-003; api_option_inventory.md §plan; traceability.md duplicate_targets=true; env: Base-1). Assert both actions present.
+- [x] (P0) Implement E2E-PLAN-001 — Plan empty inputs; expect `Plan.actions=[]` and redacted facts TS_ZERO (test_selection_matrix.md E2E-PLAN-001; api_option_inventory.md §plan; traceability.md plan.link_count=min:0, restore_count=min:0; env: Base-1). Verify stable ordering and zero actions.
+- [x] (P1) Implement E2E-PLAN-002 — Deterministic sorting for mixed actions; random input order seed=42 (test_selection_matrix.md E2E-PLAN-002; api_option_inventory.md §plan; traceability.md plan.many:10, restore=one, input_order=random; env: Base-1). Assert sorted by kind then target.rel.
+- [x] (P0) Implement E2E-PLAN-003 — Duplicate targets preserved (no dedupe) (test_selection_matrix.md E2E-PLAN-003; api_option_inventory.md §plan; traceability.md duplicate_targets=true; env: Base-1). Assert both actions present.
 - [ ] (P3) Implement E2E-PLAN-004 — Huge plan size (1000 links) performance and determinism (test_selection_matrix.md E2E-PLAN-004; api_option_inventory.md §plan; traceability.md link_count=huge:1000; env: Base-4). Assert ordering and run-time within budget.
-- [ ] (P1) Implement E2E-PLAN-005 — Many restores sorting (test_selection_matrix.md E2E-PLAN-005; api_option_inventory.md §plan; traceability.md restore_count=many:10; env: Base-1). Assert deterministic ordering.
-- [ ] (P0) Implement E2E-PLAN-006 — Single link trivial plan (test_selection_matrix.md E2E-PLAN-006; api_option_inventory.md §plan; env: Base-1). Assert one EnsureSymlink.
+- [x] (P1) Implement E2E-PLAN-005 — Many restores sorting (test_selection_matrix.md E2E-PLAN-005; api_option_inventory.md §plan; traceability.md restore_count=many:10; env: Base-1). Assert deterministic ordering.
+- [x] (P0) Implement E2E-PLAN-006 — Single link trivial plan (test_selection_matrix.md E2E-PLAN-006; api_option_inventory.md §plan; env: Base-1). Assert one EnsureSymlink.
 
 ### preflight()
 
-- [ ] (P1) Implement E2E-PREFLIGHT-001 — Rescue required but unavailable → STOP; assert summary `error_id=E_POLICY`, `exit_code=10`, `summary_error_ids` includes `E_POLICY` (test_selection_matrix.md E2E-PREFLIGHT-001; api_option_inventory.md §rescue; traceability.md rescue.require=true; REQ-E2, REQ-RC2; env: Base-1).
-- [ ] (P1) Implement E2E-PREFLIGHT-002 — Ownership strict without oracle → STOP; assert ownership mentioned and `summary_error_ids` includes `E_OWNERSHIP` (test_selection_matrix.md E2E-PREFLIGHT-002; api_option_inventory.md §risks.ownership_strict; REQ-S4; env: Base-1).
-- [ ] (P1) Implement E2E-PREFLIGHT-003 — Preservation required but unsupported → STOP (test_selection_matrix.md E2E-PREFLIGHT-003; api_option_inventory.md §durability.preservation; REQ-S5; env: Base-1 with unsupported path shim). Assert STOP reason mentions preservation unsupported.
-- [ ] (P0) Implement E2E-PREFLIGHT-004 — Rescue not required baseline (test_selection_matrix.md E2E-PREFLIGHT-004; api_option_inventory.md §rescue; env: Base-1). Assert `ok=true`.
-- [ ] (P1) Implement E2E-PREFLIGHT-005 — Exec check with min_count=100 → STOP (test_selection_matrix.md E2E-PREFLIGHT-005; api_option_inventory.md §rescue.exec_check/min_count; REQ-RC2; env: Base-1). Assert STOP and message.
+- [x] (P1) Implement E2E-PREFLIGHT-001 — Rescue required but unavailable → STOP; assert summary `error_id=E_POLICY`, `exit_code=10`, `summary_error_ids` includes `E_POLICY` (test_selection_matrix.md E2E-PREFLIGHT-001; api_option_inventory.md §rescue; traceability.md rescue.require=true; REQ-E2, REQ-RC2; env: Base-1).
+- [x] (P1) Implement E2E-PREFLIGHT-002 — Ownership strict without oracle → STOP; assert ownership mentioned and `summary_error_ids` includes `E_OWNERSHIP` (test_selection_matrix.md E2E-PREFLIGHT-002; api_option_inventory.md §risks.ownership_strict; REQ-S4; env: Base-1).
+- [x] (P1) Implement E2E-PREFLIGHT-003 — Preservation required but unsupported → STOP (test_selection_matrix.md E2E-PREFLIGHT-003; api_option_inventory.md §durability.preservation; REQ-S5; env: Base-1 with unsupported path shim). Assert STOP reason mentions preservation unsupported.
+- [x] (P0) Implement E2E-PREFLIGHT-004 — Rescue not required baseline (test_selection_matrix.md E2E-PREFLIGHT-004; api_option_inventory.md §rescue; env: Base-1). Assert `ok=true`.
+- [x] (P1) Implement E2E-PREFLIGHT-005 — Exec check with min_count=100 → STOP (test_selection_matrix.md E2E-PREFLIGHT-005; api_option_inventory.md §rescue.exec_check/min_count; REQ-RC2; env: Base-1). Assert STOP and message.
 - [ ] (P1) Implement E2E-PREFLIGHT-006 — Extra mount checks (5) (test_selection_matrix.md E2E-PREFLIGHT-006; api_option_inventory.md §apply.extra_mount_checks; env: Base-2). Assert notes present.
 - [ ] (P0) Implement E2E-PREFLIGHT-007 — Long backup tag annotation (test_selection_matrix.md E2E-PREFLIGHT-007; api_option_inventory.md §backup.tag; env: Base-1). Assert tag carried in rows.
-- [ ] (P0) Implement E2E-PREFLIGHT-008 — One extra mount check (test_selection_matrix.md E2E-PREFLIGHT-008; api_option_inventory.md §apply.extra_mount_checks; env: Base-1). Assert note present.
-- [ ] (P0) Implement E2E-PREFLIGHT-009 — Empty backup tag baseline (test_selection_matrix.md E2E-PREFLIGHT-009; api_option_inventory.md §backup.tag; env: Base-1). Assert ok.
-- [ ] (P0) Implement E2E-PREFLIGHT-010 — Exec check disabled baseline (test_selection_matrix.md E2E-PREFLIGHT-010; api_option_inventory.md §rescue.exec_check; env: Base-1). Assert ok.
-- [ ] (P0) Implement E2E-PREFLIGHT-011 — Coreutils tag baseline (test_selection_matrix.md E2E-PREFLIGHT-011; api_option_inventory.md §backup.tag; env: Base-1). Assert tag carried.
+- [x] (P0) Implement E2E-PREFLIGHT-008 — One extra mount check (test_selection_matrix.md E2E-PREFLIGHT-008; api_option_inventory.md §apply.extra_mount_checks; env: Base-1). Assert note present.
+- [x] (P0) Implement E2E-PREFLIGHT-009 — Empty backup tag baseline (test_selection_matrix.md E2E-PREFLIGHT-009; api_option_inventory.md §backup.tag; env: Base-1). Assert ok.
+- [x] (P0) Implement E2E-PREFLIGHT-010 — Exec check disabled baseline (test_selection_matrix.md E2E-PREFLIGHT-010; api_option_inventory.md §rescue.exec_check; env: Base-1). Assert ok.
+- [x] (P0) Implement E2E-PREFLIGHT-011 — Coreutils tag baseline (test_selection_matrix.md E2E-PREFLIGHT-011; api_option_inventory.md §backup.tag; env: Base-1). Assert tag carried.
 
 ### apply()
 
-- [ ] (P0) Implement E2E-APPLY-001 — DryRun symlink ensure; assert `ApplyReport.errors=[]`, per-action facts TS_ZERO, after_kind="symlink" (test_selection_matrix.md E2E-APPLY-001; api_option_inventory.md §mode/locking/exdev/override_preflight; REQ-D2; env: Base-1).
-- [ ] (P1) Implement E2E-APPLY-002 — Commit happy path; assert executed matches plan, summary has no error_id (test_selection_matrix.md E2E-APPLY-002; api_option_inventory.md §locking Required; env: Base-1). Capture attestation if configured.
-- [ ] (P1) Implement E2E-APPLY-003 — Locking required, no manager → `E_LOCKING` with `exit_code=30`; no FS mutation (test_selection_matrix.md E2E-APPLY-003; api_option_inventory.md §locking/lock_manager/timeout; REQ-L1, REQ-L3; env: Base-1).
-- [ ] (P1) Implement E2E-APPLY-004 — Smoke required, runner absent → `E_SMOKE`, `rolled_back=false` (auto_rollback=false) (test_selection_matrix.md E2E-APPLY-004; api_option_inventory.md §smoke; REQ-H3; env: Base-1).
-- [ ] (P2) Implement E2E-APPLY-005 — EXDEV degraded fallback used; assert `degraded=true` (test_selection_matrix.md E2E-APPLY-005; api_option_inventory.md §exdev; REQ-F2; env: Base-3 with `SWITCHYARD_FORCE_EXDEV=1`).
+- [x] (P0) Implement E2E-APPLY-001 — DryRun symlink ensure; assert `ApplyReport.errors=[]`, per-action facts TS_ZERO, after_kind="symlink" (test_selection_matrix.md E2E-APPLY-001; api_option_inventory.md §mode/locking/exdev/override_preflight; REQ-D2; env: Base-1).
+- [x] (P1) Implement E2E-APPLY-002 — Commit happy path; assert executed matches plan, summary has no error_id (test_selection_matrix.md E2E-APPLY-002; api_option_inventory.md §locking Required; env: Base-1). Capture attestation if configured.
+- [x] (P1) Implement E2E-APPLY-003 — Locking required, no manager → `E_LOCKING` with `exit_code=30`; no FS mutation (test_selection_matrix.md E2E-APPLY-003; api_option_inventory.md §locking/lock_manager/timeout; REQ-L1, REQ-L3; env: Base-1).
+- [x] (P1) Implement E2E-APPLY-004 — Smoke required, runner absent → `E_SMOKE`, `rolled_back=false` (auto_rollback=false) (test_selection_matrix.md E2E-APPLY-004; api_option_inventory.md §smoke; REQ-H3; env: Base-1).
+- [x] (P2) Implement E2E-APPLY-005 — EXDEV degraded fallback used; assert `degraded=true` (test_selection_matrix.md E2E-APPLY-005; api_option_inventory.md §exdev; REQ-F2; env: Base-3 with `SWITCHYARD_FORCE_EXDEV=1`).
 - [ ] (P1) Implement E2E-APPLY-006 — Ownership strict gates apply via preflight (override_preflight=false) (test_selection_matrix.md E2E-APPLY-006; api_option_inventory.md §override_preflight; REQ-S4, REQ-C2; env: Base-1). Assert early failure.
-- [ ] (P2) Implement E2E-APPLY-007 — Attestation present on success; assert `attestation{sig_alg, signature, bundle_hash, public_key_id}` (test_selection_matrix.md E2E-APPLY-007; api_option_inventory.md §attestor; REQ-O4; env: Base-3).
-- [ ] (P1) Implement E2E-APPLY-008 — Best-effort restore tolerates missing backup; assert no `E_BACKUP_MISSING` (test_selection_matrix.md E2E-APPLY-008; api_option_inventory.md §best_effort_restore; env: Base-1).
-- [ ] (P1) Implement E2E-APPLY-009 — Capture restore snapshot enables inverse (test_selection_matrix.md E2E-APPLY-009; api_option_inventory.md §capture_restore_snapshot; env: Base-1). Verify `plan_rollback_of` later produces `RestoreFromBackup`.
+- [x] (P2) Implement E2E-APPLY-007 — Attestation present on success; assert `attestation{sig_alg, signature, bundle_hash, public_key_id}` (test_selection_matrix.md E2E-APPLY-007; api_option_inventory.md §attestor; REQ-O4; env: Base-3).
+- [x] (P1) Implement E2E-APPLY-008 — Best-effort restore tolerates missing backup; assert no `E_BACKUP_MISSING` (test_selection_matrix.md E2E-APPLY-008; api_option_inventory.md §best_effort_restore; env: Base-1).
+- [x] (P1) Implement E2E-APPLY-009 — Capture restore snapshot enables inverse (test_selection_matrix.md E2E-APPLY-009; api_option_inventory.md §capture_restore_snapshot; env: Base-1). Verify `plan_rollback_of` later produces `RestoreFromBackup`.
 - [ ] (P1) Implement E2E-APPLY-010 — Lock timeout high; assert wait_ms <= timeout (test_selection_matrix.md E2E-APPLY-010; api_option_inventory.md §lock_timeout_ms; REQ-L3, REQ-L5; env: Base-2 with rival-holder).
-- [ ] (P2) Implement E2E-APPLY-011 — Smoke runner present and fails → auto-rollback=true; assert `rolled_back=true`, `error_id=E_SMOKE` (test_selection_matrix.md E2E-APPLY-011; api_option_inventory.md §smoke_outcome; REQ-H2; env: Base-3).
+- [x] (P2) Implement E2E-APPLY-011 — Smoke runner present and fails → auto-rollback=true; assert `rolled_back=true`, `error_id=E_SMOKE` (test_selection_matrix.md E2E-APPLY-011; api_option_inventory.md §smoke_outcome; REQ-H2; env: Base-3).
 - [ ] (P2) Implement E2E-APPLY-012 — Smoke runner present and ok; assert `rolled_back=false` (test_selection_matrix.md E2E-APPLY-012; api_option_inventory.md §smoke; REQ-H1; env: Base-3).
 - [ ] (P1) Implement E2E-APPLY-013 — Attestation signing error tolerated; attestation omitted (test_selection_matrix.md E2E-APPLY-013; api_option_inventory.md §attestation_outcome; env: Base-2).
 - [ ] (P3) Implement E2E-APPLY-014 — ENOSPC during backup/restore path; assert failure with generic policy error; no partials (test_selection_matrix.md E2E-APPLY-014; env: Base-4 low-disk).
@@ -55,48 +55,42 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 - [ ] (P1) Implement E2E-APPLY-016 — Restore without capture snapshot (test_selection_matrix.md E2E-APPLY-016; api_option_inventory.md §capture_restore_snapshot=false; env: Base-1). Verify rollback plan behavior.
 - [ ] (P1) Implement E2E-APPLY-017 — Ownership strict with oracle present; assert provenance present (test_selection_matrix.md E2E-APPLY-017; api_option_inventory.md §ownership_oracle; REQ-S4, REQ-O7; env: Base-2).
 - [ ] (P1) Implement E2E-APPLY-018 — DryRun ignores smoke; success, no E_SMOKE (test_selection_matrix.md E2E-APPLY-018; api_option_inventory.md §mode=DryRun, smoke=Require; REQ-H3 bound to Commit only; env: Base-1).
-- [ ] (P2) Implement E2E-APPLY-019 — EXDEV with Fail policy → `E_EXDEV` (test_selection_matrix.md E2E-APPLY-019; api_option_inventory.md §exdev=Fail; REQ-F2; env: Base-3 `SWITCHYARD_FORCE_EXDEV=1`).
+- [x] (P2) Implement E2E-APPLY-019 — EXDEV with Fail policy → `E_EXDEV` (test_selection_matrix.md E2E-APPLY-019; api_option_inventory.md §exdev=Fail; REQ-F2; env: Base-3 `SWITCHYARD_FORCE_EXDEV=1`).
 - [ ] (P2) Implement E2E-APPLY-020 — Sidecar integrity disabled tolerates tamper (test_selection_matrix.md E2E-APPLY-020; api_option_inventory.md §durability.sidecar_integrity=false; REQ-S6; env: Base-3).
-- [ ] (P0) Implement E2E-APPLY-021 — Backup durability flag off → facts `backup_durable=false` (test_selection_matrix.md E2E-APPLY-021; api_option_inventory.md §durability.backup_durability=false; env: Base-1).
+- [x] (P0) Implement E2E-APPLY-021 — Backup durability flag off → facts `backup_durable=false` (test_selection_matrix.md E2E-APPLY-021; api_option_inventory.md §durability.backup_durability=false; env: Base-1).
 - [ ] (P3) Implement E2E-APPLY-022 — Crash between backup and rename; on rerun system converges; no tmp artifacts remain (test_selection_matrix.md E2E-APPLY-022; oracles_and_invariants.md §apply invariants; REQ-A1, REQ-A3; env: Base-4 crash-injection).
 
 ### plan_rollback_of()
 
-- [ ] (P0) Implement E2E-ROLLBACK-001 — Invert only symlink actions (test_selection_matrix.md E2E-ROLLBACK-001; api_option_inventory.md §plan_rollback_of; env: Base-1). Assert inverse plan content.
-- [ ] (P1) Implement E2E-ROLLBACK-002 — Invert previous restore when snapshot captured (test_selection_matrix.md E2E-ROLLBACK-002; env: Base-1). Assert `RestoreFromBackup` present.
+- [x] (P0) Implement E2E-ROLLBACK-001 — Invert only symlink actions (test_selection_matrix.md E2E-ROLLBACK-001; api_option_inventory.md §plan_rollback_of; env: Base-1). Assert inverse plan content.
+- [x] (P1) Implement E2E-ROLLBACK-002 — Invert previous restore when snapshot captured (test_selection_matrix.md E2E-ROLLBACK-002; env: Base-1). Assert `RestoreFromBackup` present.
 - [ ] (P1) Implement E2E-ROLLBACK-003 — Mixed executed actions inversion (test_selection_matrix.md E2E-ROLLBACK-003; env: Base-1). Assert mixed inversions.
 
 ### prune_backups()
 
 - [ ] (P1) Implement E2E-PRUNE-001 — Count limit min=0; newest retained (test_selection_matrix.md E2E-PRUNE-001; api_option_inventory.md §retention_count_limit; REQ-PN1; env: Base-1). Assert counts match.
-- [ ] (P1) Implement E2E-PRUNE-002 — Age limit nominal=1d (test_selection_matrix.md E2E-PRUNE-002; api_option_inventory.md §retention_age_limit; env: Base-1 with seeded timestamps). Assert older pruned, newest kept.
-- [ ] (P0) Implement E2E-PRUNE-003 — Long tag strings behavior (test_selection_matrix.md E2E-PRUNE-003; api_option_inventory.md §backup.tag; env: Base-1). Assert correct scoping by tag.
-- [ ] (P0) Implement E2E-PRUNE-004 — coreutils tag scope (test_selection_matrix.md E2E-PRUNE-004; env: Base-1). Assert only coreutils-tag entries considered.
-- [ ] (P0) Implement E2E-PRUNE-005 — No retention (none/none) (test_selection_matrix.md E2E-PRUNE-005; env: Base-1). Assert no deletions.
-- [ ] (P1) Implement E2E-PRUNE-006 — Retain one newest (test_selection_matrix.md E2E-PRUNE-006; env: Base-1). Assert exactly one retained.
-- [ ] (P1) Implement E2E-PRUNE-007 — Retain five newest (test_selection_matrix.md E2E-PRUNE-007; env: Base-1). Assert exactly five retained.
-- [ ] (P1) Implement E2E-PRUNE-008 — Count min=0 with no age limit (test_selection_matrix.md E2E-PRUNE-008; env: Base-1). Assert newest kept.
+{{ ... }}
 - [ ] (P1) Implement E2E-PRUNE-009 — Age limit max=365d (test_selection_matrix.md E2E-PRUNE-009; env: Base-1 seeded). Assert pruning >365d.
 - [ ] (P1) Implement E2E-PRUNE-010 — Age limit min=1s (test_selection_matrix.md E2E-PRUNE-010; env: Base-1 seeded). Assert pruning >1s.
 
 ### SafePath::from_rooted()
 
-- [ ] (P0) Implement E2E-SAFEPATH-001 — Reject dotdot (invalid) (test_selection_matrix.md E2E-SAFEPATH-001; api_option_inventory.md §SafePath.candidate_form; REQ-S1; env: Base-1).
-- [ ] (P0) Implement E2E-SAFEPATH-002 — Accept absolute inside root (test_selection_matrix.md E2E-SAFEPATH-002; REQ-API1; env: Base-1).
-- [ ] (P0) Implement E2E-SAFEPATH-003 — Reject absolute outside root (test_selection_matrix.md E2E-SAFEPATH-003; REQ-S1; env: Base-1).
-- [ ] (P0) Implement E2E-SAFEPATH-004 — Relative normal (test_selection_matrix.md E2E-SAFEPATH-004; env: Base-1). Assert Ok.
-- [ ] (P0) Implement E2E-SAFEPATH-005 — Curdir normalization (test_selection_matrix.md E2E-SAFEPATH-005; env: Base-1). Assert `.` components removed.
-- [ ] (P0) Implement E2E-SAFEPATH-006 — Root not absolute (invalid) (test_selection_matrix.md E2E-SAFEPATH-006; env: Base-1). Assert panic or error.
+- [x] (P0) Implement E2E-SAFEPATH-001 — Reject dotdot (invalid) (test_selection_matrix.md E2E-SAFEPATH-001; api_option_inventory.md §SafePath.candidate_form; REQ-S1; env: Base-1).
+- [x] (P0) Implement E2E-SAFEPATH-002 — Accept absolute inside root (test_selection_matrix.md E2E-SAFEPATH-002; REQ-API1; env: Base-1).
+- [x] (P0) Implement E2E-SAFEPATH-003 — Reject absolute outside root (test_selection_matrix.md E2E-SAFEPATH-003; REQ-S1; env: Base-1).
+- [x] (P0) Implement E2E-SAFEPATH-004 — Relative normal (test_selection_matrix.md E2E-SAFEPATH-004; env: Base-1). Assert Ok.
+- [x] (P0) Implement E2E-SAFEPATH-005 — Curdir normalization (test_selection_matrix.md E2E-SAFEPATH-005; env: Base-1). Assert `.` components removed.
+- [x] (P0) Implement E2E-SAFEPATH-006 — Root not absolute (invalid) (test_selection_matrix.md E2E-SAFEPATH-006; env: Base-1). Assert panic or error.
 - [ ] (P0) Implement E2E-SAFEPATH-007 — Unsupported component invalid (test_selection_matrix.md E2E-SAFEPATH-007; env: Base-1). Assert error.
-- [ ] (P0) Implement E2E-SAFEPATH-008 — Empty candidate (test_selection_matrix.md E2E-SAFEPATH-008; env: Base-1). Assert Ok within root.
-- [ ] (P0) Implement E2E-SAFEPATH-009 — Unicode segments (test_selection_matrix.md E2E-SAFEPATH-009; env: Base-1). Assert Ok.
-- [ ] (P0) Implement E2E-SAFEPATH-010 — Short path (3 segs) (test_selection_matrix.md E2E-SAFEPATH-010; env: Base-1). Assert Ok.
+- [x] (P0) Implement E2E-SAFEPATH-008 — Empty candidate (test_selection_matrix.md E2E-SAFEPATH-008; env: Base-1). Assert Ok within root.
+- [x] (P0) Implement E2E-SAFEPATH-009 — Unicode segments (test_selection_matrix.md E2E-SAFEPATH-009; env: Base-1). Assert Ok.
+- [x] (P0) Implement E2E-SAFEPATH-010 — Short path (3 segs) (test_selection_matrix.md E2E-SAFEPATH-010; env: Base-1). Assert Ok.
 - [ ] (P2) Implement E2E-SAFEPATH-011 — Long path (255 bytes) (test_selection_matrix.md E2E-SAFEPATH-011; env: Base-3). Assert Ok.
 - [ ] (P3) Implement E2E-SAFEPATH-012 — Huge path (4096 bytes) (test_selection_matrix.md E2E-SAFEPATH-012; env: Base-4). Assert Ok or documented error.
 
 ---
 
-## Combinatorial Test Infrastructure (from combinatorial_model.json)
+{{ ... }}
 
 - [ ] (P0) Implement pairwise combination generator for all functions using `TESTPLAN/combinatorial_model.json`; export scenario manifests with seeds (pairwise=4242) and map to E2E IDs (combinatorial_model.json; test_selection_matrix.md; e2e_overview.md Determinism).
 - [ ] (P2) Implement 3-wise generator for High-risk axes and merge with curated additions (seed=314159) (combinatorial_model.json; selection strategy).

@@ -102,7 +102,6 @@ fn preflight_succeeds_when_rescue_required_and_available() {
 }
 
 fn env_guard() -> impl Drop {
-    struct G(Option<std::ffi::OsString>);
     let prev = std::env::var_os("PATH");
     struct D(Option<std::ffi::OsString>);
     impl Drop for D {

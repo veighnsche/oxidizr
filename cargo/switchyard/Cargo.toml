@@ -40,3 +40,9 @@ trybuild = "1"
 async-trait = "0.1"
 cucumber = { version = "0.20", features = ["macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[[test]]
+name = "bdd"
+path = "tests/bdd.rs"
+harness = false
+required-features = ["bdd"]
