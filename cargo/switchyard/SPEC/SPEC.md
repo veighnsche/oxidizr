@@ -11,13 +11,13 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 
 - Atomic, crash-safe swaps with no user-visible broken/missing path.
 - Complete, idempotent rollback; automatic reverse-order rollback on any apply failure; partial restoration state reported if rollback fails.
-- SafePath everywhere for mutations; TOCTOU-safe sequence (open parent O_DIRECTORY|O_NOFOLLOW → openat → renameat → fsync(parent)).
-- Deterministic plans and outputs: UUIDv5 IDs over normalized inputs; dry-run facts byte-identical after timestamp redactions.
+- SafePath everywhere for mutations; TOCTOU-safe sequence.
+- Deterministic plans and outputs: UUIDv5 IDs over normalized inputs; dry-run facts byte-identical after timestamp redactions (see §5 Audit Facts).
 - Locking required in production with bounded wait → E_LOCKING; facts include lock_wait_ms.
 - Lock fairness telemetry: apply.attempt facts include lock_attempts (approximate retry count inferred from lock_wait_ms and poll interval).
 - Rescue profile always available; at least one fallback toolset (GNU/BusyBox) present on PATH.
-- Auditable, tamper-evident facts (schema v2): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance. Envelope includes `event_id`, `run_id`, `switchyard_version`, `redaction`, and `seq`.
-- Apply summary includes a perf object aggregating timing signals (hash_ms, backup_ms, swap_ms) for observability.
+- Auditable, tamper-evident facts (schema v2): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance.
+- Apply summary includes a perf object aggregating timing signals (hash_ms, backup_ms, swap_ms) for observability (see §5 Audit Facts).
 - Backup durability is enforced: backup payloads and sidecars are synced to disk, and the parent directory is fsynced after artifact creation/rename to survive crashes.
 - Conservative by default: dry-run mode; fail-closed on critical compatibility differences unless policy overrides.
 - Health verification required: minimal smoke suite runs post-apply; failure triggers auto-rollback (unless explicitly disabled).
@@ -28,7 +28,7 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 ### 2.1 Atomicity
 
 - REQ-A1: A swap **MUST** be atomic with respect to crashes.
-- REQ-A2: At no time **MUST** a user-visible broken or missing path exist.
+- REQ-A2: A user-visible broken or missing path **MUST NOT** exist at any time.
 - REQ-A3: All-or-nothing per plan: either all actions succeed, or no visible changes remain.
 
 ### 2.2 Rollback
@@ -42,10 +42,10 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 ### 2.3 Safety Preconditions
 
 - REQ-S1: Paths **MUST NOT** contain `..` or escape allowed roots.
-- REQ-S2: Operations **MUST** fail if target FS is read-only, `noexec`, or immutable.
+- REQ-S2: Operations **MUST** fail if the target filesystem is read-only, `noexec`, or immutable.
 - REQ-S3: Source files **MUST** be root-owned and not world-writable, unless policy override.
 - REQ-S4: If `strict_ownership=true`, targets **MUST** be package-owned (via adapter).
-- REQ-S5: Preservation gating: FS capabilities for ownership, mode, timestamps, xattrs/ACLs/caps **MUST** be probed during preflight; if required by policy but unsupported, preflight **MUST** STOP (fail-closed) unless explicitly overridden.
+- REQ-S5: Preservation gating: filesystem capabilities for ownership, mode, timestamps, xattrs/ACLs/caps **MUST** be probed during preflight; if required by policy but unsupported, preflight **MUST** STOP (fail-closed) unless explicitly overridden.
 - REQ-S6: Backup sidecars SHOULD record a payload_hash when a backup payload exists (sidecar v2). On restore, if policy requires sidecar integrity and a payload_hash is present, the engine MUST verify the backup payload hash and fail restore on mismatch.
 
 
@@ -78,7 +78,7 @@ Policy guidance: Deployments MAY set a `require_rescue` policy knob. When `requi
 
 ### 2.7 Determinism
 
-- REQ-D1: `plan_id` and `action_id` are UUIDv5 values derived from the normalized plan input using a project-defined, stable namespace.
+- REQ-D1: `plan_id` and `action_id` are UUIDv5 values derived from the normalized plan input using a project-defined, stable namespace (see `src/constants.rs::NS_TAG`).
 - REQ-D2: Dry-run redactions are pinned: timestamps are zeroed (or expressed as monotonic deltas). Dry-run facts **MUST** be byte-identical to real-run facts after redaction.
 
 ### 2.8 Conservatism & Modes
