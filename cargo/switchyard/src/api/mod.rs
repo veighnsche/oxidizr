@@ -16,7 +16,7 @@
 use crate::adapters::{Attestor, LockManager, OwnershipOracle, SmokeTestRunner};
 use crate::logging::{AuditSink, FactsEmitter, StageLogger};
 use serde_json::json;
-use uuid::Uuid;
+use crate::logging::audit::new_run_id;
 use crate::policy::Policy;
 use crate::types::{ApplyMode, ApplyReport, Plan, PlanInput, PreflightReport};
 
@@ -129,10 +129,12 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             target.as_path().display(),
             self.policy.backup.tag
         );
-        let pid = Uuid::new_v5(&Uuid::NAMESPACE_URL, plan_like.as_bytes());
+        let pid = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, plan_like.as_bytes());
+        let run_id = new_run_id();
         let tctx = crate::logging::audit::AuditCtx::new(
             &self.facts as &dyn FactsEmitter,
             pid.to_string(),
+            run_id,
             crate::logging::redact::now_iso(),
             crate::logging::audit::AuditMode {
                 dry_run: false,

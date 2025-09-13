@@ -10,6 +10,7 @@
 use std::time::Instant;
 
 use serde_json::json;
+use crate::logging::audit::new_run_id;
 
 use crate::logging::ts_for_mode;
 use crate::logging::{AuditSink, FactsEmitter};
@@ -46,9 +47,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     let ts_now = ts_for_mode(&mode);
 
     // Audit context
+    let run_id = new_run_id();
     let tctx = AuditCtx::new(
         &api.facts as &dyn FactsEmitter,
         pid.to_string(),
+        run_id,
         ts_now.clone(),
         AuditMode {
             dry_run: dry,

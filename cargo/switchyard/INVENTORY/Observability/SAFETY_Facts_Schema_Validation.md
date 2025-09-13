@@ -15,7 +15,7 @@ Pros & Cons
 
 | Pros | Proof (code/tests) |
 | --- | --- |
-| Prevents schema drift and breaking analytics | `SPEC/audit_event.schema.json` exists; planned CI validation |
+| Prevents schema drift and breaking analytics | `SPEC/audit_event.v2.schema.json` exists; planned CI validation |
 | Enables stable goldens | Deterministic envelope maps cleanly to schema |
 
 | Cons | Notes |
@@ -25,14 +25,14 @@ Pros & Cons
 
 ## Behaviors
 
-- Loads `SPEC/audit_event.schema.json` and validates emitted JSONL facts against it (planned).
+- Loads `SPEC/audit_event.v2.schema.json` and validates emitted JSONL facts against it (planned).
 - Fails tests/CI on schema mismatches to prevent drift (planned).
 - Anchors facts to a schema version field for forward migration.
 
 ## Implementation
 
-- Schema: `cargo/switchyard/SPEC/audit_event.schema.json` defines the Minimal Facts v1 envelope and fields.
-- Current state: schema exists; no automated validation wired into tests yet.
+- Schema: `cargo/switchyard/SPEC/audit_event.v2.schema.json` defines the v2 envelope, stage constraints, and fields.
+- Current state: schema exists; validation tests are being added.
 
 ## Wiring Assessment
 
@@ -74,7 +74,7 @@ Observability Map
 
 | Fact | Fields (subset) | Schema |
 | --- | --- | --- |
-| All stage events | Envelope fields per Minimal Facts v1 | `SPEC/audit_event.schema.json` |
+| All stage events | Envelope fields per Audit v2 | `SPEC/audit_event.v2.schema.json` |
 
 Test Coverage Map
 
@@ -116,4 +116,4 @@ Test Coverage Map
 
 ## Related
 
-- SPEC/audit_event.schema.json; PLAN/40-facts-logging.md.
+- SPEC/audit_event.v2.schema.json; PLAN/40-facts-logging.md.

@@ -74,12 +74,20 @@
     "uuid": { "type": "string", "format": "uuid" },
     "hex": { "type": "string", "pattern": "^[a-f0-9]+$" },
     "b64": { "type": "string", "contentEncoding": "base64" },
-    "stage_plan": { "$ref": "./defs/stages/plan.schema.json" },
-    "stage_preflight": { "$ref": "./defs/stages/preflight.schema.json" },
-    "stage_preflight_summary": { "$ref": "./defs/stages/preflight.summary.schema.json" },
-    "stage_apply_attempt": { "$ref": "./defs/stages/apply.attempt.schema.json" },
-    "stage_apply_result": { "$ref": "./defs/stages/apply.result.schema.json" },
-    "stage_prune_result": { "$ref": "./defs/stages/prune.result.schema.json" },
+    "stage_plan": { "if": { "properties": { "stage": { "const": "plan" } } }, "then": { "required": ["path"] } },
+    "stage_preflight": { "if": { "properties": { "stage": { "const": "preflight" } } }, "then": { "required": ["path", "current_kind", "planned_kind"] } },
+    "stage_preflight_summary": { "if": { "properties": { "stage": { "const": "preflight.summary" } } }, "then": { } },
+    "stage_apply_attempt": {
+      "if": {
+        "allOf": [
+          { "properties": { "stage": { "const": "apply.attempt" } } },
+          { "not": { "required": ["action_id"] } }
+        ]
+      },
+      "then": { "required": ["lock_backend", "lock_attempts"] }
+    },
+    "stage_apply_result": { "if": { "properties": { "stage": { "const": "apply.result" } } }, "then": { } },
+    "stage_prune_result": { "if": { "properties": { "stage": { "const": "prune.result" } } }, "then": { "required": ["path", "pruned_count", "retained_count"] } },
     "stage": {
       "title": "Stage",
       "description": "Event stage identifier (including summary variants).",
@@ -188,7 +196,22 @@
         "signature_format": { "type": "string" }
       }
     },
-    "provenance": { "$ref": "./defs/provenance.schema.json" },
+    "provenance": {
+      "title": "Provenance",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "origin": { "enum": ["repo", "aur", "manual"] },
+        "helper": { "type": "string" },
+        "uid": { "type": "integer" },
+        "gid": { "type": "integer" },
+        "pkg": { "type": "string" },
+        "pkg_version": { "type": "string" },
+        "pkg_arch": { "type": "string" },
+        "sig_verified": { "type": ["boolean", "null"] },
+        "env_sanitized": { "type": "boolean" }
+      }
+    },
     "preservation": {
       "type": "object",
       "additionalProperties": true,
@@ -203,7 +226,30 @@
         "caps": { "type": "boolean" }
       }
     },
-    "perf": { "$ref": "./defs/perf.schema.json" },
-    "error": { "$ref": "./defs/error.schema.json" }
+    "perf": {
+      "title": "Performance",
+      "description": "Timing and IO counters for the action and stage.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hash_ms": { "type": "integer" },
+        "backup_ms": { "type": "integer" },
+        "swap_ms": { "type": "integer" },
+        "io_bytes_read": { "type": "integer" },
+        "io_bytes_written": { "type": "integer" },
+        "timers": { "type": "object", "additionalProperties": { "type": "integer" } }
+      }
+    },
+    "error": {
+      "title": "Error details",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "enum": ["io","policy","locking","integrity","smoke","unknown"] },
+        "errno": { "type": ["integer", "null"] },
+        "message": { "type": "string" },
+        "remediation": { "type": "string" }
+      }
+    }
   }
 }

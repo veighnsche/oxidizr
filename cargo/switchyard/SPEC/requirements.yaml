@@ -80,7 +80,7 @@ requirements:
     text: "If rollback itself fails, facts MUST capture partial restoration state and guidance for operator recovery."
     tags: [rollback, audit]
     verify:
-      schema: ["/SPEC/audit_event.schema.json"]
+      schema: ["/SPEC/audit_event.v2.schema.json"]
 
   - id: REQ-S1
     title: Safe paths only
@@ -124,7 +124,7 @@ requirements:
     text: "Every step MUST emit a structured fact (JSON)."
     tags: [audit, observability]
     verify:
-      schema: ["/SPEC/audit_event.schema.json"]
+      schema: ["/SPEC/audit_event.v2.schema.json"]
 
   - id: REQ-O2
     title: Dry-run facts identical to real-run
@@ -140,7 +140,7 @@ requirements:
     text: "Facts schema MUST be versioned and stable."
     tags: [audit, schema]
     verify:
-      schema: ["/SPEC/audit_event.schema.json"]
+      schema: ["/SPEC/audit_event.v2.schema.json"]
 
   - id: REQ-O4
     title: Signed attestations per apply bundle
@@ -335,7 +335,7 @@ requirements:
     title: Facts carry schema_version
     section: "13. Schema Versioning & Migration"
     level: MUST
-    text: "Facts include schema_version (current=v1). Schema changes bump this field."
+    text: "Facts include schema_version (current=v2). Schema changes bump this field."
     tags: [audit, schema]
 
 # Verification mapping conventions

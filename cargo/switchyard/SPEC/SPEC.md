@@ -16,7 +16,7 @@ It is **OS-agnostic**: it only manipulates filesystem paths and relies on adapte
 - Locking required in production with bounded wait → E_LOCKING; facts include lock_wait_ms.
 - Lock fairness telemetry: apply.attempt facts include lock_attempts (approximate retry count inferred from lock_wait_ms and poll interval).
 - Rescue profile always available; at least one fallback toolset (GNU/BusyBox) present on PATH.
-- Auditable, tamper-evident facts (schema v1): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance.
+- Auditable, tamper-evident facts (schema v2): SHA-256 before/after hashes; signed attestation bundles; secret masking; complete provenance. Envelope includes `event_id`, `run_id`, `switchyard_version`, `redaction`, and `seq`.
 - Apply summary includes a perf object aggregating timing signals (hash_ms, backup_ms, swap_ms) for observability.
 - Conservative by default: dry-run mode; fail-closed on critical compatibility differences unless policy overrides.
 - Health verification required: minimal smoke suite runs post-apply; failure triggers auto-rollback (unless explicitly disabled).
@@ -173,85 +173,31 @@ items:
     preservation_supported: { type: bool }
 ```
 
-Dry-run output must match real-run preflight rows byte-for-byte.
+ Dry-run output must match real-run preflight rows byte-for-byte.
 
 ---
 
-## 5. Audit Facts (JSON Schema v1)
+## 5. Audit Facts (JSON Schema v2)
 
-**JSON Schema (`/SPEC/audit_event.schema.json`):**
+The normative JSON Schema for audit facts is version 2 and lives at `/SPEC/audit_event.v2.schema.json`.
 
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "SwitchyardAuditEvent",
-  "type": "object",
-  "required": ["ts","plan_id","stage","decision","path"],
-  "properties": {
-    "ts": {"type":"string","format":"date-time"},
-    "plan_id": {"type":"string"},
-    "schema_version": {"type":"integer","enum":[1]},
-    "action_id": {"type":"string"},
-    "stage": {"enum":["plan","preflight","apply.attempt","apply.result","rollback","rollback.summary","prune.result"]},
-    "decision": {"enum":["success","failure","warn"]},
-    "severity": {"enum":["info","warn","error"]},
-    "degraded": {"type":["boolean","null"]},
-    "path": {"type":"string"},
-    "current_kind": {"type":"string"},
-    "planned_kind": {"type":"string"},
-    "hash_alg": {"type":"string","enum":["sha256"]},
-    "before_hash": {"type":"string"},
-    "after_hash": {"type":"string"},
-    "attestation": {
-      "type":"object",
-      "properties": {
-        "sig_alg": {"type":"string","enum":["ed25519"]},
-        "signature": {"type":"string"},
-        "bundle_hash": {"type":"string"},
-        "public_key_id": {"type":"string"}
-      }
-    },
-    "provenance": {
-      "type":"object",
-      "properties": {
-        "origin": {"enum":["repo","aur","manual"]},
-        "helper": {"type":"string"},
-        "uid": {"type":"integer"},
-        "gid": {"type":"integer"},
-        "pkg": {"type":"string"},
-        "env_sanitized": {"type":"boolean"}
-      }
-    },
-    "preservation": {
-      "type":"object",
-      "properties": {
-        "owner": {"type":"boolean"},
-        "mode": {"type":"boolean"},
-        "timestamps": {"type":"boolean"},
-        "xattrs": {"type":"boolean"},
-        "acls": {"type":"boolean"},
-        "caps": {"type":"boolean"}
-      }
-    },
-    "preservation_supported": {"type":["boolean","null"]},
-    "exit_code": {"type":["integer","null"]},
-    "duration_ms": {"type":["integer","null"]},
-    "lock_wait_ms": {"type":["integer","null"]},
-    "lock_attempts": {"type":["integer","null"]},
-    "error_id": {"type": ["string", "null"]},
-    "error_detail": {"type": ["string", "null"]},
-    "summary_error_ids": {"type": ["array", "null"], "items": {"type": "string"}},
-    "perf": {
-      "type":"object",
-      "properties": {
-        "hash_ms": {"type":["integer","null"]},
-        "backup_ms": {"type":["integer","null"]},
-        "swap_ms": {"type":["integer","null"]}
-      }
-    }
-  }
-}
-```
+Envelope (always present; best‑effort for optional fields):
+
+- `schema_version=2`, `ts`, `plan_id`, optional `action_id` for per‑action events
+- `event_id`, `run_id`, `switchyard_version`, `redaction`, `seq`, `dry_run`
+- Optional host/process/actor/build metadata objects when available
+
+Stages and required fields:
+
+- `plan` — per‑action events include `path`
+- `preflight` — per‑action events include `path`, `current_kind`, `planned_kind`
+- `preflight.summary` — stage aggregate; no per‑action required fields
+- `apply.attempt` — includes locking fields (`lock_backend`, `lock_attempts`, `lock_wait_ms` when known); may omit `path`
+- `apply.result` — per‑action results; include before/after hashes (`hash_alg=sha256`, `before_hash`, `after_hash`) when mutated
+- `rollback`, `rollback.summary` — restore and summary semantics unchanged; summaries may include `summary_error_ids`
+- `prune.result` — requires `path`, `pruned_count`, `retained_count`
+
+Selected optional fields (when measured/available): `degraded`, `degraded_reason`, `perf{hash_ms,backup_ms,swap_ms,io_bytes_*}`, `provenance`, `preservation{...}`, `backup_durable`, `sidecar_integrity_verified`, `error{kind,errno,message,remediation}`.
 
 ---
 
@@ -369,9 +315,9 @@ Golden JSON fixtures MUST exist for plan, preflight, apply, and rollback facts. 
 
 ## 13. Schema Versioning & Migration
 
-- Facts include `schema_version` (current=v1). Schema changes bump this field.
-- v1→v2 requires a dual-emit period and corresponding fixture updates.
-- Secret-masking rules are explicit and tested: any potentially sensitive strings in facts (e.g., environment-derived values, external command args) MUST be redacted according to policy before emission; tests assert no secrets leak.
+- Facts include `schema_version` (current=v2). Schema changes bump this field and require fixture/test updates.
+- Pre‑1.0 policy: no dual‑emit toggles; v2 is the only supported schema going forward. Legacy v1 is deprecated.
+- Secret‑masking rules are explicit and tested: any potentially sensitive strings in facts (e.g., environment‑derived values, external command args) MUST be redacted according to policy before emission; tests assert no secrets leak.
 
 ## 14. Thread-safety
 
@@ -384,7 +330,7 @@ Core types (e.g., `Plan`, apply engine) are `Send + Sync`. `apply()` MAY be call
 - Deterministic plan/action IDs (UUIDv5); dry-run facts byte-identical after timestamp redactions.
 - Production locking required; bounded wait with timeout → E_LOCKING; facts include lock_wait_ms.
 - Rescue profile with at least one fallback toolset on PATH; preflight verifies availability.
-- Audit facts schema v1 with SHA-256 before/after hashes; signed attestation bundles; strict secret masking; complete provenance.
+- Audit facts schema v2 with SHA-256 before/after hashes; signed attestation bundles; strict secret masking; complete provenance.
 - Preflight Diff schema with stable ordering and keys.
 - Cross-filesystem EXDEV fallback with degraded-mode policy and telemetry.
 - Minimal smoke suite with exact args; failure → auto-rollback unless explicitly disabled.

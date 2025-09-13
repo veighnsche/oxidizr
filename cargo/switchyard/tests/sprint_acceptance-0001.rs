@@ -199,7 +199,7 @@ fn golden_two_action_plan_preflight_apply() {
     let schema_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.v2.schema.json");
     let schema_text =
-        std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.schema.json");
+        std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.v2.schema.json");
     let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
     let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
     let redacted: Vec<Value> = facts
@@ -345,7 +345,7 @@ fn golden_determinism_dryrun_equals_commit() {
     let schema_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.v2.schema.json");
     let schema_text =
-        std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.schema.json");
+        std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.v2.schema.json");
     let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
     let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
 
@@ -593,11 +593,11 @@ fn golden_minimal_plan_preflight_apply() {
     let _ = api.preflight(&plan).unwrap();
     let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
 
-    // Load and compile JSON Schema
+    // Load and compile JSON Schema (v2)
     let schema_path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.schema.json");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("SPEC/audit_event.v2.schema.json");
     let schema_text =
-        std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.schema.json");
+        std::fs::read_to_string(&schema_path).expect("load SPEC/audit_event.v2.schema.json");
     let schema_json: Value = serde_json::from_str(&schema_text).expect("parse schema json");
     let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
 

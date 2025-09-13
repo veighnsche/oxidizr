@@ -12,7 +12,7 @@ pub const DEFAULT_BACKUP_TAG: &str = "switchyard";
 pub const TMP_SUFFIX: &str = ".switchyard.tmp";
 
 /// Threshold in milliseconds above which an fsync duration is annotated with a WARN severity
-/// in Minimal Facts v1. See `api/apply.rs`.
+/// in Audit v2. See `api/apply.rs`.
 pub const FSYNC_WARN_MS: u64 = 50;
 
 /// Poll interval in milliseconds for the file-backed lock manager (see `adapters/lock_file.rs`).

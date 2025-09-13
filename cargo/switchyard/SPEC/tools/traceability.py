@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # SPEC/
 FEATURES_DIR = os.path.join(ROOT, 'features')
 REQS_PATH = os.path.join(ROOT, 'requirements.yaml')
 STEPS_CONTRACT_PATH = os.path.join(FEATURES_DIR, 'steps-contract.yaml')
-AUDIT_SCHEMA_PATH = os.path.join(ROOT, 'audit_event.schema.json')
+AUDIT_SCHEMA_PATH = os.path.join(ROOT, 'audit_event.v2.schema.json')
 PREFLIGHT_SCHEMA_PATH = os.path.join(ROOT, 'preflight.yaml')
 REPORT_PATH = os.path.join(ROOT, 'traceability.md')
 

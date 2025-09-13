@@ -4,7 +4,7 @@ use crate::logging::FactsEmitter;
 use crate::types::ids::{action_id, plan_id};
 use crate::types::{Action, Plan, PlanInput};
 
-use crate::logging::audit::{AuditCtx, AuditMode};
+use crate::logging::audit::{AuditCtx, AuditMode, new_run_id};
 use crate::logging::StageLogger;
 
 /// Build a deterministic plan from input and emit per-action plan facts.
@@ -47,9 +47,11 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     // Emit per-action plan facts using the logging facade
     let pid_uuid = plan_id(&plan);
     let pid = pid_uuid.to_string();
+    let run_id = new_run_id();
     let tctx = AuditCtx::new(
         &api.facts as &dyn FactsEmitter,
         pid.clone(),
+        run_id,
         crate::logging::TS_ZERO.to_string(),
         AuditMode {
             dry_run: true,

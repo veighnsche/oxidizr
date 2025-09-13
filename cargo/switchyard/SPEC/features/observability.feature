@@ -5,11 +5,11 @@ Feature: Observability, audit, and determinism
   So that I can trust and validate system behavior over time
 
   @REQ-O1 @REQ-O3 @REQ-VERS1
-  Scenario: Every step emits a structured fact conforming to schema v1
+  Scenario: Every step emits a structured fact conforming to schema v2
     Given a plan with at least one action
     When I run in real mode
-    Then every stage emits a JSON fact that validates against /SPEC/audit_event.schema.json
-    And each fact carries schema_version=1
+    Then every stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json
+    And each fact carries schema_version=2
 
   @REQ-O2 @REQ-D2
   Scenario: Dry-run facts are byte-identical to real-run facts after redaction

@@ -9,6 +9,10 @@
 //
 // See `SPEC/SPEC.md` for field semantics and Minimal Facts v1 schema.
 use crate::logging::{redact_event, FactsEmitter};
+use std::cell::Cell;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 use serde_json::{json, Value};
 
 pub(crate) const SCHEMA_VERSION: i64 = 2;
@@ -22,22 +26,27 @@ pub(crate) struct AuditMode {
 pub(crate) struct AuditCtx<'a> {
     pub facts: &'a dyn FactsEmitter,
     pub plan_id: String,
+    pub run_id: String,
     pub ts: String,
     pub mode: AuditMode,
+    pub seq: Cell<u64>,
 }
 
 impl<'a> AuditCtx<'a> {
     pub(crate) fn new(
         facts: &'a dyn FactsEmitter,
         plan_id: String,
+        run_id: String,
         ts: String,
         mode: AuditMode,
     ) -> Self {
         Self {
             facts,
             plan_id,
+            run_id,
             ts,
             mode,
+            seq: Cell::new(0),
         }
     }
 }
@@ -170,6 +179,54 @@ fn redact_and_emit(
         obj.entry("schema_version").or_insert(json!(SCHEMA_VERSION));
         obj.entry("ts").or_insert(json!(ctx.ts));
         obj.entry("plan_id").or_insert(json!(ctx.plan_id));
+        obj.entry("run_id").or_insert(json!(ctx.run_id));
+        obj.entry("event_id").or_insert(json!(new_event_id()));
+        obj.entry("switchyard_version").or_insert(json!(env!("CARGO_PKG_VERSION")));
+        // Redaction metadata (lightweight)
+        obj.entry("redacted").or_insert(json!(ctx.mode.redact));
+        obj.entry("redaction").or_insert(json!({"applied": ctx.mode.redact}));
+        
+        // Optional envmeta (host/process/actor/build)
+        #[cfg(feature = "envmeta")]
+        {
+            use serde_json::map::Entry;
+            // host
+            if let Entry::Vacant(e) = obj.entry("host".to_string()) {
+                let hostname = std::env::var("HOSTNAME").ok();
+                let os = Some(std::env::consts::OS.to_string());
+                let arch = Some(std::env::consts::ARCH.to_string());
+                // Kernel best-effort: read from /proc/version if present
+                let kernel = std::fs::read_to_string("/proc/version").ok().and_then(|s| s.split_whitespace().nth(2).map(|x| x.to_string()));
+                e.insert(json!({
+                    "hostname": hostname,
+                    "os": os,
+                    "kernel": kernel,
+                    "arch": arch,
+                }));
+            }
+            // process
+            if let Entry::Vacant(e) = obj.entry("process".to_string()) {
+                let pid = std::process::id() as u32;
+                let ppid = unsafe { libc::getppid() as u32 };
+                e.insert(json!({"pid": pid, "ppid": ppid}));
+            }
+            // actor (effective ids)
+            if let Entry::Vacant(e) = obj.entry("actor".to_string()) {
+                let euid = unsafe { libc::geteuid() } as u32;
+                let egid = unsafe { libc::getegid() } as u32;
+                e.insert(json!({"euid": euid, "egid": egid}));
+            }
+            // build
+            if let Entry::Vacant(e) = obj.entry("build".to_string()) {
+                let git_sha = std::env::var("GIT_SHA").ok();
+                let rustc = std::env::var("RUSTC_VERSION").ok();
+                e.insert(json!({"git_sha": git_sha, "rustc": rustc}));
+            }
+        }
+        // Monotonic per-run sequence
+        let cur = ctx.seq.get();
+        obj.entry("seq").or_insert(json!(cur));
+        ctx.seq.set(cur.saturating_add(1));
         obj.entry("dry_run").or_insert(json!(ctx.mode.dry_run));
     }
     // Apply redaction policy in dry-run or when requested
@@ -179,6 +236,30 @@ fn redact_and_emit(
         fields
     };
     ctx.facts.emit(subsystem, event, decision, out);
+}
+
+fn new_event_id() -> String {
+    // Derive a name from (nanos_since_epoch, counter) for uniqueness, then build UUID v5
+    static NEXT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let c = NEXT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let name = format!("{}:{}:event", nanos, c);
+    Uuid::new_v5(&Uuid::NAMESPACE_URL, name.as_bytes()).to_string()
+}
+
+pub(crate) fn new_run_id() -> String {
+    // Similar generation strategy as event_id, but with a different tag
+    static NEXT_RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let c = NEXT_RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let name = format!("{}:{}:run", nanos, c);
+    Uuid::new_v5(&Uuid::NAMESPACE_URL, name.as_bytes()).to_string()
 }
 
 // Legacy emit_* helpers have been removed; use StageLogger facade exclusively.

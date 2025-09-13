@@ -1,6 +1,6 @@
 # Switchyard Glossary
 
-Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.md`, `SPEC/requirements.yaml`, `SPEC/audit_event.schema.json`, and planning docs under `PLAN/`. Section references point to those files.
+Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.md`, `SPEC/requirements.yaml`, `SPEC/audit_event.v2.schema.json`, and planning docs under `PLAN/`. Section references point to those files.
 
 - __Apply__ — Execution of a `Plan` to mutate the filesystem. Emits `apply.attempt` and `apply.result` audit facts per action and may trigger rollback on failure. See `SPEC/SPEC.md §3.1, §2.2, §2.4`.
 
@@ -8,11 +8,11 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __Apply Report (`ApplyReport`)__ — Summary of an `apply()` run, including decision, degraded status, exit codes, and partial restoration when rollback is incomplete. See `PLAN/10-types-traits.md`.
 
-- __Attestation__ — Signed bundle metadata for an `apply` success, containing signature, bundle hash, and public key id. Emitted in summary facts. See `SPEC §2.4`, `SPEC §5`, `audit_event.schema.json`.
+- __Attestation__ — Signed bundle metadata for an `apply` success, containing signature, bundle hash, and public key id. Emitted in summary facts. See `SPEC §2.4`, `SPEC §5`, `audit_event.v2.schema.json`.
 
 - __Attestor__ — Adapter responsible for producing an attestation signature (e.g., ed25519). See `SPEC §3.2`, `PLAN/10-types-traits.md`.
 
-- __Audit Fact (Fact)__ — Structured JSON event emitted for each step (`plan`, `preflight`, `apply.attempt`, `apply.result`, `rollback`). Versioned by `schema_version`. See `SPEC §2.4`, `SPEC §5`, `audit_event.schema.json`.
+- __Audit Fact (Fact)__ — Structured JSON event emitted for each step (`plan`, `preflight`, `apply.attempt`, `apply.result`, `rollback`). Versioned by `schema_version`. See `SPEC §2.4`, `SPEC §5`, `audit_event.v2.schema.json`.
 
 - __Audit Sink / Facts Emitter (`AuditSink`, `FactsEmitter`)__ — Abstractions for emitting and persisting facts (typically JSONL). Redaction policy is applied before emission. See `src/api/audit.rs`, `src/logging/redact.rs`, `PLAN/40-facts-logging.md`.
 
@@ -76,7 +76,7 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __Preflight Diff (YAML)__ — Deterministically ordered rows with keys: `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, `provenance.{uid,gid,pkg}`, `notes`. See `SPEC/preflight.yaml`.
 
-- __Provenance__ — Origin metadata for changes: `origin` (`repo|aur|manual`), `helper`, `uid`, `gid`, `pkg`, `env_sanitized`. Emitted in facts and subject to masking. See `audit_event.schema.json`, `SPEC §2.4`, `PLAN/45-preflight.md`.
+- __Provenance__ — Origin metadata for changes: `origin` (`repo|aur|manual`), `helper`, `uid`, `gid`, `pkg`, `env_sanitized`. Emitted in facts and subject to masking. See `audit_event.v2.schema.json`, `SPEC §2.4`, `PLAN/45-preflight.md`.
 
 - __`policy_ok`__ — Boolean field in each preflight row summarizing whether policy gates passed for that action. When `false`, `apply()` must refuse to proceed unless a policy override is set. See `src/api/preflight.rs`, `PLAN/45-preflight.md`.
 
@@ -86,7 +86,7 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __Preservation Capabilities__ — Filesystem support for preserving owner, mode, timestamps, xattrs, ACLs, capabilities; probed in preflight and gated by policy. See `SPEC §2.3`.
 
-- __Provenance__ — Origin metadata for changes: `origin` (`repo|aur|manual`), `helper`, `uid`, `gid`, `pkg`, `env_sanitized`. Emitted in facts and subject to masking. See `audit_event.schema.json`, `SPEC §2.4`.
+- __Provenance__ — Origin metadata for changes: `origin` (`repo|aur|manual`), `helper`, `uid`, `gid`, `pkg`, `env_sanitized`. Emitted in facts and subject to masking. See `audit_event.v2.schema.json`, `SPEC §2.4`.
 
 - __Rescue Profile__ — Always-available backup symlink set and verified fallback toolset (GNU or BusyBox) present on `PATH` to recover from failures. See `SPEC §2.6`.
 
@@ -96,11 +96,11 @@ Authoritative terminology for the `cargo/switchyard` crate. Sources: `SPEC/SPEC.
 
 - __SafePath__ — Path type with invariants preventing traversal/escape and enabling TOCTOU-safe operations via parent directory handles. All mutating APIs require `SafePath`. See `SPEC §3.3`, `src/types/safepath.rs`.
 
-- __Schema Version (`schema_version`)__ — Version tag in each fact; current is `1`. Changes require migration and dual-emit periods. See `SPEC §5`, `§13`.
+- __Schema Version (`schema_version`)__ — Version tag in each fact; current is `2`. Changes require migration and fixture/test updates. See `SPEC §5`, `§13`.
 
 - __Secret Masking__ — Redaction policy to prevent sensitive data exposure in facts across all sinks. See `SPEC §2.4`, `§13`, `src/logging/redact.rs`.
 
-- __Severity / Decision / Stage__ — Core fact fields describing outcome and context of an event. `stage ∈ {plan, preflight, apply.attempt, apply.result, rollback}`, `decision ∈ {success, failure, warn}`, `severity ∈ {info, warn, error}`. See `audit_event.schema.json`.
+- __Severity / Decision / Stage__ — Core fact fields describing outcome and context of an event. `stage ∈ {plan, preflight, apply.attempt, apply.result, rollback}`, `decision ∈ {success, failure, warn}`, `severity ∈ {info, warn, error}`. See `audit_event.v2.schema.json`.
 
 - __Sidecar__ — 
 

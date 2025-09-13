@@ -12,6 +12,7 @@ use crate::logging::{FactsEmitter, TS_ZERO};
 use crate::types::ids::plan_id;
 use crate::types::{Action, Plan, PreflightReport};
 use serde_json::json;
+use crate::logging::audit::new_run_id;
 
 use crate::fs::meta::{detect_preservation_capabilities, kind_of};
 use crate::logging::audit::{AuditCtx, AuditMode};
@@ -27,9 +28,11 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     let mut rows: Vec<serde_json::Value> = Vec::new();
     // Shared audit context for preflight stage
     let pid = plan_id(plan);
+    let run_id = new_run_id();
     let ctx = AuditCtx::new(
         &api.facts as &dyn FactsEmitter,
         pid.to_string(),
+        run_id,
         TS_ZERO.to_string(),
         AuditMode {
             dry_run: true,

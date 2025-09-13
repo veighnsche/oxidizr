@@ -115,7 +115,7 @@ steps:
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) the engine automatically rolls back \w+ in reverse order$
   - kind: Then
-    pattern: ^(?:Given|When|Then|And|But) every stage emits a JSON fact that validates against /SPEC/audit_event.schema.json$
+    pattern: ^(?:Given|When|Then|And|But) every stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) the emitted facts for plan and preflight are byte-identical after timestamp redaction$
   - kind: Then
@@ -147,7 +147,7 @@ steps:
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$
   - kind: Then
-    pattern: ^(?:Given|When|Then|And|But) each fact carries schema_version=1$
+    pattern: ^(?:Given|When|Then|And|But) each fact carries schema_version=2$
   - kind: Then
     pattern: ^(?:Given|When|Then|And|But) facts clearly indicate partial restoration state if any rollback step fails$
   - kind: Then
