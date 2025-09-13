@@ -74,31 +74,36 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     }
 
     /// Configure via `ApiBuilder::with_lock_manager`.
+    #[must_use]
     pub fn with_lock_manager(mut self, lock: Box<dyn DebugLockManager>) -> Self {
         self.lock = Some(lock);
         self
     }
 
     /// Configure via `ApiBuilder::with_ownership_oracle`.
+    #[must_use]
     pub fn with_ownership_oracle(mut self, owner: Box<dyn DebugOwnershipOracle>) -> Self {
         self.owner = Some(owner);
         self
     }
 
     /// Configure via `ApiBuilder::with_attestor`.
+    #[must_use]
     pub fn with_attestor(mut self, attest: Box<dyn DebugAttestor>) -> Self {
         self.attest = Some(attest);
         self
     }
 
     /// Configure via `ApiBuilder::with_smoke_runner`.
+    #[must_use]
     pub fn with_smoke_runner(mut self, smoke: Box<dyn DebugSmokeTestRunner>) -> Self {
         self.smoke = Some(smoke);
         self
     }
 
     /// Configure via `ApiBuilder::with_lock_timeout_ms`.
-    pub fn with_lock_timeout_ms(mut self, timeout_ms: u64) -> Self {
+    #[must_use]
+    pub const fn with_lock_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.lock_timeout_ms = timeout_ms;
         self
     }
@@ -109,12 +114,22 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         plan::build(self, input)
     }
 
+    /// Execute preflight analysis for a plan. Returns a report with policy evaluation results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `ApiError` if the preflight analysis fails.
     pub fn preflight(&self, plan: &Plan) -> Result<PreflightReport, errors::ApiError> {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.preflight").entered();
         Ok(preflight::run(self, plan))
     }
 
+    /// Apply a plan in the specified mode. Returns a report with execution results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `ApiError` if the plan application fails.
     pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> Result<ApplyReport, errors::ApiError> {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.apply", mode = ?mode).entered();
@@ -130,6 +145,11 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     /// Prune backup artifacts for a given target according to retention policy knobs.
     ///
     /// Emits a `prune.result` fact with details about counts and policy used.
+    /// Prune backups for a target path according to policy retention settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `ApiError` if the backup pruning fails.
     pub fn prune_backups(
         &self,
         target: &crate::types::safepath::SafePath,
@@ -168,18 +188,18 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
             age_limit,
         ) {
             Ok(res) => {
-                StageLogger::new(&tctx).prune_result().merge(json!({
+                StageLogger::new(&tctx).prune_result().merge(&json!({
                     "path": target.as_path().display().to_string(),
                     "backup_tag": self.policy.backup.tag,
                     "retention_count_limit": count_limit,
-                    "retention_age_limit_ms": age_limit.map(|d| d.as_millis() as u64),
+                    "retention_age_limit_ms": age_limit.map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX)),
                     "pruned_count": res.pruned_count,
                     "retained_count": res.retained_count,
                 })).emit_success();
                 Ok(res)
             }
             Err(e) => {
-                StageLogger::new(&tctx).prune_result().merge(json!({
+                StageLogger::new(&tctx).prune_result().merge(&json!({
                     "path": target.as_path().display().to_string(),
                     "backup_tag": self.policy.backup.tag,
                     "error": e.to_string(),

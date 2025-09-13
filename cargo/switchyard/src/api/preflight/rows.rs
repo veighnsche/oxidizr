@@ -7,14 +7,15 @@ use crate::types::{Action, Plan, PreflightRow};
 use crate::logging::audit::AuditCtx;
 
 /// Helper to push a preflight row into the rows vec and emit the corresponding fact.
+#[allow(clippy::too_many_arguments, reason = "Required for preflight row emission with full context")]
 pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
-    _api: &super::super::Switchyard<E, A>,
+    api: &super::super::Switchyard<E, A>,
     plan: &Plan,
     act: &Action,
     rows: &mut Vec<Value>,
     ctx: &AuditCtx<'_>,
     path: String,
-    current_kind: String,
+    current_kind: &str,
     planned_kind: &str,
     policy_ok: Option<bool>,
     provenance: Option<Value>,
@@ -36,7 +37,7 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     let row = PreflightRow {
         action_id: aid.to_string(),
         path: path.clone(),
-        current_kind: current_kind.clone(),
+        current_kind: current_kind.to_string(),
         planned_kind: planned_kind.to_string(),
         policy_ok,
         provenance: provenance.clone(),
@@ -44,9 +45,9 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
         preservation: preservation.clone(),
         preservation_supported,
         restore_ready,
-        backup_tag: Some(_api.policy.backup.tag.clone()),
+        backup_tag: Some(api.policy.backup.tag.clone()),
     };
-    rows.push(serde_json::to_value(row).unwrap());
+    rows.push(serde_json::to_value(row).expect("Failed to serialize preflight row"));
 
     // Emit fact via facade
     let slog = StageLogger::new(ctx);
@@ -62,6 +63,6 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     if let Some(p) = preservation { evt = evt.field("preservation", p); }
     if let Some(ps) = preservation_supported { evt = evt.field("preservation_supported", json!(ps)); }
     // Carry backup tag for traceability per TESTPLAN (long/coreutils/empty tag cases)
-    evt = evt.field("backup_tag", json!(_api.policy.backup.tag.clone()));
+    evt = evt.field("backup_tag", json!(api.policy.backup.tag.clone()));
     evt.emit_success();
 }

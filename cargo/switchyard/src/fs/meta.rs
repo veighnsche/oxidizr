@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use serde_json::json;
 
 /// Compute SHA-256 of a file at `path`, returning a lowercase hex string.
+#[must_use]
 pub fn sha256_hex_of(path: &Path) -> Option<String> {
     let mut f = std::fs::File::open(path).ok()?;
     let mut hasher = Sha256::new();
@@ -27,6 +28,7 @@ pub fn sha256_hex_of(path: &Path) -> Option<String> {
 
 /// If `target` is a symlink, resolve its target to an absolute path.
 /// Relative links are resolved relative to the parent directory of `target`.
+#[must_use]
 pub fn resolve_symlink_target(target: &Path) -> Option<PathBuf> {
     if let Ok(md) = std::fs::symlink_metadata(target) {
         if md.file_type().is_symlink() {
@@ -44,6 +46,7 @@ pub fn resolve_symlink_target(target: &Path) -> Option<PathBuf> {
 }
 
 /// Return a string describing the kind of filesystem node at `path`.
+#[must_use]
 pub fn kind_of(path: &Path) -> String {
     match std::fs::symlink_metadata(path) {
         Ok(md) => {
@@ -63,7 +66,7 @@ pub fn kind_of(path: &Path) -> String {
 }
 
 /// Heuristic preservation capability detector for target path.
-/// Returns (preservation map, preservation_supported flag).
+/// Returns (preservation map, `preservation_supported` flag).
 /// This is intentionally conservative and non-mutating; it checks basic platform support
 /// and permission surface for:
 /// - owner (chown on non-root will likely fail; we report false unless running as root)
@@ -72,6 +75,7 @@ pub fn kind_of(path: &Path) -> String {
 /// - xattrs (Linux extended attributes via getxattr syscall presence; best-effort probe)
 /// - acls (no portable check; report false)
 /// - caps (Linux file capabilities; report false unless libcap is present — we report false)
+#[must_use]
 pub fn detect_preservation_capabilities(path: &Path) -> (serde_json::Value, bool) {
     let mut owner = false;
     let mut mode = false;
@@ -116,8 +120,8 @@ fn effective_uid_is_root() -> bool {
                 if line.starts_with("Uid:") {
                     // Format: Uid:\t<real>\t<eff>\t<saved>\t<fs>
                     let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() >= 3 {
-                        if let Ok(eff) = parts[2].parse::<u32>() {
+                    if let Some(eff_str) = parts.get(2) {
+                        if let Ok(eff) = eff_str.parse::<u32>() {
                             return eff == 0;
                         }
                     }

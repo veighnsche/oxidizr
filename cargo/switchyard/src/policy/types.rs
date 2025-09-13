@@ -7,15 +7,13 @@ pub enum RiskLevel {
     Allow,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub enum ExdevPolicy {
+    #[default]
     Fail,
     DegradedFallback,
 }
 
-impl Default for ExdevPolicy {
-    fn default() -> Self { ExdevPolicy::Fail }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum LockingPolicy {
@@ -48,18 +46,13 @@ pub struct Scope {
     pub forbid_paths: Vec<PathBuf>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Rescue {
     pub require: bool,
     pub exec_check: bool,
     pub min_count: usize,
 }
 
-impl Default for Rescue {
-    fn default() -> Self {
-        Self { require: false, exec_check: false, min_count: 0 }
-    }
-}
 
 #[derive(Debug, Copy, Clone)]
 pub struct Risks {

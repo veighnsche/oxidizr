@@ -2,7 +2,7 @@ use std::{collections::HashSet, fs, path::{Path, PathBuf}};
 
 use super::sidecar::sidecar_path_for_backup;
 
-/// Return (backup_path_if_present, sidecar_path) for the latest timestamped pair.
+/// Return (`backup_path_if_present`, `sidecar_path`) for the latest timestamped pair.
 pub(crate) fn find_latest_backup_and_sidecar(
     target: &Path,
     tag: &str,
@@ -17,10 +17,7 @@ pub(crate) fn find_latest_backup_and_sidecar(
     let rd = fs::read_dir(parent).ok()?;
     for entry in rd.flatten() {
         let fname = entry.file_name(); // OsString
-        let s = match fname.to_str() {
-            Some(s) => s,
-            None => continue, // skip non-UTF-8
-        };
+        let Some(s) = fname.to_str() else { continue }; // skip non-UTF-8
 
         // Must start with the prefix
         let Some(rest) = s.strip_prefix(&prefix) else { continue };
@@ -34,7 +31,7 @@ pub(crate) fn find_latest_backup_and_sidecar(
         let Ok(ts) = num_s.parse::<u128>() else { continue };
 
         // If this timestamp is newer, keep it
-        let is_better = best.as_ref().map_or(true, |(cur, _)| ts > *cur);
+        let is_better = best.as_ref().is_none_or(|(cur, _)| ts > *cur);
         if is_better {
             // Construct the .bak base path (sidecar is derived later)
             let base = parent.join(format!("{prefix}{ts}.bak"));
@@ -85,7 +82,7 @@ pub(crate) fn find_previous_backup_and_sidecar(
 
     // Second newest by timestamp
     stamps.sort_unstable_by_key(|(ts, _)| *ts);
-    let (_ts, base) = stamps[stamps.len() - 2].clone();
+    let (_ts, base) = stamps.get(stamps.len() - 2)?.clone();
 
     let sidecar = sidecar_path_for_backup(&base);
     let backup_present = if base.exists() { Some(base) } else { None };

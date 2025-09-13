@@ -4,6 +4,11 @@ use std::path::Path;
 
 /// Ensure the filesystem backing `path` is read-write and not mounted with noexec.
 /// Returns Ok(()) if suitable; Err(String) with a human message otherwise.
+///
+/// # Errors
+///
+/// Returns an error string if the filesystem is not suitable or if there are issues
+/// accessing the filesystem information.
 pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
     // Delegate to fs::mount inspector; fail closed on ambiguity.
     match crate::fs::mount::ensure_rw_exec(&crate::fs::mount::ProcStatfsInspector, path) {
@@ -16,8 +21,12 @@ pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
 }
 
 /// Detect hardlink hazard: returns Ok(true) when the target node has more than one
-/// hardlink (nlink > 1). Uses symlink_metadata to avoid following symlinks; callers
+/// hardlink (nlink > 1). Uses `symlink_metadata` to avoid following symlinks; callers
 /// may optionally resolve and re-check as needed.
+///
+/// # Errors
+///
+/// Returns an IO error if there are issues accessing the file metadata.
 pub fn check_hardlink_hazard(path: &Path) -> std::io::Result<bool> {
     if let Ok(md) = fs::symlink_metadata(path) {
         // Only consider regular files for this hazard; symlinks/dirs are ignored.
@@ -34,6 +43,10 @@ pub fn check_hardlink_hazard(path: &Path) -> std::io::Result<bool> {
 /// Returns Ok(true) when either SUID (04000) or SGID (02000) bit is set on the
 /// resolved file; Ok(false) otherwise. On errors reading metadata, returns Ok(false)
 /// to avoid spurious stops; callers may add an informational note if desired.
+///
+/// # Errors
+///
+/// Returns an IO error if there are issues accessing the file metadata.
 pub fn check_suid_sgid_risk(path: &Path) -> std::io::Result<bool> {
     // If path is a symlink, resolve to the destination for inspection.
     let inspect_path = if let Ok(md) = fs::symlink_metadata(path) {
@@ -60,16 +73,16 @@ pub fn check_suid_sgid_risk(path: &Path) -> std::io::Result<bool> {
 /// Best-effort check for the immutable attribute via `lsattr -d`.
 /// Returns `Err(String)` only when the target itself is immutable.
 /// If `lsattr` is missing or fails, this returns `Ok(())` (best-effort).
+///
+/// # Errors
+///
+/// Returns an error string if the target is immutable.
 pub fn check_immutable(path: &Path) -> Result<(), String> {
     // Heuristic via lsattr -d; best-effort and non-fatal when unavailable
-    let output = match std::process::Command::new("lsattr")
+    let Ok(output) = std::process::Command::new("lsattr")
         .arg("-d")
         .arg(path) // avoid lossy UTF-8 conversion
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return Ok(()), // tool not found or couldn't run -> best-effort: assume not immutable
-    };
+        .output() else { return Ok(()) };
 
     if !output.status.success() {
         return Ok(()); // non-zero exit from lsattr -> treat as inconclusive
@@ -92,6 +105,11 @@ pub fn check_immutable(path: &Path) -> Result<(), String> {
 
 /// Source trust checks. Returns Err(String) if untrusted and `force` is false. When `force` is true,
 /// returns Ok(()) and leaves it to callers to emit warnings.
+///
+/// # Errors
+///
+/// Returns an error string if the source is untrusted and force is false, or if
+/// there are issues accessing the source file metadata.
 pub fn check_source_trust(source: &Path, force: bool) -> Result<(), String> {
     let meta = fs::symlink_metadata(source).map_err(|e| format!("{e}"))?;
     let mode = meta.mode();

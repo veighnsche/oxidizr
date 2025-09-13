@@ -34,7 +34,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     // Attempt fact
     {
         let slog = StageLogger::new(tctx);
-        slog.apply_attempt().merge(json!({
+        slog.apply_attempt().merge(&json!({
             "action_id": _aid.to_string(),
             "path": target.as_path().display().to_string(),
             "safepath_validation": "success",
@@ -98,7 +98,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
             let obj = extra.as_object_mut().unwrap();
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
-            StageLogger::new(tctx).apply_result().merge(extra).emit_failure();
+            StageLogger::new(tctx).apply_result().merge(&extra).emit_failure();
             return (None, Some(msg), PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms });
         }
     }
@@ -117,7 +117,7 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     ensure_provenance(&mut extra);
     insert_hashes(&mut extra, &before_hash, &after_hash);
     maybe_warn_fsync(&mut extra, fsync_ms, FSYNC_WARN_MS);
-    StageLogger::new(tctx).apply_result().merge(extra).emit_success();
+    StageLogger::new(tctx).apply_result().merge(&extra).emit_success();
 
     (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms: 0, swap_ms: fsync_ms })
 }
@@ -139,7 +139,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     };
     let _aid = action_id(pid, act, idx);
 
-    StageLogger::new(tctx).apply_attempt().merge(json!({
+    StageLogger::new(tctx).apply_attempt().merge(&json!({
         "action_id": _aid.to_string(),
         "path": target.as_path().display().to_string(),
         "safepath_validation": "success",
@@ -203,7 +203,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
                         if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
                     }
                     ensure_provenance(&mut extra);
-                    StageLogger::new(tctx).apply_result().merge(extra).emit_success();
+                    StageLogger::new(tctx).apply_result().merge(&extra).emit_success();
                     return (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
                 }
             }
@@ -226,7 +226,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
             let obj = extra.as_object_mut().unwrap();
             obj.insert("error_id".to_string(), json!(id_str(id)));
             obj.insert("exit_code".to_string(), json!(exit_code_for(id)));
-            StageLogger::new(tctx).apply_result().merge(extra).emit_failure();
+            StageLogger::new(tctx).apply_result().merge(&extra).emit_failure();
             return (None, Some(msg), PerfAgg { hash_ms, backup_ms, swap_ms: 0 });
         }
     }
@@ -243,7 +243,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         if let Some(obj) = extra.as_object_mut() { obj.insert("sidecar_integrity_verified".into(), json!(iv)); }
     }
     ensure_provenance(&mut extra);
-    StageLogger::new(tctx).apply_result().merge(extra).emit_success();
+    StageLogger::new(tctx).apply_result().merge(&extra).emit_success();
 
     (Some(act.clone()), None, PerfAgg { hash_ms, backup_ms, swap_ms: 0 })
 }

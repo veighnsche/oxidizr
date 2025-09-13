@@ -1,4 +1,4 @@
-/// replace this file with StageLogger facade — see zrefactor/logging_audit_refactor.INSTRUCTIONS.md
+/// replace this file with `StageLogger` facade — see `zrefactor/logging_audit_refactor.INSTRUCTIONS.md`
 // Audit helpers that emit Minimal Facts v1 across Switchyard stages.
 //
 // Side-effects:
@@ -13,7 +13,7 @@ use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 pub(crate) const SCHEMA_VERSION: i64 = 2;
 
@@ -66,7 +66,7 @@ pub enum Stage {
 }
 
 impl Stage {
-    fn as_event(&self) -> &'static str {
+    const fn as_event(self) -> &'static str {
         match self {
             Stage::Plan => "plan",
             Stage::Preflight => "preflight",
@@ -89,7 +89,7 @@ pub enum Decision {
 }
 
 impl Decision {
-    fn as_str(&self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Decision::Success => "success",
             Decision::Failure => "failure",
@@ -105,15 +105,23 @@ pub struct StageLogger<'a> {
 }
 
 impl<'a> StageLogger<'a> {
-    pub(crate) fn new(ctx: &'a AuditCtx<'a>) -> Self { Self { ctx } }
+    pub(crate) const fn new(ctx: &'a AuditCtx<'a>) -> Self { Self { ctx } }
 
+    #[must_use]
     pub fn plan(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Plan) }
+    #[must_use]
     pub fn preflight(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Preflight) }
+    #[must_use]
     pub fn preflight_summary(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PreflightSummary) }
+    #[must_use]
     pub fn apply_attempt(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyAttempt) }
+    #[must_use]
     pub fn apply_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyResult) }
+    #[must_use]
     pub fn rollback(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Rollback) }
+    #[must_use]
     pub fn rollback_summary(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::RollbackSummary) }
+    #[must_use]
     pub fn prune_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PruneResult) }
 }
 
@@ -121,34 +129,38 @@ impl<'a> StageLogger<'a> {
 pub struct EventBuilder<'a> {
     ctx: &'a AuditCtx<'a>,
     stage: Stage,
-    fields: serde_json::Map<String, Value>,
+    fields: Map<String, Value>,
 }
 
 impl<'a> EventBuilder<'a> {
     fn new(ctx: &'a AuditCtx<'a>, stage: Stage) -> Self {
-        let mut fields = serde_json::Map::new();
+        let mut fields = Map::new();
         fields.insert("stage".to_string(), json!(stage.as_event()));
         Self { ctx, stage, fields }
     }
 
+    #[must_use]
     pub fn action(mut self, action_id: impl Into<String>) -> Self {
         self.fields.insert("action_id".into(), json!(action_id.into()));
         self
     }
 
+    #[must_use]
     pub fn path(mut self, path: impl Into<String>) -> Self {
         self.fields.insert("path".into(), json!(path.into()));
         self
     }
 
+    #[must_use]
     pub fn field(mut self, key: &str, value: Value) -> Self {
         self.fields.insert(key.to_string(), value);
         self
     }
 
-    pub fn merge(mut self, extra: Value) -> Self {
+    #[must_use]
+    pub fn merge(mut self, extra: &Value) -> Self {
         if let Some(obj) = extra.as_object() {
-            for (k, v) in obj.iter() {
+            for (k, v) in obj {
                 self.fields.insert(k.clone(), v.clone());
             }
         }
@@ -199,7 +211,7 @@ fn redact_and_emit(
                 let os = Some(std::env::consts::OS.to_string());
                 let arch = Some(std::env::consts::ARCH.to_string());
                 // Kernel best-effort: read from /proc/version if present
-                let kernel = std::fs::read_to_string("/proc/version").ok().and_then(|s| s.split_whitespace().nth(2).map(|x| x.to_string()));
+                let kernel = std::fs::read_to_string("/proc/version").ok().and_then(|s| s.split_whitespace().nth(2).map(ToString::to_string));
                 e.insert(json!({
                     "hostname": hostname,
                     "os": os,
@@ -252,7 +264,7 @@ fn new_event_id() -> String {
         .unwrap_or_default()
         .as_nanos();
     let c = NEXT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let name = format!("{}:{}:event", nanos, c);
+    let name = format!("{nanos}:{c}:event");
     Uuid::new_v5(&Uuid::NAMESPACE_URL, name.as_bytes()).to_string()
 }
 
@@ -264,21 +276,29 @@ pub(crate) fn new_run_id() -> String {
         .unwrap_or_default()
         .as_nanos();
     let c = NEXT_RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let name = format!("{}:{}:run", nanos, c);
+    let name = format!("{nanos}:{c}:run");
     Uuid::new_v5(&Uuid::NAMESPACE_URL, name.as_bytes()).to_string()
 }
 
 // Legacy emit_* helpers have been removed; use StageLogger facade exclusively.
 
 // Optional helper to ensure a provenance object is present; callers may extend as needed.
+/// Ensure `extra["provenance"]` is an object and contains `env_sanitized: true`.
 pub(crate) fn ensure_provenance(extra: &mut Value) {
     if let Some(obj) = extra.as_object_mut() {
+        // Get or create the "provenance" field as an object
         let prov = obj
             .entry("provenance")
-            .or_insert(json!({}))
-            .as_object_mut()
-            .unwrap();
-        // Only enforce env_sanitized presence by default; origin/helper are adapter-provided.
-        prov.entry("env_sanitized").or_insert(json!(true));
+            .or_insert_with(|| Value::Object(Map::new()));
+
+        // If it existed but wasn't an object, replace it with an empty object
+        if !prov.is_object() {
+            *prov = Value::Object(Map::new());
+        }
+
+        // Now safely insert the key
+        if let Value::Object(prov_obj) = prov {
+            prov_obj.entry("env_sanitized").or_insert(Value::Bool(true));
+        }
     }
 }

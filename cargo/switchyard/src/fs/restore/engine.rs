@@ -4,7 +4,11 @@ use crate::fs::backup::sidecar::read_sidecar;
 use crate::types::safepath::SafePath;
 use super::{idempotence, integrity, steps, selector, types::{SnapshotSel, RestoreOptions}};
 
-/// Restore a file from its backup. When no backup exists, return an error unless force_best_effort is true.
+/// Restore a file from its backup. When no backup exists, return an error unless `force_best_effort` is true.
+///
+/// # Errors
+///
+/// Returns an IO error if the backup file cannot be restored.
 pub fn restore_file(
     target: &SafePath,
     dry_run: bool,
@@ -21,6 +25,10 @@ pub fn restore_file(
 
 /// Restore from the previous (second newest) backup pair. Used when a fresh snapshot
 /// was just captured pre-restore and we want to restore to the state before snapshot.
+///
+/// # Errors
+///
+/// Returns an IO error if the backup file cannot be restored.
 pub fn restore_file_prev(
     target: &SafePath,
     dry_run: bool,
@@ -37,6 +45,10 @@ pub fn restore_file_prev(
 
 
 /// Engine entry that performs restore given a selector and options.
+///
+/// # Errors
+///
+/// Returns an IO error if the backup file cannot be restored.
 pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) -> std::io::Result<()> {
     let target_path = target.as_path();
     // Locate backup payload and sidecar based on selector
@@ -44,14 +56,13 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
         SnapshotSel::Latest => selector::latest(&target_path, &opts.backup_tag),
         SnapshotSel::Previous => selector::previous(&target_path, &opts.backup_tag),
     };
-    let (backup_opt, sidecar_path): (Option<PathBuf>, PathBuf) = match pair {
-        Some(p) => p,
-        None => {
-            if !opts.force_best_effort {
-                return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"));
-            }
-            return Ok(());
+    let (backup_opt, sidecar_path): (Option<PathBuf>, PathBuf) = if let Some(p) = pair {
+        p
+    } else {
+        if !opts.force_best_effort {
+            return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup missing"));
         }
+        return Ok(());
     };
     // Read sidecar if present
     let sc = read_sidecar(&sidecar_path).ok();
@@ -67,12 +78,11 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
     if let Some(side) = sc {
         match side.prior_kind.as_str() {
             "file" => {
-                let backup: PathBuf = match backup_opt {
-                    Some(p) => p,
-                    None => {
-                        if opts.force_best_effort { return Ok(()); }
-                        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
-                    }
+                let backup: PathBuf = if let Some(p) = backup_opt {
+                    p
+                } else {
+                    if opts.force_best_effort { return Ok(()); }
+                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
                 };
                 if let Some(ref expected) = side.payload_hash {
                     if !integrity::verify_payload_hash_ok(&backup, expected.as_str()) {
@@ -89,12 +99,10 @@ pub fn restore_impl(target: &SafePath, sel: SnapshotSel, opts: &RestoreOptions) 
                     if let Some(b) = backup_opt.as_ref() {
                         let _ = std::fs::remove_file(b);
                     }
-                } else {
-                    if let Some(backup) = backup_opt {
-                        steps::legacy_rename(&target_path, &backup)?;
-                    } else if !opts.force_best_effort {
-                        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
-                    }
+                } else if let Some(backup) = backup_opt {
+                    steps::legacy_rename(&target_path, &backup)?;
+                } else if !opts.force_best_effort {
+                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "backup payload missing"));
                 }
             }
             "none" => {

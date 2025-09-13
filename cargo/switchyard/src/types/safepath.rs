@@ -14,7 +14,7 @@ pub struct SafePath {
 }
 
 impl SafePath {
-    /// Creates a new SafePath from a root and candidate path.
+    /// Creates a new `SafePath` from a root and candidate path.
     /// 
     /// This function ensures that the candidate path is within the root path
     /// and does not contain any unsafe components like dotdot (..).
@@ -26,7 +26,12 @@ impl SafePath {
     /// 
     /// # Returns
     /// 
-    /// * `Result<Self>` - A SafePath if the candidate is valid, or an error otherwise
+    /// * `Result<Self>` - A `SafePath` if the candidate is valid, or an error otherwise
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the root path is not absolute, if the candidate path escapes the root,
+    /// or if the candidate path contains unsafe components like dotdot (..).
     pub fn from_rooted(root: &Path, candidate: &Path) -> Result<Self> {
         if !root.is_absolute() {
             return Err(Error {
@@ -59,7 +64,7 @@ impl SafePath {
                         msg: "dotdot".into(),
                     });
                 }
-                _ => {
+                Component::Prefix(_) | Component::RootDir => {
                     return Err(Error {
                         kind: ErrorKind::InvalidPath,
                         msg: "unsupported component".into(),
@@ -85,6 +90,7 @@ impl SafePath {
     /// # Returns
     /// 
     /// * `PathBuf` - The complete path
+    #[must_use]
     pub fn as_path(&self) -> PathBuf {
         self.root.join(&self.rel)
     }
@@ -94,6 +100,7 @@ impl SafePath {
     /// # Returns
     /// 
     /// * `&Path` - Reference to the relative path
+    #[must_use]
     pub fn rel(&self) -> &Path {
         &self.rel
     }

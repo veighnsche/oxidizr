@@ -21,11 +21,11 @@ pub const LOCK_POLL_MS: u64 = 25;
 /// Default lock timeout used by `Switchyard::new()` unless overridden by `with_lock_timeout_ms()`.
 pub const DEFAULT_LOCK_TIMEOUT_MS: u64 = 5_000;
 
-/// UUIDv5 namespace tag for deterministic plan/action IDs.
+/// `UUIDv5` namespace tag for deterministic plan/action IDs.
 /// Derived from SPEC Reproducible v1.1 guidance; see `SPEC/SPEC.md` § Determinism.
 pub const NS_TAG: &str = "https://oxidizr-arch/switchyard";
 
-/// Heuristic for rescue tool availability when BusyBox is not present.
+/// Heuristic for rescue tool availability when `BusyBox` is not present.
 /// At least `RESCUE_MIN_COUNT` of the `RESCUE_MUST_HAVE` tools must be found on PATH.
 pub const RESCUE_MUST_HAVE: &[&str] = &[
     "cp",

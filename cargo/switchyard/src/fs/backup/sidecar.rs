@@ -14,9 +14,7 @@ pub(crate) struct BackupSidecar {
 }
 
 pub(crate) fn sidecar_path_for_backup(backup: &Path) -> PathBuf {
-    let s = backup.as_os_str().to_owned();
-    use std::ffi::OsString;
-    let mut s2 = OsString::from(s);
+    let mut s2 = backup.as_os_str().to_owned();
     s2.push(".meta.json");
     PathBuf::from(s2)
 }
@@ -28,7 +26,7 @@ pub(crate) fn write_sidecar(backup: &Path, sc: &BackupSidecar) -> std::io::Resul
     }
     let f = std::fs::File::create(&sc_path)?;
     serde_json::to_writer_pretty(&f, sc)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
     // Ensure sidecar durability as well
     let _ = f.sync_all();
     let _ = crate::fs::atomic::fsync_parent_dir(&sc_path);
@@ -37,5 +35,5 @@ pub(crate) fn write_sidecar(backup: &Path, sc: &BackupSidecar) -> std::io::Resul
 
 pub(crate) fn read_sidecar(sc_path: &Path) -> std::io::Result<BackupSidecar> {
     let f = std::fs::File::open(sc_path)?;
-    serde_json::from_reader(f).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    serde_json::from_reader(f).map_err(std::io::Error::other)
 }

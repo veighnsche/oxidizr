@@ -10,6 +10,7 @@ use super::sidecar::{write_sidecar, BackupSidecar};
 
 /// Generate a unique backup path for a target file (includes a timestamp).
 /// Public so callers (preflight/tests) can compute expected names.
+#[must_use]
 pub fn backup_path_with_tag(target: &Path, tag: &str) -> std::path::PathBuf {
     use std::time::{SystemTime, UNIX_EPOCH};
     let name = target
@@ -21,13 +22,17 @@ pub fn backup_path_with_tag(target: &Path, tag: &str) -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    parent.join(format!(".{}.{}.{}.bak", name, tag, ts))
+    parent.join(format!(".{name}.{tag}.{ts}.bak"))
 }
 
 /// Create a snapshot (backup payload and sidecar) of the current target state.
+///
+/// # Errors
+///
+/// Returns an IO error if the snapshot creation fails.
 /// - If target is a regular file: copy bytes to a timestamped backup and record mode in sidecar.
-/// - If target is a symlink: create a symlink backup pointing to current dest and write sidecar with prior_dest.
-/// - If target is absent: create a tombstone payload and sidecar with prior_kind="none".
+/// - If target is a symlink: create a symlink backup pointing to current dest and write sidecar with `prior_dest`.
+/// - If target is absent: create a tombstone payload and sidecar with `prior_kind="none"`.
 pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
     let metadata = fs::symlink_metadata(target);
     let existed = metadata.is_ok();
@@ -52,9 +57,8 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
                 payload_hash: None,
             };
             write_sidecar(&backup, &sc).map_err(|e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("sidecar write failed: {}", e),
+                std::io::Error::other(
+                    format!("sidecar write failed: {e}"),
                 )
             })?;
             // Durability: best-effort parent fsync
@@ -115,13 +119,12 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
                 schema: if payload_hash.is_some() { "backup_meta.v2".to_string() } else { "backup_meta.v1".to_string() },
                 prior_kind: "file".to_string(),
                 prior_dest: None,
-                mode: Some(format!("{:o}", mode)),
+                mode: Some(format!("{mode:o}")),
                 payload_hash,
             };
             write_sidecar(&backup_pb, &sc).map_err(|e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("sidecar write failed: {}", e),
+                std::io::Error::other(
+                    format!("sidecar write failed: {e}"),
                 )
             })?;
             // Durability: ensure parent dir sync
@@ -143,9 +146,8 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
         payload_hash: None,
     };
     write_sidecar(&backup, &sc).map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("sidecar write failed: {}", e),
+        std::io::Error::other(
+            format!("sidecar write failed: {e}"),
         )
     })?;
     // Durability: parent dir sync
@@ -155,6 +157,7 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
 
 /// Public helper for preflight/tests: check if there are backup artifacts (payload and/or sidecar)
 /// for the given target and tag.
+#[must_use]
 pub fn has_backup_artifacts(target: &Path, tag: &str) -> bool {
     if let Some((payload, sc)) = super::index::find_latest_backup_and_sidecar(target, tag) {
         payload.is_some() || sc.exists()

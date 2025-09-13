@@ -12,7 +12,7 @@
 //!
 use crate::types::plan::Plan;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct SmokeFailure;
 
 pub trait SmokeTestRunner: Send + Sync {
@@ -22,7 +22,7 @@ pub trait SmokeTestRunner: Send + Sync {
 /// DefaultSmokeRunner implements a minimal, no-op smoke suite.
 /// In Sprint 2, the adapter is made available and can be enabled by integrators.
 /// Future iterations will implement the SPEC §11 command set.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct DefaultSmokeRunner;
 
 impl SmokeTestRunner for DefaultSmokeRunner {

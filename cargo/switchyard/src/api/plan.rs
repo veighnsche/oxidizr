@@ -1,4 +1,4 @@
-//! api/plan.rs — extracted plan() implementation
+//! api/plan.rs — extracted `plan()` implementation
 
 use crate::logging::FactsEmitter;
 use crate::types::ids::{action_id, plan_id};
@@ -62,8 +62,7 @@ pub(crate) fn build<E: FactsEmitter, A: crate::logging::AuditSink>(
     for (idx, act) in plan.actions.iter().enumerate() {
         let aid = action_id(&pid_uuid, act, idx).to_string();
         let path = match act {
-            Action::EnsureSymlink { target, .. } => Some(target.as_path().display().to_string()),
-            Action::RestoreFromBackup { target } => Some(target.as_path().display().to_string()),
+            Action::EnsureSymlink { target, .. } | Action::RestoreFromBackup { target } => Some(target.as_path().display().to_string()),
         };
         if let Some(p) = path {
             slog.plan().action(aid).path(p).emit_success();

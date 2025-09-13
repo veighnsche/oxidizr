@@ -4,6 +4,11 @@ use std::path::{Path, PathBuf};
 use crate::types::{MountError, MountFlags};
 
 pub trait MountInspector {
+    /// Get mount flags for a path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `MountError` if mount information cannot be determined.
     fn flags_for(&self, path: &Path) -> Result<MountFlags, MountError>;
 }
 
@@ -23,9 +28,9 @@ impl ProcStatfsInspector {
             if parts.len() < 4 {
                 continue;
             }
-            let mnt = PathBuf::from(parts[1]);
+            let mnt = parts.get(1).map(PathBuf::from).ok_or(MountError::Unknown)?;
             if p.starts_with(&mnt) {
-                let opts = parts[3].to_ascii_lowercase();
+                let opts = parts.get(3).ok_or(MountError::Unknown)?.to_ascii_lowercase();
                 match &best {
                     None => best = Some((mnt, opts)),
                     Some((b, _)) => {
@@ -56,7 +61,11 @@ impl MountInspector for ProcStatfsInspector {
     }
 }
 
-/// Policy helper: ensure the target mount is rw and exec-capable.
+/// Policy helper: Ensure that the filesystem containing `path` is mounted with both read and write permissions.
+///
+/// # Errors
+///
+/// Returns a `MountError` if the filesystem is not mounted with read and write permissions.
 pub fn ensure_rw_exec(inspector: &impl MountInspector, path: &Path) -> Result<(), MountError> {
     match inspector.flags_for(path) {
         Ok(flags) => {

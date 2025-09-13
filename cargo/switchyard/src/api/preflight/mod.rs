@@ -86,7 +86,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     &mut rows,
                     &ctx,
                     target.as_path().display().to_string(),
-                    current_kind,
+                    &current_kind,
                     "symlink",
                     Some(eval.policy_ok),
                     prov,
@@ -123,7 +123,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                     &mut rows,
                     &ctx,
                     target.as_path().display().to_string(),
-                    "unknown".to_string(),
+                    "unknown",
                     "restore_from_backup",
                     Some(eval.policy_ok),
                     None,
@@ -174,9 +174,8 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     }
     let slog = crate::logging::StageLogger::new(&ctx);
     match decision {
-        "success" => slog.preflight_summary().merge(extra).emit_success(),
-        "failure" => slog.preflight_summary().merge(extra).emit_failure(),
-        _ => slog.preflight_summary().merge(extra).emit_success(),
+        "failure" => slog.preflight_summary().merge(&extra).emit_failure(),
+        _ => slog.preflight_summary().merge(&extra).emit_success(),
     }
 
     // Stable ordering of rows by (path, action_id)
@@ -189,7 +188,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 let ab = b.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
                 aa.cmp(ab)
             }
-            other => other,
+            other @ (std::cmp::Ordering::Less | std::cmp::Ordering::Greater) => other,
         }
     });
 

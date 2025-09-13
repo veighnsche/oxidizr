@@ -1,4 +1,4 @@
-//! Restore subsystem — split from monolith per zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md
+//! Restore subsystem — split from monolith per `zrefactor/fs_refactor_backup_restore.INSTRUCTIONS.md`
 
 pub mod types;
 pub mod selector;

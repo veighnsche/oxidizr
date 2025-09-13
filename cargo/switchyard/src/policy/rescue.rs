@@ -2,7 +2,7 @@
 //!
 //! This module verifies that a rescue profile is available before mutations happen when
 //! required by policy. Two profiles are supported:
-//! - BusyBox present on PATH (preferred single-binary profile)
+//! - `BusyBox` present on PATH (preferred single-binary profile)
 //! - GNU core tools subset present on PATH (configurable minimum count)
 //!
 //! Test override knobs:
@@ -12,23 +12,31 @@ use crate::constants::{RESCUE_MIN_COUNT, RESCUE_MUST_HAVE};
 use std::env;
 use crate::types::{RescueError, RescueStatus};
 
-/// Verify that at least one rescue toolset is available on PATH (BusyBox or GNU core utilities).
+/// Verify that at least one rescue toolset is available on PATH (`BusyBox` or GNU core utilities).
 /// Wrapper that does not enforce executability checks.
+#[must_use]
 pub fn verify_rescue_tools() -> bool {
     verify_rescue(false).is_ok()
 }
 
 /// Verify rescue tooling with optional executability check.
 /// When `exec_check` is true, the discovered binaries must have at least one execute bit set.
+#[must_use]
 pub fn verify_rescue_tools_with_exec(exec_check: bool) -> bool {
     verify_rescue(exec_check).is_ok()
 }
 
-/// Verify rescue tooling with an explicit minimum count for the GNU subset when BusyBox is absent.
+/// Verify rescue tooling with an explicit minimum count for the GNU subset when `BusyBox` is absent.
+#[must_use]
 pub fn verify_rescue_tools_with_exec_min(exec_check: bool, min_count: usize) -> bool {
     verify_rescue_min(exec_check, min_count).is_ok()
 }
 
+/// Verify rescue tooling with optional executability check.
+///
+/// # Errors
+///
+/// Returns a `RescueError` if no suitable rescue tools are found.
 pub fn verify_rescue(exec_check: bool) -> Result<RescueStatus, RescueError> {
     verify_rescue_min(exec_check, RESCUE_MIN_COUNT)
 }
@@ -56,7 +64,7 @@ fn verify_rescue_min(exec_check: bool, min_count: usize) -> Result<RescueStatus,
     // Fallback: require a tiny subset of GNU core tools to be present
     let must_have = RESCUE_MUST_HAVE;
     let mut found = 0usize;
-    for bin in must_have.iter() {
+    for bin in must_have {
         if let Some(p) = which_on_path(bin) {
             if !exec_check || is_executable(&p) {
                 found += 1;

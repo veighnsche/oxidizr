@@ -19,7 +19,8 @@ pub enum ApiError {
 }
 
 /// Best-effort mapping from apply-stage error strings to a chain of stable summary error IDs.
-/// Always includes a top-level classification; may include co-emitted categories like E_OWNERSHIP.
+/// Always includes a top-level classification; may include co-emitted categories like `E_OWNERSHIP`.
+#[must_use]
 pub fn infer_summary_error_ids(errors: &[String]) -> Vec<&'static str> {
     let mut out: Vec<&'static str> = Vec::new();
     let joined = errors.join("; ").to_lowercase();
@@ -59,7 +60,7 @@ pub fn infer_summary_error_ids(errors: &[String]) -> Vec<&'static str> {
 
 impl From<crate::types::errors::Error> for ApiError {
     fn from(e: crate::types::errors::Error) -> Self {
-        use crate::types::errors::ErrorKind::*;
+        use crate::types::errors::ErrorKind::{InvalidPath, Io, Policy};
         match e.kind {
             InvalidPath | Io => ApiError::FilesystemError(e.msg),
             Policy => ApiError::PolicyViolation(e.msg),
@@ -83,7 +84,8 @@ pub enum ErrorId {
     E_GENERIC,
 }
 
-pub fn id_str(id: ErrorId) -> &'static str {
+#[must_use]
+pub const fn id_str(id: ErrorId) -> &'static str {
     match id {
         ErrorId::E_POLICY => "E_POLICY",
         ErrorId::E_OWNERSHIP => "E_OWNERSHIP",
@@ -97,7 +99,8 @@ pub fn id_str(id: ErrorId) -> &'static str {
     }
 }
 
-pub fn exit_code_for(id: ErrorId) -> i32 {
+#[must_use]
+pub const fn exit_code_for(id: ErrorId) -> i32 {
     match id {
         ErrorId::E_POLICY => 10,
         ErrorId::E_OWNERSHIP => 20,
@@ -111,6 +114,7 @@ pub fn exit_code_for(id: ErrorId) -> i32 {
     }
 }
 
+#[must_use]
 pub fn exit_code_for_id_str(s: &str) -> Option<i32> {
     match s {
         "E_POLICY" => Some(10),

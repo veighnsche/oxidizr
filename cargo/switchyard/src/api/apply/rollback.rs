@@ -6,7 +6,7 @@ use crate::types::Action;
 
 pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
-    executed: &Vec<Action>,
+    executed: &[Action],
     dry: bool,
     slog: &StageLogger<'_>,
     rollback_errors: &mut Vec<String>,
@@ -18,7 +18,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                 target,
             } => {
                 match crate::fs::restore::restore_file(
-                    &target,
+                    target,
                     dry,
                     api.policy.apply.best_effort_restore,
                     &api.policy.backup.tag,
@@ -47,7 +47,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
     }
 }
 
-pub(crate) fn emit_summary(slog: &StageLogger<'_>, rollback_errors: &Vec<String>) {
+pub(crate) fn emit_summary(slog: &StageLogger<'_>, rollback_errors: &[String]) {
     let rb_decision = if rollback_errors.is_empty() { "success" } else { "failure" };
     let mut rb_extra = json!({});
     if rb_decision == "failure" {
@@ -70,8 +70,8 @@ pub(crate) fn emit_summary(slog: &StageLogger<'_>, rollback_errors: &Vec<String>
         }
     }
     if rb_decision == "failure" {
-        slog.rollback_summary().merge(rb_extra).emit_failure();
+        slog.rollback_summary().merge(&rb_extra).emit_failure();
     } else {
-        slog.rollback_summary().merge(rb_extra).emit_success();
+        slog.rollback_summary().merge(&rb_extra).emit_success();
     }
 }

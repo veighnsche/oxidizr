@@ -10,6 +10,10 @@ use crate::types::safepath::SafePath;
 
 /// Atomically replace a file with a symlink, creating a backup. Emits no logs; pure mechanism.
 /// Returns Ok(true) when degraded EXDEV fallback was used (non-atomic), Ok(false) otherwise.
+///
+/// # Errors
+///
+/// Returns an IO error if the file cannot be replaced with a symlink or if backup creation fails.
 pub fn replace_file_with_symlink(
     source: &SafePath,
     target: &SafePath,
@@ -45,7 +49,7 @@ pub fn replace_file_with_symlink(
     }
 
     if is_symlink {
-        let desired = fs::canonicalize(&source_path).unwrap_or_else(|_| source_path.to_path_buf());
+        let desired = fs::canonicalize(&source_path).unwrap_or_else(|_| source_path.clone());
         let mut resolved_current = current_dest.clone().unwrap_or_default();
         if resolved_current.is_relative() {
             if let Some(parent) = target_path.parent() {

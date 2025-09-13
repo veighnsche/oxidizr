@@ -1,6 +1,7 @@
 /// Render a SPEC-aligned YAML sequence from a `PreflightReport` rows collection.
 /// This exporter is intended for tests and artifacts and preserves only the
 /// keys defined in SPEC/preflight.yaml.
+#[must_use]
 pub fn to_yaml(report: &crate::types::report::PreflightReport) -> String {
     use serde_json::Value as J;
     use serde_yaml::Value as Y;
@@ -20,7 +21,7 @@ pub fn to_yaml(report: &crate::types::report::PreflightReport) -> String {
             "preservation",
             "preservation_supported",
         ];
-        for k in keys.iter() {
+        for k in &keys {
             let v = get(k);
             if !v.is_null() {
                 let y: Y = serde_yaml::to_value(v).unwrap_or(Y::Null);

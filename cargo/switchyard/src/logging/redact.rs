@@ -5,6 +5,7 @@ use time::OffsetDateTime;
 
 pub const TS_ZERO: &str = "1970-01-01T00:00:00Z";
 
+#[must_use]
 pub fn now_iso() -> String {
     OffsetDateTime::now_utc()
         .format(&Rfc3339)
@@ -12,8 +13,9 @@ pub fn now_iso() -> String {
 }
 
 /// Return a timestamp for facts emission based on mode.
-/// - DryRun: constant zero timestamp for determinism.
+/// - `DryRun`: constant zero timestamp for determinism.
 /// - Commit: real, current timestamp in RFC3339.
+#[must_use]
 pub fn ts_for_mode(mode: &ApplyMode) -> String {
     match mode {
         ApplyMode::DryRun => TS_ZERO.to_string(),
@@ -22,8 +24,9 @@ pub fn ts_for_mode(mode: &ApplyMode) -> String {
 }
 
 /// Apply redactions to a fact event for comparison and safe logging.
-/// Currently zeroes timestamps to TS_ZERO and removes volatile fields that
+/// Currently zeroes timestamps to `TS_ZERO` and removes volatile fields that
 /// could leak secrets in tests. Extend as policy evolves.
+#[must_use]
 pub fn redact_event(mut v: Value) -> Value {
     if let Some(obj) = v.as_object_mut() {
         obj.insert("ts".into(), Value::String(TS_ZERO.to_string()));

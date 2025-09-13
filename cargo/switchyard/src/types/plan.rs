@@ -1,16 +1,12 @@
 use super::safepath::SafePath;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub enum ApplyMode {
+    #[default]
     DryRun,
     Commit,
 }
 
-impl Default for ApplyMode {
-    fn default() -> Self {
-        ApplyMode::DryRun
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct LinkRequest {

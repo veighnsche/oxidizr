@@ -65,27 +65,32 @@ impl<E: FactsEmitter, A: AuditSink> ApiBuilder<E, A> {
         api
     }
 
+    #[must_use]
     pub fn with_lock_manager(mut self, lock: Box<dyn DebugLockManager>) -> Self {
         self.lock = Some(lock);
         self
     }
 
+    #[must_use]
     pub fn with_ownership_oracle(mut self, owner: Box<dyn DebugOwnershipOracle>) -> Self {
         self.owner = Some(owner);
         self
     }
 
+    #[must_use]
     pub fn with_attestor(mut self, attest: Box<dyn DebugAttestor>) -> Self {
         self.attest = Some(attest);
         self
     }
 
+    #[must_use]
     pub fn with_smoke_runner(mut self, smoke: Box<dyn DebugSmokeTestRunner>) -> Self {
         self.smoke = Some(smoke);
         self
     }
 
-    pub fn with_lock_timeout_ms(mut self, timeout_ms: u64) -> Self {
+    #[must_use]
+    pub const fn with_lock_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.lock_timeout_ms = Some(timeout_ms);
         self
     }

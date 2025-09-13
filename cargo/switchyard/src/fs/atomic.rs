@@ -19,12 +19,17 @@ fn errno_to_io(e: Errno) -> std::io::Error {
     std::io::Error::from_raw_os_error(e.raw_os_error())
 }
 
+/// Open a directory with `O_DIRECTORY` | `O_NOFOLLOW` for atomic operations.
+///
+/// # Errors
+///
+/// Returns an IO error if the directory cannot be opened.
 pub fn open_dir_nofollow(dir: &Path) -> std::io::Result<OwnedFd> {
     use std::os::unix::ffi::OsStrExt;
     let c = std::ffi::CString::new(dir.as_os_str().as_bytes())
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))?;
     openat(
-        &CWD,
+        CWD,
         c.as_c_str(),
         OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
         Mode::empty(),
@@ -32,6 +37,11 @@ pub fn open_dir_nofollow(dir: &Path) -> std::io::Result<OwnedFd> {
     .map_err(errno_to_io)
 }
 
+/// Fsync the parent directory of `path` for durability.
+///
+/// # Errors
+///
+/// Returns an IO error if the parent directory cannot be opened or fsynced.
 pub fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         let dir = fs::File::open(parent)?;
@@ -40,18 +50,24 @@ pub fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Atomically swap a symlink target using a temporary file and renameat.
+///
+/// # Errors
+///
+/// Returns an IO error if the atomic swap operation fails.
 pub fn atomic_symlink_swap(
     source: &Path,
     target: &Path,
     allow_degraded: bool,
 ) -> std::io::Result<(bool, u64)> {
+    use std::os::unix::ffi::OsStrExt;
     // Open parent directory with O_DIRECTORY | O_NOFOLLOW to prevent traversal and races
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
     let fname = target
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("target");
-    let tmp_name = format!(".{}{}", fname, TMP_SUFFIX);
+    let tmp_name = format!(".{fname}{TMP_SUFFIX}");
 
     let dirfd = open_dir_nofollow(parent)?;
 
@@ -61,7 +77,6 @@ pub fn atomic_symlink_swap(
     let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
 
     // Create symlink using symlinkat relative to parent dirfd
-    use std::os::unix::ffi::OsStrExt;
     let src_c = std::ffi::CString::new(source.as_os_str().as_bytes()).map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path")
     })?;
@@ -80,7 +95,7 @@ pub fn atomic_symlink_swap(
     match renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str()) {
         Ok(()) => {
             let _ = fsync_parent_dir(target);
-            let fsync_ms = t0.elapsed().as_millis() as u64;
+            let fsync_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
             Ok((false, fsync_ms))
         }
         Err(e) if e == Errno::XDEV && allow_degraded => {
@@ -88,7 +103,7 @@ pub fn atomic_symlink_swap(
             let _ = unlinkat(&dirfd, new_c.as_c_str(), AtFlags::empty());
             symlinkat(src_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(errno_to_io)?;
             let _ = fsync_parent_dir(target);
-            let fsync_ms = t0.elapsed().as_millis() as u64;
+            let fsync_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
             Ok((true, fsync_ms))
         }
         Err(e) => Err(errno_to_io(e)),

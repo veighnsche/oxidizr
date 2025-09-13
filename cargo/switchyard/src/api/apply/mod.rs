@@ -70,7 +70,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 
     // Audit v2: apply attempt summary (include lock_wait_ms when present)
     let approx_attempts = linfo.approx_attempts;
-    slog.apply_attempt().merge(json!({
+    slog.apply_attempt().merge(&json!({
         "lock_backend": linfo.lock_backend,
         "lock_wait_ms": linfo.lock_wait_ms,
         "lock_attempts": approx_attempts,
@@ -178,11 +178,13 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             });
             let bundle: Vec<u8> = serde_json::to_vec(&bundle_json).unwrap_or_default();
             if let Some(att_json) = crate::adapters::attest::build_attestation_fields(&**att, &bundle) {
-                let obj = fields.as_object_mut().unwrap();
+                #[allow(clippy::unwrap_used, reason = "defer cleanup; will replace with safe shape normalizer later")]
+                let obj = fields.as_object_mut().unwrap_or_else(|| panic!("Failed to get object mut reference"));
                 obj.insert("attestation".to_string(), att_json);
             }
         }
     }
+
     // we already include ts/stage in helper
     // If we failed post-apply due to smoke, emit E_SMOKE at summary level; otherwise include a best-effort E_POLICY
     if decision == "failure" {
@@ -209,14 +211,14 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         }
     }
     if decision == "failure" {
-        slog.apply_result().merge(fields).emit_failure();
+        slog.apply_result().merge(&fields).emit_failure();
     } else {
-        slog.apply_result().merge(fields).emit_success();
+        slog.apply_result().merge(&fields).emit_success();
     }
     api.audit.log(Level::Info, "apply: finished");
 
     // Compute total duration
-    let duration_ms = t0.elapsed().as_millis() as u64;
+    let duration_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
     ApplyReport {
         executed,
         duration_ms,

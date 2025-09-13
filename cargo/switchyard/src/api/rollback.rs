@@ -1,7 +1,7 @@
 use crate::types::report::ApplyReport;
 use crate::types::{Action, Plan};
 
-/// Derive an inverse plan from an ApplyReport by reversing executed actions.
+/// Derive an inverse plan from an `ApplyReport` by reversing executed actions.
 ///
 /// Restore invertibility: for a `RestoreFromBackup` action, we invert to another
 /// `RestoreFromBackup` targeting the same path. This relies on the engine having

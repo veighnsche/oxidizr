@@ -81,26 +81,23 @@ pub(crate) fn evaluate_action(
             ) {
                 Ok(()) => {}
                 Err(e) => {
-                    if policy.risks.source_trust != SourceTrustPolicy::RequireTrusted {
-                        notes.push(format!("untrusted source allowed by policy: {}", e));
-                    } else {
-                        stops.push(format!("untrusted source: {}", e));
+                    if policy.risks.source_trust == SourceTrustPolicy::RequireTrusted {
+                        stops.push(format!("untrusted source: {e}"));
                         notes.push("untrusted source".to_string());
+                    } else {
+                        notes.push(format!("untrusted source allowed by policy: {e}"));
                     }
                 }
             }
             if policy.risks.ownership_strict {
-                match owner {
-                    Some(oracle) => {
-                        if let Err(e) = oracle.owner_of(target) {
-                            stops.push(format!("strict ownership check failed: {}", e));
-                            notes.push("strict ownership check failed".to_string());
-                        }
+                if let Some(oracle) = owner {
+                    if let Err(e) = oracle.owner_of(target) {
+                        stops.push(format!("strict ownership check failed: {e}"));
+                        notes.push("strict ownership check failed".to_string());
                     }
-                    None => {
-                        stops.push("strict ownership policy requires OwnershipOracle".to_string());
-                        notes.push("missing OwnershipOracle for strict ownership".to_string());
-                    }
+                } else {
+                    stops.push("strict ownership policy requires OwnershipOracle".to_string());
+                    notes.push("missing OwnershipOracle for strict ownership".to_string());
                 }
             }
             if !policy.scope.allow_roots.is_empty() {

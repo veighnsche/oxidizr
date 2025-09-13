@@ -5,6 +5,10 @@ use rustix::fs::{fchmod, openat, renameat, unlinkat, AtFlags, Mode, OFlags};
 use crate::fs::atomic::{fsync_parent_dir, open_dir_nofollow};
 
 /// Legacy rename of a backup payload into the target place. Removes target first.
+///
+/// # Errors
+///
+/// Returns an IO error if the rename operation fails.
 pub fn legacy_rename(target_path: &Path, backup: &Path) -> std::io::Result<()> {
     let parent = target_path.parent().unwrap_or_else(|| Path::new("."));
     let fname = target_path
@@ -15,7 +19,7 @@ pub fn legacy_rename(target_path: &Path, backup: &Path) -> std::io::Result<()> {
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("backup");
-    let _ = std::fs::remove_file(&target_path);
+    let _ = std::fs::remove_file(target_path);
     let dirfd = open_dir_nofollow(parent)?;
     let old_c = std::ffi::CString::new(bname)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
@@ -23,11 +27,15 @@ pub fn legacy_rename(target_path: &Path, backup: &Path) -> std::io::Result<()> {
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
-    let _ = fsync_parent_dir(&target_path);
+    let _ = fsync_parent_dir(target_path);
     Ok(())
 }
 
 /// Restore file bytes by renaming the backup payload and restoring mode if provided.
+///
+/// # Errors
+///
+/// Returns an IO error if the restore operation fails.
 pub fn restore_file_bytes(
     target_path: &Path,
     backup: &Path,
@@ -43,7 +51,7 @@ pub fn restore_file_bytes(
         .and_then(|s| s.to_str())
         .unwrap_or("backup");
     let dirfd = open_dir_nofollow(parent)?;
-    let _ = std::fs::remove_file(&target_path);
+    let _ = std::fs::remove_file(target_path);
     let old_c = std::ffi::CString::new(bname)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     let new_c = std::ffi::CString::new(fname)
@@ -57,11 +65,15 @@ pub fn restore_file_bytes(
             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
         let _ = fchmod(&tfd, Mode::from_bits_truncate(m));
     }
-    let _ = fsync_parent_dir(&target_path);
+    let _ = fsync_parent_dir(target_path);
     Ok(())
 }
 
 /// Ensure target is absent by unlinking in a TOCTOU-safe way.
+///
+/// # Errors
+///
+/// Returns an IO error if the unlink operation fails.
 pub fn ensure_absent(target_path: &Path) -> std::io::Result<()> {
     if let Some(parent) = target_path.parent() {
         let dirfd = open_dir_nofollow(parent)?;
@@ -73,16 +85,20 @@ pub fn ensure_absent(target_path: &Path) -> std::io::Result<()> {
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
         let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
     } else {
-        let _ = std::fs::remove_file(&target_path);
+        let _ = std::fs::remove_file(target_path);
     }
-    let _ = fsync_parent_dir(&target_path);
+    let _ = fsync_parent_dir(target_path);
     Ok(())
 }
 
 /// Restore symlink to a destination path atomically.
+///
+/// # Errors
+///
+/// Returns an IO error if the symlink restoration fails.
 pub fn restore_symlink_to(target_path: &Path, dest: &Path) -> std::io::Result<()> {
     let _ = crate::fs::atomic::atomic_symlink_swap(dest, target_path, true)?;
-    let _ = fsync_parent_dir(&target_path);
+    let _ = fsync_parent_dir(target_path);
     Ok(())
 }
 

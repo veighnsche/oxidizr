@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use uuid::Uuid;
 
 use super::{
@@ -28,6 +29,7 @@ fn serialize_action(a: &Action) -> String {
     }
 }
 
+#[must_use]
 pub fn plan_id(plan: &Plan) -> Uuid {
     let ns = namespace();
     // Deterministic serialization in action order
@@ -39,8 +41,9 @@ pub fn plan_id(plan: &Plan) -> Uuid {
     Uuid::new_v5(&ns, s.as_bytes())
 }
 
+#[must_use]
 pub fn action_id(plan_id: &Uuid, action: &Action, idx: usize) -> Uuid {
     let mut s = serialize_action(action);
-    s.push_str(&format!("#{}", idx));
+    let _ = write!(s, "#{idx}"); // Ignore formatting errors as they're unlikely in this context
     Uuid::new_v5(plan_id, s.as_bytes())
 }

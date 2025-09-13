@@ -63,7 +63,7 @@ impl Policy {
     /// Notes:
     /// - Other flags (e.g., `allow_degraded_fs`) remain at their defaults and should be set
     ///   explicitly per environment.
-    /// - In Commit mode, absence of a LockManager yields an early `apply.attempt` failure
+    /// - In Commit mode, absence of a `LockManager` yields an early `apply.attempt` failure
     ///   with `error_id=E_LOCKING` (`exit_code=30`).
     /// - Missing smoke runner when `require_smoke_in_commit=true` yields `E_SMOKE`
     ///   and triggers auto-rollback unless disabled by policy.
@@ -82,6 +82,7 @@ impl Policy {
     ///     .with_smoke_runner(Box::new(DefaultSmokeRunner::default()));
     /// # let _ = api; // avoid unused warning
     /// ```
+    #[must_use]
     pub fn production_preset() -> Self {
         let mut p = Self::default();
         p.rescue.require = true;
@@ -92,7 +93,7 @@ impl Policy {
     }
 
     /// Mutate this Policy to apply the recommended **production defaults**.
-    pub fn apply_production_preset(&mut self) -> &mut Self {
+    pub const fn apply_production_preset(&mut self) -> &mut Self {
         self.rescue.require = true;
         self.rescue.exec_check = true;
         self.governance.locking = LockingPolicy::Required;
@@ -127,6 +128,7 @@ impl Policy {
     /// // Optionally tighten expectations on rescue tool count:
     /// // policy.rescue.min_count = policy.rescue.min_count.max(6);
     /// ```
+    #[must_use]
     pub fn coreutils_switch_preset() -> Self {
         let mut p = Self::production_preset();
 

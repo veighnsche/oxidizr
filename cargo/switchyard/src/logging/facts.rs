@@ -62,7 +62,7 @@ impl FactsEmitter for FileJsonlSink {
                 m.entry("decision".to_string()).or_insert(Value::from(decision));
                 Value::Object(m)
             }
-            other => serde_json::json!({
+            other @ (Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Array(_)) => serde_json::json!({
                 "subsystem": subsystem,
                 "event": event,
                 "decision": decision,

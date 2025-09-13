@@ -5,7 +5,7 @@ use crate::types::OwnershipInfo;
 use crate::types::errors::{Error, ErrorKind, Result};
 use crate::types::safepath::SafePath;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct FsOwnershipOracle;
 
 impl OwnershipOracle for FsOwnershipOracle {

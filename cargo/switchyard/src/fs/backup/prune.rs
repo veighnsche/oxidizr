@@ -9,7 +9,11 @@ use std::{
 use crate::fs::atomic::fsync_parent_dir;
 use super::sidecar::sidecar_path_for_backup;
 
-/// Prune backups by *count* and *age*. The newest backup is never deleted.
+/// Prune timestamped backup pairs for target path based on count and age limits.
+///
+/// # Errors
+///
+/// Returns an IO error if the backup pruning operation fails. The newest backup is never deleted.
 ///
 /// Retention semantics:
 /// - `count_limit = Some(N)`: retain up to N newest backups in total, including the newest. N is clamped to at least 1.
@@ -33,23 +37,14 @@ pub fn prune_backups(
     let mut seen = HashSet::<u128>::new();
     let mut stamps: Vec<(u128, PathBuf)> = Vec::new();
 
-    let rd = match fs::read_dir(parent) {
-        Ok(rd) => rd,
-        Err(e) => return Err(e),
-    };
+    let rd = fs::read_dir(parent)?;
 
     for entry_res in rd {
-        let entry = match entry_res {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
+        let Ok(entry) = entry_res else { continue };
     
         // Bind the OsString so it lives past the match
         let fname = entry.file_name(); // OsString
-        let s = match fname.to_str() {
-            Some(s) => s,
-            None => continue, // skip non-UTF-8
-        };
+        let Some(s) = fname.to_str() else { continue }; // skip non-UTF-8
     
         let Some(rest) = s.strip_prefix(&prefix) else { continue };
         let Some(num_s) = rest.strip_suffix(".bak")
@@ -82,7 +77,7 @@ pub fn prune_backups(
 
     // Determine how many newest to retain by count policy.
     // We never delete the newest, so clamp minimum to 1.
-    let desired_keep_by_count = count_limit.map(|n| n.max(1)).unwrap_or(usize::MAX);
+    let desired_keep_by_count = count_limit.map_or(usize::MAX, |n| n.max(1));
 
     let mut to_delete: Vec<PathBuf> = Vec::new();
     let mut retained: usize = 0;
@@ -99,8 +94,7 @@ pub fn prune_backups(
 
         // Age policy: delete if older than cutoff (if provided)
         let age_violation = age_cutoff_ms
-            .map(|cut| now_ms.saturating_sub(*ts) > cut)
-            .unwrap_or(false);
+            .is_some_and(|cut| now_ms.saturating_sub(*ts) > cut);
 
         if count_violation || age_violation {
             to_delete.push(base.clone());

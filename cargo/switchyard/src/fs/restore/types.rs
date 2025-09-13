@@ -30,7 +30,8 @@ pub enum PriorKind {
 }
 
 impl PriorKind {
-    pub fn from_str(s: &str) -> Self {
+    #[must_use]
+    pub fn from_string(s: &str) -> Self {
         match s {
             "file" => PriorKind::File,
             "symlink" => PriorKind::Symlink,

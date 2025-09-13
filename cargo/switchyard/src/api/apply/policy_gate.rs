@@ -35,23 +35,22 @@ pub(crate) fn enforce<E: FactsEmitter, A: AuditSink>(
     for (idx, act) in plan.actions.iter().enumerate() {
         let aid = crate::types::ids::action_id(&pid, act, idx).to_string();
         let path = match act {
-            Action::EnsureSymlink { target, .. } => target.as_path().display().to_string(),
-            Action::RestoreFromBackup { target } => target.as_path().display().to_string(),
+            Action::EnsureSymlink { target, .. } | Action::RestoreFromBackup { target } => target.as_path().display().to_string(),
         };
-        slog.apply_result().merge(json!({
+        slog.apply_result().merge(&json!({
             "action_id": aid,
             "path": path,
             "error_id": "E_POLICY",
             "exit_code": ec,
         })).emit_failure();
     }
-    slog.apply_result().merge(json!({
+    slog.apply_result().merge(&json!({
         "error_id": "E_POLICY",
         "exit_code": ec,
         "perf": {"hash_ms": 0u64, "backup_ms": 0u64, "swap_ms": 0u64},
     })).emit_failure();
 
-    let duration_ms = t0.elapsed().as_millis() as u64;
+    let duration_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
     Some(ApplyReport {
         executed: Vec::new(),
         duration_ms,
