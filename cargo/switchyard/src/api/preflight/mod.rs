@@ -169,7 +169,12 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
             obj.insert("summary_error_ids".to_string(), json!(chain));
         }
     }
-    crate::logging::audit::emit_summary_extra(&ctx, "preflight", decision, extra);
+    let slog = crate::logging::StageLogger::new(&ctx);
+    match decision {
+        "success" => slog.preflight().merge(extra).emit_success(),
+        "failure" => slog.preflight().merge(extra).emit_failure(),
+        _ => slog.preflight().merge(extra).emit_success(),
+    }
 
     // Stable ordering of rows by (path, action_id)
     rows.sort_by(|a, b| {
