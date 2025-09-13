@@ -31,8 +31,7 @@ pub mod util {
     /// Convert a human path like "/usr/bin/ls" or "providerA/ls" into a path under `root`.
     pub fn under_root(root: &Path, p: &str) -> PathBuf {
         let trimmed = p.trim();
-        if trimmed.starts_with('/') {
-            let rel = &trimmed[1..];
+        if let Some(rel) = trimmed.strip_prefix('/') {
             root.join(rel)
         } else {
             root.join(trimmed)

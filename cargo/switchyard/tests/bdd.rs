@@ -7,7 +7,7 @@ use cucumber::World as _; // bring trait into scope for World::cucumber()
 use serde_json::Value;
 use std::path::Path;
 use switchyard::adapters::{DefaultSmokeRunner, FileLockManager};
-use switchyard::api::Switchyard;
+use switchyard::api::{DebugAttestor, Switchyard};
 use switchyard::policy::types::{ExdevPolicy, LockingPolicy, SmokePolicy};
 use switchyard::policy::Policy;
 use switchyard::preflight::yaml as preflight_yaml;
@@ -182,7 +182,7 @@ mod steps {
             world.audit.clone(),
             world.policy.clone(),
         )
-        .with_smoke_runner(Box::new(DefaultSmokeRunner::default()))
+        .with_smoke_runner(Box::new(DefaultSmokeRunner))
         .build();
         world.api = Some(api);
     }
@@ -504,13 +504,11 @@ mod steps {
         for e in facts {
             if e.get("stage").and_then(|v| v.as_str()) == Some("apply.result")
                 && e.get("action_id").is_some()
+                && e.get("hash_alg").and_then(|v| v.as_str()) == Some("sha256")
+                && e.get("before_hash").is_some() && e.get("after_hash").is_some()
             {
-                if e.get("hash_alg").and_then(|v| v.as_str()) == Some("sha256") {
-                    if e.get("before_hash").is_some() && e.get("after_hash").is_some() {
-                        ok = true;
-                        break;
-                    }
-                }
+                ok = true;
+                break;
             }
         }
         assert!(
@@ -621,11 +619,11 @@ mod steps {
     async fn then_rescue_recorded(world: &mut World) {
         let mut ok = false;
         for e in all_facts(world) {
-            if e.get("stage").and_then(|v| v.as_str()) == Some("preflight.summary") {
-                if e.get("rescue_profile").is_some() {
-                    ok = true;
-                    break;
-                }
+            if e.get("stage").and_then(|v| v.as_str()) == Some("preflight.summary")
+                && e.get("rescue_profile").is_some()
+            {
+                ok = true;
+                break;
             }
         }
         assert!(ok, "expected rescue_profile in preflight.summary");
@@ -636,11 +634,11 @@ mod steps {
         // If verify succeeded, preflight summary should be success and rescue_profile available
         let mut ok = false;
         for e in all_facts(world) {
-            if e.get("stage").and_then(|v| v.as_str()) == Some("preflight.summary") {
-                if e.get("rescue_profile").is_some() {
-                    ok = true;
-                    break;
-                }
+            if e.get("stage").and_then(|v| v.as_str()) == Some("preflight.summary")
+                && e.get("rescue_profile").is_some()
+            {
+                ok = true;
+                break;
             }
         }
         assert!(ok, "expected fallback verification recorded");
@@ -661,6 +659,7 @@ mod steps {
     }
 
     // Attestation configuration and checks
+    #[derive(Debug)]
     struct DummyAttestor;
     impl Attestor for DummyAttestor {
         fn sign(&self, _bundle: &[u8]) -> Result<Signature, switchyard::types::errors::Error> {
@@ -677,7 +676,7 @@ mod steps {
         if world.plan.is_none() {
             given_plan_min(world).await;
         }
-        let att: Box<dyn Attestor> = Box::new(DummyAttestor);
+        let att: Box<dyn DebugAttestor> = Box::new(DummyAttestor);
         let api = Switchyard::builder(
             world.facts.clone(),
             world.audit.clone(),
@@ -731,15 +730,13 @@ mod steps {
     async fn then_warn_no_lock(world: &mut World) {
         let mut saw = false;
         for ev in all_facts(world) {
-            if ev.get("stage").and_then(|v| v.as_str()) == Some("apply.attempt") {
-                if ev.get("decision").and_then(|v| v.as_str()) == Some("warn") {
-                    if ev.get("no_lock_manager").is_some()
-                        || ev.get("lock_backend").and_then(|v| v.as_str()) == Some("none")
-                    {
-                        saw = true;
-                        break;
-                    }
-                }
+            if ev.get("stage").and_then(|v| v.as_str()) == Some("apply.attempt")
+                && ev.get("decision").and_then(|v| v.as_str()) == Some("warn")
+                && (ev.get("no_lock_manager").is_some()
+                    || ev.get("lock_backend").and_then(|v| v.as_str()) == Some("none"))
+            {
+                saw = true;
+                break;
             }
         }
         assert!(saw, "expected WARN apply.attempt for no lock manager");
@@ -776,11 +773,11 @@ mod steps {
     async fn then_locking_failure(world: &mut World) {
         let mut saw = false;
         for ev in all_facts(world) {
-            if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_LOCKING") {
-                if ev.get("exit_code").and_then(|v| v.as_i64()) == Some(30) {
-                    saw = true;
-                    break;
-                }
+            if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_LOCKING")
+                && ev.get("exit_code").and_then(|v| v.as_i64()) == Some(30)
+            {
+                saw = true;
+                break;
             }
         }
         assert!(saw, "expected E_LOCKING with exit_code=30");

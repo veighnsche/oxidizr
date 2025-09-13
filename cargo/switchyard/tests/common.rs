@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use switchyard::logging::{AuditSink, FactsEmitter};
 
 /// A simple in-memory emitter to capture facts during tests.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct TestEmitter {
     pub events: Arc<Mutex<Vec<(String, String, String, Value)>>>,
 }

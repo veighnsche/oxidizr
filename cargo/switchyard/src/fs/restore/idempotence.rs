@@ -50,6 +50,7 @@ pub fn is_idempotent(target_path: &Path, prior_kind: &str, prior_dest: Option<&s
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

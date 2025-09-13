@@ -2,7 +2,6 @@ use jsonschema::JSONSchema;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Write;
-use switchyard; // crate name per Cargo.toml
 use switchyard::adapters::FsOwnershipOracle;
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
@@ -10,7 +9,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -753,10 +752,10 @@ fn golden_minimal_plan_preflight_apply() {
             let a = v.get("action_id").and_then(|x| x.as_str()).unwrap_or("");
             format!("{}:{}", s, a)
         };
-        canon_plan.sort_by(|a, b| key2(a).cmp(&key2(b)));
-        canon_preflight.sort_by(|a, b| key2(a).cmp(&key2(b)));
-        canon_apply_attempt.sort_by(|a, b| key2(a).cmp(&key2(b)));
-        canon_apply_result.sort_by(|a, b| key2(a).cmp(&key2(b)));
+        canon_plan.sort_by_key(|a| key2(a));
+        canon_preflight.sort_by_key(|a| key2(a));
+        canon_apply_attempt.sort_by_key(|a| key2(a));
+        canon_apply_result.sort_by_key(|a| key2(a));
 
         // Write files
         let write_pretty = |path: &std::path::Path, val: &Vec<Value>| {

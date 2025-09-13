@@ -5,7 +5,7 @@ use switchyard::types::plan::{PlanInput, RestoreRequest};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct TestEmitter {
     events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
@@ -22,15 +22,15 @@ impl FactsEmitter for TestEmitter {
 
 #[test]
 fn restore_emits_e_backup_missing_when_no_backup_exists() {
-    let facts = TestEmitter::default();
-    let audit = JsonlSink::default();
+    let facts = TestEmitter;
+    let audit = JsonlSink;
     let mut policy = Policy::default();
     policy.apply.best_effort_restore = false; // enforce failure when missing
     policy.apply.capture_restore_snapshot = false; // do not create snapshot pre-restore in this test
     policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
-        .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));
+        .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle));
 
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
