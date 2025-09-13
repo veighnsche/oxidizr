@@ -18,11 +18,12 @@ use crate::logging::StageLogger;
 /// Returns (executed_action_if_success, error_message_if_failure).
 pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
-    tctx: &AuditCtx,
+    tctx: &AuditCtx<'_>,
     pid: &Uuid,
     act: &Action,
     idx: usize,
     dry: bool,
+    _slog: &StageLogger<'_>,
 ) -> (Option<Action>, Option<String>, PerfAgg) {
     let (source, target) = match act {
         Action::EnsureSymlink { source, target } => (source, target),
@@ -125,11 +126,12 @@ pub(crate) fn handle_ensure_symlink<E: FactsEmitter, A: AuditSink>(
 /// Returns (executed_action_if_success, error_message_if_failure).
 pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
-    tctx: &AuditCtx,
+    tctx: &AuditCtx<'_>,
     pid: &Uuid,
     act: &Action,
     idx: usize,
     dry: bool,
+    _slog: &StageLogger<'_>,
 ) -> (Option<Action>, Option<String>, PerfAgg) {
     let target = match act {
         Action::RestoreFromBackup { target } => target,
@@ -165,7 +167,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         let (backup_opt, sc_path) = pair;
         let sc = crate::fs::backup::read_sidecar(&sc_path).ok()?;
         if let (Some(backup), Some(hash)) = (backup_opt, sc.payload_hash) {
-            let actual = crate::fs::meta::sha256_hex_of(&backup)?;
+            let actual = sha256_hex_of(&backup)?;
             Some(actual == hash)
         } else {
             None
@@ -184,7 +186,7 @@ pub(crate) fn handle_restore<E: FactsEmitter, A: AuditSink>(
         }
         Err(mut e) => {
             // If we tried previous and it was NotFound (no previous), fall back to latest
-            if used_prev && e.kind() == std::io::ErrorKind::NotFound {
+            if used_prev && e.kind() == ErrorKind::NotFound {
                 if let Err(e2) =
                     crate::fs::restore::restore_file(&target, dry, force, &api.policy.backup.tag)
                 {

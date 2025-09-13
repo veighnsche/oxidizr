@@ -168,7 +168,7 @@ impl<'a> EventBuilder<'a> {
 }
 
 fn redact_and_emit(
-    ctx: &AuditCtx,
+    ctx: &AuditCtx<'_>,
     subsystem: &str,
     event: &str,
     decision: &str,

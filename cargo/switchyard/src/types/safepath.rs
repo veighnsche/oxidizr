@@ -2,13 +2,31 @@ use std::path::{Component, Path, PathBuf};
 
 use super::errors::{Error, ErrorKind, Result};
 
+/// Data-only type for safe path handling.
+/// Centralized under `crate::types` for cross-layer reuse.
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SafePath {
+    /// The root path that this safe path is relative to
     root: PathBuf,
+    /// The relative path component
     rel: PathBuf,
 }
 
 impl SafePath {
+    /// Creates a new SafePath from a root and candidate path.
+    /// 
+    /// This function ensures that the candidate path is within the root path
+    /// and does not contain any unsafe components like dotdot (..).
+    /// 
+    /// # Arguments
+    /// 
+    /// * `root` - The root path that the candidate should be within
+    /// * `candidate` - The path to check and make safe
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<Self>` - A SafePath if the candidate is valid, or an error otherwise
     pub fn from_rooted(root: &Path, candidate: &Path) -> Result<Self> {
         assert!(root.is_absolute(), "root must be absolute");
         let effective = if candidate.is_absolute() {
@@ -57,10 +75,20 @@ impl SafePath {
         })
     }
 
+    /// Returns the full path by joining the root and relative components.
+    /// 
+    /// # Returns
+    /// 
+    /// * `PathBuf` - The complete path
     pub fn as_path(&self) -> PathBuf {
         self.root.join(&self.rel)
     }
 
+    /// Returns a reference to the relative path component.
+    /// 
+    /// # Returns
+    /// 
+    /// * `&Path` - Reference to the relative path
     pub fn rel(&self) -> &Path {
         &self.rel
     }

@@ -19,7 +19,7 @@ pub fn ensure_mount_rw_exec(path: &Path) -> Result<(), String> {
 /// hardlink (nlink > 1). Uses symlink_metadata to avoid following symlinks; callers
 /// may optionally resolve and re-check as needed.
 pub fn check_hardlink_hazard(path: &Path) -> std::io::Result<bool> {
-    if let Ok(md) = std::fs::symlink_metadata(path) {
+    if let Ok(md) = fs::symlink_metadata(path) {
         // Only consider regular files for this hazard; symlinks/dirs are ignored.
         let ft = md.file_type();
         if ft.is_file() {
@@ -36,7 +36,7 @@ pub fn check_hardlink_hazard(path: &Path) -> std::io::Result<bool> {
 /// to avoid spurious stops; callers may add an informational note if desired.
 pub fn check_suid_sgid_risk(path: &Path) -> std::io::Result<bool> {
     // If path is a symlink, resolve to the destination for inspection.
-    let inspect_path = if let Ok(md) = std::fs::symlink_metadata(path) {
+    let inspect_path = if let Ok(md) = fs::symlink_metadata(path) {
         if md.file_type().is_symlink() {
             if let Some(p) = crate::fs::meta::resolve_symlink_target(path) {
                 p
@@ -49,7 +49,7 @@ pub fn check_suid_sgid_risk(path: &Path) -> std::io::Result<bool> {
     } else {
         path.to_path_buf()
     };
-    if let Ok(meta) = std::fs::metadata(&inspect_path) {
+    if let Ok(meta) = fs::metadata(&inspect_path) {
         let mode = meta.mode();
         let risk = (mode & 0o6000) != 0; // SUID (04000) or SGID (02000)
         return Ok(risk);

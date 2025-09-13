@@ -166,8 +166,8 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
                     "path": target.as_path().display().to_string(),
                     "backup_tag": self.policy.backup.tag,
                     "error": e.to_string(),
-                    "error_id": crate::api::errors::id_str(crate::api::errors::ErrorId::E_GENERIC),
-                    "exit_code": crate::api::errors::exit_code_for(crate::api::errors::ErrorId::E_GENERIC),
+                    "error_id": errors::id_str(errors::ErrorId::E_GENERIC),
+                    "exit_code": errors::exit_code_for(errors::ErrorId::E_GENERIC),
                 })).emit_failure();
                 Err(errors::ApiError::FilesystemError(e.to_string()))
             }

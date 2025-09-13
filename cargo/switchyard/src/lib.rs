@@ -4,25 +4,25 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 // Broad, stable Rust warnings that catch future breakage & API footguns.
-// #![warn(
-//     // Rustc groups
-//     future_incompatible,
-//     rust_2018_idioms,
+#![warn(
+    // Rustc groups
+    future_incompatible,
+    rust_2018_idioms,
 
-//     // API hygiene
-//     unreachable_pub,                 // accidental public API
-//     missing_debug_implementations,   // make types debuggable
-//     missing_copy_implementations,    // highlight trivial Copy candidates
-//     trivial_casts,
-//     trivial_numeric_casts,
-//     unused_import_braces,
-//     unused_qualifications,
+    // API hygiene
+    unreachable_pub,                 // accidental public API
+    missing_debug_implementations,   // make types debuggable
+    missing_copy_implementations,    // highlight trivial Copy candidates
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_import_braces,
+    unused_qualifications,
 
-//     // Docs quality
-//     missing_docs,
-//     rustdoc::broken_intra_doc_links,
-//     rustdoc::private_intra_doc_links
-// )]
+    // Docs quality
+    missing_docs,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::private_intra_doc_links
+)]
 
 // Clippy: general quality + cargo + pedantic (you already had these)
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]

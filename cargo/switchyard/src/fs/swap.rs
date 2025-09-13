@@ -101,7 +101,7 @@ pub fn replace_file_with_symlink(
                 unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty())
                     .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
             } else {
-                let _ = std::fs::remove_file(&target_path);
+                let _ = fs::remove_file(&target_path);
             }
         }
     } else {

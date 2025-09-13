@@ -12,7 +12,7 @@ pub(crate) fn push_row_emit<E: FactsEmitter, A: AuditSink>(
     plan: &Plan,
     act: &Action,
     rows: &mut Vec<Value>,
-    ctx: &AuditCtx,
+    ctx: &AuditCtx<'_>,
     path: String,
     current_kind: String,
     planned_kind: &str,

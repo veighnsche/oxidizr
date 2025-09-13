@@ -18,7 +18,7 @@ pub(crate) fn enforce<E: FactsEmitter, A: AuditSink>(
     pid: Uuid,
     dry: bool,
     t0: std::time::Instant,
-    slog: &StageLogger,
+    slog: &StageLogger<'_>,
 ) -> Option<ApplyReport> {
     if api.policy.apply.override_preflight || dry {
         return None;

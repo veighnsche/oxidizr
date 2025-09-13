@@ -16,7 +16,7 @@ use crate::types::plan::Plan;
 pub struct SmokeFailure;
 
 pub trait SmokeTestRunner: Send + Sync {
-    fn run(&self, plan: &Plan) -> std::result::Result<(), SmokeFailure>;
+    fn run(&self, plan: &Plan) -> Result<(), SmokeFailure>;
 }
 
 /// DefaultSmokeRunner implements a minimal, no-op smoke suite.
@@ -26,7 +26,7 @@ pub trait SmokeTestRunner: Send + Sync {
 pub struct DefaultSmokeRunner;
 
 impl SmokeTestRunner for DefaultSmokeRunner {
-    fn run(&self, _plan: &Plan) -> std::result::Result<(), SmokeFailure> {
+    fn run(&self, _plan: &Plan) -> Result<(), SmokeFailure> {
         // Deterministic subset: validate that each EnsureSymlink target points to the source.
         for act in &_plan.actions {
             if let crate::types::Action::EnsureSymlink { source, target } = act {

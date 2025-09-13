@@ -23,7 +23,7 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
     t0: Instant,
     pid: Uuid,
     mode: ApplyMode,
-    tctx: &crate::logging::audit::AuditCtx,
+    tctx: &crate::logging::audit::AuditCtx<'_>,
 ) -> LockInfo {
     let dry = matches!(mode, ApplyMode::DryRun);
     let mut lock_wait_ms: Option<u64> = None;

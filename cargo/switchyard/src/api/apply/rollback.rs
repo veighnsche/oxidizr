@@ -8,7 +8,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
     executed: &Vec<Action>,
     dry: bool,
-    slog: &StageLogger,
+    slog: &StageLogger<'_>,
     rollback_errors: &mut Vec<String>,
 ) {
     for prev in executed.iter().rev() {
@@ -47,7 +47,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
     }
 }
 
-pub(crate) fn emit_summary(slog: &StageLogger, rollback_errors: &Vec<String>) {
+pub(crate) fn emit_summary(slog: &StageLogger<'_>, rollback_errors: &Vec<String>) {
     let rb_decision = if rollback_errors.is_empty() { "success" } else { "failure" };
     let mut rb_extra = json!({});
     if rb_decision == "failure" {

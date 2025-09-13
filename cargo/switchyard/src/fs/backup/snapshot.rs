@@ -16,7 +16,7 @@ pub fn backup_path_with_tag(target: &Path, tag: &str) -> std::path::PathBuf {
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("backup");
-    let parent = target.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -97,8 +97,8 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
             )
             .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
             // Copy bytes
-            let mut sfile = std::fs::File::from(srcfd);
-            let mut dfile = std::fs::File::from(dstfd);
+            let mut sfile = fs::File::from(srcfd);
+            let mut dfile = fs::File::from(dstfd);
             std::io::copy(&mut sfile, &mut dfile)?;
             // Set permissions on backup to match source meta
             let mode = meta.permissions().mode();
@@ -133,7 +133,7 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
     // Target did not exist: create a tombstone and sidecar
     let backup = backup_path_with_tag(target, backup_tag);
     let _ = fs::remove_file(&backup);
-    let f = std::fs::File::create(&backup)?;
+    let f = fs::File::create(&backup)?;
     let _ = f.sync_all();
     let sc = BackupSidecar {
         schema: "backup_meta.v1".to_string(),

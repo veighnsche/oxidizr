@@ -85,7 +85,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         match act {
             Action::EnsureSymlink { .. } => {
                 let (exec, err, perf) =
-                    handlers::handle_ensure_symlink(api, &tctx, &pid, act, idx, dry);
+                    handlers::handle_ensure_symlink(api, &tctx, &pid, act, idx, dry, &slog);
                 perf_total.hash_ms += perf.hash_ms;
                 perf_total.backup_ms += perf.backup_ms;
                 perf_total.swap_ms += perf.swap_ms;
@@ -98,7 +98,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
             }
             Action::RestoreFromBackup { .. } => {
                 let (exec, err, perf) =
-                    handlers::handle_restore(api, &tctx, &pid, act, idx, dry);
+                    handlers::handle_restore(api, &tctx, &pid, act, idx, dry, &slog);
                 perf_total.hash_ms += perf.hash_ms;
                 perf_total.backup_ms += perf.backup_ms;
                 perf_total.swap_ms += perf.swap_ms;
