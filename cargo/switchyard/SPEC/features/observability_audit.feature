@@ -37,3 +37,9 @@ Feature: Observability and audit (schema v2)
     Given an attestor is configured and apply succeeds in Commit mode
     When I inspect apply.result
     Then attestation fields (sig_alg, signature, bundle_hash, public_key_id) are present
+
+  @REQ-PF1
+  Scenario: Preflight YAML Dry-Run Byte-Identical To Real
+    Given a plan with at least one action
+    When I run preflight in DryRun and Commit modes
+    Then the exported preflight YAML rows are byte-identical between runs
