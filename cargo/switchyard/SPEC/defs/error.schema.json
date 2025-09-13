@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxidizr.dev/switchyard/defs/error.schema.json",
+  "title": "Error details",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "kind": { "enum": ["io","policy","locking","integrity","smoke","unknown"] },
+    "errno": { "type": ["integer", "null"] },
+    "message": { "type": "string" },
+    "remediation": { "type": "string" }
+  }
+}

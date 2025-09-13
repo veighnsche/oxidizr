@@ -19,17 +19,8 @@
     "actor": { "$ref": "#/$defs/actor" },
     "redaction": { "$ref": "#/$defs/redaction" },
     "seq": { "type": "integer" },
-    "stage": { "enum": [
-      "plan",
-      "preflight",
-      "preflight.summary",
-      "apply.attempt",
-      "apply.result",
-      "rollback",
-      "rollback.summary",
-      "prune.result"
-    ] },
-    "decision": { "enum": ["success", "failure", "warn"] },
+    "stage": { "$ref": "#/$defs/stage" },
+    "decision": { "$ref": "#/$defs/decision" },
     "severity": { "enum": ["info", "warn", "error"] },
     "degraded": { "type": ["boolean", "null"] },
     "degraded_reason": { "type": ["string", "null"] },
@@ -45,6 +36,7 @@
     "before_hash": { "$ref": "#/$defs/hex" },
     "after_hash": { "$ref": "#/$defs/hex" },
     "hashes": {
+      "description": "Optional multi-algorithm hash list; retains top-level before/after sha256 fields for compatibility.",
       "type": "array",
       "items": { "$ref": "#/$defs/hash" }
     },
@@ -71,35 +63,42 @@
     "summary_error_ids": { "type": ["array", "null"], "items": { "type": "string" } }
   },
   "allOf": [
-    {
-      "if": { "properties": { "stage": { "const": "plan" } } },
-      "then": { "required": ["path"] }
-    },
-    {
-      "if": { "properties": { "stage": { "const": "preflight" } } },
-      "then": { "required": ["path", "current_kind", "planned_kind"] }
-    },
-    {
-      "if": { "properties": { "stage": { "const": "preflight.summary" } } },
-      "then": { }
-    },
-    {
-      "if": { "properties": { "stage": { "const": "apply.attempt" } } },
-      "then": { "required": ["lock_backend", "lock_attempts"] }
-    },
-    {
-      "if": { "properties": { "stage": { "const": "apply.result" } } },
-      "then": { }
-    },
-    {
-      "if": { "properties": { "stage": { "const": "prune.result" } } },
-      "then": { "required": ["path", "pruned_count", "retained_count"] }
-    }
+    { "$ref": "#/$defs/stage_plan" },
+    { "$ref": "#/$defs/stage_preflight" },
+    { "$ref": "#/$defs/stage_preflight_summary" },
+    { "$ref": "#/$defs/stage_apply_attempt" },
+    { "$ref": "#/$defs/stage_apply_result" },
+    { "$ref": "#/$defs/stage_prune_result" }
   ],
   "$defs": {
     "uuid": { "type": "string", "format": "uuid" },
     "hex": { "type": "string", "pattern": "^[a-f0-9]+$" },
     "b64": { "type": "string", "contentEncoding": "base64" },
+    "stage_plan": { "$ref": "./defs/stages/plan.schema.json" },
+    "stage_preflight": { "$ref": "./defs/stages/preflight.schema.json" },
+    "stage_preflight_summary": { "$ref": "./defs/stages/preflight.summary.schema.json" },
+    "stage_apply_attempt": { "$ref": "./defs/stages/apply.attempt.schema.json" },
+    "stage_apply_result": { "$ref": "./defs/stages/apply.result.schema.json" },
+    "stage_prune_result": { "$ref": "./defs/stages/prune.result.schema.json" },
+    "stage": {
+      "title": "Stage",
+      "description": "Event stage identifier (including summary variants).",
+      "enum": [
+        "plan",
+        "preflight",
+        "preflight.summary",
+        "apply.attempt",
+        "apply.result",
+        "rollback",
+        "rollback.summary",
+        "prune.result"
+      ]
+    },
+    "decision": {
+      "title": "Decision",
+      "description": "Outcome classification for the event.",
+      "enum": ["success", "failure", "warn"]
+    },
     "build": {
       "type": "object",
       "additionalProperties": true,
@@ -111,6 +110,8 @@
     "host": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Host",
+      "description": "Best-effort environment snapshot; optional for privacy.",
       "properties": {
         "hostname": { "type": "string" },
         "os": { "type": "string" },
@@ -121,6 +122,8 @@
     "process": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Process",
+      "description": "Minimal process identifiers.",
       "properties": {
         "pid": { "type": "integer" },
         "ppid": { "type": "integer" }
@@ -129,6 +132,8 @@
     "actor": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Actor",
+      "description": "Effective user/group identifiers.",
       "properties": {
         "euid": { "type": "integer" },
         "egid": { "type": "integer" }
@@ -137,6 +142,8 @@
     "redaction": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Redaction",
+      "description": "Details of redaction applied to the event (if any).",
       "properties": {
         "applied": { "type": "boolean" },
         "rules": { "type": "array", "items": { "type": "string" } }
@@ -145,6 +152,8 @@
     "resource": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Resource",
+      "description": "Stable resource identity for the target, complementing top-level path.",
       "properties": {
         "path": { "type": "string" },
         "rel": { "type": "string" },
@@ -156,6 +165,8 @@
     "hash": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Hash",
+      "description": "A single content hash record.",
       "properties": {
         "role": { "enum": ["before", "after"] },
         "alg": { "type": "string" },
@@ -166,6 +177,7 @@
     "attestation": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Attestation",
       "properties": {
         "sig_alg": { "type": "string", "enum": ["ed25519"] },
         "signature": { "$ref": "#/$defs/b64" },
@@ -176,24 +188,12 @@
         "signature_format": { "type": "string" }
       }
     },
-    "provenance": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "origin": { "enum": ["repo", "aur", "manual"] },
-        "helper": { "type": "string" },
-        "uid": { "type": "integer" },
-        "gid": { "type": "integer" },
-        "pkg": { "type": "string" },
-        "pkg_version": { "type": "string" },
-        "pkg_arch": { "type": "string" },
-        "sig_verified": { "type": ["boolean", "null"] },
-        "env_sanitized": { "type": "boolean" }
-      }
-    },
+    "provenance": { "$ref": "./defs/provenance.schema.json" },
     "preservation": {
       "type": "object",
       "additionalProperties": true,
+      "title": "Preservation",
+      "description": "Whether preservation of attributes is supported and planned.",
       "properties": {
         "owner": { "type": "boolean" },
         "mode": { "type": "boolean" },
@@ -203,26 +203,7 @@
         "caps": { "type": "boolean" }
       }
     },
-    "perf": {
-      "type": "object",
-      "properties": {
-        "hash_ms": { "type": "integer" },
-        "backup_ms": { "type": "integer" },
-        "swap_ms": { "type": "integer" },
-        "io_bytes_read": { "type": "integer" },
-        "io_bytes_written": { "type": "integer" },
-        "timers": { "type": "object", "additionalProperties": { "type": "integer" } }
-      }
-    },
-    "error": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "kind": { "enum": ["io","policy","locking","integrity","smoke","unknown"] },
-        "errno": { "type": ["integer", "null"] },
-        "message": { "type": "string" },
-        "remediation": { "type": "string" }
-      }
-    }
+    "perf": { "$ref": "./defs/perf.schema.json" },
+    "error": { "$ref": "./defs/error.schema.json" }
   }
 }

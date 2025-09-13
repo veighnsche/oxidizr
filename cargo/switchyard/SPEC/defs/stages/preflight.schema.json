@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxidizr.dev/switchyard/defs/stages/preflight.schema.json",
+  "title": "Stage: preflight",
+  "description": "Constraint: preflight per-action rows require path/current_kind/planned_kind.",
+  "if": { "properties": { "stage": { "const": "preflight" } } },
+  "then": { "required": ["path", "current_kind", "planned_kind"] }
+}

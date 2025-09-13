@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxidizr.dev/switchyard/defs/stages/apply.result.schema.json",
+  "title": "Stage: apply.result",
+  "description": "Constraint: no additional required fields beyond envelope; per-action rows and summary are permitted.",
+  "if": { "properties": { "stage": { "const": "apply.result" } } },
+  "then": { }
+}

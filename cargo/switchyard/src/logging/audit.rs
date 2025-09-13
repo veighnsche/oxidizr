@@ -11,7 +11,7 @@
 use crate::logging::{redact_event, FactsEmitter};
 use serde_json::{json, Value};
 
-pub(crate) const SCHEMA_VERSION: i64 = 1;
+pub(crate) const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct AuditMode {
@@ -47,6 +47,7 @@ impl<'a> AuditCtx<'a> {
 pub enum Stage {
     Plan,
     Preflight,
+    PreflightSummary,
     ApplyAttempt,
     ApplyResult,
     Rollback,
@@ -59,6 +60,7 @@ impl Stage {
         match self {
             Stage::Plan => "plan",
             Stage::Preflight => "preflight",
+            Stage::PreflightSummary => "preflight.summary",
             Stage::ApplyAttempt => "apply.attempt",
             Stage::ApplyResult => "apply.result",
             Stage::Rollback => "rollback",
@@ -96,6 +98,7 @@ impl<'a> StageLogger<'a> {
 
     pub fn plan(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Plan) }
     pub fn preflight(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Preflight) }
+    pub fn preflight_summary(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::PreflightSummary) }
     pub fn apply_attempt(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyAttempt) }
     pub fn apply_result(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::ApplyResult) }
     pub fn rollback(&'a self) -> EventBuilder<'a> { EventBuilder::new(self.ctx, Stage::Rollback) }
@@ -167,7 +170,6 @@ fn redact_and_emit(
         obj.entry("schema_version").or_insert(json!(SCHEMA_VERSION));
         obj.entry("ts").or_insert(json!(ctx.ts));
         obj.entry("plan_id").or_insert(json!(ctx.plan_id));
-        obj.entry("path").or_insert(json!(""));
         obj.entry("dry_run").or_insert(json!(ctx.mode.dry_run));
     }
     // Apply redaction policy in dry-run or when requested

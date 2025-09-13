@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oxidizr.dev/switchyard/defs/stages/plan.schema.json",
+  "title": "Stage: plan",
+  "description": "Constraint: plan events require path.",
+  "if": { "properties": { "stage": { "const": "plan" } } },
+  "then": { "required": ["path"] }
+}
