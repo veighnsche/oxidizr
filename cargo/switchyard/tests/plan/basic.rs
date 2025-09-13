@@ -14,9 +14,16 @@ use switchyard::types::safepath::SafePath;
 #[test]
 fn e2e_plan_001_empty_inputs_yields_empty_actions() {
     // REQ-D1, E2E-PLAN-001 (P0)
-    let api = switchyard::Switchyard::new(JsonlSink::default(), JsonlSink::default(), Policy::default());
+    let api = switchyard::Switchyard::new(
+        JsonlSink::default(),
+        JsonlSink::default(),
+        Policy::default(),
+    );
     let plan = api.plan(PlanInput::default());
-    assert!(plan.actions.is_empty(), "Plan.actions should be empty for empty input");
+    assert!(
+        plan.actions.is_empty(),
+        "Plan.actions should be empty for empty input"
+    );
 }
 
 #[test]
@@ -37,7 +44,13 @@ fn e2e_plan_006_single_link_trivial_plan() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] };
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    };
 
     let plan = api.plan(input);
     assert_eq!(plan.actions.len(), 1, "expected one EnsureSymlink action");
@@ -46,7 +59,11 @@ fn e2e_plan_006_single_link_trivial_plan() {
 #[test]
 fn e2e_plan_003_duplicate_targets_preserved_no_dedupe() {
     // REQ-D1, E2E-PLAN-003 (P0)
-    let api = switchyard::Switchyard::new(JsonlSink::default(), JsonlSink::default(), Policy::default());
+    let api = switchyard::Switchyard::new(
+        JsonlSink::default(),
+        JsonlSink::default(),
+        Policy::default(),
+    );
 
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
@@ -65,11 +82,21 @@ fn e2e_plan_003_duplicate_targets_preserved_no_dedupe() {
 
     let input = PlanInput {
         link: vec![
-            LinkRequest { source: s1, target: t.clone() },
-            LinkRequest { source: s2, target: t.clone() },
+            LinkRequest {
+                source: s1,
+                target: t.clone(),
+            },
+            LinkRequest {
+                source: s2,
+                target: t.clone(),
+            },
         ],
         restore: vec![],
     };
     let plan = api.plan(input);
-    assert_eq!(plan.actions.len(), 2, "both actions should be present (no dedupe)");
+    assert_eq!(
+        plan.actions.len(),
+        2,
+        "both actions should be present (no dedupe)"
+    );
 }

@@ -1,5 +1,5 @@
 use serde_json::Value;
-use switchyard::adapters::{Attestor, Signature, AttestationError};
+use switchyard::adapters::{AttestationError, Attestor, Signature};
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};

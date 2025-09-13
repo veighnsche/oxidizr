@@ -11,40 +11,46 @@ use switchyard::types::ApplyMode;
 fn req_a2_no_broken_missing_path_visible() {
     // REQ-A2 (P0)
     // Assert no temporary paths exposed during operations
-    
+
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
     policy.apply.override_preflight = true; // Skip preflight checks for this test
     policy.governance.allow_unlocked_commit = true; // Allow commit without lock manager
-    
+
     let api = switchyard::Switchyard::new(facts, audit, policy);
-    
+
     // Use temp directory
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
-    
+
     let src = root.join("bin/new");
     let tgt = root.join("usr/bin/app");
-    
+
     std::fs::create_dir_all(src.parent().unwrap()).unwrap();
     std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
     std::fs::write(&src, b"new").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    
-    let input = PlanInput { 
-        link: vec![LinkRequest { source: s, target: t }], 
-        restore: vec![] 
+
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
     };
-    
+
     let plan = api.plan(input);
     let apply_result = api.apply(&plan, ApplyMode::DryRun).unwrap();
-    
+
     // No errors should occur in dry run mode
-    assert!(apply_result.errors.is_empty(), "dry run should not have errors");
-    
+    assert!(
+        apply_result.errors.is_empty(),
+        "dry run should not have errors"
+    );
+
     // Verify that no temporary artifacts remain after operations
     let temp_files: Vec<std::path::PathBuf> = std::fs::read_dir(root)
         .unwrap()
@@ -59,8 +65,11 @@ fn req_a2_no_broken_missing_path_visible() {
             }
         })
         .collect();
-    
+
     // In dry run mode, no actual file operations occur, so this test mainly verifies
     // that the API doesn't expose temporary paths in its interface
-    assert!(temp_files.is_empty(), "no temporary artifacts should be visible");
+    assert!(
+        temp_files.is_empty(),
+        "no temporary artifacts should be visible"
+    );
 }

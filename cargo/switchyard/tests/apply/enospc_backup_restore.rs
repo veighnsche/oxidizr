@@ -33,9 +33,9 @@ fn e2e_apply_014_enospc_during_backup_restore_path() {
     policy.governance.allow_unlocked_commit = true; // avoid lock manager requirement
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid gating on temp files
     policy.apply.override_preflight = true; // skip preflight checks
-    
+
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
-    
+
     // Layout under temp root
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
@@ -45,16 +45,22 @@ fn e2e_apply_014_enospc_during_backup_restore_path() {
     std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
     std::fs::write(&src, b"n").unwrap();
     std::fs::write(&tgt, b"o").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] };
-    
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    };
+
     let plan = api.plan(input);
-    
+
     // Apply should succeed in normal conditions
     let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
-    
+
     // Check that we got the appropriate apply events
     let redacted: Vec<Value> = facts
         .events
@@ -63,13 +69,16 @@ fn e2e_apply_014_enospc_during_backup_restore_path() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    
+
     // Should have an apply.result success event
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result"))
-            && e.get("decision") == Some(&Value::from("success"))
-    }), "expected apply.result success in normal conditions");
-    
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("success"))
+        }),
+        "expected apply.result success in normal conditions"
+    );
+
     // Note: We can't easily simulate ENOSPC in tests without special filesystem setup
     // This test just verifies normal successful behavior
 }

@@ -24,10 +24,20 @@ fn preflight_rows_carry_long_backup_tag() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
     assert!(!pf.rows.is_empty(), "expected preflight rows");
-    assert!(pf.rows.iter().any(|r| r.get("backup_tag").and_then(|v| v.as_str()) == Some(tag.as_str())),
-        "preflight rows should carry backup_tag");
+    assert!(
+        pf.rows
+            .iter()
+            .any(|r| r.get("backup_tag").and_then(|v| v.as_str()) == Some(tag.as_str())),
+        "preflight rows should carry backup_tag"
+    );
 }

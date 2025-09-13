@@ -44,14 +44,26 @@ fn exdev_degraded_fallback_sets_degraded_true() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     // Force EXDEV path
     std::env::set_var("SWITCHYARD_FORCE_EXDEV", "1");
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
     std::env::remove_var("SWITCHYARD_FORCE_EXDEV");
 
-    let redacted: Vec<Value> = facts.events.lock().unwrap().iter().map(|(_, _, _, f)| redact_event(f.clone())).collect();
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
     assert!(redacted.iter().any(|e| e.get("stage") == Some(&Value::from("apply.result"))
         && e.get("decision") == Some(&Value::from("success"))
         && e.get("degraded") == Some(&Value::from(true))

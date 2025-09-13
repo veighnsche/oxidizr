@@ -27,7 +27,7 @@ fn restore_is_invertible_with_snapshot() {
     let mut policy = Policy::default();
     policy.governance.allow_unlocked_commit = true; // allow Commit without LockManager
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid preflight STOP on non-root source in temp env
-                                          // capture_restore_snapshot defaults to true
+                                                                                              // capture_restore_snapshot defaults to true
 
     let api = switchyard::Switchyard::new(facts, audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));

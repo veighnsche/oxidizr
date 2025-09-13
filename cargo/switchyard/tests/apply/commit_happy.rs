@@ -51,16 +51,38 @@ fn commit_happy_path_succeeds_and_emits_success() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
     let _pf = api.preflight(&plan).unwrap();
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     assert!(report.errors.is_empty(), "no errors on happy path");
 
     // Ensure apply.result success and no error_id
-    let redacted: Vec<Value> = facts.events.lock().unwrap().iter().map(|(_, _, _, f)| redact_event(f.clone())).collect();
-    assert!(redacted.iter().any(|e| e.get("stage") == Some(&Value::from("apply.result")) && e.get("decision") == Some(&Value::from("success"))),
-        "expected apply.result success");
-    assert!(!redacted.iter().any(|e| e.get("stage") == Some(&Value::from("apply.result")) && e.get("error_id").is_some()),
-        "apply.result should not carry error_id on success");
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
+    assert!(
+        redacted
+            .iter()
+            .any(|e| e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("success"))),
+        "expected apply.result success"
+    );
+    assert!(
+        !redacted
+            .iter()
+            .any(|e| e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("error_id").is_some()),
+        "apply.result should not carry error_id on success"
+    );
 }

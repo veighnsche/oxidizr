@@ -32,17 +32,30 @@ fn extra_mount_checks_many_emit_notes() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
     // At least one row should include a note mentioning not rw+exec
     let mut saw = false;
     for row in pf.rows.iter() {
         if let Some(notes) = row.get("notes").and_then(|v| v.as_array()) {
-            if notes.iter().any(|n| n.as_str().unwrap_or("").contains("not rw+exec")) {
-                saw = true; break;
+            if notes
+                .iter()
+                .any(|n| n.as_str().unwrap_or("").contains("not rw+exec"))
+            {
+                saw = true;
+                break;
             }
         }
     }
-    assert!(saw, "expected at least one not rw+exec note from extra mount checks");
+    assert!(
+        saw,
+        "expected at least one not rw+exec note from extra mount checks"
+    );
 }

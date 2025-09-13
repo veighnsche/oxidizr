@@ -20,27 +20,39 @@ fn e2e_preflight_006_extra_mount_checks_five() {
         "/usr/local".to_string().into(),
     ];
     let api = switchyard::Switchyard::new(facts, audit, policy);
-    
+
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
     std::fs::create_dir_all(root.join("bin")).unwrap();
     std::fs::create_dir_all(root.join("usr/bin")).unwrap();
     std::fs::write(root.join("bin/new"), b"n").unwrap();
     std::fs::write(root.join("usr/bin/app"), b"o").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
     let pf = api.preflight(&plan).unwrap();
-    
+
     // Check that extra mount checks are present in the notes
     assert!(pf.rows.len() > 0, "preflight should have rows");
     let has_mount_notes = pf.rows.iter().any(|row| {
-        row.get("notes").and_then(|notes| notes.as_array()).map_or(false, |notes| {
-            notes.iter().any(|note| {
-                note.as_str().map_or(false, |note_str| note_str.contains("mount"))
+        row.get("notes")
+            .and_then(|notes| notes.as_array())
+            .map_or(false, |notes| {
+                notes.iter().any(|note| {
+                    note.as_str()
+                        .map_or(false, |note_str| note_str.contains("mount"))
+                })
             })
-        })
     });
-    assert!(has_mount_notes, "preflight rows should contain mount check notes");
+    assert!(
+        has_mount_notes,
+        "preflight rows should contain mount check notes"
+    );
 }

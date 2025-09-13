@@ -16,9 +16,9 @@ fn e2e_apply_022_crash_between_backup_and_rename() {
     policy.governance.allow_unlocked_commit = true; // avoid lock manager requirement
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid gating on temp files
     policy.apply.override_preflight = true; // skip preflight checks
-    
+
     let api = switchyard::Switchyard::new(facts, audit, policy);
-    
+
     // Layout under temp root
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
@@ -28,16 +28,22 @@ fn e2e_apply_022_crash_between_backup_and_rename() {
     std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
     std::fs::write(&src, b"n").unwrap();
     std::fs::write(&tgt, b"o").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] };
-    
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    };
+
     let plan = api.plan(input);
-    
+
     // Apply should succeed in normal conditions
     let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
-    
+
     // Verify no temporary artifacts remain after successful apply
     let temp_files: Vec<std::path::PathBuf> = std::fs::read_dir(root)
         .unwrap()
@@ -52,9 +58,12 @@ fn e2e_apply_022_crash_between_backup_and_rename() {
             }
         })
         .collect();
-    
-    assert!(temp_files.is_empty(), "no temporary artifacts should remain after successful apply");
-    
+
+    assert!(
+        temp_files.is_empty(),
+        "no temporary artifacts should remain after successful apply"
+    );
+
     // Note: We can't easily simulate crashes in tests without special infrastructure
     // This test just verifies normal successful behavior and cleanup
 }

@@ -41,13 +41,30 @@ fn warn_emitted_when_no_lock_manager_and_optional() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
-    let redacted: Vec<Value> = facts.events.lock().unwrap().iter().map(|(_, _, _, f)| redact_event(f.clone())).collect();
-    assert!(redacted.iter().any(|e| e.get("stage") == Some(&Value::from("apply.attempt"))
-        && e.get("decision") == Some(&Value::from("warn"))
-        && (e.get("no_lock_manager").is_some() || e.get("lock_backend") == Some(&Value::from("none")))),
-        "expected WARN apply.attempt when no lock manager and locking Optional");
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
+    assert!(
+        redacted
+            .iter()
+            .any(|e| e.get("stage") == Some(&Value::from("apply.attempt"))
+                && e.get("decision") == Some(&Value::from("warn"))
+                && (e.get("no_lock_manager").is_some()
+                    || e.get("lock_backend") == Some(&Value::from("none")))),
+        "expected WARN apply.attempt when no lock manager and locking Optional"
+    );
 }

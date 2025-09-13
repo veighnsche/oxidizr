@@ -1,12 +1,12 @@
 use serde_json::Value;
+use switchyard::constants::DEFAULT_BACKUP_TAG;
 use switchyard::logging::{FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::safepath::SafePath;
-use switchyard::constants::DEFAULT_BACKUP_TAG;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
-    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>> ,
+    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
 impl FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
@@ -53,7 +53,9 @@ fn prune_by_count_keeps_newest_and_limits_total() {
 
     // Verify event emitted
     let evs = facts.events.lock().unwrap();
-    assert!(evs.iter().any(|(_, event, decision, _)| event == "prune.result" && decision == "success"));
+    assert!(evs
+        .iter()
+        .any(|(_, event, decision, _)| event == "prune.result" && decision == "success"));
 }
 
 #[test]
@@ -80,6 +82,15 @@ fn prune_by_age_prunes_old_backups() {
     let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
     let res = api.prune_backups(&sp_tgt).expect("prune ok");
 
-    assert!(res.pruned_count >= 2, "expected at least two old backups pruned, got {}", res.pruned_count);
-    assert!(facts.events.lock().unwrap().iter().any(|(_, ev, _, _)| ev == "prune.result"));
+    assert!(
+        res.pruned_count >= 2,
+        "expected at least two old backups pruned, got {}",
+        res.pruned_count
+    );
+    assert!(facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(_, ev, _, _)| ev == "prune.result"));
 }

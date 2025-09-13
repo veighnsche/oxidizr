@@ -114,7 +114,7 @@ mod steps {
     use cucumber::{given, then, when};
     use jsonschema::JSONSchema;
     use switchyard::adapters::LockManager;
-    use switchyard::adapters::{Attestor, Signature, AttestationError};
+    use switchyard::adapters::{AttestationError, Attestor, Signature};
     use switchyard::logging::redact::redact_event;
 
     // Given steps

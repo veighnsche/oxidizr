@@ -10,7 +10,10 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 
-fn make_plan() -> (switchyard::Switchyard<JsonlSink, JsonlSink>, std::path::PathBuf) {
+fn make_plan() -> (
+    switchyard::Switchyard<JsonlSink, JsonlSink>,
+    std::path::PathBuf,
+) {
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();
     let api = switchyard::Switchyard::new(facts, audit, Policy::default());
@@ -31,7 +34,13 @@ fn e2e_preflight_004_rescue_not_required_ok() {
     let (api, root) = make_plan();
     let s = SafePath::from_rooted(&root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(&root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
     let pf = api.preflight(&plan).unwrap();
     assert!(pf.ok, "preflight should succeed when rescue not required");
 }
@@ -55,7 +64,13 @@ fn e2e_preflight_010_exec_check_disabled_ok() {
     // Build plan
     let s = SafePath::from_rooted(&root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(&root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
     let pf = api.preflight(&plan).unwrap();
     assert!(pf.ok, "preflight should succeed with exec_check disabled");
 }
@@ -77,7 +92,13 @@ fn e2e_preflight_009_empty_backup_tag_ok() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
     let pf = api.preflight(&plan).unwrap();
     assert!(pf.ok, "preflight should succeed with empty backup tag");
 }
@@ -99,7 +120,13 @@ fn e2e_preflight_011_coreutils_tag_ok() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
     let pf = api.preflight(&plan).unwrap();
     assert!(pf.ok, "preflight should succeed with coreutils tag");
 }

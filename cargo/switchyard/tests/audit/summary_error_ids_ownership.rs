@@ -38,7 +38,13 @@ fn preflight_summary_includes_e_ownership_in_chain_when_strict_ownership_stops()
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.preflight(&plan).unwrap();
 
@@ -50,8 +56,18 @@ fn preflight_summary_includes_e_ownership_in_chain_when_strict_ownership_stops()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    let summary = redacted.iter().find(|e| e.get("stage") == Some(&Value::from("preflight")) && e.get("decision") == Some(&Value::from("failure"))).expect("preflight summary");
-    let chain = summary.get("summary_error_ids").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let summary = redacted
+        .iter()
+        .find(|e| {
+            e.get("stage") == Some(&Value::from("preflight"))
+                && e.get("decision") == Some(&Value::from("failure"))
+        })
+        .expect("preflight summary");
+    let chain = summary
+        .get("summary_error_ids")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     assert!(chain.iter().any(|s| s.as_str() == Some("E_POLICY")));
     assert!(chain.iter().any(|s| s.as_str() == Some("E_OWNERSHIP")));
 }

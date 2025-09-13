@@ -43,7 +43,13 @@ fn ownership_strict_without_oracle_blocks_apply() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
@@ -55,9 +61,13 @@ fn ownership_strict_without_oracle_blocks_apply() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    assert!(redacted.iter().any(|e| e.get("stage") == Some(&Value::from("apply.result"))
-        && e.get("decision") == Some(&Value::from("failure"))
-        && e.get("error_id") == Some(&Value::from("E_POLICY"))
-        && e.get("exit_code") == Some(&Value::from(10))),
-        "expected E_POLICY failure with exit_code=10 due to strict ownership gating");
+    assert!(
+        redacted
+            .iter()
+            .any(|e| e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("failure"))
+                && e.get("error_id") == Some(&Value::from("E_POLICY"))
+                && e.get("exit_code") == Some(&Value::from(10))),
+        "expected E_POLICY failure with exit_code=10 due to strict ownership gating"
+    );
 }

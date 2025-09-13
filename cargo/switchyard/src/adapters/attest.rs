@@ -1,5 +1,5 @@
-use thiserror::Error;
 use crate::types::errors::{Error, ErrorKind};
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AttestationError {
@@ -12,7 +12,7 @@ pub enum AttestationError {
 impl From<AttestationError> for Error {
     fn from(e: AttestationError) -> Self {
         Error {
-            kind: ErrorKind::Io,  // Using Io for now, could be more specific
+            kind: ErrorKind::Io, // Using Io for now, could be more specific
             msg: e.to_string(),
         }
     }

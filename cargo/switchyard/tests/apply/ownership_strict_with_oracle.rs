@@ -34,10 +34,10 @@ fn e2e_apply_017_ownership_strict_with_oracle_present() {
     policy.governance.allow_unlocked_commit = true; // avoid lock manager requirement
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid gating on temp files
     policy.apply.override_preflight = true; // skip preflight checks
-    
+
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));
-    
+
     // Layout under temp root
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
@@ -47,16 +47,22 @@ fn e2e_apply_017_ownership_strict_with_oracle_present() {
     std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
     std::fs::write(&src, b"n").unwrap();
     std::fs::write(&tgt, b"o").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] };
-    
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    };
+
     let plan = api.plan(input);
-    
+
     // Apply should succeed with ownership oracle present
     let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
-    
+
     // Check that we got the appropriate apply events with provenance
     let redacted: Vec<Value> = facts
         .events
@@ -65,21 +71,33 @@ fn e2e_apply_017_ownership_strict_with_oracle_present() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    
+
     // Should have an apply.result success event with provenance information
     let provenance_event = redacted.iter().find(|e| {
         e.get("stage") == Some(&Value::from("apply.result"))
             && e.get("decision") == Some(&Value::from("success"))
             && e.get("provenance").is_some()
     });
-    
-    assert!(provenance_event.is_some(), "expected apply.result success with provenance information");
-    
+
+    assert!(
+        provenance_event.is_some(),
+        "expected apply.result success with provenance information"
+    );
+
     // Check that provenance includes uid/gid/pkg fields
     if let Some(event) = provenance_event {
         let provenance = event.get("provenance").unwrap();
-        assert!(provenance.get("uid").is_some(), "provenance should include uid field");
-        assert!(provenance.get("gid").is_some(), "provenance should include gid field");
-        assert!(provenance.get("pkg").is_some(), "provenance should include pkg field");
+        assert!(
+            provenance.get("uid").is_some(),
+            "provenance should include uid field"
+        );
+        assert!(
+            provenance.get("gid").is_some(),
+            "provenance should include gid field"
+        );
+        assert!(
+            provenance.get("pkg").is_some(),
+            "provenance should include pkg field"
+        );
     }
 }

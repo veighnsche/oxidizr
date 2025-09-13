@@ -56,7 +56,13 @@ fn apply_attempt_emits_lock_attempts_greater_than_one_when_contended() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
     holder.join().unwrap();
@@ -67,7 +73,11 @@ fn apply_attempt_emits_lock_attempts_greater_than_one_when_contended() {
     for (_sub, event, decision, fields) in evs.iter() {
         if event == "apply.attempt" && decision == "success" {
             if let Some(attempts) = fields.get("lock_attempts").and_then(|v| v.as_u64()) {
-                assert!(attempts >= 2, "expected lock_attempts >= 2, got {}", attempts);
+                assert!(
+                    attempts >= 2,
+                    "expected lock_attempts >= 2, got {}",
+                    attempts
+                );
                 found = true;
                 break;
             }

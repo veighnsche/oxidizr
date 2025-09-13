@@ -38,12 +38,25 @@ fn preflight_stops_when_exec_check_and_min_count_huge() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
-    assert!(!pf.ok, "preflight should STOP when exec_check enabled and min_count huge");
+    assert!(
+        !pf.ok,
+        "preflight should STOP when exec_check enabled and min_count huge"
+    );
     let stops = pf.stops.join("\n");
-    assert!(stops.to_lowercase().contains("rescue"), "expected rescue-related stop message: {}", stops);
+    assert!(
+        stops.to_lowercase().contains("rescue"),
+        "expected rescue-related stop message: {}",
+        stops
+    );
 }
 
 struct EnvGuard(Option<std::ffi::OsString>);

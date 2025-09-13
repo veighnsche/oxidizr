@@ -49,12 +49,21 @@ fn dryrun_symlink_emits_symlink_after_kind_and_no_errors() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] };
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    };
 
     let plan = api.plan(input);
     let _ = api.preflight(&plan).unwrap();
     let report = api.apply(&plan, ApplyMode::DryRun).unwrap();
-    assert!(report.errors.is_empty(), "DryRun should not record apply errors");
+    assert!(
+        report.errors.is_empty(),
+        "DryRun should not record apply errors"
+    );
 
     let redacted: Vec<Value> = facts
         .events
@@ -64,10 +73,13 @@ fn dryrun_symlink_emits_symlink_after_kind_and_no_errors() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result"))
-            && e.get("decision") == Some(&Value::from("success"))
-            && e.get("after_kind") == Some(&Value::from("symlink"))
-            && e.get("ts") == Some(&Value::from("1970-01-01T00:00:00Z"))
-    }), "expected apply.result success with after_kind=symlink and TS_ZERO");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("success"))
+                && e.get("after_kind") == Some(&Value::from("symlink"))
+                && e.get("ts") == Some(&Value::from("1970-01-01T00:00:00Z"))
+        }),
+        "expected apply.result success with after_kind=symlink and TS_ZERO"
+    );
 }

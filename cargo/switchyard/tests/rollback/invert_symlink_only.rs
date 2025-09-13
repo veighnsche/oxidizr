@@ -30,15 +30,29 @@ fn invert_only_symlink_actions() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t.clone() }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t.clone(),
+        }],
+        restore: vec![],
+    });
 
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     let inv = api.plan_rollback_of(&report);
-    assert_eq!(inv.actions.len(), 1, "inverse plan should contain one action");
+    assert_eq!(
+        inv.actions.len(),
+        1,
+        "inverse plan should contain one action"
+    );
     match &inv.actions[0] {
         switchyard::types::plan::Action::RestoreFromBackup { target } => {
-            assert_eq!(target.as_path(), t.as_path(), "inverse restore should target original path");
+            assert_eq!(
+                target.as_path(),
+                t.as_path(),
+                "inverse restore should target original path"
+            );
         }
         _ => panic!("expected RestoreFromBackup in inverse plan"),
     }

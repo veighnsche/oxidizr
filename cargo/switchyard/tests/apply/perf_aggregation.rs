@@ -40,7 +40,10 @@ fn apply_result_includes_perf_object() {
 
     let source = SafePath::from_rooted(root, &src).unwrap();
     let target = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source, target }], restore: vec![] };
+    let input = PlanInput {
+        link: vec![LinkRequest { source, target }],
+        restore: vec![],
+    };
 
     let plan = api.plan(input);
     let _ = api.preflight(&plan).unwrap();
@@ -54,11 +57,16 @@ fn apply_result_includes_perf_object() {
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
 
-    let perf = redacted.iter().find_map(|e| {
-        if e.get("stage") == Some(&Value::from("apply.result")) {
-            e.get("perf").cloned()
-        } else { None }
-    }).expect("apply.result should include perf");
+    let perf = redacted
+        .iter()
+        .find_map(|e| {
+            if e.get("stage") == Some(&Value::from("apply.result")) {
+                e.get("perf").cloned()
+            } else {
+                None
+            }
+        })
+        .expect("apply.result should include perf");
 
     let obj = perf.as_object().expect("perf is object");
     assert!(obj.get("hash_ms").is_some());

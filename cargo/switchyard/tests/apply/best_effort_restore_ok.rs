@@ -39,7 +39,10 @@ fn best_effort_restore_tolerates_missing_backup() {
     std::fs::write(root.join("usr/bin/app"), b"o").unwrap();
 
     let tgt = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![], restore: vec![RestoreRequest { target: tgt }] });
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: vec![RestoreRequest { target: tgt }],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 

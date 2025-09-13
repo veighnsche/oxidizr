@@ -48,16 +48,32 @@ fn lock_timeout_high_acquires_and_wait_le_timeout() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
-    let redacted: Vec<Value> = facts.events.lock().unwrap().iter().map(|(_, _, _, f)| redact_event(f.clone())).collect();
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
     // Find apply.result and assert lock_wait_ms <= 10000 when present
     for e in &redacted {
         if e.get("stage") == Some(&Value::from("apply.result")) {
             if let Some(ms) = e.get("lock_wait_ms").and_then(|v| v.as_u64()) {
-                assert!(ms <= 10_000, "lock_wait_ms should be <= timeout; got {}", ms);
+                assert!(
+                    ms <= 10_000,
+                    "lock_wait_ms should be <= timeout; got {}",
+                    ms
+                );
             }
         }
     }

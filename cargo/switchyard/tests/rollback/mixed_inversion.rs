@@ -32,14 +32,23 @@ fn mixed_actions_inverse_in_reverse_order() {
     std::fs::write(&link_t, b"o").unwrap();
 
     let plan = api.plan(PlanInput {
-        link: vec![LinkRequest { source: SafePath::from_rooted(root, &src_new).unwrap(), target: SafePath::from_rooted(root, &link_t).unwrap() }],
-        restore: vec![RestoreRequest { target: SafePath::from_rooted(root, &restore_t).unwrap() }],
+        link: vec![LinkRequest {
+            source: SafePath::from_rooted(root, &src_new).unwrap(),
+            target: SafePath::from_rooted(root, &link_t).unwrap(),
+        }],
+        restore: vec![RestoreRequest {
+            target: SafePath::from_rooted(root, &restore_t).unwrap(),
+        }],
     });
 
     let report = api.apply(&plan, ApplyMode::Commit).unwrap();
     // Inversion should contain two restores, in reverse order of executed actions
     let inv = api.plan_rollback_of(&report);
-    assert_eq!(inv.actions.len(), 2, "inverse of mixed executed should have two restores");
+    assert_eq!(
+        inv.actions.len(),
+        2,
+        "inverse of mixed executed should have two restores"
+    );
     // First inverse should be for the last executed (restore target)
     match &inv.actions[0] {
         switchyard::types::plan::Action::RestoreFromBackup { target } => {

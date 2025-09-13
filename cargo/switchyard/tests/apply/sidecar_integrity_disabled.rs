@@ -34,9 +34,9 @@ fn e2e_apply_020_sidecar_integrity_disabled_tolerates_tamper() {
     policy.governance.allow_unlocked_commit = true; // avoid lock manager requirement
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid gating on temp files
     policy.apply.override_preflight = true; // skip preflight checks
-    
+
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
-    
+
     // Layout under temp root
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
@@ -46,17 +46,23 @@ fn e2e_apply_020_sidecar_integrity_disabled_tolerates_tamper() {
     std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
     std::fs::write(&src, b"n").unwrap();
     std::fs::write(&tgt, b"o").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let input = PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] };
-    
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    };
+
     let plan = api.plan(input);
     let _ = api.preflight(&plan).unwrap();
-    
+
     // Apply should succeed even with sidecar integrity disabled
     let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
-    
+
     // Check that we got the appropriate apply events
     let redacted: Vec<Value> = facts
         .events
@@ -65,10 +71,13 @@ fn e2e_apply_020_sidecar_integrity_disabled_tolerates_tamper() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    
+
     // Should have an apply.result success event
-    assert!(redacted.iter().any(|e| {
-        e.get("stage") == Some(&Value::from("apply.result"))
-            && e.get("decision") == Some(&Value::from("success"))
-    }), "expected apply.result success with sidecar integrity disabled");
+    assert!(
+        redacted.iter().any(|e| {
+            e.get("stage") == Some(&Value::from("apply.result"))
+                && e.get("decision") == Some(&Value::from("success"))
+        }),
+        "expected apply.result success with sidecar integrity disabled"
+    );
 }

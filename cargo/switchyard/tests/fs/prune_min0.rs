@@ -5,7 +5,10 @@ use switchyard::policy::Policy;
 use switchyard::types::safepath::SafePath;
 
 fn make_snaps(tgt: &std::path::Path, tag: &str, n: usize) {
-    for _ in 0..n { let _ = switchyard::fs::backup::create_snapshot(tgt, tag); std::thread::sleep(std::time::Duration::from_millis(2)); }
+    for _ in 0..n {
+        let _ = switchyard::fs::backup::create_snapshot(tgt, tag);
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
 }
 
 #[test]

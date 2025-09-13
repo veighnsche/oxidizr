@@ -28,7 +28,9 @@ fn commit_requires_smoke_runner_when_policy_enforced() {
     let mut policy = Policy::default();
     policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted; // avoid preflight source trust STOP in temp env
-    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true };
+    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require {
+        auto_rollback: true,
+    };
     policy.governance.allow_unlocked_commit = true; // allow Commit path in test without LockManager
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)

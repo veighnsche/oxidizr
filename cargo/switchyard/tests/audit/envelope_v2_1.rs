@@ -1,5 +1,5 @@
 use serde_json::Value;
-use switchyard::logging::{FactsEmitter, JsonlSink, redact_event};
+use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
@@ -36,7 +36,13 @@ fn envelope_contains_v2_1_fields() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     // Run both preflight and apply to capture dry-run events
     let _ = api.preflight(&plan).unwrap();
@@ -52,7 +58,10 @@ fn envelope_contains_v2_1_fields() {
         assert!(v.get("event_id").is_some(), "event_id missing");
         assert!(v.get("run_id").is_some(), "run_id missing");
         assert!(v.get("seq").is_some(), "seq missing");
-        assert!(v.get("switchyard_version").is_some(), "switchyard_version missing");
+        assert!(
+            v.get("switchyard_version").is_some(),
+            "switchyard_version missing"
+        );
         assert_eq!(v.get("dry_run"), Some(&Value::from(true)));
         assert_eq!(v.get("redacted"), Some(&Value::from(true)));
     }

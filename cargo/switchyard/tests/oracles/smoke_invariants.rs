@@ -28,7 +28,10 @@ impl FactsEmitter for TestEmitter {
 #[derive(Debug)]
 struct FailingSmokeRunner;
 impl switchyard::adapters::SmokeTestRunner for FailingSmokeRunner {
-    fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::SmokeFailure> {
+    fn run(
+        &self,
+        _plan: &switchyard::types::plan::Plan,
+    ) -> Result<(), switchyard::adapters::SmokeFailure> {
         Err(switchyard::adapters::SmokeFailure)
     }
 }
@@ -37,43 +40,51 @@ impl switchyard::adapters::SmokeTestRunner for FailingSmokeRunner {
 fn smoke_invariants() {
     // Smoke invariants (P2)
     // Assert missing/fail leads to E_SMOKE and auto-rollback per policy
-    
+
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true }; // Require smoke tests
+    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require {
+        auto_rollback: true,
+    }; // Require smoke tests
     policy.governance.allow_unlocked_commit = true; // Allow commit without lock manager
-    
+
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
         .with_smoke_runner(Box::new(FailingSmokeRunner));
-    
+
     // Use temp directory
     let td = tempfile::tempdir().unwrap();
     let root = td.path();
-    
+
     let src = root.join("bin/new");
     let tgt = root.join("usr/bin/app");
-    
+
     std::fs::create_dir_all(src.parent().unwrap()).unwrap();
     std::fs::create_dir_all(tgt.parent().unwrap()).unwrap();
     std::fs::write(&src, b"new").unwrap();
     std::fs::write(&tgt, b"old").unwrap();
-    
+
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    
-    let input = PlanInput { 
-        link: vec![LinkRequest { source: s, target: t }], 
-        restore: vec![] 
+
+    let input = PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
     };
-    
+
     let plan = api.plan(input);
     let _ = api.preflight(&plan).unwrap();
-    
+
     // Apply with failing smoke runner should fail with E_SMOKE
     let apply_result = api.apply(&plan, ApplyMode::Commit);
-    assert!(apply_result.is_err(), "apply should fail when smoke test fails");
-    
+    assert!(
+        apply_result.is_err(),
+        "apply should fail when smoke test fails"
+    );
+
     // Check that we got the appropriate smoke error events
     let redacted: Vec<Value> = facts
         .events
@@ -82,9 +93,12 @@ fn smoke_invariants() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    
+
     // Should have an apply.attempt or apply.result failure with E_SMOKE error
-    assert!(redacted.iter().any(|e| {
-        e.get("error_id") == Some(&Value::from("E_SMOKE"))
-    }), "expected E_SMOKE error in events");
+    assert!(
+        redacted
+            .iter()
+            .any(|e| { e.get("error_id") == Some(&Value::from("E_SMOKE")) }),
+        "expected E_SMOKE error in events"
+    );
 }

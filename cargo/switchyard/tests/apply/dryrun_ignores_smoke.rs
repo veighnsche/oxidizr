@@ -27,7 +27,9 @@ fn dryrun_does_not_invoke_smoke_runner() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
     let mut policy = Policy::default();
-    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true };
+    policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require {
+        auto_rollback: true,
+    };
     policy.risks.source_trust = switchyard::policy::types::SourceTrustPolicy::AllowUntrusted;
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
@@ -43,14 +45,28 @@ fn dryrun_does_not_invoke_smoke_runner() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
 
-    let redacted: Vec<Value> = facts.events.lock().unwrap().iter().map(|(_, _, _, f)| redact_event(f.clone())).collect();
+    let redacted: Vec<Value> = facts
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(_, _, _, f)| redact_event(f.clone()))
+        .collect();
     // Ensure there is no E_SMOKE reported
     assert!(
-        !redacted.iter().any(|e| e.get("error_id") == Some(&Value::from("E_SMOKE"))),
+        !redacted
+            .iter()
+            .any(|e| e.get("error_id") == Some(&Value::from("E_SMOKE"))),
         "DryRun should not emit E_SMOKE even when smoke is required"
     );
 }

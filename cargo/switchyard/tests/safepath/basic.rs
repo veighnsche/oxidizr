@@ -71,14 +71,14 @@ fn e2e_safepath_007_unsupported_component_invalid() {
     // We'll fallback to checking when path has a component that is not CurDir/Normal/ParentDir by creating a path
     // starting with root again: "/usr" as candidate while root is "/tmp/root" is handled in absolute cases.
     // So we assert that an absolute outside root is invalid (already covered).
-    assert!(SafePath::from_rooted(r, std::path::Path::new("/" )).is_err());
+    assert!(SafePath::from_rooted(r, std::path::Path::new("/")).is_err());
 }
 
 #[test]
 fn e2e_safepath_008_empty_candidate_ok() {
     let root = tempfile::tempdir().unwrap();
     let r = root.path();
-    let sp = SafePath::from_rooted(r, std::path::Path::new("" )).expect("empty path ok");
+    let sp = SafePath::from_rooted(r, std::path::Path::new("")).expect("empty path ok");
     assert_eq!(sp.rel(), std::path::Path::new(""));
 }
 

@@ -9,7 +9,7 @@ use switchyard::types::safepath::SafePath;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
-    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>> ,
+    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
 }
 impl FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
@@ -40,12 +40,25 @@ fn ownership_strict_without_oracle_stops_preflight() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
-    assert!(!pf.ok, "preflight should STOP when strict ownership without oracle");
+    assert!(
+        !pf.ok,
+        "preflight should STOP when strict ownership without oracle"
+    );
     let stops = pf.stops.join("\n").to_lowercase();
-    assert!(stops.contains("ownership"), "expected ownership mentioned in stops: {}", stops);
+    assert!(
+        stops.contains("ownership"),
+        "expected ownership mentioned in stops: {}",
+        stops
+    );
 
     // Inspect redacted events for summary_error_ids chain
     let redacted: Vec<Value> = facts
@@ -55,9 +68,25 @@ fn ownership_strict_without_oracle_stops_preflight() {
         .iter()
         .map(|(_, _, _, f)| redact_event(f.clone()))
         .collect();
-    let summary = redacted.iter().find(|e| e.get("stage") == Some(&Value::from("preflight.summary")) && e.get("decision") == Some(&Value::from("failure")))
+    let summary = redacted
+        .iter()
+        .find(|e| {
+            e.get("stage") == Some(&Value::from("preflight.summary"))
+                && e.get("decision") == Some(&Value::from("failure"))
+        })
         .expect("preflight.summary failure event");
-    let chain = summary.get("summary_error_ids").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let chain_s: Vec<String> = chain.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
-    assert!(chain_s.iter().any(|x| x == "E_OWNERSHIP"), "expected E_OWNERSHIP in summary_error_ids chain: {:?}", chain_s);
+    let chain = summary
+        .get("summary_error_ids")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let chain_s: Vec<String> = chain
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(
+        chain_s.iter().any(|x| x == "E_OWNERSHIP"),
+        "expected E_OWNERSHIP in summary_error_ids chain: {:?}",
+        chain_s
+    );
 }
