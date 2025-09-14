@@ -17,3 +17,6 @@ mod rollback_reversibility;
 mod secret_masking;
 mod signed_attestations;
 mod warn_no_lock_manager;
+mod default_dry_run;
+mod deterministic_ids;
+mod before_after_hashes;

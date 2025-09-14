@@ -115,6 +115,14 @@ jobs:
             exit 1
           fi
 
+      - name: Zero-SKIP gate (no #[ignore] tests)
+        run: |
+          set -euo pipefail
+          if grep -R --line-number -E '^[[:space:]]*#\[ignore\]' cargo/switchyard/tests; then
+            echo "ERROR: #[ignore] present in tests; Zero-SKIP gate requires no skipped tests." >&2
+            exit 1
+          fi
+
       - name: Changelog updated for switchyard crate changes
         run: |
           set -euo pipefail

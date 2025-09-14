@@ -10,3 +10,4 @@ mod preflight_suid_sgid;
 mod preflight_yaml;
 mod preflight_yaml_golden;
 mod rescue_exec_min_count;
+mod fallback_toolset_on_path;

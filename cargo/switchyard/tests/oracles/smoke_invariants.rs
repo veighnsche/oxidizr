@@ -78,11 +78,16 @@ fn smoke_invariants() {
     let plan = api.plan(input);
     let _ = api.preflight(&plan).unwrap();
 
-    // Apply with failing smoke runner should fail with E_SMOKE
-    let apply_result = api.apply(&plan, ApplyMode::Commit);
+    // Apply with failing smoke runner: under Option A (facts-only), apply returns Ok(report)
+    // and records E_SMOKE in facts and report.errors; auto-rollback may occur per policy.
+    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
     assert!(
-        apply_result.is_err(),
-        "apply should fail when smoke test fails"
+        !report.errors.is_empty(),
+        "apply.report should contain errors when smoke test fails"
+    );
+    assert!(
+        report.rolled_back,
+        "policy requires auto_rollback=true, report should indicate rolled_back"
     );
 
     // Check that we got the appropriate smoke error events

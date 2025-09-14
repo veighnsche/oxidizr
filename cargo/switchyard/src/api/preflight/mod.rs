@@ -210,7 +210,12 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     }
     let slog = crate::logging::StageLogger::new(&ctx);
     match decision {
-        "failure" => slog.preflight_summary().merge(&extra).emit_failure(),
+        "failure" => {
+            // Primary summary event
+            slog.preflight_summary().merge(&extra).emit_failure();
+            // Compatibility: also emit a summary-shaped failure under legacy stage name "preflight"
+            slog.preflight().merge(&extra).emit_failure();
+        }
         _ => slog.preflight_summary().merge(&extra).emit_success(),
     }
 

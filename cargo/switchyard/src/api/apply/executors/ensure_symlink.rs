@@ -99,6 +99,8 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
                     "degraded_reason": if matches!(id, ErrorId::E_EXDEV) { Some("exdev_fallback") } else { None },
                     "error_detail": if matches!(id, ErrorId::E_EXDEV) { Some("exdev_fallback_failed") } else { None },
                     "duration_ms": fsync_ms,
+                    "fsync_ms": fsync_ms,
+                    "lock_wait_ms": 0u64,
                     "before_kind": before_kind,
                     "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()).to_string() },
                 });
@@ -144,6 +146,8 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
             "degraded": if degraded_used { Some(true) } else { None },
             "degraded_reason": if degraded_used { Some("exdev_fallback") } else { None },
             "duration_ms": fsync_ms,
+            "fsync_ms": fsync_ms,
+            "lock_wait_ms": 0u64,
             "before_kind": before_kind,
             "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()).to_string() },
             "backup_durable": api.policy.durability.backup_durability,

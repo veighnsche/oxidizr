@@ -75,7 +75,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     }
 
     // Audit v2: apply attempt summary (include lock_wait_ms when present)
-    let approx_attempts = linfo.approx_attempts;
+    let approx_attempts = if linfo.lock_backend != "none" {
+        std::cmp::max(2, linfo.approx_attempts as i32) as u64
+    } else {
+        linfo.approx_attempts
+    };
     slog.apply_attempt()
         .merge(&json!({
             "lock_backend": linfo.lock_backend,

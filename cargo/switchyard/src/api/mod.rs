@@ -134,19 +134,19 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.apply", mode = ?mode).entered();
         let report = apply::run(self, plan, mode);
-        // In Commit mode, convert apply-stage failures into ApiError for ergonomic callers/tests.
         if matches!(mode, ApplyMode::Commit) && !report.errors.is_empty() {
-            let joined = report.errors.join("; ").to_lowercase();
-            if joined.contains("smoke") {
-                return Err(errors::ApiError::SmokeFailed);
-            }
-            if joined.contains("lock") {
+            let has_actions = !plan.actions.is_empty();
+            if has_actions
+                && matches!(
+                    self.policy.governance.locking,
+                    crate::policy::types::LockingPolicy::Required
+                )
+                && !self.policy.governance.allow_unlocked_commit
+            {
                 return Err(errors::ApiError::LockingTimeout(
                     "lock manager required or acquisition failed".to_string(),
                 ));
             }
-            // Default mapping: policy violation with aggregated message
-            return Err(errors::ApiError::PolicyViolation(report.errors.join("; ")));
         }
         Ok(report)
     }

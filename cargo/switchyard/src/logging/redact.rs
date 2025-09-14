@@ -30,12 +30,10 @@ pub fn ts_for_mode(mode: &ApplyMode) -> String {
 pub fn redact_event(mut v: Value) -> Value {
     if let Some(obj) = v.as_object_mut() {
         obj.insert("ts".into(), Value::String(TS_ZERO.to_string()));
-        // Remove or normalize volatile timings
+        // Remove or normalize volatile timings (keep lock_wait_ms for assertions)
         obj.remove("duration_ms");
-        obj.remove("lock_wait_ms");
-        // Remove volatile flags derived from runtime conditions
+        // Remove volatile flags derived from runtime conditions (keep degraded for assertions)
         obj.remove("severity");
-        obj.remove("degraded");
         // Remove content-hash fields for determinism gating (kept in raw logs)
         obj.remove("before_hash");
         obj.remove("after_hash");
@@ -89,9 +87,10 @@ mod tests {
         let out = redact_event(input);
         assert_eq!(out.get("ts").and_then(|v| v.as_str()), Some(TS_ZERO));
         assert!(out.get("duration_ms").is_none());
-        assert!(out.get("lock_wait_ms").is_none());
+        // We keep lock_wait_ms and degraded in redacted output for test assertions
+        assert_eq!(out.get("lock_wait_ms").and_then(|v| v.as_i64()), Some(45));
         assert!(out.get("severity").is_none());
-        assert!(out.get("degraded").is_none());
+        assert_eq!(out.get("degraded").and_then(|v| v.as_bool()), Some(true));
         assert!(out.get("before_hash").is_none());
         assert!(out.get("after_hash").is_none());
         assert!(out.get("hash_alg").is_none());

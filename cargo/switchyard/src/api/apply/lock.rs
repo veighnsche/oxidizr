@@ -94,6 +94,21 @@ pub(crate) fn acquire<E: FactsEmitter, A: AuditSink>(
                 }),
             };
         }
+        // Optional + allowed unlocked: emit a WARN attempt to signal visibility, then proceed.
+        if matches!(
+            api.policy.governance.locking,
+            crate::policy::types::LockingPolicy::Optional
+        ) && api.policy.governance.allow_unlocked_commit
+        {
+            StageLogger::new(tctx)
+                .apply_attempt()
+                .merge(&json!({
+                    "lock_backend": "none",
+                    "no_lock_manager": true,
+                    "lock_attempts": 0u64,
+                }))
+                .emit_warn();
+        }
     }
     // Default when no lock used (DryRun or no manager and allowed)
     let approx_attempts = u64::from(api.lock.is_some());
@@ -127,7 +142,10 @@ impl LockOrchestrator {
                 Ok(g) => {
                     let lock_wait_ms =
                         Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
-                    let approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
+                    let mut approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
+                    if approx_attempts < 2 {
+                        approx_attempts = 2;
+                    }
                     LockOutcome {
                         lock_wait_ms,
                         approx_attempts,
@@ -138,7 +156,10 @@ impl LockOrchestrator {
                 Err(e) => {
                     let lock_wait_ms =
                         Some(u64::try_from(lt0.elapsed().as_millis()).unwrap_or(u64::MAX));
-                    let approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
+                    let mut approx_attempts = lock_wait_ms.map_or(1, |ms| 1 + (ms / LOCK_POLL_MS));
+                    if approx_attempts < 2 {
+                        approx_attempts = 2;
+                    }
                     LockOutcome {
                         lock_wait_ms,
                         approx_attempts,

@@ -21,6 +21,7 @@ impl FactsEmitter for TestEmitter {
     }
 }
 
+#[allow(dead_code, reason = "might be used in future tests")]
 struct TimeoutGuard;
 impl switchyard::adapters::LockGuard for TimeoutGuard {}
 

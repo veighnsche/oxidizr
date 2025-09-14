@@ -12,3 +12,5 @@ mod redaction_invariant;
 mod restore_success;
 mod rollback_pure_function;
 mod smoke_invariants;
+mod ensure_symlink_fsync;
+mod bounds_threshold;

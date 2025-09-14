@@ -1,0 +1,18 @@
+error[E0308]: mismatched types
+  --> tests/trybuild/mutate_with_raw_path.rs:10:43
+   |
+10 |     let _ = replace_file_with_symlink(p, q, false, false, "tag");
+   |                                           ^ expected struct `switchyard::types::safepath::SafePath`, found struct `std::path::Path`
+   |
+   = note: expected reference `&switchyard::types::safepath::SafePath`
+              found reference `&std::path::Path`
+
+error[E0308]: mismatched types
+  --> tests/trybuild/mutate_with_raw_path.rs:10:46
+   |
+10 |     let _ = replace_file_with_symlink(p, q, false, false, "tag");
+   |                                              ^ expected struct `switchyard::types::safepath::SafePath`, found struct `std::path::Path`
+   |
+   = note: expected reference `&switchyard::types::safepath::SafePath`
+              found reference `&std::path::Path`
+

@@ -2,3 +2,5 @@
 mod prune_backups;
 mod prune_min0;
 mod restore_invertible_roundtrip;
+mod prune_age_limits;
+mod prune_invariants_extended;

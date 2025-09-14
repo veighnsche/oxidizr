@@ -28,6 +28,8 @@ impl ApplySummary {
                     "swap_ms": total.swap,
                 }),
             );
+            // Expose a top-level fsync_ms for tests that assert bounds recording
+            obj.insert("fsync_ms".to_string(), json!(total.swap));
         }
         self
     }
