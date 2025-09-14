@@ -280,19 +280,20 @@ fn redact_and_emit(
             use serde_json::map::Entry;
             // host
             if let Entry::Vacant(e) = obj.entry("host".to_string()) {
-                let hostname = std::env::var("HOSTNAME").ok();
-                let os = Some(std::env::consts::OS.to_string());
-                let arch = Some(std::env::consts::ARCH.to_string());
+                let mut host_obj = Map::new();
+                if let Some(hostname) = std::env::var("HOSTNAME").ok() {
+                    host_obj.insert("hostname".to_string(), json!(hostname));
+                }
+                host_obj.insert("os".to_string(), json!(std::env::consts::OS.to_string()));
+                host_obj.insert("arch".to_string(), json!(std::env::consts::ARCH.to_string()));
                 // Kernel best-effort: read from /proc/version if present
-                let kernel = std::fs::read_to_string("/proc/version")
+                if let Some(kernel) = std::fs::read_to_string("/proc/version")
                     .ok()
-                    .and_then(|s| s.split_whitespace().nth(2).map(ToString::to_string));
-                e.insert(json!({
-                    "hostname": hostname,
-                    "os": os,
-                    "kernel": kernel,
-                    "arch": arch,
-                }));
+                    .and_then(|s| s.split_whitespace().nth(2).map(ToString::to_string))
+                {
+                    host_obj.insert("kernel".to_string(), json!(kernel));
+                }
+                e.insert(json!(host_obj));
             }
             // process
             if let Entry::Vacant(e) = obj.entry("process".to_string()) {
@@ -308,9 +309,14 @@ fn redact_and_emit(
             }
             // build
             if let Entry::Vacant(e) = obj.entry("build".to_string()) {
-                let git_sha = std::env::var("GIT_SHA").ok();
-                let rustc = std::env::var("RUSTC_VERSION").ok();
-                e.insert(json!({"git_sha": git_sha, "rustc": rustc}));
+                let mut build_obj = Map::new();
+                if let Some(git_sha) = std::env::var("GIT_SHA").ok() {
+                    build_obj.insert("git_sha".to_string(), json!(git_sha));
+                }
+                if let Some(rustc) = std::env::var("RUSTC_VERSION").ok() {
+                    build_obj.insert("rustc".to_string(), json!(rustc));
+                }
+                e.insert(json!(build_obj));
             }
         }
         // Monotonic per-run sequence

@@ -34,10 +34,7 @@ impl SafePath {
     /// or if the candidate path contains unsafe components like dotdot (..).
     pub fn from_rooted(root: &Path, candidate: &Path) -> Result<Self> {
         if !root.is_absolute() {
-            return Err(Error {
-                kind: ErrorKind::InvalidPath,
-                msg: "root must be absolute".into(),
-            });
+            panic!("root must be absolute");
         }
         let effective = if candidate.is_absolute() {
             match candidate.strip_prefix(root) {

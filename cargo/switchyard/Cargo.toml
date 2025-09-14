@@ -30,11 +30,12 @@ xattr = "1"
 tracing = { version = "0.1", optional = true }
 
 [features]
-default = ["bdd"]
+# default = ["bdd"]
+default = []
 prod = []   # turns warnings into errors for high-signal lints
 # Enable a simple file-backed JSONL sink for facts and audit streams
 file-logging = []
-bdd = []
+# bdd = []
 envmeta = []
 
 [dev-dependencies]
