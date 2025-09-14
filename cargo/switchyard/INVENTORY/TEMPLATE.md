@@ -1,139 +1,97 @@
-# Implementation Inventory Template
+# <Name> — <Type: Feature | Module | API | Concept>
 
-- Title: <feature name>
-- Category: Safety | UX | DX | Infra | Concurrency | Determinism | Observability | Recovery | Attestation | Performance | API Safety
-- Maturity: Bronze | Silver | Gold | Platinum
-- Owner(s): <github handle(s)>
-- Last reviewed: <YYYY-MM-DD>
-- Next review due: <YYYY-MM-DD>
-- Related PR(s): <#NNNN, links>
+**Owner:** <@handle/team>  
+**Last Reviewed:** <YYYY-MM-DD> · **Next Review:** <YYYY-MM-DD>
 
-## Summary
+> **Scope:** Deep Wiki already documents behavior. This file records **risk posture**, **policy context**, **wiring**, and **proof**.
 
-Brief description of the feature and its intent. Reference SPEC requirements if applicable.
+---
 
-## Pros & Cons
+## 1) Contract (non-negotiables)  
 
-| Pros | Proof (code/tests) |
-| --- | --- |
-| <clear benefit> | <repo-relative code/test citation> |
-|  |  |
+*(Max 3 bullets — Alpine brevity)*  
 
-| Cons | Notes |
-| --- | --- |
-| <tradeoff/limitation> | <operational caveat/portability note> |
-|  |  |
+- <Invariant 1>  
+- <Invariant 2>  
+- <Invariant 3>  
 
-## Implementation
+**Policy Impact (Debian-style):**  
 
-- Key modules and symbols:
-  - Files and functions/classes used (with paths), for example:
-    - `src/foo/bar.rs::some_function()`
-- Data flow and control flow:
-  - How requests enter, which modules process them, and where side effects occur.
-- Invariants enforced and error mapping.
+- Related SPEC sections: §… (link)  
+- Policy knobs: `policy.*` flags that affect this  
 
-## Wiring Assessment
+---
 
-- Entry points calling into this feature
-- Adapters, traits, or policies used
-- Stage(s) that emit facts or perform mutations
-- Conclusion: wired correctly? yes/no and why
+## 2) Wiring (code-referential only — Arch transparency)  
 
-## Evidence and Proof
+- **Locations (impl):** `<path>:<line>`  
+- **Callers (consumers):** `<path>:<line>`  
+- **Callees (deps):** `<path>:<line>`  
+- **External Surface:** CLI flags / API endpoints / crate exports  
 
-- Tests covering this feature (paths and test names)
-- Observability: facts/emitted fields and schema version
-- Determinism: IDs, timestamps, redaction policy
+---
 
-## Feature Analytics
+## 3) Risk & Impact (scored)  
 
-- Complexity: <qualitative + rough LOC/modules touched>
-- Risk & Blast Radius: <subsystems/filesystems/policies impacted>
-- Performance Budget: <hot path? expected overhead; micro/macro benchmarks if present>
-- Observability: <facts emitted, schema version, log fields>
-- Test Coverage: <unit/integration/property/golden; file paths/test names>
-- Determinism & Redaction: <IDs, timestamps, redaction strategy>
-- Policy Knobs: <config flags and defaults>
-- Exit Codes & Error Mapping: <table below must reflect this>
-- Concurrency/Locking Touchpoints: <who acquires locks; deadlock surfaces>
-- Cross-FS/Degraded Behavior: <EXDEV paths, fallbacks>
-- Platform Notes: <Linux variants, container/fs quirks>
-- DX Ergonomics: <APIs, ergonomics tradeoffs>
+- **Impact (1–5):** <#> — why this severe  
+- **Likelihood (1–5):** <#> — churn / unsafe / FS variance  
+- **Risk = I×L:** <#> → **Tier:** Bronze | Silver | Gold | **Platinum**  
 
-## Gaps and Risks
+---
 
-- Known limitations
-- Security/consistency risks
+## 4) Maturity / Robustness (OpenBSD strictness + Fedora roadmap)  
 
-## Next Steps to Raise Maturity
+- [ ] Invariants documented (→ code lines)  
+- [ ] Unit tests (→ test names/paths)  
+- [ ] Boundary / negative tests  
+- [ ] Property / fuzz / chaos / failure-injection (if relevant)  
+- [ ] E2E tests (happy/sad/idempotence/rollback)  
+- [ ] Platform/FS matrix (if FS/OS-sensitive)  
+- [ ] Telemetry (metrics/logs/events + alerts/SLOs)  
+- [ ] Rollback / Recovery proof (tests or playbook)  
+- [ ] Determinism check (goldens, UUIDv5, redactions — NixOS influence)  
+- [ ] Independent review recorded  
 
-- Concrete, small PR-sized tasks
-- Golden tests or CI gates to add
+**Current Tier:** <Bronze|Silver|Gold|Platinum>  
+**Target Tier & ETA (Fedora-style):** <Tier> by <release/date>  
 
-## Policy Controls Matrix
+---
 
-| Flag | Default | Effect |
-| --- | --- | --- |
-| <policy_flag> | <default> | <enforcement behavior> |
+## 5) Failure Modes (observable)  
 
-## Exit Reasons / Error → Exit Code Map
+- <Mode> → <symptom / error code / audit event>  
+- <Mode> → <…>  
 
-| Error ID | Exit Code | Where mapped |
-| --- | --- | --- |
-| <E_FOO> | <NN> | `cargo/switchyard/src/api/errors.rs::{exit_code_for, exit_code_for_id_str}` |
+---
 
-## Observability Map
+## 6) Evidence (links only — Arch style)  
 
-| Fact | Fields (subset) | Schema |
-| --- | --- | --- |
-| <stage.event> | <fields> | <schema ref> |
+- **Tests:** `<path>::<test_name>` (3–7 load-bearing)  
+- **Schemas/Specs:** `<path>`  
+- **Telemetry:** metric/log/event names, dashboards  
+- **Playbooks:** rollback/recovery procedures  
 
-## Test Coverage Map
+---
 
-| Path | Test name | Proves |
-| --- | --- | --- |
-| <repo path> | <test name> | <what it proves> |
+## 7) Gaps → Actions (mandatory — OpenBSD strictness)  
 
-## Maturity & Upgrade Path
+| ID  | Action | Evidence target | Expected effect (I/L ↓) | Owner  | Due        |  
+|-----|--------|-----------------|--------------------------|--------|-----------|  
+| G-1 | <…>    | <tests/dashboards> | L: 4→3 | @handle | YYYY-MM-DD |  
 
-| Tier | Capabilities | Required Guarantees | Tests/Proofs | Ops/Tooling | Relationship to Previous Tier |
-| --- | --- | --- | --- | --- | --- |
-| Bronze | <baseline> | <minimal guarantees> | <tests> | <ops/tooling> | Additive or Replacement |
-| Silver | <hardened & observable> | <determinism, error taxonomy, facts/logs validated> | <tests> | <ops/tooling> | Additive or Replacement |
-| Gold | <production-ready> | <policy gating, rollback tests, perf bounds> | <tests> | <ops/tooling> | Additive or Replacement |
-| Platinum | <mission-critical> | <formal invariants, multi-platform, continuous compliance> | <tests> | <ops/tooling> | Additive or Replacement |
+*(If no gaps, explicitly write “None (verified)”)*  
 
-Upgrade Path Notes:
-- Bronze→Silver: <Additive/Replacement> — <why>
-- Silver→Gold: <Additive/Replacement> — <why>
-- Gold→Platinum: <Additive/Replacement> — <why>
+---
 
-## Maintenance Checklist
+## 8) Notes for IDE-AI (verification rules)  
 
-- [ ] Code citations are accurate (paths and symbol names)
-- [ ] Policy knobs documented reflect current `policy::Policy`
-- [ ] Error mapping and `exit_code` coverage verified
-- [ ] Emitted facts fields listed and schema version up to date
-- [ ] Determinism parity (DryRun vs Commit) verified in tests
-- [ ] Goldens added/updated and CI gates green
-- [ ] Preflight YAML or JSON Schema validated (where applicable)
-- [ ] Cross-filesystem or degraded-mode notes reviewed (if applicable)
-- [ ] Security considerations reviewed; redaction masks adequate
-- [ ] Licensing impact considered (deps changed? update licensing inventory)
-- [ ] Maturity rating reassessed and justified if changed
-- [ ] Observations log updated with date/author if noteworthy
+- Resolve **all** references to **file:line** at HEAD.  
+- Derive callers/callees via static analysis.  
+- Confirm invariants with guard conditions or post-effects in code.  
+- Verify tests assert the invariant.  
+- Locate telemetry emit sites + dashboards.  
+- Detect policy knobs (`policy.*`) that affect behavior (Gentoo configurability).  
+- Compute 90-day **churn score** (git) to inform Likelihood.  
+- If unverifiable → mark as **Gap**.  
 
-## Observations log
-
-- <YYYY-MM-DD> — <author> — <short observation>
-
-## Change history
-
-- <YYYY-MM-DD> — <author> — <summary of change>; PR: <#NNNN>
-
-## Related
-
-- SPEC sections, ADRs, and planning docs
-- Closely related inventory entries
-
+---

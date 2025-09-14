@@ -1,133 +1,20 @@
-# Switchyard Implementation Inventory
+# Switchyard Implementation Inventory (v2, NEW_TEMPLATE)
 
-This folder tracks one entry per implemented feature across API Safety, Filesystem, Policy, Concurrency, Determinism, Observability, Recovery, Attestation, Tooling, and Performance. Each entry includes a maturity rating and proofs with code citations. Use `TEMPLATE.md` for new entries.
+This folder contains normalized, NEW_TEMPLATE-based entries with precise code citations, risk scoring, maturity checklists, failure modes, and gaps→actions.
 
-## Maintenance and Contributions
+## Index
 
-Use this inventory as a living document. Keep entries up-to-date as code changes land.
+- FS — Atomic symlink swap: `FS_Atomic_Symlink_Swap.md`
+- FS — Backup and sidecar: `FS_Backup_and_Sidecar.md`
+- FS — Restore and rollback: `FS_Restore_and_Rollback.md`
+- API — SafePath: `API_SafePath.md`
+- Policy — Gating and preflight: `Policy_Gating_and_Preflight.md`
+- Safety — Locking and concurrency: `Safety_Locking_and_Concurrency.md`
+- Determinism — Determinism and redaction: `Determinism_and_Redaction.md`
+- Observability — Audit and logging: `Observability_Audit_and_Logging.md`
+- Observability — Facts schema validation: `Observability_Facts_Schema_Validation.md`
+- Observability — Preflight YAML exporter: `Observability_Preflight_YAML.md`
+- Infra — Rescue profile verification: `Infra_Rescue_Profile_Verification.md`
+- Safety — Exit codes taxonomy: `Safety_Exit_Codes.md`
 
-- Observations
-  - Add short notes under an entry’s "Observations log" with date, author, and a brief description of what was discovered (e.g., edge cases, flaky behavior, environment caveats).
-  - Example: "2025-09-13 — vince — EXDEV on btrfs observed in container; degraded path ok."
-
-- Updates
-  - When code or behavior changes, update the entry’s code citations and any affected fields (policy knobs, emitted facts, error mapping).
-  - If maturity changes, bump the tier and briefly justify in "Change history" with a link to the PR.
-
-- Maintenance cadence
-  - Each entry carries "Owner(s)" and "Last reviewed" metadata. Target regular reviews (e.g., monthly or per release).
-  - If ownership changes, update the entry header.
-
-- PR workflow
-  - If your PR modifies code paths cited by an entry, update that entry in the same PR.
-  - Checklist: update code references; run tests; add or update goldens; update maturity if warranted; append a dated observation if adding nuance.
-
-- Living inventory guidance
-  - Prefer precise repo-relative paths for code references (e.g., `cargo/switchyard/src/fs/mount.rs`).
-  - Keep entries concise; link to SPEC/ADRs for depth. Use the maintenance checklist in `TEMPLATE.md`.
-
-## Template Requirements & Placement
-
-Use `TEMPLATE.md` strictly and include these mandatory sections and tables in every entry:
-
-- Pros & Cons (table)
-  - Placement: immediately after `## Summary`.
-- Feature Analytics
-  - Placement: immediately after `## Evidence and Proof`.
-  - Include: Complexity; Risk & Blast Radius; Performance Budget; Observability; Test Coverage; Determinism & Redaction; Policy Knobs; Exit Codes & Error Mapping; Concurrency/Locking Touchpoints; Cross-FS/Degraded Behavior; Platform Notes; DX Ergonomics.
-- Policy Controls Matrix (table)
-- Exit Reasons / Error → Exit Code Map (table)
-- Observability Map (table)
-- Test Coverage Map (table)
-- Maturity & Upgrade Path (Bronze → Platinum)
-  - State whether each tier transition is Additive or Replacement and why. Prefer Additive.
-- Maintenance Checklist
-- Observations log
-- Change history
-
-Every behavioral claim must cite concrete repo-relative code/tests. When a test is missing, mark a Gap and propose a PR-sized next step in "Next Steps to Raise Maturity".
-
-### Licensing Inventory
-
-Document and maintain licensing information as a dedicated inventory entry to ensure compliance and attribution.
-
-- Where
-  - Create `GOV_Licensing_Inventory.md` in this folder (or `docs/licensing/` if you prefer a separate area) using `TEMPLATE.md` as a base.
-
-- What to capture
-  - Project license(s): reference and link to `LICENSE`, `LICENSE-MIT`, etc. at repo root.
-  - SPDX expression for the project if applicable (e.g., in `Cargo.toml` or `package metadata`).
-  - Dependency license summary: generate and attach reports (store under `golden-diff/` or `docs/licensing/`).
-  - Exceptions/allowlist/denylist and decisions with rationale.
-  - NOTICE/attribution requirements and third-party notices file path(s).
-  - SBOM location and format (SPDX/CycloneDX), generation commands, and version.
-
-- How to maintain
-  - Trigger: on dependency changes (lockfile updates), releases, or policy changes.
-  - Review cadence: at least per release; update "Last reviewed" metadata.
-  - Add a dated entry to the "Observations log" when noteworthy variances are found (e.g., new license types).
-
-- Example commands
-  - cargo-deny (policy-driven checks)
-    - Install: `cargo install cargo-deny`
-    - Run: `cargo deny check licenses`
-  - cargo-about (generate human-readable inventory)
-    - Install: `cargo install cargo-about`
-    - Init template: `cargo about init about.hbs`
-    - Generate: `cargo about generate about.hbs > docs/licensing/THIRD_PARTY_NOTICES.md`
-  - SBOM generators (optional)
-    - CycloneDX: `cargo install cargo-cyclonedx && cargo cyclonedx -o docs/licensing/sbom.cdx.json`
-    - SPDX: `cargo install spdx-rs` (or use CI action) and export to `docs/licensing/sbom.spdx.json`
-
-## Index (Quick Reference)
-
-- API Safety
-  - [SafePath (capability-scoped paths)](API_SAFETY/SAFETY_SafePath.md) — Silver
-
-- Filesystem
-  - [Atomic symlink swap (TOCTOU-safe)](Filesystem/SAFETY_Atomic_Symlink_Swap.md) — Silver
-  - [Backup and sidecar](Filesystem/SAFETY_Backup_and_Sidecar.md) — Silver
-  - [Restore and rollback](Filesystem/SAFETY_Restore_and_Rollback.md) — Silver
-  - [Preservation capabilities probe](Filesystem/SAFETY_Preservation_Capabilities_Probe.md) — Silver
-  - [Mount checks (rw+exec)](Filesystem/INFRA_Mount_Checks.md) — Silver
-  - [Backup retention and prune](Filesystem/INFRA_Backup_Retention_Prune.md) — Bronze
-
-- Policy
-  - [Policy gating and preflight](Policy/SAFETY_Policy_Gating_and_Preflight.md) — Silver
-  - [Ownership and provenance](Policy/SAFETY_Ownership_and_Provenance.md) — Silver
-  - [Node hazards: SUID/SGID and hardlinks](Policy/SAFETY_Node_Hazards_SUID_SGID_and_Hardlinks.md) — Silver
-  - [Rescue profile verification](Policy/INFRA_Rescue_Profile_Verification.md) — Silver
-  - [Exit codes taxonomy](Policy/SAFETY_Exit_Codes.md) — Silver
-
-- Concurrency
-  - [Locking and concurrency](Concurrency/SAFETY_Locking_and_Concurrency.md) — Silver (with adapter)
-
-- Determinism
-  - [Determinism and redaction](Determinism/SAFETY_Determinism_and_Redaction.md) — Silver
-  - [Golden fixtures and CI gates](Determinism/INFRA_Golden_Fixtures_and_CI_Gates.md) — Bronze
-
-- Observability
-  - [Audit and logging](Observability/SAFETY_Audit_and_Logging.md) — Silver
-  - [Facts schema validation](Observability/SAFETY_Facts_Schema_Validation.md) — Bronze
-  - [JSONL file logging sink](Observability/INFRA_JSONL_File_Logging.md) — Bronze
-  - [Preflight YAML exporter](Observability/UX_Preflight_YAML.md) — Bronze
-  - [Traceability tools](Observability/DX_Traceability_Tools.md) — Bronze
-
-- Recovery
-  - [Smoke tests and auto-rollback](Recovery/INFRA_Smoke_Tests_Auto_Rollback.md) — Silver
-
-- Attestation
-  - [Attestation](Attestation/SAFETY_Attestation.md) — Bronze
-
-- Tooling
-  - [Adapters and extensibility](Tooling/DX_Adapters_and_Extensibility.md) — Bronze
-  - [Developer ergonomics](Tooling/DX_Dev_Ergonomics.md) — Silver
-
-- Performance
-  - [Operational bounds](Performance/INFRA_Operational_Bounds.md) — Bronze
-
-Conventions:
-
-- Maturity tiers follow `PLAN/90-implementation-tiers.md` (Bronze → Platinum).
-- All code references use repository-relative paths, e.g., `cargo/switchyard/src/...`.
-- Keep entries short but precise; link to SPEC/ADRs for deeper context.
+Additional entries to be added in this v2 set (next batch): Ownership & Provenance, Node Hazards (SUID/SGID & hardlinks), Prune, Smoke & Auto-Rollback, Operational Bounds, Attestation, Adapters/Extensibility, JSONL File Sink, Golden Fixtures & CI Gates.
