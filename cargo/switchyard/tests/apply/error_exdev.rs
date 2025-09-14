@@ -4,6 +4,7 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
+use serial_test::serial;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -21,6 +22,7 @@ impl FactsEmitter for TestEmitter {
 }
 
 #[test]
+#[serial]
 // #[ignore = "see BUGS.md:apply-exdev-fallback-disallowed"]
 fn ensure_symlink_emits_e_exdev_when_fallback_disallowed() {
     let facts = TestEmitter::default();

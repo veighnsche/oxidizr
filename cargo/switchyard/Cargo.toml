@@ -35,7 +35,7 @@ default = []
 prod = []   # turns warnings into errors for high-signal lints
 # Enable a simple file-backed JSONL sink for facts and audit streams
 file-logging = []
-# bdd = []
+bdd = []
 envmeta = []
 
 [dev-dependencies]

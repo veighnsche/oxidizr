@@ -7,6 +7,7 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
+use serial_test::serial;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -24,6 +25,7 @@ impl FactsEmitter for TestEmitter {
 }
 
 #[test]
+#[serial]
 fn exdev_degraded_fallback_sets_degraded_true() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();

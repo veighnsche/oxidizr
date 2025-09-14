@@ -59,7 +59,7 @@ fn preflight_summary_includes_e_ownership_in_chain_when_strict_ownership_stops()
     let summary = redacted
         .iter()
         .find(|e| {
-            e.get("stage") == Some(&Value::from("preflight"))
+            e.get("stage") == Some(&Value::from("preflight.summary"))
                 && e.get("decision") == Some(&Value::from("failure"))
         })
         .expect("preflight summary");
