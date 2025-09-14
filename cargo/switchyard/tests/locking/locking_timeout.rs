@@ -4,6 +4,25 @@ use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::PlanInput;
 use switchyard::types::ApplyMode;
+use switchyard::adapters::{LockManager, LockGuard};
+use switchyard::types::errors::{Error, ErrorKind, Result};
+
+#[derive(Debug)]
+struct FailingLockGuard;
+
+impl LockGuard for FailingLockGuard {}
+
+#[derive(Debug)]
+struct FailingLockManager;
+
+impl LockManager for FailingLockManager {
+    fn acquire_process_lock(&self, _timeout_ms: u64) -> Result<Box<dyn LockGuard>> {
+        Err(Error {
+            kind: ErrorKind::Policy,
+            msg: "E_LOCKING: timeout acquiring process lock".to_string(),
+        })
+    }
+}
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -53,7 +72,7 @@ fn locking_timeout_emits_e_locking_exit_code_and_lock_wait_ms() {
         link: vec![],
         restore: vec![],
     });
-    let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
+    let _ = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when lock manager times out");
 
     let evs = facts.events.lock().unwrap();
     // Find first apply.attempt event with decision=failure

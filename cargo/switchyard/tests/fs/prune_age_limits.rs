@@ -23,7 +23,7 @@ fn prune_max_age_365d_prunes_older() {
         .as_millis();
 
     // Three backups: 400d old (should prune), 200d old (keep), newest (keep)
-    let days = |d: u64| -> u128 { (Duration::from_secs(d * 24 * 60 * 60).as_millis()) };
+    let days = |d: u64| -> u128 { Duration::from_secs(d * 24 * 60 * 60).as_millis() };
     let ts_old = now_ms.saturating_sub(days(400));
     let ts_mid = now_ms.saturating_sub(days(200));
     let ts_new = now_ms;

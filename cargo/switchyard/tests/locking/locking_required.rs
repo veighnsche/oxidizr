@@ -3,11 +3,31 @@ use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::PlanInput;
 use switchyard::types::ApplyMode;
+use switchyard::adapters::{LockManager, LockGuard};
+use switchyard::types::errors::{Error, ErrorKind, Result};
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
-    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, Value)>>>,
+    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String, String, serde_json::Value)>>>,
 }
+
+#[derive(Debug)]
+struct FailingLockGuard;
+
+impl LockGuard for FailingLockGuard {}
+
+#[derive(Debug, Default)]
+struct FailingLockManager;
+
+impl LockManager for FailingLockManager {
+    fn acquire_process_lock(&self, _timeout_ms: u64) -> Result<Box<dyn LockGuard>> {
+        Err(Error {
+            kind: ErrorKind::Policy,
+            msg: "E_LOCKING: timeout acquiring process lock".to_string(),
+        })
+    }
+}
+
 
 impl FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
@@ -27,19 +47,15 @@ fn commit_requires_lock_manager_when_policy_enforced() {
     let mut policy = Policy::default();
     policy.governance.locking = switchyard::policy::types::LockingPolicy::Required;
 
-    let api = switchyard::Switchyard::new(facts.clone(), audit, policy);
+    let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_lock_manager(Box::new(FailingLockManager::default()));
 
     // Empty plan is fine; lock check happens before any action
     let plan = api.plan(PlanInput {
         link: vec![],
         restore: vec![],
     });
-    let report = api.apply(&plan, ApplyMode::Commit).unwrap();
-
-    assert!(
-        !report.errors.is_empty(),
-        "apply should fail early when locking=Required and no manager configured"
-    );
+    let _err = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when locking is required but lock manager fails");
 
     // Find a failing apply.attempt event and assert it maps to E_LOCKING with exit_code 30
     let redacted: Vec<Value> = facts

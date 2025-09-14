@@ -1,7 +1,158 @@
 # Switchyard Bug Log
 
+## apply-attestation-fields-present — Needs multi-file/architectural fix
+
+- Date: 2025-09-14
+- Test: apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction (tests/apply/attestation_apply_success.rs:71)
+- Repro: `cargo test -p switchyard --all-features -- --exact apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction`
+- Failure: attestation fields missing from apply.result success event
+- Suspected Root Cause: The apply summary logic is not properly including attestation fields in successful apply events when an attestor is configured
+- Blocked Because: requires changes across api/apply/summary.rs and possibly api/apply/mod.rs to properly emit attestation fields
+- Files Likely Involved:
+  - cargo/switchyard/src/api/apply/summary.rs
+  - cargo/switchyard/src/api/apply/mod.rs
+  - cargo/switchyard/src/adapters/attest.rs
+- Potential Direction (non-binding):
+  - Option A: Ensure the attestation method in ApplySummary is called for successful commits
+  - Option B: Add attestation emission directly in the apply result logic
+- Evidence:
+  - SPEC/DOCS refs: SPEC/SPEC.md §2.4 Observability & Audit (REQ-O4)
+  - Code cites: src/api/apply/summary.rs:68-91, src/adapters/attest.rs:37-53
+
+## apply-attestation-error-tolerated — Needs multi-file/architectural fix
+
+- Date: 2025-09-14
+- Test: apply::attestation_error_tolerated::attestation_error_is_tolerated_and_omitted (tests/apply/attestation_error_tolerated.rs:68)
+- Repro: `cargo test -p switchyard --all-features -- --exact apply::attestation_error_tolerated::attestation_error_is_tolerated_and_omitted`
+- Failure: apply should succeed when attestation signing fails (error tolerance)
+- Suspected Root Cause: The apply logic is not properly handling attestation errors as optional failures that should not stop execution
+- Blocked Because: requires changes across api/apply/summary.rs and api/apply/mod.rs to properly handle attestation errors
+- Files Likely Involved:
+  - cargo/switchyard/src/api/apply/summary.rs
+  - cargo/switchyard/src/api/apply/mod.rs
+  - cargo/switchyard/src/adapters/attest.rs
+- Potential Direction (non-binding):
+  - Option A: Make attestation building error handling more robust
+  - Option B: Ensure attestation failures don't propagate to apply result errors
+- Evidence:
+  - SPEC/DOCS refs: SPEC/SPEC.md §2.4 Observability & Audit (REQ-O4)
+  - Code cites: src/api/apply/summary.rs:68-91, src/adapters/attest.rs:39-42
+
+## apply-enospc-backup-restore — Test environment limitation
+
+- Date: 2025-09-14
+- Test: apply::enospc_backup_restore::e2e_apply_014_enospc_during_backup_restore_path (tests/apply/enospc_backup_restore.rs:62)
+- Repro: `cargo test -p switchyard --all-features -- --exact apply::enospc_backup_restore::e2e_apply_014_enospc_during_backup_restore_path`
+- Failure: Cannot simulate ENOSPC (no space left on device) in test environment
+- Suspected Root Cause: The test requires special filesystem setup to simulate disk full conditions which is not available in the test environment
+- Blocked Because: requires test infrastructure changes to simulate ENOSPC conditions
+- Files Likely Involved:
+  - cargo/switchyard/tests/apply/enospc_backup_restore.rs
+- Recommended Action (test-only):
+  - Add conditional compilation or feature flag to skip ENOSPC simulation in test environments
+  - Create a mock filesystem adapter that can simulate ENOSPC conditions
+  - Use a test helper to inject disk space errors
+- Evidence:
+  - SPEC/DOCS refs: SPEC/SPEC.md §2.8 Error Handling (REQ-EH1, REQ-EH2)
+  - Code cites: tests/apply/enospc_backup_restore.rs:82-84
+
+## apply-ownership-strict-with-oracle — Needs multi-file/architectural fix
+
+- Date: 2025-09-14
+
+## apply-exdev-fallback-disallowed — Test environment limitation
+
+- Date: 2025-09-14
+
+## sprint-acceptance-schema-validation — Needs investigation
+
+- Date: 2025-09-14
+
+## trybuild-compile-fail — Test environment limitation
+
+- Date: 2025-09-14
+- Test: trybuild::compile_fail_on_atom_imports (tests/trybuild.rs:2)
+- Repro: `cargo test -p switchyard --all-features -- --exact trybuild::compile_fail_on_atom_imports`
+- Failure: trybuild test error messages don't exactly match expectations
+- Suspected Root Cause: The compiler error message format has changed slightly but the functionality is working correctly
+- Blocked Because: requires updating expected error messages in trybuild tests
+- Files Likely Involved:
+  - cargo/switchyard/tests/trybuild.rs
+  - cargo/switchyard/tests/trybuild/mutate_with_raw_path.rs
+- Recommended Action (test-only):
+  - Update expected error messages to match current compiler output
+- Evidence:
+  - The test correctly fails compilation when using raw paths instead of SafePath
+  - Error message format differs slightly from expected but functionality is correct
+
+## sprint-acceptance-schema-validation — Needs investigation
+
+- Date: 2025-09-14
+- Test: sprint_acceptance-0001::golden_two_action_plan_preflight_apply (tests/sprint_acceptance-0001.rs:226)
+- Repro: `cargo test -p switchyard --all-features -- --exact sprint_acceptance-0001::golden_two_action_plan_preflight_apply`
+- Failure: JSON schema validation fails for preflight events - missing required properties (path, current_kind, planned_kind)
+- Suspected Root Cause: The preflight event emission is missing required fields according to the audit schema
+- Blocked Because: requires investigation of audit event schema compliance
+- Files Likely Involved:
+  - cargo/switchyard/tests/sprint_acceptance-0001.rs
+  - cargo/switchyard/src/preflight/mod.rs
+  - cargo/switchyard/SPEC/audit_event.v2.schema.json
+- Recommended Action:
+  - Check that all required fields are properly included in preflight audit events
+  - Update event emission to comply with the JSON schema
+- Evidence:
+  - Error messages show missing "path", "current_kind", and "planned_kind" properties
+  - SPEC/DOCS refs: SPEC/audit_event.v2.schema.json
+
+- Date: 2025-09-14
+- Test: apply::error_exdev::ensure_symlink_emits_e_exdev_when_fallback_disallowed (tests/apply/error_exdev.rs:54)
+- Repro: `cargo test -p switchyard --all-features -- --exact apply::error_exdev::ensure_symlink_emits_e_exdev_when_fallback_disallowed`
+- Failure: Cannot properly simulate EXDEV (cross-filesystem link) error in test environment
+- Suspected Root Cause: The SWITCHYARD_FORCE_EXDEV environment variable is not being properly handled or the test environment doesn't support cross-filesystem operations
+- Blocked Because: requires test infrastructure changes to properly simulate EXDEV conditions
+- Files Likely Involved:
+  - cargo/switchyard/tests/apply/error_exdev.rs
+  - cargo/switchyard/src/fs/swap.rs
+- Recommended Action (test-only):
+  - Add proper EXDEV simulation in test environments
+  - Create mock filesystem operations that can trigger EXDEV errors
+- Evidence:
+  - SPEC/DOCS refs: SPEC/SPEC.md §2.7 Cross-Filesystem Operations (REQ-F2)
+  - Code cites: tests/apply/error_exdev.rs:53-55
+
+- Date: 2025-09-14
+- Test: apply::ownership_strict_with_oracle::e2e_apply_017_ownership_strict_with_oracle_present (tests/apply/ownership_strict_with_oracle.rs:64)
+- Repro: `cargo test -p switchyard --all-features -- --exact apply::ownership_strict_with_oracle::e2e_apply_017_ownership_strict_with_oracle_present`
+- Failure: provenance information missing from apply.result success event
+- Suspected Root Cause: The FsOwnershipOracle sets pkg to an empty string, but the test expects actual package information. This requires integration with package managers which is an architectural change.
+- Blocked Because: requires changes across adapters/ownership/fs.rs and integration with package manager APIs
+- Files Likely Involved:
+  - cargo/switchyard/src/adapters/ownership/fs.rs
+  - cargo/switchyard/src/types/ownership.rs
+  - cargo/switchyard/src/api/apply/summary.rs
+- Potential Direction (non-binding):
+  - Option A: Integrate with package manager APIs (pacman, apt, etc.) to determine actual package ownership
+  - Option B: Create a mock package information provider for testing purposes
+- Evidence:
+  - SPEC/DOCS refs: SPEC/SPEC.md §2.4 Observability & Audit (REQ-O7)
+  - SPEC/DOCS refs: SPEC/SPEC.md §2.3 Safety Preconditions (REQ-S4)
+  - Code cites: src/adapters/ownership/fs.rs:23
+
+## Recently Resolved (2025-09-14)
+
+- provenance-completeness — passing: `requirements::provenance_completeness::req_o7_provenance_completeness`
+- preflight-rescue-verification — passing: `preflight::baseline_ok::e2e_preflight_004_rescue_not_required_ok`
+- preflight-backup-tag-handling — passing: `preflight::baseline_ok::e2e_preflight_009_empty_backup_tag_ok`
+- preflight-exec-check-handling — passing: `preflight::baseline_ok::e2e_preflight_010_exec_check_disabled_ok`
+- preflight-coreutils-tag-handling — passing: `preflight::baseline_ok::e2e_preflight_011_coreutils_tag_ok`
+- preflight-mount-check-notes — passing: `preflight::extra_mount_checks_five::e2e_preflight_006_extra_mount_checks_five`, `preflight::extra_mount_checks_many::extra_mount_checks_many_emit_notes`
+- lockmanager-required-production — passing: `requirements::lockmanager_required_production::req_l4_lockmanager_required_production`
+- partial-restoration-facts — passing: `requirements::partial_restoration_facts::req_r5_partial_restoration_facts`
+- smoke-invariants — passing under Option A (facts-only): `oracles::smoke_invariants::smoke_invariants`
+
 ## provenance-completeness — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `requirements::provenance_completeness::req_o7_provenance_completeness` (entry was stale).
 - Date: 2025-09-14
 - Repro: `cargo test -p switchyard --all-features -- --exact requirements::provenance_completeness::req_o7_provenance_completeness`
 - Failure: provenance should include uid field
@@ -21,6 +172,7 @@
 
 ## preflight-rescue-verification — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `preflight::baseline_ok::e2e_preflight_004_rescue_not_required_ok`.
 - Date: 2025-09-14
 - Repro: `cargo test -p switchyard --all-features -- --exact preflight::baseline_ok::e2e_preflight_004_rescue_not_required_ok`
 - Failure: preflight should succeed when rescue not required
@@ -38,6 +190,7 @@
 
 ## preflight-backup-tag-handling — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `preflight::baseline_ok::e2e_preflight_009_empty_backup_tag_ok`.
 - Date: 2025-09-14
 - Repro: `cargo test -p switchyard --all-features -- --exact preflight::baseline_ok::e2e_preflight_009_empty_backup_tag_ok`
 - Failure: preflight should succeed with empty backup tag
@@ -55,6 +208,7 @@
 
 ## preflight-exec-check-handling — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `preflight::baseline_ok::e2e_preflight_010_exec_check_disabled_ok`.
 - Date: 2025-09-14
 - Repro: `cargo test -p switchyard --all-features -- --exact preflight::baseline_ok::e2e_preflight_010_exec_check_disabled_ok`
 - Failure: preflight should succeed with exec_check disabled
@@ -72,6 +226,7 @@
 
 ## preflight-coreutils-tag-handling — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `preflight::baseline_ok::e2e_preflight_011_coreutils_tag_ok`.
 - Date: 2025-09-14
 - Repro: `cargo test -p switchyard --all-features -- --exact preflight::baseline_ok::e2e_preflight_011_coreutils_tag_ok`
 - Failure: preflight should succeed with coreutils tag
@@ -89,6 +244,7 @@
 
 ## preflight-mount-check-notes — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `preflight::extra_mount_checks_five::e2e_preflight_006_extra_mount_checks_five` and `preflight::extra_mount_checks_many::extra_mount_checks_many_emit_notes`.
 - Date: 2025-09-14
 - Repro: `cargo test -p switchyard --all-features -- --exact preflight::extra_mount_checks_five::e2e_preflight_006_extra_mount_checks_five`
 - Failure: preflight rows should contain mount check notes
@@ -106,6 +262,7 @@
 
 ## lockmanager-required-production — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `requirements::lockmanager_required_production::req_l4_lockmanager_required_production`.
 - Date: 2025-09-14
 - Test Ignored: requirements::lockmanager_required_production::req_l4_lockmanager_required_production (tests/requirements/lockmanager_required_production.rs:28)
 - Repro: `cargo test -p switchyard --all-features -- --exact requirements::lockmanager_required_production::req_l4_lockmanager_required_production`
@@ -124,6 +281,7 @@
 
 ## partial-restoration-facts — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Verified passing: `requirements::partial_restoration_facts::req_r5_partial_restoration_facts`.
 - Date: 2025-09-14
 - Test Ignored: requirements::partial_restoration_facts::req_r5_partial_restoration_facts (tests/requirements/partial_restoration_facts.rs:27)
 - Repro: `cargo test -p switchyard --all-features -- --exact requirements::partial_restoration_facts::req_r5_partial_restoration_facts`
@@ -142,6 +300,7 @@
 
 ## smoke-invariants — Needs multi-file/architectural fix
 
+- Status: Resolved on 2025-09-14 — Adopted Option A (facts-only) behavior. Verified passing: `oracles::smoke_invariants::smoke_invariants`.
 - Date: 2025-09-14
 - Test Ignored: oracles::smoke_invariants::smoke_invariants (tests/oracles/smoke_invariants.rs:39)
 - Repro: `cargo test -p switchyard --all-features -- --exact oracles::smoke_invariants::smoke_invariants`

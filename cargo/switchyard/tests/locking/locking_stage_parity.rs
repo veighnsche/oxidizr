@@ -5,6 +5,25 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
+use switchyard::adapters::{LockManager, LockGuard};
+use switchyard::types::errors::{Error, ErrorKind, Result};
+
+#[derive(Debug)]
+struct FailingLockGuard;
+
+impl LockGuard for FailingLockGuard {}
+
+#[derive(Debug, Default)]
+struct FailingLockManager;
+
+impl LockManager for FailingLockManager {
+    fn acquire_process_lock(&self, _timeout_ms: u64) -> Result<Box<dyn LockGuard>> {
+        Err(Error {
+            kind: ErrorKind::Policy,
+            msg: "E_LOCKING: timeout acquiring process lock".to_string(),
+        })
+    }
+}
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -41,7 +60,7 @@ fn apply_emits_apply_result_on_lock_failure_when_require_lock_manager() {
         restore: vec![],
     });
 
-    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
+    let _report = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when locking is required but lock manager fails");
 
     // Redacted events should include both apply.attempt and apply.result failures with E_LOCKING/30
     let redacted: Vec<Value> = facts
@@ -112,7 +131,7 @@ fn apply_emits_apply_result_on_lock_failure() {
         restore: vec![],
     });
 
-    let _report = api.apply(&plan, ApplyMode::Commit).unwrap();
+    let _report = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when locking is required but lock manager fails");
 
     // Redacted events should include both apply.attempt and apply.result failures with E_LOCKING/30
     let redacted: Vec<Value> = facts

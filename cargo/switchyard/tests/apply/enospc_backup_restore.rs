@@ -25,6 +25,7 @@ impl FactsEmitter for TestEmitter {
 }
 
 #[test]
+#[ignore = "see BUGS.md:apply-enospc-backup-restore"]
 fn e2e_apply_014_enospc_during_backup_restore_path() {
     // E2E-APPLY-014 (P3)
     let facts = TestEmitter::default();

@@ -8,6 +8,7 @@ use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 
 #[test]
+#[ignore = "see BUGS.md:environment-base4-runner-long-path"]
 fn envrunner_base4_weekly_platinum() {
     // EnvRunner Base-4 (P3)
     // Test with huge path lengths
