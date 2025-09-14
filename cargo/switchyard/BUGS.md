@@ -3,6 +3,7 @@
 ## apply-attestation-fields-present — Needs multi-file/architectural fix
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 - Test: apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction (tests/apply/attestation_apply_success.rs:71)
 - Repro: `cargo test -p switchyard --all-features -- --exact apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction`
 - Failure: attestation fields missing from apply.result success event
@@ -22,6 +23,7 @@
 ## apply-attestation-error-tolerated — Needs multi-file/architectural fix
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 - Test: apply::attestation_error_tolerated::attestation_error_is_tolerated_and_omitted (tests/apply/attestation_error_tolerated.rs:68)
 - Repro: `cargo test -p switchyard --all-features -- --exact apply::attestation_error_tolerated::attestation_error_is_tolerated_and_omitted`
 - Failure: apply should succeed when attestation signing fails (error tolerance)
@@ -41,6 +43,7 @@
 ## apply-enospc-backup-restore — Test environment limitation
 
 - Date: 2025-09-14
+- Status: ⬜ Needs work
 - Test: apply::enospc_backup_restore::e2e_apply_014_enospc_during_backup_restore_path (tests/apply/enospc_backup_restore.rs:62)
 - Repro: `cargo test -p switchyard --all-features -- --exact apply::enospc_backup_restore::e2e_apply_014_enospc_during_backup_restore_path`
 - Failure: Cannot simulate ENOSPC (no space left on device) in test environment
@@ -59,18 +62,22 @@
 ## apply-ownership-strict-with-oracle — Needs multi-file/architectural fix
 
 - Date: 2025-09-14
+- Status: ⬜ Needs work
 
 ## apply-exdev-fallback-disallowed — Test environment limitation
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 
 ## sprint-acceptance-schema-validation — Needs investigation
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 
 ## trybuild-compile-fail — Test environment limitation
 
 - Date: 2025-09-14
+- Status: ⬜ Needs work
 - Test: trybuild::compile_fail_on_atom_imports (tests/trybuild.rs:2)
 - Repro: `cargo test -p switchyard --all-features -- --exact trybuild::compile_fail_on_atom_imports`
 - Failure: trybuild test error messages don't exactly match expectations
@@ -88,6 +95,7 @@
 ## sprint-acceptance-schema-validation — Needs investigation
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 - Test: sprint_acceptance-0001::golden_two_action_plan_preflight_apply (tests/sprint_acceptance-0001.rs:226)
 - Repro: `cargo test -p switchyard --all-features -- --exact sprint_acceptance-0001::golden_two_action_plan_preflight_apply`
 - Failure: JSON schema validation fails for preflight events - missing required properties (path, current_kind, planned_kind)
@@ -105,6 +113,7 @@
   - SPEC/DOCS refs: SPEC/audit_event.v2.schema.json
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 - Test: apply::error_exdev::ensure_symlink_emits_e_exdev_when_fallback_disallowed (tests/apply/error_exdev.rs:54)
 - Repro: `cargo test -p switchyard --all-features -- --exact apply::error_exdev::ensure_symlink_emits_e_exdev_when_fallback_disallowed`
 - Failure: Cannot properly simulate EXDEV (cross-filesystem link) error in test environment
@@ -121,6 +130,7 @@
   - Code cites: tests/apply/error_exdev.rs:53-55
 
 - Date: 2025-09-14
+- Status: ⬜ Needs work
 - Test: apply::ownership_strict_with_oracle::e2e_apply_017_ownership_strict_with_oracle_present (tests/apply/ownership_strict_with_oracle.rs:64)
 - Repro: `cargo test -p switchyard --all-features -- --exact apply::ownership_strict_with_oracle::e2e_apply_017_ownership_strict_with_oracle_present`
 - Failure: provenance information missing from apply.result success event
@@ -141,6 +151,7 @@
 ## environment-base4-runner-long-path — Test harness limitation (ENAMETOOLONG)
 
 - Date: 2025-09-14
+- Status: ⬜ Needs work
 - Repro: `cargo test -p switchyard -- --exact environment::base4_runner::envrunner_base4_weekly_platinum`
 - Failure: `Os { code: 36, kind: InvalidFilename, message: "File name too long" }`
 - Suspected Root Cause: The test constructs an extremely long path segment (~2000 chars). Even in DryRun mode, any attempt to actually create such a path on the host filesystem will fail with `ENAMETOOLONG`. This is a test harness limitation, not a runtime Switchyard defect.
@@ -159,6 +170,7 @@
 ## fs-atomic-hardening — Needs multi-file/architectural fix
 
 - Date: 2025-09-14
+- Status: ✅ Fixed
 - Symptoms: Potential temp-name collision under concurrency and wrong-path operations with non-UTF-8 filenames; not yet covered by tests but poses release risk.
 - Suspected Root Cause: Deterministic tmp name `.{fname}{TMP_SUFFIX}` and UTF-8 conversions (`to_str().unwrap_or("target")`) in FS primitives.
 - Files Likely Involved:

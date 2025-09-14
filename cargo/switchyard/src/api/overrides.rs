@@ -1,7 +1,7 @@
 // src/api/overrides.rs
 // Per-instance simulation overrides used for test-only or controlled scenarios.
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Copy)]
 pub struct Overrides {
     pub force_exdev: Option<bool>,
     pub force_rescue_ok: Option<bool>,

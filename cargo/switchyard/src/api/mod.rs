@@ -54,7 +54,7 @@ pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
     audit: A,
     policy: Policy,
-    overrides: overrides::Overrides,
+    overrides: Overrides,
     lock: Option<Box<dyn DebugLockManager>>, // None in dev/test; required in production
     owner: Option<Box<dyn DebugOwnershipOracle>>, // for strict ownership gating
     attest: Option<Box<dyn DebugAttestor>>,  // for final summary attestation
@@ -85,14 +85,14 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
 
     /// Configure per-instance overrides for simulations (tests/controlled scenarios).
     #[must_use]
-    pub fn with_overrides(mut self, overrides: overrides::Overrides) -> Self {
+    pub fn with_overrides(mut self, overrides: Overrides) -> Self {
         self.overrides = overrides;
         self
     }
 
     /// Access the current per-instance overrides.
     #[must_use]
-    pub fn overrides(&self) -> &overrides::Overrides {
+    pub fn overrides(&self) -> &Overrides {
         &self.overrides
     }
 
