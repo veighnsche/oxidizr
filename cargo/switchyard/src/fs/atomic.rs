@@ -1,7 +1,7 @@
 //! Atomic symlink swap primitives and helpers.
 //!
 //! This module implements a TOCTOU-safe sequence using directory handles:
-//! `open_dir_nofollow(parent) -> symlinkat(tmp) -> renameat(tmp, final) -> fsync(parent)`.
+//! `open_dir_nofollow(parent) -> symlinkat(tmp) -> renameat(tmp, final) -> fsync(dirfd)`.
 //!
 //! Test override knobs:
 //! - `SWITCHYARD_FORCE_EXDEV=1` — simulate a cross-filesystem rename error (EXDEV) to exercise
@@ -70,6 +70,7 @@ pub fn atomic_symlink_swap(
     source: &Path,
     target: &Path,
     allow_degraded: bool,
+    force_exdev: Option<bool>,
 ) -> std::io::Result<(bool, u64)> {
     use std::os::unix::ffi::OsStrExt;
     // Open parent directory with O_DIRECTORY | O_NOFOLLOW to prevent traversal and races
@@ -112,17 +113,18 @@ pub fn atomic_symlink_swap(
     };
     let t0 = Instant::now();
     let rename_res = renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str());
-    // Test override: simulate EXDEV for coverage when explicitly allowed.
-    // Honor SWITCHYARD_FORCE_EXDEV only when running tests (cfg(test)) or when
-    // SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES=1 is set. This prevents accidental
-    // production behavior changes due to process-global env.
+    // Prefer per-instance override when provided; fallback to gated env for legacy tests only.
     let allow_env_overrides = cfg!(test)
         || std::env::var_os("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES")
             == Some(std::ffi::OsString::from("1"));
-    // If allowed, inject Err(Errno::XDEV) after the renameat call so the fallback branch executes.
-    let rename_res = if allow_env_overrides
-        && std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1"))
-    {
+    let inject_exdev = match force_exdev {
+        Some(true) => true,
+        Some(false) => false,
+        None => allow_env_overrides
+            && std::env::var_os("SWITCHYARD_FORCE_EXDEV")
+                == Some(std::ffi::OsString::from("1")),
+    };
+    let rename_res = if inject_exdev {
         match rename_res {
             Ok(()) => Err(Errno::XDEV),
             Err(e) => Err(e),

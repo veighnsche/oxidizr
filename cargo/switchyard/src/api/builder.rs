@@ -52,6 +52,7 @@ impl<E: FactsEmitter, A: AuditSink> ApiBuilder<E, A> {
             facts: self.facts,
             audit: self.audit,
             policy: self.policy,
+            overrides: super::overrides::Overrides::default(),
             lock: None,
             owner: None,
             attest: None,

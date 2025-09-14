@@ -5,8 +5,6 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 use serial_test::serial;
-#[path = "../helpers/env.rs"]
-mod scoped_env;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -35,6 +33,7 @@ fn ensure_symlink_emits_e_exdev_when_fallback_disallowed() {
     policy.governance.allow_unlocked_commit = true; // allow Commit without lock manager for this test
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_overrides(switchyard::api::Overrides::exdev(true))
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));
 
     let td = tempfile::tempdir().unwrap();
@@ -54,9 +53,6 @@ fn ensure_symlink_emits_e_exdev_when_fallback_disallowed() {
         restore: vec![],
     });
 
-    // Simulate EXDEV during atomic rename (scoped; allow env overrides in tests only)
-    let _allow = scoped_env::ScopedEnv::set("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1");
-    let _exdev = scoped_env::ScopedEnv::set("SWITCHYARD_FORCE_EXDEV", "1");
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     let redacted: Vec<Value> = facts

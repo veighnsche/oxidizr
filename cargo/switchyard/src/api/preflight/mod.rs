@@ -46,10 +46,13 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     );
 
     // Global rescue verification: if required by policy, STOP when unavailable.
-    let rescue_ok = crate::policy::rescue::verify_rescue_tools_with_exec_min(
+    // Prefer per-instance override when provided; otherwise run normal probe.
+    let rescue_ok = crate::policy::rescue::verify_rescue_min_with_override(
         api.policy.rescue.exec_check,
         api.policy.rescue.min_count,
-    );
+        api.overrides().force_rescue_ok,
+    )
+    .is_ok();
     if api.policy.rescue.require && !rescue_ok {
         stops.push("rescue profile unavailable".to_string());
     }

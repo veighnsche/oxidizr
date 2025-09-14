@@ -1,6 +1,7 @@
 //! Symlink swap orchestration that coordinates backup/snapshot and atomic swap.
 
 use std::fs;
+use std::os::unix::ffi::OsStrExt;
 
 use rustix::fs::{unlinkat, AtFlags};
 
@@ -20,6 +21,18 @@ pub fn replace_file_with_symlink(
     dry_run: bool,
     allow_degraded: bool,
     backup_tag: &str,
+) -> std::io::Result<(bool, u64)> {
+    replace_file_with_symlink_with_override(source, target, dry_run, allow_degraded, backup_tag, None)
+}
+
+/// Version of `replace_file_with_symlink` that accepts a per-instance EXDEV override for tests/controlled scenarios.
+pub fn replace_file_with_symlink_with_override(
+    source: &SafePath,
+    target: &SafePath,
+    dry_run: bool,
+    allow_degraded: bool,
+    backup_tag: &str,
+    force_exdev: Option<bool>,
 ) -> std::io::Result<(bool, u64)> {
     let source_path = source.as_path();
     let target_path = target.as_path();
@@ -90,7 +103,7 @@ pub fn replace_file_with_symlink(
                 Err(e) => return Err(std::io::Error::from_raw_os_error(e.raw_os_error())),
             }
         }
-        let res = atomic_symlink_swap(&source_path, &target_path, allow_degraded)?;
+        let res = atomic_symlink_swap(&source_path, &target_path, allow_degraded, force_exdev)?;
         return Ok(res);
     }
 
@@ -152,7 +165,7 @@ pub fn replace_file_with_symlink(
             Err(e) => return Err(std::io::Error::from_raw_os_error(e.raw_os_error())),
         }
     }
-    let res = atomic_symlink_swap(&source_path, &target_path, allow_degraded)?;
+    let res = atomic_symlink_swap(&source_path, &target_path, allow_degraded, force_exdev)?;
     Ok(res)
 }
 

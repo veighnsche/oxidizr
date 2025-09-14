@@ -8,8 +8,7 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 use serial_test::serial;
-#[path = "../helpers/env.rs"]
-mod scoped_env;
+// Overrides-based simulation avoids process-global env leakage in parallel runs
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -37,6 +36,7 @@ fn exdev_degraded_fallback_sets_degraded_true() {
     policy.governance.allow_unlocked_commit = true; // allow Commit path in test
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_overrides(switchyard::api::Overrides::exdev(true))
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));
 
     let td = tempfile::tempdir().unwrap();
@@ -56,9 +56,6 @@ fn exdev_degraded_fallback_sets_degraded_true() {
         restore: vec![],
     });
 
-    // Force EXDEV path (scoped; allow env overrides in tests only)
-    let _allow = scoped_env::ScopedEnv::set("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1");
-    let _exdev = scoped_env::ScopedEnv::set("SWITCHYARD_FORCE_EXDEV", "1");
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
 
     let redacted: Vec<Value> = facts

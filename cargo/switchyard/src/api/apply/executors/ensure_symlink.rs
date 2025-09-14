@@ -10,7 +10,7 @@ use crate::api::errors::{exit_code_for, id_str, ErrorId};
 use crate::api::Switchyard;
 use crate::constants::FSYNC_WARN_MS;
 use crate::fs::meta::{kind_of, resolve_symlink_target, sha256_hex_of};
-use crate::fs::swap::replace_file_with_symlink;
+use crate::fs::swap::replace_file_with_symlink_with_override;
 use crate::logging::audit::{ensure_provenance, AuditCtx};
 use crate::logging::StageLogger;
 use crate::logging::{AuditSink, FactsEmitter};
@@ -67,7 +67,7 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
         };
         let after_hash = sha256_hex_of(&source.as_path());
         let hash_ms = u64::try_from(th0.elapsed().as_millis()).unwrap_or(u64::MAX);
-        match replace_file_with_symlink(
+        match replace_file_with_symlink_with_override(
             source,
             target,
             dry,
@@ -76,6 +76,7 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
                 crate::policy::types::ExdevPolicy::DegradedFallback
             ),
             &api.policy.backup.tag,
+            api.overrides().force_exdev,
         ) {
             Ok((d, ms)) => {
                 degraded_used = d;

@@ -22,12 +22,14 @@ use serde_json::json;
 
 // Internal API submodules (idiomatic; directory module)
 mod apply;
+mod overrides;
 mod builder;
 pub mod errors;
 mod plan;
 mod preflight;
 mod rollback;
 pub use builder::ApiBuilder;
+pub use overrides::Overrides;
 /// DX alias for `ApiBuilder`.
 pub type SwitchyardBuilder<E, A> = ApiBuilder<E, A>;
 
@@ -52,6 +54,7 @@ pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
     audit: A,
     policy: Policy,
+    overrides: overrides::Overrides,
     lock: Option<Box<dyn DebugLockManager>>, // None in dev/test; required in production
     owner: Option<Box<dyn DebugOwnershipOracle>>, // for strict ownership gating
     attest: Option<Box<dyn DebugAttestor>>,  // for final summary attestation
@@ -78,6 +81,19 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     pub fn with_lock_manager(mut self, lock: Box<dyn DebugLockManager>) -> Self {
         self.lock = Some(lock);
         self
+    }
+
+    /// Configure per-instance overrides for simulations (tests/controlled scenarios).
+    #[must_use]
+    pub fn with_overrides(mut self, overrides: overrides::Overrides) -> Self {
+        self.overrides = overrides;
+        self
+    }
+
+    /// Access the current per-instance overrides.
+    #[must_use]
+    pub fn overrides(&self) -> &overrides::Overrides {
+        &self.overrides
     }
 
     /// Configure via `ApiBuilder::with_ownership_oracle`.

@@ -1,5 +1,0 @@
-error[E0432]: unresolved import `switchyard::fs::atomic_symlink_swap`
- --> tests/trybuild/atom_import.rs:3:5
-  |
-3 | use switchyard::fs::atomic_symlink_swap;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `atomic_symlink_swap` in `fs`

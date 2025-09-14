@@ -20,6 +20,21 @@ pub fn verify_rescue_tools() -> bool {
     verify_rescue(false).is_ok()
 }
 
+/// Public helper that prefers a per-instance override for rescue status, falling back to
+/// normal verification when no override is provided. This is used by the API layer to
+/// eliminate process-global env influence during preflight.
+pub fn verify_rescue_min_with_override(
+    exec_check: bool,
+    min_count: usize,
+    force_ok: Option<bool>,
+) -> Result<RescueStatus, RescueError> {
+    match force_ok {
+        Some(true) => Ok(RescueStatus::GNU { found: min_count, min: min_count }),
+        Some(false) => Err(RescueError::Unavailable),
+        None => verify_rescue_min(exec_check, min_count),
+    }
+}
+
 /// Verify rescue tooling with optional executability check.
 /// When `exec_check` is true, the discovered binaries must have at least one execute bit set.
 #[must_use]
