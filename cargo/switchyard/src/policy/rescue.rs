@@ -55,6 +55,13 @@ fn verify_rescue_min(exec_check: bool, min_count: usize) -> Result<RescueStatus,
             return Err(RescueError::Unavailable);
         }
     }
+    // If exec checks are disabled and minimum required count is zero, treat as OK.
+    if !exec_check && min_count == 0 {
+        return Ok(RescueStatus::GNU {
+            found: 0,
+            min: 0,
+        });
+    }
     // Prefer BusyBox (single binary) as a compact rescue profile
     if let Some(p) = which_on_path("busybox") {
         if !exec_check || is_executable(&p) {

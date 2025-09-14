@@ -25,7 +25,6 @@ impl FactsEmitter for TestEmitter {
 }
 
 #[test]
-#[ignore = "multi-file/architectural bug; see BUGS.md:locking-invariant"]
 fn locking_invariant() {
     // Locking invariant (P0)
     // Assert Required+no manager leads to early E_LOCKING and no FS mutation

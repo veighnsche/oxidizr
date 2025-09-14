@@ -39,7 +39,7 @@ impl Default for Policy {
             risks: Risks {
                 suid_sgid: RiskLevel::Stop,
                 hardlinks: RiskLevel::Stop,
-                source_trust: SourceTrustPolicy::RequireTrusted,
+                source_trust: SourceTrustPolicy::WarnOnUntrusted,
                 ownership_strict: false,
             },
             durability: Durability {

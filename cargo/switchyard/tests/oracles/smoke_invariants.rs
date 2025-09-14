@@ -37,7 +37,6 @@ impl switchyard::adapters::SmokeTestRunner for FailingSmokeRunner {
 }
 
 #[test]
-#[ignore = "multi-file/architectural bug; see BUGS.md:smoke-invariants"]
 fn smoke_invariants() {
     // Smoke invariants (P2)
     // Assert missing/fail leads to E_SMOKE and auto-rollback per policy

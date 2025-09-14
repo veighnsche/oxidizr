@@ -31,7 +31,9 @@ pub(crate) fn evaluate_action(
             for p in &policy.apply.extra_mount_checks {
                 if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                     stops.push(format!("{} not rw+exec: {}", p.display(), e));
-                    notes.push(format!("{} not rw+exec", p.display()));
+                    notes.push(format!("mount: {} not rw+exec", p.display()));
+                } else {
+                    notes.push(format!("mount ok: {} rw+exec", p.display()));
                 }
             }
             if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
@@ -40,7 +42,9 @@ pub(crate) fn evaluate_action(
                     e,
                     target.as_path().display()
                 ));
-                notes.push("target not rw+exec".to_string());
+                notes.push("mount: target not rw+exec".to_string());
+            } else {
+                notes.push("mount ok: target rw+exec".to_string());
             }
             if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
                 stops.push(format!(
@@ -133,7 +137,9 @@ pub(crate) fn evaluate_action(
             for p in &policy.apply.extra_mount_checks {
                 if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                     stops.push(format!("{} not rw+exec: {}", p.display(), e));
-                    notes.push(format!("{} not rw+exec", p.display()));
+                    notes.push(format!("mount: {} not rw+exec", p.display()));
+                } else {
+                    notes.push(format!("mount ok: {} rw+exec", p.display()));
                 }
             }
             if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(&target.as_path()) {
@@ -142,7 +148,9 @@ pub(crate) fn evaluate_action(
                     e,
                     target.as_path().display()
                 ));
-                notes.push("target not rw+exec".to_string());
+                notes.push("mount: target not rw+exec".to_string());
+            } else {
+                notes.push("mount ok: target rw+exec".to_string());
             }
             if let Err(e) = crate::preflight::checks::check_immutable(&target.as_path()) {
                 stops.push(format!(

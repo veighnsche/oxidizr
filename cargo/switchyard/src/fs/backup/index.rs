@@ -13,38 +13,55 @@ pub(crate) fn find_latest_backup_and_sidecar(
 ) -> Option<(Option<PathBuf>, PathBuf)> {
     let name = target.file_name()?.to_str()?; // relies on UTF-8 file name
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    let prefix = format!(".{name}.{tag}.");
+    let rd = fs::read_dir(parent).ok()?;
 
     // Track best (timestamp, base_path) as we scan — no Vec, no sort.
     let mut best: Option<(u128, PathBuf)> = None;
 
-    let rd = fs::read_dir(parent).ok()?;
     for entry in rd.flatten() {
-        let fname = entry.file_name(); // OsString
+        let fname = entry.file_name();
         let Some(s) = fname.to_str() else { continue }; // skip non-UTF-8
 
-        // Must start with the prefix
-        let Some(rest) = s.strip_prefix(&prefix) else {
+        // Two modes:
+        // - Tagged: expect ".{name}.{tag}.{ts}.bak[.meta.json]"
+        // - Untagged (wildcard): accept any tag: ".{name}.<any>.<ts>.bak[.meta.json]"
+        let (rest_opt, wildcard) = if tag.is_empty() {
+            let pre = format!(".{name}.");
+            (s.strip_prefix(&pre), true)
+        } else {
+            let pre = format!(".{name}.{tag}.");
+            (s.strip_prefix(&pre), false)
+        };
+        let Some(rest) = rest_opt else { continue };
+
+        // Accept both payload and sidecar filenames.
+        let core = if let Some(core) = rest.strip_suffix(".bak") {
+            core
+        } else if let Some(core) = rest.strip_suffix(".bak.meta.json") {
+            core
+        } else {
             continue;
         };
 
-        // Accept ".bak" or ".bak.meta.json"
-        let Some(num_s) = rest
-            .strip_suffix(".bak")
-            .or_else(|| rest.strip_suffix(".bak.meta.json"))
-        else {
-            continue;
+        // When wildcard, `core` has the form "<ts>" only if the tag had no body.
+        // We want the last dotted segment to be the timestamp.
+        let ts_part = if wildcard {
+            core.rsplit('.').next().unwrap_or(core)
+        } else {
+            core
+        };
+        let Ok(ts) = ts_part.parse::<u128>() else { continue };
+
+        // Build the base path back. For wildcard we cannot reconstruct tag; however, we only need base path.
+        // Reconstruct from the actual filename: drop any ".meta.json" suffix if present.
+        let base = if s.ends_with(".bak.meta.json") {
+            parent.join(&s[..s.len() - ".meta.json".len()])
+        } else {
+            parent.join(s)
         };
 
-        let Ok(ts) = num_s.parse::<u128>() else {
-            continue;
-        };
-
-        // If this timestamp is newer, keep it
         let is_better = best.as_ref().is_none_or(|(cur, _)| ts > *cur);
         if is_better {
-            // Construct the .bak base path (sidecar is derived later)
-            let base = parent.join(format!("{prefix}{ts}.bak"));
             best = Some((ts, base));
         }
     }
@@ -62,42 +79,48 @@ pub(crate) fn find_previous_backup_and_sidecar(
 ) -> Option<(Option<PathBuf>, PathBuf)> {
     let name = target.file_name()?.to_str()?;
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    let prefix = format!(".{name}.{tag}.");
 
     let mut seen = HashSet::<u128>::new();
-
-    // Collect unique (timestamp, base_path) pairs
     let mut stamps: Vec<(u128, PathBuf)> = fs::read_dir(parent)
         .ok()?
         .filter_map(Result::ok)
         .filter_map(|e| e.file_name().into_string().ok())
         .filter_map(|s| {
-            // Guard: must start with prefix
-            let rest = s.strip_prefix(&prefix)?;
-            // Accept either ".bak" or ".bak.meta.json"
-            let num_s = rest
+            // Prefix acceptance
+            let ok_prefix = if tag.is_empty() {
+                s.strip_prefix(&format!(".{name}.")).is_some()
+            } else {
+                s.strip_prefix(&format!(".{name}.{tag}.")).is_some()
+            };
+            if !ok_prefix { return None; }
+
+            // Strip sidecar suffix if present
+            let rest_opt = s
                 .strip_suffix(".bak")
-                .or_else(|| rest.strip_suffix(".bak.meta.json"))?;
-            let num: u128 = num_s.parse().ok()?;
-            // Deduplicate timestamps
-            if !seen.insert(num) {
-                return None;
-            }
-            let base = parent.join(format!("{prefix}{num}.bak"));
-            Some((num, base))
+                .or_else(|| s.strip_suffix(".bak.meta.json"))
+                .map(|core| core.to_string());
+            let Some(core) = rest_opt else { return None };
+
+            // Timestamp is the last dotted segment
+            let ts_s = core.rsplit('.').next().unwrap_or("");
+            let Ok(ts) = ts_s.parse::<u128>() else { return None };
+
+            if !seen.insert(ts) { return None; }
+            // Base path is without .meta.json when present
+            let base = if s.ends_with(".bak.meta.json") {
+                parent.join(&s[..s.len() - ".meta.json".len()])
+            } else {
+                parent.join(&s)
+            };
+            Some((ts, base))
         })
         .collect();
 
-    if stamps.len() < 2 {
-        return None;
-    }
-
-    // Second newest by timestamp
+    if stamps.len() < 2 { return None; }
     stamps.sort_unstable_by_key(|(ts, _)| *ts);
     let (_ts, base) = stamps.get(stamps.len() - 2)?.clone();
 
     let sidecar = sidecar_path_for_backup(&base);
     let backup_present = if base.exists() { Some(base) } else { None };
-
     Some((backup_present, sidecar))
 }

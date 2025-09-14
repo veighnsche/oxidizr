@@ -7,7 +7,6 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 
 #[test]
-#[ignore = "multi-file/architectural bug; see BUGS.md:preflight-mount-check-notes"]
 fn e2e_preflight_006_extra_mount_checks_five() {
     let facts = JsonlSink::default();
     let audit = JsonlSink::default();

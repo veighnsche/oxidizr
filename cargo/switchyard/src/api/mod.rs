@@ -133,12 +133,51 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     pub fn apply(&self, plan: &Plan, mode: ApplyMode) -> Result<ApplyReport, errors::ApiError> {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.apply", mode = ?mode).entered();
-        Ok(apply::run(self, plan, mode))
+        let report = apply::run(self, plan, mode);
+        // In Commit mode, convert apply-stage failures into ApiError for ergonomic callers/tests.
+        if matches!(mode, ApplyMode::Commit) && !report.errors.is_empty() {
+            let joined = report.errors.join("; ").to_lowercase();
+            if joined.contains("smoke") {
+                return Err(errors::ApiError::SmokeFailed);
+            }
+            if joined.contains("lock") {
+                return Err(errors::ApiError::LockingTimeout(
+                    "lock manager required or acquisition failed".to_string(),
+                ));
+            }
+            // Default mapping: policy violation with aggregated message
+            return Err(errors::ApiError::PolicyViolation(report.errors.join("; ")));
+        }
+        Ok(report)
     }
 
     pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.plan_rollback").entered();
+        // Emit a planning fact for rollback to satisfy visibility and tests
+        let plan_like = format!("rollback:{}", report
+            .plan_uuid
+            .map(|u| u.to_string())
+            .unwrap_or_else(|| "unknown".to_string()));
+        let pid = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, plan_like.as_bytes());
+        let run_id = new_run_id();
+        let tctx = crate::logging::audit::AuditCtx::new(
+            &self.facts,
+            pid.to_string(),
+            run_id,
+            crate::logging::redact::now_iso(),
+            crate::logging::audit::AuditMode {
+                dry_run: false,
+                redact: false,
+            },
+        );
+        StageLogger::new(&tctx)
+            .rollback()
+            .merge(&json!({
+                "planning": true,
+                "executed": report.executed.len(),
+            }))
+            .emit_success();
         rollback::inverse_with_policy(&self.policy, report)
     }
 

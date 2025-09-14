@@ -25,7 +25,6 @@ impl FactsEmitter for TestEmitter {
 }
 
 #[test]
-#[ignore = "multi-file/architectural bug; see BUGS.md:partial-restoration-facts"]
 fn req_r5_partial_restoration_facts() {
     // REQ-R5 (P1)
     // Assert partial rollback emits facts

@@ -132,6 +132,18 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 if api.policy.rescue.require && !backup_present {
                     stops.push("restore requested but no backup artifacts present".to_string());
                 }
+                // Provenance best-effort for restore actions as well
+                let prov = match &api.owner {
+                    Some(oracle) => match oracle.owner_of(target) {
+                        Ok(info) => Some(serde_json::json!({
+                            "uid": info.uid,
+                            "gid": info.gid,
+                            "pkg": info.pkg,
+                        })),
+                        Err(_) => None,
+                    },
+                    None => None,
+                };
                 emitter.emit_row(
                     &mut rows,
                     &ctx,
@@ -141,7 +153,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                         current_kind: "unknown".to_string(),
                         planned_kind: "restore_from_backup".to_string(),
                         policy_ok: Some(eval.policy_ok),
-                        provenance: None,
+                        provenance: prov,
                         notes: if eval.notes.is_empty() {
                             None
                         } else {

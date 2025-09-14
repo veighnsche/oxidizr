@@ -102,6 +102,19 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
                     "before_kind": before_kind,
                     "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()).to_string() },
                 });
+                // Attach ownership provenance best-effort
+                if let Some(owner) = &api.owner {
+                    if let Ok(info) = owner.owner_of(target) {
+                        if let Some(obj) = extra.as_object_mut() {
+                            let prov = obj.entry("provenance".to_string()).or_insert(json!({}));
+                            if let Some(pobj) = prov.as_object_mut() {
+                                pobj.insert("uid".to_string(), json!(info.uid));
+                                pobj.insert("gid".to_string(), json!(info.gid));
+                                pobj.insert("pkg".to_string(), json!(info.pkg));
+                            }
+                        }
+                    }
+                }
                 ensure_provenance(&mut extra);
                 insert_hashes(&mut extra, before_hash.as_ref(), after_hash.as_ref());
                 if let Some(obj) = extra.as_object_mut() {
@@ -135,6 +148,19 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for EnsureSymlinkExec {
             "after_kind": if dry { "symlink".to_string() } else { kind_of(&target.as_path()).to_string() },
             "backup_durable": api.policy.durability.backup_durability,
         });
+        // Attach ownership provenance best-effort
+        if let Some(owner) = &api.owner {
+            if let Ok(info) = owner.owner_of(target) {
+                if let Some(obj) = extra.as_object_mut() {
+                    let prov = obj.entry("provenance".to_string()).or_insert(json!({}));
+                    if let Some(pobj) = prov.as_object_mut() {
+                        pobj.insert("uid".to_string(), json!(info.uid));
+                        pobj.insert("gid".to_string(), json!(info.gid));
+                        pobj.insert("pkg".to_string(), json!(info.pkg));
+                    }
+                }
+            }
+        }
         ensure_provenance(&mut extra);
         insert_hashes(&mut extra, before_hash.as_ref(), after_hash.as_ref());
         maybe_warn_fsync(&mut extra, fsync_ms, FSYNC_WARN_MS);

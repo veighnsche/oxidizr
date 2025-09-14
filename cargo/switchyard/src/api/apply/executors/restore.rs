@@ -140,6 +140,19 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
                     "before_kind": before_kind,
                     "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
                 });
+                // Attach ownership provenance best-effort
+                if let Some(owner) = &api.owner {
+                    if let Ok(info) = owner.owner_of(target) {
+                        if let Some(obj) = extra.as_object_mut() {
+                            let prov = obj.entry("provenance".to_string()).or_insert(json!({}));
+                            if let Some(pobj) = prov.as_object_mut() {
+                                pobj.insert("uid".to_string(), json!(info.uid));
+                                pobj.insert("gid".to_string(), json!(info.gid));
+                                pobj.insert("pkg".to_string(), json!(info.pkg));
+                            }
+                        }
+                    }
+                }
                 if let Some(iv) = integrity_verified {
                     if let Some(obj) = extra.as_object_mut() {
                         obj.insert("sidecar_integrity_verified".into(), json!(iv));
@@ -174,6 +187,19 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
             "backup_durable": api.policy.durability.backup_durability,
         });
+        // Attach ownership provenance best-effort
+        if let Some(owner) = &api.owner {
+            if let Ok(info) = owner.owner_of(target) {
+                if let Some(obj) = extra.as_object_mut() {
+                    let prov = obj.entry("provenance".to_string()).or_insert(json!({}));
+                    if let Some(pobj) = prov.as_object_mut() {
+                        pobj.insert("uid".to_string(), json!(info.uid));
+                        pobj.insert("gid".to_string(), json!(info.gid));
+                        pobj.insert("pkg".to_string(), json!(info.pkg));
+                    }
+                }
+            }
+        }
         if let Some(iv) = integrity_verified {
             if let Some(obj) = extra.as_object_mut() {
                 obj.insert("sidecar_integrity_verified".into(), json!(iv));
