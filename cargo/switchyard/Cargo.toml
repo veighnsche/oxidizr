@@ -30,7 +30,7 @@ xattr = "1"
 tracing = { version = "0.1", optional = true }
 
 [features]
-default = []
+default = ["bdd"]
 prod = []   # turns warnings into errors for high-signal lints
 # Enable a simple file-backed JSONL sink for facts and audit streams
 file-logging = []
@@ -48,6 +48,6 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [[test]]
 name = "bdd"
-path = "tests/bdd.rs"
+path = "tests/bdd_main.rs"
 harness = false
 required-features = ["bdd"]

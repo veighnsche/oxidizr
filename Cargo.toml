@@ -51,4 +51,5 @@ default = []
 arch = []
 # Experimental internal switchyard facade (phase 1). Enable to pull in the local 'switchyard' crate.
 switchyard = ["dep:switchyard"]
+bdd = []
 
