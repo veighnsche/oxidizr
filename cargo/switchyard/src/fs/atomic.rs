@@ -14,10 +14,14 @@ use rustix::fd::OwnedFd;
 use rustix::fs::{openat, renameat, symlinkat, unlinkat, AtFlags, Mode, OFlags, CWD};
 use rustix::io::Errno;
 use std::time::Instant;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 fn errno_to_io(e: Errno) -> std::io::Error {
     std::io::Error::from_raw_os_error(e.raw_os_error())
 }
+
+// Global counter to produce unique temporary names within a process.
+static NEXT_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Open a directory with `O_DIRECTORY` | `O_NOFOLLOW` for atomic operations.
 ///
@@ -50,6 +54,13 @@ pub fn fsync_parent_dir(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Fsync a directory using an already-open directory file descriptor.
+///
+/// This avoids a TOCTOU window from re-opening the directory by path.
+fn fsync_dirfd(dirfd: &OwnedFd) -> std::io::Result<()> {
+    rustix::fs::fsync(dirfd).map_err(errno_to_io)
+}
+
 /// Atomically swap a symlink target using a temporary file and renameat.
 ///
 /// # Errors
@@ -67,14 +78,20 @@ pub fn atomic_symlink_swap(
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("target");
-    let tmp_name = format!(".{fname}{TMP_SUFFIX}");
+    let pid = std::process::id();
+    let ctr = NEXT_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp_name = format!(".{fname}.{pid}.{ctr}{TMP_SUFFIX}");
 
     let dirfd = open_dir_nofollow(parent)?;
 
-    // Best-effort unlink temporary name if present (ignore errors)
+    // Best-effort unlink temporary name if present (ignore ENOENT only)
     let tmp_c = std::ffi::CString::new(tmp_name.as_str())
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-    let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
+    match unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty()) {
+        Ok(()) => {}
+        Err(e) if e == Errno::NOENT => {}
+        Err(e) => return Err(errno_to_io(e)),
+    }
 
     // Create symlink using symlinkat relative to parent dirfd
     let src_c = std::ffi::CString::new(source.as_os_str().as_bytes()).map_err(|_| {
@@ -84,9 +101,15 @@ pub fn atomic_symlink_swap(
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 
-    // Atomically rename tmp -> fname within the same directory
-    let new_c = std::ffi::CString::new(fname)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+    // Atomically rename tmp -> final name within the same directory (bytes-safe)
+    let new_c = if let Some(name_os) = target.file_name() {
+        std::ffi::CString::new(name_os.as_bytes()).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+        })?
+    } else {
+        std::ffi::CString::new("target")
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+    };
     let t0 = Instant::now();
     let rename_res = renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str());
     // Test override: simulate EXDEV for coverage when explicitly allowed.
@@ -109,15 +132,19 @@ pub fn atomic_symlink_swap(
     };
     match rename_res {
         Ok(()) => {
-            let _ = fsync_parent_dir(target);
+            let _ = fsync_dirfd(&dirfd);
             let fsync_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
             Ok((false, fsync_ms))
         }
         Err(e) if e == Errno::XDEV && allow_degraded => {
             // Fall back: best-effort non-atomic replacement
-            let _ = unlinkat(&dirfd, new_c.as_c_str(), AtFlags::empty());
+            match unlinkat(&dirfd, new_c.as_c_str(), AtFlags::empty()) {
+                Ok(()) => {}
+                Err(e) if e == Errno::NOENT => {}
+                Err(e) => return Err(errno_to_io(e)),
+            }
             symlinkat(src_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(errno_to_io)?;
-            let _ = fsync_parent_dir(target);
+            let _ = fsync_dirfd(&dirfd);
             let fsync_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
             Ok((true, fsync_ms))
         }

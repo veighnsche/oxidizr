@@ -75,14 +75,20 @@ pub fn replace_file_with_symlink(
         // Atomically swap: ensure target removed via cap-handle
         if let Some(parent) = target_path.parent() {
             let dirfd = open_dir_nofollow(parent)?;
-            let fname = target_path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("target");
-            let fname_c = std::ffi::CString::new(fname).map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-            })?;
-            let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
+            // Bytes-safe C string from OsStr
+            let fname_c = if let Some(name_os) = target_path.file_name() {
+                std::ffi::CString::new(name_os.as_bytes()).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?
+            } else {
+                std::ffi::CString::new("target")
+                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+            };
+            match unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty()) {
+                Ok(()) => {}
+                Err(e) if e == rustix::io::Errno::NOENT => {}
+                Err(e) => return Err(std::io::Error::from_raw_os_error(e.raw_os_error())),
+            }
         }
         let res = atomic_symlink_swap(&source_path, &target_path, allow_degraded)?;
         return Ok(res);
@@ -100,15 +106,19 @@ pub fn replace_file_with_symlink(
             // Remove original target (will be replaced by atomic swap below)
             if let Some(parent) = target_path.parent() {
                 let dirfd = open_dir_nofollow(parent)?;
-                let fname = target_path
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("target");
-                let fname_c = std::ffi::CString::new(fname).map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-                })?;
-                unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty())
-                    .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
+                let fname_c = if let Some(name_os) = target_path.file_name() {
+                    std::ffi::CString::new(name_os.as_bytes()).map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?
+                } else {
+                    std::ffi::CString::new("target")
+                        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+                };
+                match unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty()) {
+                    Ok(()) => {}
+                    Err(e) if e == rustix::io::Errno::NOENT => {}
+                    Err(e) => return Err(std::io::Error::from_raw_os_error(e.raw_os_error())),
+                }
             } else {
                 let _ = fs::remove_file(&target_path);
             }
@@ -128,14 +138,19 @@ pub fn replace_file_with_symlink(
     // Ensure target removed via capability handle
     if let Some(parent) = target_path.parent() {
         let dirfd = open_dir_nofollow(parent)?;
-        let fname = target_path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("target");
-        let fname_c = std::ffi::CString::new(fname).map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-        })?;
-        let _ = unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty());
+        let fname_c = if let Some(name_os) = target_path.file_name() {
+            std::ffi::CString::new(name_os.as_bytes()).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+            })?
+        } else {
+            std::ffi::CString::new("target")
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+        };
+        match unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty()) {
+            Ok(()) => {}
+            Err(e) if e == rustix::io::Errno::NOENT => {}
+            Err(e) => return Err(std::io::Error::from_raw_os_error(e.raw_os_error())),
+        }
     }
     let res = atomic_symlink_swap(&source_path, &target_path, allow_degraded)?;
     Ok(res)
