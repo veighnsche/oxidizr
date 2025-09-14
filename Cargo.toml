@@ -41,6 +41,7 @@ tempfile = "3.12"
 
 [workspace]
 members = [
+    "cargo/switchyard",
 ]
 resolver = "2"
 
