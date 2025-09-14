@@ -1,7 +1,7 @@
 use cucumber::{given, when};
 
-use crate::bdd_world::World;
 use crate::bdd_support::env::EnvGuard;
+use crate::bdd_world::World;
 use switchyard::policy::types::SmokePolicy;
 
 #[given(regex = r"^(/.+) is a symlink to (.+)$")]

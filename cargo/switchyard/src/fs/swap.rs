@@ -22,10 +22,29 @@ pub fn replace_file_with_symlink(
     allow_degraded: bool,
     backup_tag: &str,
 ) -> std::io::Result<(bool, u64)> {
-    replace_file_with_symlink_with_override(source, target, dry_run, allow_degraded, backup_tag, None)
+    replace_file_with_symlink_with_override(
+        source,
+        target,
+        dry_run,
+        allow_degraded,
+        backup_tag,
+        None,
+    )
 }
 
 /// Version of `replace_file_with_symlink` that accepts a per-instance EXDEV override for tests/controlled scenarios.
+///
+/// # Errors
+///
+/// Returns an IO error when:
+/// - Capability handle acquisition for the parent directory fails
+/// - Removing the existing target fails with an unexpected errno
+/// - Creating a snapshot (backup) of the prior state fails (Commit mode)
+/// - Performing the atomic symlink swap fails (including EXDEV fallback when disallowed)
+#[allow(
+    clippy::too_many_lines,
+    reason = "Will be broken down into smaller helpers in a follow-up refactor"
+)]
 pub fn replace_file_with_symlink_with_override(
     source: &SafePath,
     target: &SafePath,
@@ -94,8 +113,9 @@ pub fn replace_file_with_symlink_with_override(
                     std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                 })?
             } else {
-                std::ffi::CString::new("target")
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+                std::ffi::CString::new("target").map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                })?
             };
             match unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty()) {
                 Ok(()) => {}
@@ -124,8 +144,9 @@ pub fn replace_file_with_symlink_with_override(
                         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
                     })?
                 } else {
-                    std::ffi::CString::new("target")
-                        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+                    std::ffi::CString::new("target").map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+                    })?
                 };
                 match unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty()) {
                     Ok(()) => {}
@@ -156,8 +177,9 @@ pub fn replace_file_with_symlink_with_override(
                 std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
             })?
         } else {
-            std::ffi::CString::new("target")
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
+            std::ffi::CString::new("target").map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
+            })?
         };
         match unlinkat(&dirfd, fname_c.as_c_str(), AtFlags::empty()) {
             Ok(()) => {}

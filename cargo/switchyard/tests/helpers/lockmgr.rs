@@ -23,7 +23,9 @@ impl Drop for Guard {
 impl LockGuard for Guard {}
 
 impl TestLockManager {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl LockManager for TestLockManager {

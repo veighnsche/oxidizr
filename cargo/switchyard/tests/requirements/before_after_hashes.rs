@@ -13,10 +13,12 @@ struct TestEmitter {
 }
 impl switchyard::logging::FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
-        self.events
-            .lock()
-            .unwrap()
-            .push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
+        self.events.lock().unwrap().push((
+            subsystem.to_string(),
+            event.to_string(),
+            decision.to_string(),
+            fields,
+        ));
     }
 }
 
@@ -41,7 +43,13 @@ fn req_o5_before_after_hashes_present() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     // Use Commit mode so fields are not redacted out of emitted facts
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
@@ -59,5 +67,8 @@ fn req_o5_before_after_hashes_present() {
             break;
         }
     }
-    assert!(ok, "expected sha256 before/after hash fields in apply.result per-action fact");
+    assert!(
+        ok,
+        "expected sha256 before/after hash fields in apply.result per-action fact"
+    );
 }

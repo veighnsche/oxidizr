@@ -285,7 +285,10 @@ fn redact_and_emit(
                     host_obj.insert("hostname".to_string(), json!(hostname));
                 }
                 host_obj.insert("os".to_string(), json!(std::env::consts::OS.to_string()));
-                host_obj.insert("arch".to_string(), json!(std::env::consts::ARCH.to_string()));
+                host_obj.insert(
+                    "arch".to_string(),
+                    json!(std::env::consts::ARCH.to_string()),
+                );
                 // Kernel best-effort: read from /proc/version if present
                 if let Some(kernel) = std::fs::read_to_string("/proc/version")
                     .ok()

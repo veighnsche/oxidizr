@@ -15,10 +15,12 @@ struct TestEmitter {
 
 impl switchyard::logging::FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
-        self.events
-            .lock()
-            .unwrap()
-            .push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
+        self.events.lock().unwrap().push((
+            subsystem.to_string(),
+            event.to_string(),
+            decision.to_string(),
+            fields,
+        ));
     }
 }
 
@@ -47,7 +49,10 @@ fn req_c1_dry_run_by_default() {
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
     let plan = api.plan(PlanInput {
-        link: vec![LinkRequest { source: s, target: t.clone() }],
+        link: vec![LinkRequest {
+            source: s,
+            target: t.clone(),
+        }],
         restore: vec![],
     });
 
@@ -55,12 +60,16 @@ fn req_c1_dry_run_by_default() {
 
     // Filesystem unchanged: target remains a regular file (not a symlink)
     let md = std::fs::symlink_metadata(&tgt).unwrap();
-    assert!(md.file_type().is_file(), "target should remain a regular file in DryRun");
+    assert!(
+        md.file_type().is_file(),
+        "target should remain a regular file in DryRun"
+    );
 
     // Facts use TS_ZERO in DryRun
     let evs = facts.events.lock().unwrap();
     assert!(
-        evs.iter().any(|(_, _, _, f)| f.get("ts").and_then(|v| v.as_str()) == Some(TS_ZERO)),
+        evs.iter()
+            .any(|(_, _, _, f)| f.get("ts").and_then(|v| v.as_str()) == Some(TS_ZERO)),
         "expected TS_ZERO timestamps in DryRun facts"
     );
 }

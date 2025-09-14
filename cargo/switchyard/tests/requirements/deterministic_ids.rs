@@ -24,17 +24,32 @@ fn req_d1_deterministic_ids() {
 
     let s1 = SafePath::from_rooted(root, &src).unwrap();
     let t1 = SafePath::from_rooted(root, &tgt).unwrap();
-    let input1 = PlanInput { link: vec![LinkRequest { source: s1, target: t1 }], restore: vec![] };
+    let input1 = PlanInput {
+        link: vec![LinkRequest {
+            source: s1,
+            target: t1,
+        }],
+        restore: vec![],
+    };
     let plan1 = api.plan(input1);
 
     let s2 = SafePath::from_rooted(root, &src).unwrap();
     let t2 = SafePath::from_rooted(root, &tgt).unwrap();
-    let input2 = PlanInput { link: vec![LinkRequest { source: s2, target: t2 }], restore: vec![] };
+    let input2 = PlanInput {
+        link: vec![LinkRequest {
+            source: s2,
+            target: t2,
+        }],
+        restore: vec![],
+    };
     let plan2 = api.plan(input2);
 
     let pid1 = plan_id(&plan1);
     let pid2 = plan_id(&plan2);
-    assert_eq!(pid1, pid2, "plan_id should be deterministic for identical plans");
+    assert_eq!(
+        pid1, pid2,
+        "plan_id should be deterministic for identical plans"
+    );
 
     assert_eq!(plan1.actions.len(), plan2.actions.len());
     for (i, (a1, a2)) in plan1.actions.iter().zip(plan2.actions.iter()).enumerate() {

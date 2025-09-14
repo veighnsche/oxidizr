@@ -1,4 +1,4 @@
-use cucumber::{given, when, then};
+use cucumber::{given, then, when};
 
 use crate::bdd_world::World;
 use switchyard::adapters::{FileLockManager, LockManager};
@@ -20,7 +20,9 @@ pub async fn given_with_lock(world: &mut World) {
 }
 
 #[given(regex = r"^a Switchyard built with a LockManager$")]
-pub async fn given_with_lock_alias(world: &mut World) { given_with_lock(world).await }
+pub async fn given_with_lock_alias(world: &mut World) {
+    given_with_lock(world).await
+}
 
 #[given(regex = r"^a development environment without a LockManager$")]
 pub async fn given_without_lock(world: &mut World) {
@@ -30,7 +32,9 @@ pub async fn given_without_lock(world: &mut World) {
 }
 
 #[given(regex = r"^a Switchyard without a LockManager$")]
-pub async fn given_without_lock_alias(world: &mut World) { given_without_lock(world).await }
+pub async fn given_without_lock_alias(world: &mut World) {
+    given_without_lock(world).await
+}
 
 #[when(regex = r"^two apply\(\) calls overlap in time$")]
 pub async fn when_two_apply_overlap(world: &mut World) {
@@ -67,7 +71,9 @@ pub async fn when_two_apply_overlap(world: &mut World) {
 }
 
 #[when(regex = r"^both apply\(\) are started in Commit mode$")]
-pub async fn when_both_started(world: &mut World) { when_two_apply_overlap(world).await }
+pub async fn when_both_started(world: &mut World) {
+    when_two_apply_overlap(world).await
+}
 
 #[then(regex = r"^facts record lock_wait_ms when available$")]
 pub async fn then_lock_wait(world: &mut World) {
@@ -86,7 +92,10 @@ pub async fn then_warn_no_lock(world: &mut World) {
             && ev.get("decision").and_then(|v| v.as_str()) == Some("warn")
             && (ev.get("no_lock_manager").is_some()
                 || ev.get("lock_backend").and_then(|v| v.as_str()) == Some("none"))
-        { saw = true; break; }
+        {
+            saw = true;
+            break;
+        }
     }
     assert!(saw, "expected WARN apply.attempt for no lock manager");
 }
@@ -124,7 +133,10 @@ pub async fn then_locking_failure(world: &mut World) {
     for ev in world.all_facts() {
         if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_LOCKING")
             && ev.get("exit_code").and_then(|v| v.as_i64()) == Some(30)
-        { saw = true; break; }
+        {
+            saw = true;
+            break;
+        }
     }
     assert!(saw, "expected E_LOCKING with exit_code=30");
 }
@@ -150,7 +162,10 @@ pub async fn then_lock_attempts(world: &mut World) {
     for ev in world.all_facts() {
         if ev.get("stage").and_then(|v| v.as_str()) == Some("apply.attempt") {
             if let Some(n) = ev.get("lock_attempts").and_then(|v| v.as_u64()) {
-                if n >= 2 { ok = true; break; }
+                if n >= 2 {
+                    ok = true;
+                    break;
+                }
             }
         }
     }

@@ -8,10 +8,18 @@ pub struct Overrides {
 }
 
 impl Overrides {
+    #[must_use]
     pub fn exdev(v: bool) -> Self {
-        Self { force_exdev: Some(v), ..Default::default() }
+        Self {
+            force_exdev: Some(v),
+            ..Default::default()
+        }
     }
+    #[must_use]
     pub fn rescue_ok(v: bool) -> Self {
-        Self { force_rescue_ok: Some(v), ..Default::default() }
+        Self {
+            force_rescue_ok: Some(v),
+            ..Default::default()
+        }
     }
 }

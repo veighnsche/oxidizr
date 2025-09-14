@@ -11,7 +11,10 @@ impl EnvGuard {
         let key_s = key.into();
         let prev = env::var(&key_s).ok();
         env::set_var(&key_s, value.into());
-        EnvGuard { key: key_s, previous: prev }
+        EnvGuard {
+            key: key_s,
+            previous: prev,
+        }
     }
 }
 

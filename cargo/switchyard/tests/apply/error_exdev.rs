@@ -1,10 +1,10 @@
 use serde_json::Value;
+use serial_test::serial;
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
-use serial_test::serial;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {

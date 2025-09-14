@@ -1,10 +1,10 @@
 use serde_json::Value;
+use switchyard::adapters::{LockGuard, LockManager};
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
+use switchyard::types::errors::{Error, ErrorKind, Result};
 use switchyard::types::plan::PlanInput;
 use switchyard::types::ApplyMode;
-use switchyard::adapters::{LockManager, LockGuard};
-use switchyard::types::errors::{Error, ErrorKind, Result};
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -29,7 +29,6 @@ impl LockManager for FailingLockManager {
         })
     }
 }
-
 
 impl FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
@@ -57,7 +56,9 @@ fn commit_requires_lock_manager_when_policy_enforced() {
         link: vec![],
         restore: vec![],
     });
-    let _err = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when locking is required but lock manager fails");
+    let _err = api
+        .apply(&plan, ApplyMode::Commit)
+        .expect_err("apply should fail when locking is required but lock manager fails");
 
     // Find a failing apply.attempt event and assert it maps to E_LOCKING with exit_code 30
     let redacted: Vec<Value> = facts

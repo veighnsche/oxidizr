@@ -22,9 +22,9 @@ use serde_json::json;
 
 // Internal API submodules (idiomatic; directory module)
 mod apply;
-mod overrides;
 mod builder;
 pub mod errors;
+mod overrides;
 mod plan;
 mod preflight;
 mod rollback;
@@ -85,6 +85,10 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
 
     /// Configure per-instance overrides for simulations (tests/controlled scenarios).
     #[must_use]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "Not meaningful to expose as const; builder-style setter"
+    )]
     pub fn with_overrides(mut self, overrides: Overrides) -> Self {
         self.overrides = overrides;
         self
@@ -92,6 +96,10 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
 
     /// Access the current per-instance overrides.
     #[must_use]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "Getter const provides no benefit; keep simple runtime API"
+    )]
     pub fn overrides(&self) -> &Overrides {
         &self.overrides
     }
@@ -165,10 +173,12 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.plan_rollback").entered();
         // Emit a planning fact for rollback to satisfy visibility and tests
-        let plan_like = format!("rollback:{}", report
-            .plan_uuid
-            .map(|u| u.to_string())
-            .unwrap_or_else(|| "unknown".to_string()));
+        let plan_like = format!(
+            "rollback:{}",
+            report
+                .plan_uuid
+                .map_or_else(|| "unknown".to_string(), |u| u.to_string())
+        );
         let pid = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, plan_like.as_bytes());
         let run_id = new_run_id();
         let tctx = crate::logging::audit::AuditCtx::new(

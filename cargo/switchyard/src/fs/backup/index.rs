@@ -50,7 +50,9 @@ pub(crate) fn find_latest_backup_and_sidecar(
         } else {
             core
         };
-        let Ok(ts) = ts_part.parse::<u128>() else { continue };
+        let Ok(ts) = ts_part.parse::<u128>() else {
+            continue;
+        };
 
         // Build the base path back. For wildcard we cannot reconstruct tag; however, we only need base path.
         // Reconstruct from the actual filename: drop any ".meta.json" suffix if present.
@@ -92,20 +94,26 @@ pub(crate) fn find_previous_backup_and_sidecar(
             } else {
                 s.strip_prefix(&format!(".{name}.{tag}.")).is_some()
             };
-            if !ok_prefix { return None; }
+            if !ok_prefix {
+                return None;
+            }
 
             // Strip sidecar suffix if present
             let rest_opt = s
                 .strip_suffix(".bak")
                 .or_else(|| s.strip_suffix(".bak.meta.json"))
-                .map(|core| core.to_string());
-            let Some(core) = rest_opt else { return None };
+                .map(ToString::to_string);
+            let core = rest_opt?;
 
             // Timestamp is the last dotted segment
             let ts_s = core.rsplit('.').next().unwrap_or("");
-            let Ok(ts) = ts_s.parse::<u128>() else { return None };
+            let Ok(ts) = ts_s.parse::<u128>() else {
+                return None;
+            };
 
-            if !seen.insert(ts) { return None; }
+            if !seen.insert(ts) {
+                return None;
+            }
             // Base path is without .meta.json when present
             let base = if s.ends_with(".bak.meta.json") {
                 parent.join(&s[..s.len() - ".meta.json".len()])
@@ -116,7 +124,9 @@ pub(crate) fn find_previous_backup_and_sidecar(
         })
         .collect();
 
-    if stamps.len() < 2 { return None; }
+    if stamps.len() < 2 {
+        return None;
+    }
     stamps.sort_unstable_by_key(|(ts, _)| *ts);
     let (_ts, base) = stamps.get(stamps.len() - 2)?.clone();
 

@@ -94,6 +94,10 @@ pub enum RestoreAction {
 struct RestorePlanner;
 
 impl RestorePlanner {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Will be split into RestorePlanner plan/execute in follow-up PR"
+    )]
     fn plan(
         target: &Path,
         sel: SnapshotSel,

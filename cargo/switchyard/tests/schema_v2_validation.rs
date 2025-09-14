@@ -1,11 +1,11 @@
 use jsonschema::{Draft, JSONSchema};
 use serde_json::Value;
+use std::sync::{Arc, Mutex};
 use switchyard::api::Switchyard;
 use switchyard::logging::{AuditSink, FactsEmitter};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{ApplyMode, LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
-use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, Default)]
 struct TestEmitter {
@@ -52,7 +52,10 @@ fn schema_v2_validates_preflight_apply_and_prune() {
     let sp_tgt = SafePath::from_rooted(root, &tgt).expect("sp tgt");
 
     let mut input = PlanInput::default();
-    input.link.push(LinkRequest { source: sp_src.clone(), target: sp_tgt.clone() });
+    input.link.push(LinkRequest {
+        source: sp_src.clone(),
+        target: sp_tgt.clone(),
+    });
     let plan = api.plan(input);
 
     // Act: preflight (always dry-run)
@@ -72,7 +75,11 @@ fn schema_v2_validates_preflight_apply_and_prune() {
             for e in errors {
                 msgs.push(e.to_string());
             }
-            panic!("schema validation failed for event #{idx}: {}\nEvent: {}", msgs.join("; "), serde_json::to_string_pretty(evt).unwrap());
+            panic!(
+                "schema validation failed for event #{idx}: {}\nEvent: {}",
+                msgs.join("; "),
+                serde_json::to_string_pretty(evt).unwrap()
+            );
         }
     }
 }

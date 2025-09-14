@@ -1,5 +1,5 @@
-use std::path::Path;
 use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 
 use rustix::fs::{fchmod, fsync, openat, renameat, unlinkat, AtFlags, Mode, OFlags};
 
@@ -23,12 +23,10 @@ pub fn legacy_rename(target_path: &Path, backup: &Path) -> std::io::Result<()> {
     })?;
     let _ = std::fs::remove_file(target_path);
     let dirfd = open_dir_nofollow(parent)?;
-    let old_c = std::ffi::CString::new(bname_os.as_bytes()).map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-    })?;
-    let new_c = std::ffi::CString::new(fname_os.as_bytes()).map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-    })?;
+    let old_c = std::ffi::CString::new(bname_os.as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+    let new_c = std::ffi::CString::new(fname_os.as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
     let _ = fsync(&dirfd);
@@ -57,12 +55,10 @@ pub fn restore_file_bytes(
     })?;
     let dirfd = open_dir_nofollow(parent)?;
     let _ = std::fs::remove_file(target_path);
-    let old_c = std::ffi::CString::new(bname_os.as_bytes()).map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-    })?;
-    let new_c = std::ffi::CString::new(fname_os.as_bytes()).map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-    })?;
+    let old_c = std::ffi::CString::new(bname_os.as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
+    let new_c = std::ffi::CString::new(fname_os.as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     renameat(&dirfd, old_c.as_c_str(), &dirfd, new_c.as_c_str())
         .map_err(|e| std::io::Error::from_raw_os_error(e.raw_os_error()))?;
     if let Some(m) = mode_octal {

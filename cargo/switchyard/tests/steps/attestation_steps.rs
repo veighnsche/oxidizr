@@ -11,7 +11,9 @@ impl Attestor for DummyAttestor {
     fn sign(&self, _bundle: &[u8]) -> Result<Signature, AttestationError> {
         Ok(Signature(vec![0xAA; 64]))
     }
-    fn key_id(&self) -> String { "test-key".to_string() }
+    fn key_id(&self) -> String {
+        "test-key".to_string()
+    }
 }
 
 #[given(regex = r"^an attestor is configured and apply succeeds in Commit mode$")]
@@ -40,7 +42,9 @@ pub async fn given_attestor_and_apply(world: &mut World) {
         .unwrap();
 }
 
-#[then(regex = r"^an attestation is attached to the apply\.result summary fact with sig_alg=ed25519, signature, bundle_hash, and public_key_id$")]
+#[then(
+    regex = r"^an attestation is attached to the apply\.result summary fact with sig_alg=ed25519, signature, bundle_hash, and public_key_id$"
+)]
 pub async fn then_attestation_present(world: &mut World) {
     let mut ok = false;
     for e in world.all_facts() {
@@ -52,12 +56,19 @@ pub async fn then_attestation_present(world: &mut World) {
                     && att.get("signature").is_some()
                     && att.get("bundle_hash").is_some()
                     && att.get("public_key_id").is_some()
-                { ok = true; break; }
+                {
+                    ok = true;
+                    break;
+                }
             }
         }
     }
     assert!(ok, "missing attestation on apply.result summary");
 }
 
-#[then(regex = r"^attestation fields \(sig_alg, signature, bundle_hash, public_key_id\) are present$")]
-pub async fn then_attestation_fields_alias(world: &mut World) { then_attestation_present(world).await }
+#[then(
+    regex = r"^attestation fields \(sig_alg, signature, bundle_hash, public_key_id\) are present$"
+)]
+pub async fn then_attestation_fields_alias(world: &mut World) {
+    then_attestation_present(world).await
+}

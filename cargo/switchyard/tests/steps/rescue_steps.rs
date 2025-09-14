@@ -1,26 +1,36 @@
-use cucumber::{given, when, then};
+use cucumber::{given, then, when};
 
-use crate::bdd_world::World;
 use crate::bdd_support::util;
+use crate::bdd_world::World;
 
 #[given(regex = r"^a configured rescue profile consisting of backup symlinks$")]
 pub async fn given_rescue_configured(world: &mut World) {
     world
         .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "1"));
+        .push(crate::bdd_support::env::EnvGuard::new(
+            "SWITCHYARD_FORCE_RESCUE_OK",
+            "1",
+        ));
 }
 
 #[given(regex = r"^a system with configured rescue profile$")]
-pub async fn given_rescue_system(world: &mut World) { given_rescue_configured(world).await }
+pub async fn given_rescue_system(world: &mut World) {
+    given_rescue_configured(world).await
+}
 
 #[given(regex = r"^no BusyBox but GNU core utilities are present on PATH$")]
-pub async fn given_gnu_subset_ok(world: &mut World) { given_rescue_configured(world).await }
+pub async fn given_gnu_subset_ok(world: &mut World) {
+    given_rescue_configured(world).await
+}
 
 #[given(regex = r"^at least one fallback binary set \(GNU or BusyBox\) is installed and on PATH$")]
 pub async fn given_fallback_present(world: &mut World) {
     world
         .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "1"));
+        .push(crate::bdd_support::env::EnvGuard::new(
+            "SWITCHYARD_FORCE_RESCUE_OK",
+            "1",
+        ));
 }
 
 #[then(regex = r"^the presence of a rescue symlink set is recorded$")]
@@ -29,7 +39,10 @@ pub async fn then_rescue_recorded(world: &mut World) {
     for e in world.all_facts() {
         if e.get("stage").and_then(|v| v.as_str()) == Some("preflight.summary")
             && e.get("rescue_profile").is_some()
-        { ok = true; break; }
+        {
+            ok = true;
+            break;
+        }
     }
     assert!(ok, "expected rescue_profile in preflight.summary");
 }
@@ -41,7 +54,10 @@ pub async fn then_rescue_fallback(world: &mut World) {
     for e in world.all_facts() {
         if e.get("stage").and_then(|v| v.as_str()) == Some("preflight.summary")
             && e.get("rescue_profile").is_some()
-        { ok = true; break; }
+        {
+            ok = true;
+            break;
+        }
     }
     assert!(ok, "expected fallback verification recorded");
 }
@@ -52,7 +68,9 @@ pub async fn given_multiple_backups(world: &mut World) {
     let root = world.ensure_root().to_path_buf();
     let link = "/usr/bin/ls";
     let tgt = util::under_root(&root, link);
-    if let Some(p) = tgt.parent() { let _ = std::fs::create_dir_all(p); }
+    if let Some(p) = tgt.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
     let _ = std::fs::write(&tgt, b"payload");
     // Create several backups with distinct timestamps
     for _ in 0..3 {
@@ -93,7 +111,9 @@ pub async fn then_newest_retained(world: &mut World) {
         for entry_res in rd {
             let Ok(entry) = entry_res else { continue };
             let name_os = entry.file_name();
-            let Some(name) = name_os.to_str() else { continue };
+            let Some(name) = name_os.to_str() else {
+                continue;
+            };
             if let Some(rest) = name.strip_prefix(&prefix) {
                 if let Some(num_s) = rest.strip_suffix(".bak") {
                     if let Ok(ts) = num_s.parse::<u128>() {
@@ -110,7 +130,9 @@ pub async fn then_newest_retained(world: &mut World) {
     let newest = stamps.first().unwrap().1.clone();
     assert!(newest.exists(), "expected newest payload present");
     // And if count limit is 1, there should be exactly one payload left
-    if world.policy.retention_count_limit == Some(1) { assert_eq!(stamps.len(), 1, "expected only the newest payload retained"); }
+    if world.policy.retention_count_limit == Some(1) {
+        assert_eq!(stamps.len(), 1, "expected only the newest payload retained");
+    }
     // Sidecar for newest should also exist
     let sidecar = newest.with_extension("bak.meta.json");
     assert!(sidecar.exists(), "expected latest sidecar present");
@@ -124,7 +146,10 @@ pub async fn then_prune_deletions_complete(world: &mut World) {
         if ev.get("stage").and_then(|v| v.as_str()) == Some("prune.result")
             && ev.get("pruned_count").is_some()
             && ev.get("retained_count").is_some()
-        { ok = true; break; }
+        {
+            ok = true;
+            break;
+        }
     }
     assert!(ok, "expected prune.result with counts");
 }
@@ -138,7 +163,9 @@ pub async fn given_prune_completed(world: &mut World) {
 #[when(regex = r"^I inspect emitted facts$")]
 pub async fn when_inspect_emitted(_world: &mut World) {}
 
-#[then(regex = r"^a prune\.result event includes path, policy_used, pruned_count, and retained_count$")]
+#[then(
+    regex = r"^a prune\.result event includes path, policy_used, pruned_count, and retained_count$"
+)]
 pub async fn then_prune_event_has_fields(world: &mut World) {
     let mut ok = false;
     for ev in world.all_facts() {
@@ -146,8 +173,12 @@ pub async fn then_prune_event_has_fields(world: &mut World) {
             let path_ok = ev.get("path").is_some();
             let counts_ok = ev.get("pruned_count").is_some() && ev.get("retained_count").is_some();
             let policy_ok = ev.get("policy_used").is_some()
-                || (ev.get("retention_count_limit").is_some() || ev.get("retention_age_limit_ms").is_some());
-            if path_ok && counts_ok && policy_ok { ok = true; break; }
+                || (ev.get("retention_count_limit").is_some()
+                    || ev.get("retention_age_limit_ms").is_some());
+            if path_ok && counts_ok && policy_ok {
+                ok = true;
+                break;
+            }
         }
     }
     assert!(ok, "expected prune.result with required fields");

@@ -2,6 +2,8 @@
 mod apply_facts_emission;
 mod best_effort_restore_invariant;
 mod bounds_recording;
+mod bounds_threshold;
+mod ensure_symlink_fsync;
 mod ensure_symlink_success;
 mod exdev_invariants;
 mod locking_invariant;
@@ -12,5 +14,3 @@ mod redaction_invariant;
 mod restore_success;
 mod rollback_pure_function;
 mod smoke_invariants;
-mod ensure_symlink_fsync;
-mod bounds_threshold;

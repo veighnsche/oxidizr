@@ -11,8 +11,20 @@ use switchyard::types::safepath::SafePath;
 fn fallback_toolset_on_path() {
     // Guard PATH to avoid leakage
     struct EnvGuard(Option<std::ffi::OsString>);
-    impl EnvGuard { fn new() -> Self { Self(std::env::var_os("PATH")) } }
-    impl Drop for EnvGuard { fn drop(&mut self) { if let Some(v) = self.0.take() { std::env::set_var("PATH", v) } else { std::env::remove_var("PATH") } } }
+    impl EnvGuard {
+        fn new() -> Self {
+            Self(std::env::var_os("PATH"))
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(v) = self.0.take() {
+                std::env::set_var("PATH", v)
+            } else {
+                std::env::remove_var("PATH")
+            }
+        }
+    }
 
     let _g = EnvGuard::new();
     // Create a temp dir with a fake executable named "busybox" to satisfy rescue
@@ -46,8 +58,17 @@ fn fallback_toolset_on_path() {
 
     let s = SafePath::from_rooted(root, &root.join("bin/new")).unwrap();
     let t = SafePath::from_rooted(root, &root.join("usr/bin/app")).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let pf = api.preflight(&plan).unwrap();
-    assert!(pf.ok, "preflight should succeed when a rescue toolset is available on PATH");
+    assert!(
+        pf.ok,
+        "preflight should succeed when a rescue toolset is available on PATH"
+    );
 }

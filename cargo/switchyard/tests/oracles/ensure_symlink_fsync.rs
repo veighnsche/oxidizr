@@ -13,10 +13,12 @@ struct TestEmitter {
 }
 impl switchyard::logging::FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
-        self.events
-            .lock()
-            .unwrap()
-            .push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
+        self.events.lock().unwrap().push((
+            subsystem.to_string(),
+            event.to_string(),
+            decision.to_string(),
+            fields,
+        ));
     }
 }
 
@@ -40,7 +42,13 @@ fn ensure_symlink_fsync_present() {
 
     let s = SafePath::from_rooted(root, &src).unwrap();
     let t = SafePath::from_rooted(root, &tgt).unwrap();
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
+        restore: vec![],
+    });
 
     let _ = api.apply(&plan, ApplyMode::DryRun).unwrap();
 
@@ -48,8 +56,14 @@ fn ensure_symlink_fsync_present() {
     let mut saw = false;
     for (_, _, _, f) in evs.iter() {
         if f.get("stage") == Some(&Value::from("apply.result")) && f.get("action_id").is_some() {
-            if f.get("fsync_ms").is_some() { saw = true; break; }
+            if f.get("fsync_ms").is_some() {
+                saw = true;
+                break;
+            }
         }
     }
-    assert!(saw, "expected fsync_ms to be present on per-action apply.result fact");
+    assert!(
+        saw,
+        "expected fsync_ms to be present on per-action apply.result fact"
+    );
 }

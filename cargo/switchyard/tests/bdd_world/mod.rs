@@ -12,8 +12,8 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{ApplyMode, LinkRequest, PlanInput};
 use switchyard::types::report::{ApplyReport, PreflightReport};
 
-use crate::bdd_support::{util, CollectingAudit, CollectingEmitter};
 use crate::bdd_support::env::EnvGuard;
+use crate::bdd_support::{util, CollectingAudit, CollectingEmitter};
 
 #[derive(Default, cucumber::World)]
 pub struct World {
@@ -32,7 +32,7 @@ pub struct World {
     pub(crate) facts_real: Option<Vec<Value>>,
     // Scoped guards to ensure no cross-scenario leakage
     pub(crate) env_guards: Vec<EnvGuard>,
-    pub(crate) lock_guards: Vec<Box<dyn switchyard::adapters::LockGuard>>,    
+    pub(crate) lock_guards: Vec<Box<dyn switchyard::adapters::LockGuard>>,
 }
 
 impl World {
@@ -179,8 +179,7 @@ impl World {
         }
         let plan = self.plan.as_ref().unwrap();
         self.apply_report = Some(
-            self
-                .api
+            self.api
                 .as_ref()
                 .unwrap()
                 .apply(plan, ApplyMode::Commit)
@@ -206,13 +205,9 @@ impl World {
         self.policy.governance.smoke = SmokePolicy::Require {
             auto_rollback: true,
         };
-        let api = Switchyard::builder(
-            self.facts.clone(),
-            self.audit.clone(),
-            self.policy.clone(),
-        )
-        .with_smoke_runner(Box::new(DefaultSmokeRunner))
-        .build();
+        let api = Switchyard::builder(self.facts.clone(), self.audit.clone(), self.policy.clone())
+            .with_smoke_runner(Box::new(DefaultSmokeRunner))
+            .build();
         self.api = Some(api);
     }
 }

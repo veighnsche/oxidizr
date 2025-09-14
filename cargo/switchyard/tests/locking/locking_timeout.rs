@@ -1,11 +1,11 @@
 use serde_json::json;
 use serde_json::Value;
+use switchyard::adapters::{LockGuard, LockManager};
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
+use switchyard::types::errors::{Error, ErrorKind, Result};
 use switchyard::types::plan::PlanInput;
 use switchyard::types::ApplyMode;
-use switchyard::adapters::{LockManager, LockGuard};
-use switchyard::types::errors::{Error, ErrorKind, Result};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -74,7 +74,9 @@ fn locking_timeout_emits_e_locking_exit_code_and_lock_wait_ms() {
         link: vec![],
         restore: vec![],
     });
-    let _ = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when lock manager times out");
+    let _ = api
+        .apply(&plan, ApplyMode::Commit)
+        .expect_err("apply should fail when lock manager times out");
 
     let evs = facts.events.lock().unwrap();
     // Find first apply.attempt event with decision=failure

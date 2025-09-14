@@ -1,7 +1,7 @@
-use cucumber::{given, when, then};
+use cucumber::{given, then, when};
 
+use crate::bdd_support::schema;
 use crate::bdd_world::World;
-use crate::bdd_support::{schema};
 use serde_json::Value;
 use switchyard::api::Overrides;
 
@@ -12,7 +12,9 @@ pub async fn then_schema_v2(world: &mut World) {
     }
 }
 
-#[then(regex = r"^(every|each) stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json$")]
+#[then(
+    regex = r"^(every|each) stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json$"
+)]
 pub async fn then_validate_schema(world: &mut World) {
     let compiled = schema::compiled_v2();
     for ev in world.all_facts() {
@@ -49,7 +51,9 @@ pub async fn given_failing_preflight(world: &mut World) {
     world.policy.rescue.require = true;
     world.policy.rescue.exec_check = true;
     // Prefer per-instance Overrides over env to avoid process-global side effects
-    if world.plan.is_none() { crate::steps::plan_steps::given_plan_min(world).await; }
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_min(world).await;
+    }
     let api = switchyard::api::Switchyard::new(
         world.facts.clone(),
         world.audit.clone(),
@@ -60,7 +64,9 @@ pub async fn given_failing_preflight(world: &mut World) {
 }
 
 #[when(regex = r"^I inspect summary events$")]
-pub async fn when_inspect_summary(world: &mut World) { crate::steps::preflight_steps::when_preflight(world).await }
+pub async fn when_inspect_summary(world: &mut World) {
+    crate::steps::preflight_steps::when_preflight(world).await
+}
 
 #[then(regex = r"^summary_error_ids is present and ordered from specific to general$")]
 pub async fn then_summary_error_chain(world: &mut World) {
@@ -101,7 +107,9 @@ pub async fn then_no_secrets(world: &mut World) {
 }
 
 #[given(regex = r"^environment-derived sensitive values might appear in facts$")]
-pub async fn given_env_sensitive_alias(world: &mut World) { crate::steps::plan_steps::given_plan_env_sensitive(world).await }
+pub async fn given_env_sensitive_alias(world: &mut World) {
+    crate::steps::plan_steps::given_plan_env_sensitive(world).await
+}
 
 #[then(regex = r"^facts include origin, helper, uid, gid, pkg, and env_sanitized=true$")]
 pub async fn then_provenance_fields(world: &mut World) {
@@ -140,18 +148,27 @@ pub async fn when_construct_safepath(world: &mut World) {
         .last_src
         .clone()
         .unwrap_or_else(|| "../etc/passwd".to_string());
-    let res = switchyard::types::safepath::SafePath::from_rooted(&root, std::path::Path::new(&cand));
+    let res =
+        switchyard::types::safepath::SafePath::from_rooted(&root, std::path::Path::new(&cand));
     // Record the result as a fact in audit memory via world fields (ephemeral)
-    if res.is_ok() { world.last_src = Some("SAFE_OK".to_string()); } else { world.last_src = Some("SAFE_ERR".to_string()); }
+    if res.is_ok() {
+        world.last_src = Some("SAFE_OK".to_string());
+    } else {
+        world.last_src = Some("SAFE_ERR".to_string());
+    }
 }
 
 #[then(regex = r"^SafePath normalization rejects the path as unsafe$")]
-pub async fn then_safepath_rejects(world: &mut World) { assert_eq!(world.last_src.as_deref(), Some("SAFE_ERR")); }
+pub async fn then_safepath_rejects(world: &mut World) {
+    assert_eq!(world.last_src.as_deref(), Some("SAFE_ERR"));
+}
 
 // Operational bounds fsync steps
 #[given(regex = r"^a rename completes for a staged swap$")]
 pub async fn given_rename_completes(world: &mut World) {
-    if world.plan.is_none() { crate::steps::plan_steps::given_plan_min(world).await; }
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_min(world).await;
+    }
     crate::steps::apply_steps::when_apply(world).await;
 }
 
@@ -165,7 +182,10 @@ pub async fn then_fsync_recorded(world: &mut World) {
         if ev.get("stage").and_then(|v| v.as_str()) == Some("apply.result")
             && ev.get("action_id").is_some()
             && ev.get("duration_ms").is_some()
-        { saw = true; break; }
+        {
+            saw = true;
+            break;
+        }
     }
     assert!(saw, "expected duration_ms in apply.result per-action fact");
 }

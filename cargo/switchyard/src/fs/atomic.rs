@@ -13,8 +13,8 @@ use crate::constants::TMP_SUFFIX;
 use rustix::fd::OwnedFd;
 use rustix::fs::{openat, renameat, symlinkat, unlinkat, AtFlags, Mode, OFlags, CWD};
 use rustix::io::Errno;
-use std::time::Instant;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 fn errno_to_io(e: Errno) -> std::io::Error {
     std::io::Error::from_raw_os_error(e.raw_os_error())
@@ -104,9 +104,8 @@ pub fn atomic_symlink_swap(
 
     // Atomically rename tmp -> final name within the same directory (bytes-safe)
     let new_c = if let Some(name_os) = target.file_name() {
-        std::ffi::CString::new(name_os.as_bytes()).map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring")
-        })?
+        std::ffi::CString::new(name_os.as_bytes())
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
     } else {
         std::ffi::CString::new("target")
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
@@ -120,9 +119,10 @@ pub fn atomic_symlink_swap(
     let inject_exdev = match force_exdev {
         Some(true) => true,
         Some(false) => false,
-        None => allow_env_overrides
-            && std::env::var_os("SWITCHYARD_FORCE_EXDEV")
-                == Some(std::ffi::OsString::from("1")),
+        None => {
+            allow_env_overrides
+                && std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1"))
+        }
     };
     let rename_res = if inject_exdev {
         match rename_res {
@@ -153,4 +153,3 @@ pub fn atomic_symlink_swap(
         Err(e) => Err(errno_to_io(e)),
     }
 }
-

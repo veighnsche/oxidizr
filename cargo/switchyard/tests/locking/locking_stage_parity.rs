@@ -1,12 +1,12 @@
 use serde_json::Value;
 use switchyard::adapters::FsOwnershipOracle;
+use switchyard::adapters::{LockGuard, LockManager};
 use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
+use switchyard::types::errors::{Error, ErrorKind, Result};
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
-use switchyard::adapters::{LockManager, LockGuard};
-use switchyard::types::errors::{Error, ErrorKind, Result};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -62,7 +62,9 @@ fn apply_emits_apply_result_on_lock_failure_when_require_lock_manager() {
         restore: vec![],
     });
 
-    let _report = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when locking is required but lock manager fails");
+    let _report = api
+        .apply(&plan, ApplyMode::Commit)
+        .expect_err("apply should fail when locking is required but lock manager fails");
 
     // Redacted events should include both apply.attempt and apply.result failures with E_LOCKING/30
     let redacted: Vec<Value> = facts
@@ -133,7 +135,9 @@ fn apply_emits_apply_result_on_lock_failure() {
         restore: vec![],
     });
 
-    let _report = api.apply(&plan, ApplyMode::Commit).expect_err("apply should fail when locking is required but lock manager fails");
+    let _report = api
+        .apply(&plan, ApplyMode::Commit)
+        .expect_err("apply should fail when locking is required but lock manager fails");
 
     // Redacted events should include both apply.attempt and apply.result failures with E_LOCKING/30
     let redacted: Vec<Value> = facts

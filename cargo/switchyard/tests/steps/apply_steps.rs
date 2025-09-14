@@ -1,25 +1,35 @@
-use cucumber::{when, then, given};
+use cucumber::{given, then, when};
 
-use crate::bdd_world::World;
 use crate::bdd_support::facts;
+use crate::bdd_world::World;
 use serde_json::Value;
 use switchyard::policy::types::ExdevPolicy;
 use switchyard::types::plan::ApplyMode;
 
 #[when(regex = r"^I run in real mode$")]
-pub async fn when_run_real(world: &mut World) { world.run_real(); }
+pub async fn when_run_real(world: &mut World) {
+    world.run_real();
+}
 
 #[when(regex = r"^I run in Commit mode$")]
-pub async fn when_run_commit(world: &mut World) { when_run_real(world).await }
+pub async fn when_run_commit(world: &mut World) {
+    when_run_real(world).await
+}
 
 #[when(regex = r"^I run in DryRun and Commit modes$")]
-pub async fn when_run_both_modes(world: &mut World) { world.run_both_modes(); }
+pub async fn when_run_both_modes(world: &mut World) {
+    world.run_both_modes();
+}
 
 #[when(regex = r"^I apply the plan$")]
-pub async fn when_apply(world: &mut World) { world.apply_current_plan_commit(); }
+pub async fn when_apply(world: &mut World) {
+    world.apply_current_plan_commit();
+}
 
 #[when(regex = r"^I run in dry-run mode$")]
-pub async fn when_run_dry(world: &mut World) { world.run_dry_and_store(); }
+pub async fn when_run_dry(world: &mut World) {
+    world.run_dry_and_store();
+}
 
 #[when(regex = r"^I attempt apply in Commit mode$")]
 pub async fn when_attempt_apply_commit(world: &mut World) {
@@ -28,7 +38,9 @@ pub async fn when_attempt_apply_commit(world: &mut World) {
     let _ = world.api.as_ref().unwrap().apply(plan, ApplyMode::Commit);
 }
 
-#[then(regex = r"^the emitted facts for apply\.result per-action events are byte-identical after redaction$")]
+#[then(
+    regex = r"^the emitted facts for apply\.result per-action events are byte-identical after redaction$"
+)]
 pub async fn then_apply_result_identical(world: &mut World) {
     let dry = world.facts_dry.clone().expect("facts_dry");
     if world.facts_real.is_none() {
@@ -46,10 +58,15 @@ pub async fn then_apply_result_identical(world: &mut World) {
         .collect();
     facts::sort_by_action_id(&mut a);
     facts::sort_by_action_id(&mut b);
-    assert_eq!(a, b, "apply.result per-action not identical after redaction");
+    assert_eq!(
+        a, b,
+        "apply.result per-action not identical after redaction"
+    );
 }
 
-#[then(regex = r"^the resulting facts include hash_alg=sha256 and both before_hash and after_hash$")]
+#[then(
+    regex = r"^the resulting facts include hash_alg=sha256 and both before_hash and after_hash$"
+)]
 pub async fn then_hash_fields_present(world: &mut World) {
     let facts = world.all_facts();
     let mut ok = false;
@@ -64,7 +81,10 @@ pub async fn then_hash_fields_present(world: &mut World) {
             break;
         }
     }
-    assert!(ok, "missing sha256 before/after hash fields in apply.result");
+    assert!(
+        ok,
+        "missing sha256 before/after hash fields in apply.result"
+    );
 }
 
 #[then(regex = r"^facts record degraded=true when policy allow_degraded_fs is enabled$")]
@@ -82,7 +102,10 @@ pub async fn then_degraded_flag(world: &mut World) {
     let mut saw = false;
     for ev in world.all_facts() {
         if let Some(d) = ev.get("degraded").and_then(|v| v.as_bool()) {
-            if d { saw = true; break; }
+            if d {
+                saw = true;
+                break;
+            }
         }
     }
     assert!(saw, "did not observe degraded=true fact");
@@ -94,10 +117,16 @@ pub async fn then_exdev_fail(world: &mut World) {
     world.rebuild_api();
     world
         .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1"));
+        .push(crate::bdd_support::env::EnvGuard::new(
+            "SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES",
+            "1",
+        ));
     world
         .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_FORCE_EXDEV", "1"));
+        .push(crate::bdd_support::env::EnvGuard::new(
+            "SWITCHYARD_FORCE_EXDEV",
+            "1",
+        ));
     let plan = world.plan.as_ref().unwrap();
     let _ = world
         .api
@@ -107,7 +136,10 @@ pub async fn then_exdev_fail(world: &mut World) {
         .unwrap();
     let mut saw = false;
     for ev in world.all_facts() {
-        if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_EXDEV") { saw = true; break; }
+        if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_EXDEV") {
+            saw = true;
+            break;
+        }
     }
     assert!(saw, "expected E_EXDEV in facts");
 }
@@ -118,7 +150,9 @@ pub async fn given_target_fs_unsupported(world: &mut World) {
     let root = world.ensure_root().to_path_buf();
     world.policy.scope.forbid_paths.push(root.clone());
     world.rebuild_api();
-    if world.plan.is_none() { crate::steps::plan_steps::given_plan_min(world).await; }
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_min(world).await;
+    }
 }
 
 #[when(regex = r"^I attempt to apply a plan$")]
@@ -135,7 +169,10 @@ pub async fn when_attempt_apply(world: &mut World) {
 pub async fn then_policy_violation(world: &mut World) {
     let mut saw = false;
     for ev in world.all_facts() {
-        if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_POLICY") { saw = true; break; }
+        if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_POLICY") {
+            saw = true;
+            break;
+        }
     }
     assert!(saw, "expected E_POLICY in emitted facts");
 }

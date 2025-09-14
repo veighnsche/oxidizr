@@ -23,13 +23,22 @@ pub fn verify_rescue_tools() -> bool {
 /// Public helper that prefers a per-instance override for rescue status, falling back to
 /// normal verification when no override is provided. This is used by the API layer to
 /// eliminate process-global env influence during preflight.
+///
+/// # Errors
+///
+/// Returns a `RescueError` when no suitable rescue profile can be verified under the
+/// given constraints (e.g., required minimum GNU tools not found when `BusyBox` is absent),
+/// or when a forced failure override is provided.
 pub fn verify_rescue_min_with_override(
     exec_check: bool,
     min_count: usize,
     force_ok: Option<bool>,
 ) -> Result<RescueStatus, RescueError> {
     match force_ok {
-        Some(true) => Ok(RescueStatus::GNU { found: min_count, min: min_count }),
+        Some(true) => Ok(RescueStatus::GNU {
+            found: min_count,
+            min: min_count,
+        }),
         Some(false) => Err(RescueError::Unavailable),
         None => verify_rescue_min(exec_check, min_count),
     }
@@ -79,10 +88,7 @@ fn verify_rescue_min(exec_check: bool, min_count: usize) -> Result<RescueStatus,
     }
     // If exec checks are disabled and minimum required count is zero, treat as OK.
     if !exec_check && min_count == 0 {
-        return Ok(RescueStatus::GNU {
-            found: 0,
-            min: 0,
-        });
+        return Ok(RescueStatus::GNU { found: 0, min: 0 });
     }
     // Prefer BusyBox (single binary) as a compact rescue profile
     if let Some(p) = which_on_path("busybox") {

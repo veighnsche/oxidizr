@@ -11,10 +11,12 @@ struct TestEmitter {
 }
 impl switchyard::logging::FactsEmitter for TestEmitter {
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value) {
-        self.events
-            .lock()
-            .unwrap()
-            .push((subsystem.to_string(), event.to_string(), decision.to_string(), fields));
+        self.events.lock().unwrap().push((
+            subsystem.to_string(),
+            event.to_string(),
+            decision.to_string(),
+            fields,
+        ));
     }
 }
 
@@ -37,9 +39,11 @@ fn prune_invariants_extended() {
     std::fs::write(&tgt, b"current").unwrap();
 
     // Create two snapshots with different times
-    switchyard::fs::backup::create_snapshot(&tgt, switchyard::constants::DEFAULT_BACKUP_TAG).unwrap();
+    switchyard::fs::backup::create_snapshot(&tgt, switchyard::constants::DEFAULT_BACKUP_TAG)
+        .unwrap();
     std::thread::sleep(std::time::Duration::from_millis(5));
-    switchyard::fs::backup::create_snapshot(&tgt, switchyard::constants::DEFAULT_BACKUP_TAG).unwrap();
+    switchyard::fs::backup::create_snapshot(&tgt, switchyard::constants::DEFAULT_BACKUP_TAG)
+        .unwrap();
 
     let sp_tgt = SafePath::from_rooted(root, &tgt).unwrap();
     let res = api.prune_backups(&sp_tgt).unwrap();
@@ -56,8 +60,13 @@ fn prune_invariants_extended() {
         .iter()
         .map(|(_, _, _, f)| f.clone())
         .collect();
-    assert!(redacted.iter().any(|e| e.get("stage") == Some(&Value::from("prune.result"))
-        && e.get("path").is_some()
-        && e.get("pruned_count").is_some()
-        && e.get("retained_count").is_some()), "expected a prune.result fact with counts");
+    assert!(
+        redacted
+            .iter()
+            .any(|e| e.get("stage") == Some(&Value::from("prune.result"))
+                && e.get("path").is_some()
+                && e.get("pruned_count").is_some()
+                && e.get("retained_count").is_some()),
+        "expected a prune.result fact with counts"
+    );
 }
