@@ -9,7 +9,7 @@ This V2 summarizes the gaps that still need implementation and proposes concrete
 
 ## High Priority (P0)
 
-- __Prune by age exact limits (E2E-PRUNE-009 / E2E-PRUNE-010)__
+- __Prune by age exact limits (E2E-PRUNE-009 / E2E-PRUNE-010)__ — Done (see `tests/fs/prune_age_limits.rs`)
   - What: Add deterministic age-based pruning tests for 365d max and 1s min.
   - Where: `cargo/switchyard/tests/fs/prune_age_limits.rs`
   - How: Create multiple backup snapshots and set mtimes deterministically (e.g., via `filetime` crate or `nix::unistd::utimensat`).
@@ -17,7 +17,7 @@ This V2 summarizes the gaps that still need implementation and proposes concrete
     - `prune_max_age_365d_prunes_older()` → implements E2E-PRUNE-009
     - `prune_min_age_1s_prunes_older()` → implements E2E-PRUNE-010
 
-- __Golden fixtures gate (REQ-CI1/CI3)__
+- __Golden fixtures gate (REQ-CI1/CI3)__ — CI golden diff job present; fixtures exist for minimal and two-action scenarios (see `.github/workflows/ci.yml` golden-fixtures job and `tests/golden/*`).
   - What: Commit canon JSON fixtures for golden scenarios and enforce CI diff gate.
   - Where:
     - `cargo/switchyard/tests/golden/minimal-plan/{canon_plan.json, canon_preflight.json, canon_apply_attempt.json, canon_apply_result.json}`
@@ -26,48 +26,45 @@ This V2 summarizes the gaps that still need implementation and proposes concrete
     - Run: `python3 test_ci_runner.py --golden all --update`
     - Commit generated files. Ensure CI job “Golden Fixtures Diff” passes.
 
-- __Dry-run by default (REQ-C1)__
+- __Dry-run by default (REQ-C1)__ — Done (see `tests/requirements/default_dry_run.rs`)
   - What: Assert the public API defaults to `ApplyMode::DryRun` or equivalent fail-closed behavior unless explicitly set.
   - Where: `cargo/switchyard/tests/requirements/default_dry_run.rs`
   - Test: `req_c1_dry_run_by_default()` creates a plan and invokes apply without forcing Commit; assert no mutation facts, TS_ZERO timestamps.
 
-- __Mutating APIs accept SafePath only (REQ-API1)__
+- __Mutating APIs accept SafePath only (REQ-API1)__ — Done (compile-fail trybuild: `tests/trybuild/mutate_with_raw_path.rs`)
   - What: Enforce SafePath-only inputs for mutating operations.
   - Where: `cargo/switchyard/tests/requirements/mutating_api_safepath_only.rs`
   - How: Prefer compile-time/type tests (e.g., `static_assertions`) or doctest that attempts to call mutator with `&Path` fails to compile.
 
-- __TOCTOU-safe syscall sequence evidence (REQ-TOCTOU1)__
+- __TOCTOU-safe syscall sequence evidence (REQ-TOCTOU1)__ — Done (fsync evidence in `tests/oracles/ensure_symlink_fsync.rs`)
   - What: Assert behavior consistent with open_dir_nofollow → openat → renameat → fsync(parent).
   - Where: `cargo/switchyard/tests/oracles/ensure_symlink_fsync.rs`
   - How: At minimum, assert presence of `fsync_ms` for parent dir and success facts; optionally instrument with a mockable FS layer to capture call order.
 
-- __Deterministic IDs stable (REQ-D1)__
+- __Deterministic IDs stable (REQ-D1)__ — Done (see `tests/requirements/deterministic_ids.rs`)
   - What: Assert `plan_id/action_id` are stable across identical runs.
   - Where: `cargo/switchyard/tests/requirements/deterministic_ids.rs`
   - Test: Build identical inputs twice; assert IDs equal and sorted ordering matches.
 
-- __Before/after hashes present (REQ-O5)__
+- __Before/after hashes present (REQ-O5)__ — Done (see `tests/requirements/before_after_hashes.rs`)
   - What: Assert `before_hash`/`after_hash` fields are present in apply facts when applicable.
   - Where: `cargo/switchyard/tests/requirements/before_after_hashes.rs`
   - Test: DryRun and Commit comparisons; presence/consistency of hash fields.
 
-- __Prune invariants facts & fsync (REQ-PN2/PN3)__
+- __Prune invariants facts & fsync (REQ-PN2/PN3)__ — Done (see `tests/fs/prune_invariants_extended.rs`)
   - What: Assert prune deletes payload+sidecar and parent fsync recorded; assert `prune.result` fields.
   - Where: `cargo/switchyard/tests/fs/prune_invariants_extended.rs`
   - Tests: `prune_deletes_payload_and_sidecar_and_fsyncs_parent()`, `prune_emits_prune_result_fact()`
 
-- __Fallback toolset available on PATH (REQ-RC3)__
+- __Fallback toolset available on PATH (REQ-RC3)__ — Done (see `tests/preflight/fallback_toolset_on_path.rs`)
   - What: Simulate PATH and assert at least one rescue toolset is present/executable when required by policy.
   - Where: `cargo/switchyard/tests/preflight/fallback_toolset_on_path.rs`
 
-- __Bounds threshold (REQ-BND1)__
+- __Bounds threshold (REQ-BND1)__ — Done (best-effort ≤100ms; see `tests/oracles/bounds_threshold.rs`)
   - What: Assert `fsync_ms <= 50` best-effort under controlled tempfs (flakiness guard). Consider a looser threshold (e.g., 100ms) if CI is noisy.
   - Where: `cargo/switchyard/tests/oracles/bounds_threshold.rs`
 
-- __CI: Zero-SKIP gate (REQ-CI2)__
-  - What: Fail CI when any test is skipped.
-  - Where: `.github/workflows/ci.yml`
-  - How: Add a post-test grep/assertion or use cargo features to deny `#[ignore]` in CI.
+- __CI: Zero-SKIP gate (REQ-CI2)__ — Done (grep for `#[ignore]` in `.github/workflows/ci.yml`)
 
 ---
 

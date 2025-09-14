@@ -157,3 +157,21 @@
 - Evidence:
   - SPEC/DOCS refs: SPEC/SPEC.md §2.9 Health Verification (REQ-H1, REQ-H2, REQ-H3)
   - Code cites: src/adapters/smoke.rs, src/api/apply/mod.rs:134-164
+
+## environment-base4-runner-long-path — Test harness limitation (ENAMETOOLONG)
+
+- Date: 2025-09-14
+- Repro: `cargo test -p switchyard -- --exact environment::base4_runner::envrunner_base4_weekly_platinum`
+- Failure: `Os { code: 36, kind: InvalidFilename, message: "File name too long" }`
+- Suspected Root Cause: The test constructs an extremely long path segment (~2000 chars). Even in DryRun mode, any attempt to actually create such a path on the host filesystem will fail with `ENAMETOOLONG`. This is a test harness limitation, not a runtime Switchyard defect.
+- Files Likely Involved:
+  - cargo/switchyard/tests/environment/base4_runner.rs
+- Recommended Action (test-only):
+  - Avoid real filesystem creation for overlong segments in this test.
+  - Use `ApplyMode::DryRun` exclusively and assert on planned actions and emitted facts instead of touching the filesystem.
+  - If path existence is needed, shorten the generated segment to within platform limits (e.g., <=255 bytes per component) or mock path probing.
+  - Optionally guard long-path branches behind a feature flag for CI environments with stricter limits.
+-
+  - Evidence:
+    - POSIX and common Linux filesystems limit filename components to 255 bytes.
+    - The current test creates a single component exceeding this bound, guaranteeing ENAMETOOLONG.

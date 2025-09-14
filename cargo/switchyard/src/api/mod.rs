@@ -135,14 +135,8 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         let _span = tracing::info_span!("switchyard.apply", mode = ?mode).entered();
         let report = apply::run(self, plan, mode);
         if matches!(mode, ApplyMode::Commit) && !report.errors.is_empty() {
-            let has_actions = !plan.actions.is_empty();
-            if has_actions
-                && matches!(
-                    self.policy.governance.locking,
-                    crate::policy::types::LockingPolicy::Required
-                )
-                && !self.policy.governance.allow_unlocked_commit
-            {
+            let joined = report.errors.join("; ").to_lowercase();
+            if joined.contains("lock") {
                 return Err(errors::ApiError::LockingTimeout(
                     "lock manager required or acquisition failed".to_string(),
                 ));

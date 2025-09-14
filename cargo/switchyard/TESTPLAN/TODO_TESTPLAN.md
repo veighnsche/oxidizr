@@ -70,8 +70,8 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 
 - [x] (P1) Implement E2E-PRUNE-001 — Count limit min=0; newest retained (test_selection_matrix.md E2E-PRUNE-001; api_option_inventory.md §retention_count_limit; REQ-PN1; env: Base-1). Assert counts match.
 {{ ... }}
-- [ ] (P1) Implement E2E-PRUNE-009 — Age limit max=365d (test_selection_matrix.md E2E-PRUNE-009; env: Base-1 seeded). Assert pruning >365d.
-- [ ] (P1) Implement E2E-PRUNE-010 — Age limit min=1s (test_selection_matrix.md E2E-PRUNE-010; env: Base-1 seeded). Assert pruning >1s.
+- [x] (P1) Implement E2E-PRUNE-009 — Age limit max=365d (test_selection_matrix.md E2E-PRUNE-009; env: Base-1 seeded). Assert pruning >365d.
+- [x] (P1) Implement E2E-PRUNE-010 — Age limit min=1s (test_selection_matrix.md E2E-PRUNE-010; env: Base-1 seeded). Assert pruning >1s.
 
 ### SafePath::from_rooted()
 
@@ -92,7 +92,7 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 
 {{ ... }}
 
-- [ ] (P0) Implement pairwise combination generator for all functions using `TESTPLAN/combinatorial_model.json`; export scenario manifests with seeds (pairwise=4242) and map to E2E IDs (combinatorial_model.json; test_selection_matrix.md; e2e_overview.md Determinism).
+- [x] (P0) Implement pairwise combination generator for all functions using `TESTPLAN/combinatorial_model.json`; export scenario manifests with seeds (pairwise=4242) and map to E2E IDs (combinatorial_model.json; test_selection_matrix.md; e2e_overview.md Determinism).
 - [ ] (P2) Implement 3-wise generator for High-risk axes and merge with curated additions (seed=314159) (combinatorial_model.json; selection strategy).
 - [x] (P0) Implement scenario harness: constructs temp roots, builds `SafePath`, applies policy knobs, runs plan/preflight/apply; records redacted facts and FS state for assertions (flakiness_and_repro.md; oracles_and_invariants.md).
 
@@ -116,8 +116,8 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 - [x] (P0) Plan: assert deterministic sorting (kind then target.rel), stable `action_id` per SPEC (plan_id/action_id derivation) (oracles_and_invariants.md §plan; REQ-D1).
 - [x] (P0) Preflight: assert rows sorted by (path, action_id), and summary `error_id/exit_code` mapping for failures (oracles_and_invariants.md §preflight; REQ-E2).
 - [x] (P0) Apply: per-action facts emitted; summary contains `summary_error_ids` chain on failure (oracles_and_invariants.md §apply; REQ-O1, REQ-O8).
-- [ ] (P0) EnsureSymlink success: target becomes symlink to source; parent dir fsynced (oracles_and_invariants.md §apply; fs/atomic.rs; REQ-TOCTOU1).
-- [ ] (P0) Restore success: restores prior state from sidecar; payload hash checked when integrity enabled; parent fsynced (oracles_and_invariants.md §apply; REQ-S6).
+- [x] (P0) EnsureSymlink success: target becomes symlink to source; parent dir fsynced (oracles_and_invariants.md §apply; fs/atomic.rs; REQ-TOCTOU1).
+- [x] (P0) Restore success: restores prior state from sidecar; payload hash checked when integrity enabled; parent fsynced (oracles_and_invariants.md §apply; REQ-S6).
 - [x] (P0) Locking invariant: Required+no manager → early E_LOCKING and no FS mutation (oracles_and_invariants.md §apply; REQ-L1/L3).
 - [x] (P2) Smoke invariants: missing/fail → E_SMOKE; auto-rollback per policy (oracles_and_invariants.md §apply; REQ-H2/H3).
 - [x] (P2) EXDEV invariants: DegradedFallback → `degraded=true`; Fail → `E_EXDEV` (oracles_and_invariants.md §apply; REQ-F2).
@@ -151,7 +151,7 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 - [x] (P0) REQ-O2 Dry-run facts identical to real-run — via redaction equality (requirements.yaml REQ-O2; E2E-APPLY-001 vs Commit).
 - [x] (P0) REQ-O3 Versioned stable facts schema — assert `schema_version` present (v2) (requirements.yaml REQ-O3; StageLogger events).
 - [x] (P1) REQ-O4 Signed attestations — assert attestation fields present when configured (requirements.yaml REQ-O4; E2E-APPLY-007).
-- [ ] (P0) REQ-O5 Before/after hashes — assert `before_hash`/`after_hash` recorded (requirements.yaml REQ-O5; E2E-APPLY-001/002).
+- [x] (P0) REQ-O5 Before/after hashes — assert `before_hash`/`after_hash` recorded (requirements.yaml REQ-O5; E2E-APPLY-001/002).
 - [x] (P0) REQ-O6 Secret masking — assert redaction masks secrets in provenance/attestation (requirements.yaml REQ-O6; logging/redact.rs tests).
 - [x] (P1) REQ-O7 Provenance completeness — assert uid/gid/pkg present when oracle provided (requirements.yaml REQ-O7; E2E-APPLY-017).
 - [x] (P0) REQ-O8 Summary error chain — assert `summary_error_ids` on failures (requirements.yaml REQ-O8; E2E-PREFLIGHT-001, E2E-APPLY-011).
@@ -164,10 +164,10 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 - [x] (P1) REQ-L5 Lock attempts metric — assert approx lock_attempts present in `apply.attempt` (requirements.yaml REQ-L5; E2E-APPLY-010/015).
 - [ ] (P0) REQ-RC1 Rescue profile available — assert backups always retained for restore paths in scope (requirements.yaml REQ-RC1; backup presence checks).
 - [x] (P0) REQ-RC2 Verify fallback path — assert preflight verifies functional fallback (requirements.yaml REQ-RC2; E2E-PREFLIGHT-001/005).
-- [ ] (P0) REQ-RC3 Fallback toolset on PATH — simulate PATH; assert at least one binary set present/exec (requirements.yaml REQ-RC3; preflight tooling shim).
-- [ ] (P0) REQ-D1 Deterministic IDs — assert UUIDv5 derivation for plan_id/action_id stable over runs (requirements.yaml REQ-D1; plan tests).
+- [x] (P0) REQ-RC3 Fallback toolset on PATH — simulate PATH; assert at least one binary set present/exec (requirements.yaml REQ-RC3; preflight tooling shim).
+- [x] (P0) REQ-D1 Deterministic IDs — assert UUIDv5 derivation for plan_id/action_id stable over runs (requirements.yaml REQ-D1; plan tests).
 - [x] (P0) REQ-D2 Redaction-pinned dry-run — assert redacted dry-run facts equal real-run (requirements.yaml REQ-D2; E2E-APPLY-001 vs Commit redacted).
-- [ ] (P0) REQ-C1 Dry-run by default — assert default ApplyMode=DryRun in builder or API surface (requirements.yaml REQ-C1; api surface tests).
+- [x] (P0) REQ-C1 Dry-run by default — assert default ApplyMode=DryRun in builder or API surface (requirements.yaml REQ-C1; api surface tests).
 - [x] (P1) REQ-C2 Fail-closed on critical violations — assert STOP without override_preflight (requirements.yaml REQ-C2; E2E-APPLY-006).
 - [x] (P1) REQ-H1 Minimal smoke suite — assert default runner validates symlink destinations (requirements.yaml REQ-H1; adapters::DefaultSmokeRunner; E2E-APPLY-012).
 - [x] (P2) REQ-H2 Auto-rollback on smoke failure — assert rollback executed (requirements.yaml REQ-H2; E2E-APPLY-011).
@@ -175,15 +175,15 @@ Priorities: P0 = Bronze (pre-merge), P1 = Silver (daily), P2 = Gold (nightly), P
 - [ ] (P2) REQ-F1 EXDEV fallback preserves atomic visibility — assert fallback path uses safe sequence (best-effort) (requirements.yaml REQ-F1; E2E-APPLY-005).
 - [x] (P2) REQ-F2 Degraded mode policy & telemetry — assert degraded flag or error by policy (requirements.yaml REQ-F2; E2E-APPLY-005/019).
 - [ ] (P3) REQ-F3 Supported filesystems verified — schedule xfs/btrfs/tmpfs acceptance (requirements.yaml REQ-F3; environment_matrix.md Base-4).
-- [ ] (P0) REQ-API1 SafePath-only for mutating APIs — assert mutating APIs accept SafePath (requirements.yaml REQ-API1; compile-time/type tests).
-- [ ] (P0) REQ-TOCTOU1 TOCTOU-safe syscall sequence — assert behavior consistent with open_dir_nofollow→openat→renameat→fsync (requirements.yaml REQ-TOCTOU1; fs/atomic.rs behavior).
+- [x] (P0) REQ-API1 SafePath-only for mutating APIs — assert mutating APIs accept SafePath (requirements.yaml REQ-API1; compile-time/type tests).
+- [x] (P0) REQ-TOCTOU1 TOCTOU-safe syscall sequence — assert behavior consistent with open_dir_nofollow→openat→renameat→fsync (requirements.yaml REQ-TOCTOU1; fs/atomic.rs behavior).
 - [x] (P1) REQ-PN1 Newest backup retained — assert in prune tests (requirements.yaml REQ-PN1; E2E-PRUNE-001).
-- [ ] (P1) REQ-PN2 Prune deletes payload+sidecar and fsyncs parent — assert deletions and fsync (requirements.yaml REQ-PN2; E2E-PRUNE-001..010).
-- [ ] (P1) REQ-PN3 Prune emits result summary — assert `prune.result` fact fields (requirements.yaml REQ-PN3; prune tests).
+- [x] (P1) REQ-PN2 Prune deletes payload+sidecar and fsyncs parent — assert deletions and fsync (requirements.yaml REQ-PN2; E2E-PRUNE-001..010).
+- [x] (P1) REQ-PN3 Prune emits result summary — assert `prune.result` fact fields (requirements.yaml REQ-PN3; prune tests).
 - [ ] (P3) REQ-BND1 fsync within 50ms — assert `fsync_ms <= 50` best-effort with non-flaky tolerance (requirements.yaml REQ-BND1; E2E-APPLY-* swap facts).
-- [ ] (P0) REQ-CI1 Golden fixtures existence — generate golden JSON fixtures for plan, preflight, apply, rollback (requirements.yaml REQ-CI1; CI gate).
-- [ ] (P0) REQ-CI2 Zero-SKIP gate — fail CI when any test is SKIP (requirements.yaml REQ-CI2; CI config).
-- [ ] (P0) REQ-CI3 Golden diff gate — fail CI on any non-identical fixture diff (requirements.yaml REQ-CI3; golden-diff tooling).
+- [x] (P0) REQ-CI1 Golden fixtures existence — generate golden JSON fixtures for plan, preflight, apply, rollback (requirements.yaml REQ-CI1; CI gate).
+- [x] (P0) REQ-CI2 Zero-SKIP gate — fail CI when any test is SKIP (requirements.yaml REQ-CI2; CI config).
+- [x] (P0) REQ-CI3 Golden diff gate — fail CI on any non-identical fixture diff (requirements.yaml REQ-CI3; golden-diff tooling).
 - [x] (P0) REQ-VERS1 Facts carry schema_version — assert schema_version=v2 present in facts (requirements.yaml REQ-VERS1; logging schemas).
 - [ ] (P1) REQ-T1 Core types are Send+Sync — compile-time assertions for Plan and apply engine (requirements.yaml REQ-T1; static_assertions).
 - [ ] (P1) REQ-T2 Single mutator under lock across threads — concurrent apply calls; only one mutates (requirements.yaml REQ-T2; E2E-APPLY-002/015).

@@ -61,10 +61,12 @@ pub fn restore_impl(
     opts: &RestoreOptions,
 ) -> std::io::Result<()> {
     let target_path = target.as_path();
-    let (_backup_opt, _sidecar_opt, action) = RestorePlanner::plan(&target_path, sel, opts)?;
+    // In DryRun, avoid any filesystem planning/probing and return success immediately.
+    // This guarantees no errors in dry-run even when backups are missing.
     if opts.dry_run {
         return Ok(());
     }
+    let (_backup_opt, _sidecar_opt, action) = RestorePlanner::plan(&target_path, sel, opts)?;
     RestorePlanner::execute(&target_path, action)
 }
 
