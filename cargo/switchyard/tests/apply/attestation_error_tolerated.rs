@@ -37,7 +37,7 @@ impl Attestor for FailingAttestor {
 }
 
 #[test]
-#[ignore = "see BUGS.md:apply-attestation-error-tolerated"]
+// #[ignore = "see BUGS.md:apply-attestation-error-tolerated"]
 fn attestation_error_is_tolerated_and_omitted() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();

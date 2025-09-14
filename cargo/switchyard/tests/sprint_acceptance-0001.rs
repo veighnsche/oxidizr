@@ -149,7 +149,7 @@ fn apply_fail_closed_on_policy_violation() {
 }
 
 #[test]
-#[ignore = "see BUGS.md:sprint-acceptance-schema-validation"]
+// #[ignore = "see BUGS.md:sprint-acceptance-schema-validation"]
 fn golden_two_action_plan_preflight_apply() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();

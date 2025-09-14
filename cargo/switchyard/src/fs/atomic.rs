@@ -116,3 +116,4 @@ pub fn atomic_symlink_swap(
         Err(e) => Err(errno_to_io(e)),
     }
 }
+
