@@ -1,45 +1,5 @@
 # Switchyard Bug Log
 
-## apply-attestation-fields-present — Needs multi-file/architectural fix
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-- Test: apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction (tests/apply/attestation_apply_success.rs:71)
-- Repro: `cargo test -p switchyard --all-features -- --exact apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction`
-- Failure: attestation fields missing from apply.result success event
-- Suspected Root Cause: The apply summary logic is not properly including attestation fields in successful apply events when an attestor is configured
-- Blocked Because: requires changes across api/apply/summary.rs and possibly api/apply/mod.rs to properly emit attestation fields
-- Files Likely Involved:
-  - cargo/switchyard/src/api/apply/summary.rs
-  - cargo/switchyard/src/api/apply/mod.rs
-  - cargo/switchyard/src/adapters/attest.rs
-- Potential Direction (non-binding):
-  - Option A: Ensure the attestation method in ApplySummary is called for successful commits
-  - Option B: Add attestation emission directly in the apply result logic
-- Evidence:
-  - SPEC/DOCS refs: SPEC/SPEC.md §2.4 Observability & Audit (REQ-O4)
-  - Code cites: src/api/apply/summary.rs:68-91, src/adapters/attest.rs:37-53
-
-## apply-attestation-error-tolerated — Needs multi-file/architectural fix
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-- Test: apply::attestation_error_tolerated::attestation_error_is_tolerated_and_omitted (tests/apply/attestation_error_tolerated.rs:68)
-- Repro: `cargo test -p switchyard --all-features -- --exact apply::attestation_error_tolerated::attestation_error_is_tolerated_and_omitted`
-- Failure: apply should succeed when attestation signing fails (error tolerance)
-- Suspected Root Cause: The apply logic is not properly handling attestation errors as optional failures that should not stop execution
-- Blocked Because: requires changes across api/apply/summary.rs and api/apply/mod.rs to properly handle attestation errors
-- Files Likely Involved:
-  - cargo/switchyard/src/api/apply/summary.rs
-  - cargo/switchyard/src/api/apply/mod.rs
-  - cargo/switchyard/src/adapters/attest.rs
-- Potential Direction (non-binding):
-  - Option A: Make attestation building error handling more robust
-  - Option B: Ensure attestation failures don't propagate to apply result errors
-- Evidence:
-  - SPEC/DOCS refs: SPEC/SPEC.md §2.4 Observability & Audit (REQ-O4)
-  - Code cites: src/api/apply/summary.rs:68-91, src/adapters/attest.rs:39-42
-
 ## apply-enospc-backup-restore — Test environment limitation
 
 - Date: 2025-09-14
@@ -64,16 +24,6 @@
 - Date: 2025-09-14
 - Status: ⬜ Needs work
 
-## apply-exdev-fallback-disallowed — Test environment limitation
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-
-## sprint-acceptance-schema-validation — Needs investigation
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-
 ## trybuild-compile-fail — Test environment limitation
 
 - Date: 2025-09-14
@@ -93,41 +43,6 @@
   - Error message format differs slightly from expected but functionality is correct
 
 ## sprint-acceptance-schema-validation — Needs investigation
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-- Test: sprint_acceptance-0001::golden_two_action_plan_preflight_apply (tests/sprint_acceptance-0001.rs:226)
-- Repro: `cargo test -p switchyard --all-features -- --exact sprint_acceptance-0001::golden_two_action_plan_preflight_apply`
-- Failure: JSON schema validation fails for preflight events - missing required properties (path, current_kind, planned_kind)
-- Suspected Root Cause: The preflight event emission is missing required fields according to the audit schema
-- Blocked Because: requires investigation of audit event schema compliance
-- Files Likely Involved:
-  - cargo/switchyard/tests/sprint_acceptance-0001.rs
-  - cargo/switchyard/src/preflight/mod.rs
-  - cargo/switchyard/SPEC/audit_event.v2.schema.json
-- Recommended Action:
-  - Check that all required fields are properly included in preflight audit events
-  - Update event emission to comply with the JSON schema
-- Evidence:
-  - Error messages show missing "path", "current_kind", and "planned_kind" properties
-  - SPEC/DOCS refs: SPEC/audit_event.v2.schema.json
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-- Test: apply::error_exdev::ensure_symlink_emits_e_exdev_when_fallback_disallowed (tests/apply/error_exdev.rs:54)
-- Repro: `cargo test -p switchyard --all-features -- --exact apply::error_exdev::ensure_symlink_emits_e_exdev_when_fallback_disallowed`
-- Failure: Cannot properly simulate EXDEV (cross-filesystem link) error in test environment
-- Suspected Root Cause: The SWITCHYARD_FORCE_EXDEV environment variable is not being properly handled or the test environment doesn't support cross-filesystem operations
-- Blocked Because: requires test infrastructure changes to properly simulate EXDEV conditions
-- Files Likely Involved:
-  - cargo/switchyard/tests/apply/error_exdev.rs
-  - cargo/switchyard/src/fs/swap.rs
-- Recommended Action (test-only):
-  - Add proper EXDEV simulation in test environments
-  - Create mock filesystem operations that can trigger EXDEV errors
-- Evidence:
-  - SPEC/DOCS refs: SPEC/SPEC.md §2.7 Cross-Filesystem Operations (REQ-F2)
-  - Code cites: tests/apply/error_exdev.rs:53-55
 
 - Date: 2025-09-14
 - Status: ⬜ Needs work
@@ -166,19 +81,3 @@
   - Evidence:
     - POSIX and common Linux filesystems limit filename components to 255 bytes.
     - The current test creates a single component exceeding this bound, guaranteeing ENAMETOOLONG.
-
-## fs-atomic-hardening — Needs multi-file/architectural fix
-
-- Date: 2025-09-14
-- Status: ✅ Fixed
-- Symptoms: Potential temp-name collision under concurrency and wrong-path operations with non-UTF-8 filenames; not yet covered by tests but poses release risk.
-- Suspected Root Cause: Deterministic tmp name `.{fname}{TMP_SUFFIX}` and UTF-8 conversions (`to_str().unwrap_or("target")`) in FS primitives.
-- Files Likely Involved:
-  - cargo/switchyard/src/fs/atomic.rs
-  - cargo/switchyard/src/fs/swap.rs
-- Potential Direction (non-binding):
-  - Option A: Minimal hardening — ENOENT-only ignore on `unlinkat`, ensure tmp cleanup on all error paths, keep env-based EXDEV simulation gated.
-  - Option B: Full hardening — unique tmp names (PID + counter/UUID), bytes-safe `CString::new(OsStrExt::as_bytes(...))` for names, use `rustix::fs::fsync(&dirfd)` instead of reopening by path.
-- Evidence:
-  - Code cites: src/fs/atomic.rs:64–76, 87–117; src/fs/swap.rs:78–85, 103–111, 131–139
-  - SPEC refs: SPEC/requirements.yaml REQ-A2 (no broken/missing path), REQ-TOCTOU1 (TOCTOU-safe syscall sequence)
