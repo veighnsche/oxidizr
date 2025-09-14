@@ -85,17 +85,19 @@ pub fn atomic_symlink_swap(
     symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 
     // Atomically rename tmp -> fname within the same directory
-    // Test override: simulate EXDEV for coverage when requested via env var by
-    // injecting an Err(Errno::XDEV) into the rename path so the fallback branch executes.
-    let force_exdev =
-        std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1"));
     let new_c = std::ffi::CString::new(fname)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     let t0 = Instant::now();
-    let rename_res = if force_exdev {
-        Err(Errno::XDEV)
+    let rename_res = renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str());
+    // Test override: simulate EXDEV for coverage when requested via env var by
+    // injecting an Err(Errno::XDEV) error after the renameat call so the fallback branch executes.
+    let rename_res = if std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1")) {
+        match rename_res {
+            Ok(()) => Err(Errno::XDEV),
+            Err(e) => Err(e),
+        }
     } else {
-        renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str())
+        rename_res
     };
     match rename_res {
         Ok(()) => {
