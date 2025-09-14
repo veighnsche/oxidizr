@@ -23,7 +23,9 @@ fn envrunner_base4_weekly_platinum() {
     let root = td.path();
 
     // Huge path lengths
-    let huge_segment = "a".repeat(2000);
+    // Use a very long but filesystem-valid segment length. Many Linux filesystems have NAME_MAX=255,
+    // so keep this below that to avoid ENAMETOOLONG while still exercising long path handling.
+    let huge_segment = "a".repeat(200);
     let src = root.join(format!("bin/{}/new", huge_segment));
     let tgt = root.join(format!("usr/{}/bin/app", huge_segment));
 
