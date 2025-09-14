@@ -94,6 +94,9 @@ pub async fn then_exdev_fail(world: &mut World) {
     world.rebuild_api();
     world
         .env_guards
+        .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1"));
+    world
+        .env_guards
         .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_FORCE_EXDEV", "1"));
     let plan = world.plan.as_ref().unwrap();
     let _ = world

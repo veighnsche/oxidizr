@@ -6,6 +6,8 @@ use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
+#[path = "../helpers/lockmgr.rs"]
+mod test_lockmgr;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -34,6 +36,7 @@ fn smoke_runner_ok_yields_success_and_no_rollback() {
     policy.governance.allow_unlocked_commit = true;
 
     let api = switchyard::Switchyard::new(facts.clone(), audit, policy)
+        .with_lock_manager(Box::new(test_lockmgr::TestLockManager::new()))
         .with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner::default()))
         .with_ownership_oracle(Box::new(switchyard::adapters::FsOwnershipOracle::default()));
 

@@ -3,6 +3,9 @@ use switchyard::logging::{redact_event, FactsEmitter, JsonlSink};
 use switchyard::policy::Policy;
 use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
+use serial_test::serial;
+#[path = "../helpers/env.rs"]
+mod scoped_env;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -20,6 +23,7 @@ impl FactsEmitter for TestEmitter {
 }
 
 #[test]
+#[serial]
 fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
     let facts = TestEmitter::default();
     let audit = JsonlSink::default();
@@ -47,10 +51,10 @@ fn preflight_summary_failure_maps_to_e_policy_with_exit_code() {
         restore: vec![],
     });
 
-    // Force rescue verification failure
-    std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");
+    // Force rescue verification failure (scoped; allow env overrides in tests only)
+    let _allow = scoped_env::ScopedEnv::set("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1");
+    let _rescue = scoped_env::ScopedEnv::set("SWITCHYARD_FORCE_RESCUE_OK", "0");
     let _ = api.preflight(&plan).unwrap();
-    std::env::remove_var("SWITCHYARD_FORCE_RESCUE_OK");
 
     let redacted: Vec<Value> = facts
         .events

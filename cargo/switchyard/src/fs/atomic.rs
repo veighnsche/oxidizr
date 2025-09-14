@@ -89,9 +89,17 @@ pub fn atomic_symlink_swap(
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
     let t0 = Instant::now();
     let rename_res = renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str());
-    // Test override: simulate EXDEV for coverage when requested via env var by
-    // injecting an Err(Errno::XDEV) error after the renameat call so the fallback branch executes.
-    let rename_res = if std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1")) {
+    // Test override: simulate EXDEV for coverage when explicitly allowed.
+    // Honor SWITCHYARD_FORCE_EXDEV only when running tests (cfg(test)) or when
+    // SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES=1 is set. This prevents accidental
+    // production behavior changes due to process-global env.
+    let allow_env_overrides = cfg!(test)
+        || std::env::var_os("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES")
+            == Some(std::ffi::OsString::from("1"));
+    // If allowed, inject Err(Errno::XDEV) after the renameat call so the fallback branch executes.
+    let rename_res = if allow_env_overrides
+        && std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1"))
+    {
         match rename_res {
             Ok(()) => Err(Errno::XDEV),
             Err(e) => Err(e),

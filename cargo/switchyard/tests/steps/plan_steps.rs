@@ -26,6 +26,9 @@ pub async fn given_plan_min(world: &mut World) {
 pub async fn given_exdev_env(world: &mut World) {
     world
         .env_guards
+        .push(EnvGuard::new("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1"));
+    world
+        .env_guards
         .push(EnvGuard::new("SWITCHYARD_FORCE_EXDEV", "1"));
 }
 

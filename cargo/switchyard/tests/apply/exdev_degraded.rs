@@ -8,6 +8,8 @@ use switchyard::types::plan::{LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
 use switchyard::types::ApplyMode;
 use serial_test::serial;
+#[path = "../helpers/env.rs"]
+mod scoped_env;
 
 #[derive(Default, Clone, Debug)]
 struct TestEmitter {
@@ -54,10 +56,10 @@ fn exdev_degraded_fallback_sets_degraded_true() {
         restore: vec![],
     });
 
-    // Force EXDEV path
-    std::env::set_var("SWITCHYARD_FORCE_EXDEV", "1");
+    // Force EXDEV path (scoped; allow env overrides in tests only)
+    let _allow = scoped_env::ScopedEnv::set("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES", "1");
+    let _exdev = scoped_env::ScopedEnv::set("SWITCHYARD_FORCE_EXDEV", "1");
     let _ = api.apply(&plan, ApplyMode::Commit).unwrap();
-    std::env::remove_var("SWITCHYARD_FORCE_EXDEV");
 
     let redacted: Vec<Value> = facts
         .events

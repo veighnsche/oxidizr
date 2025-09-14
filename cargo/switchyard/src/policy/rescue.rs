@@ -11,6 +11,7 @@
 use crate::constants::{RESCUE_MIN_COUNT, RESCUE_MUST_HAVE};
 use crate::types::{RescueError, RescueStatus};
 use std::env;
+use std::ffi::OsString;
 
 /// Verify that at least one rescue toolset is available on PATH (`BusyBox` or GNU core utilities).
 /// Wrapper that does not enforce executability checks.
@@ -42,17 +43,23 @@ pub fn verify_rescue(exec_check: bool) -> Result<RescueStatus, RescueError> {
 }
 
 fn verify_rescue_min(exec_check: bool, min_count: usize) -> Result<RescueStatus, RescueError> {
-    // Test override knobs:
-    if let Ok(v) = env::var("SWITCHYARD_FORCE_RESCUE_OK") {
-        let v = v.trim();
-        if v == "1" {
-            return Ok(RescueStatus::GNU {
-                found: min_count,
-                min: min_count,
-            });
-        }
-        if v == "0" {
-            return Err(RescueError::Unavailable);
+    // Test override knobs: only honor when explicitly allowed in tests or when the
+    // SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES=1 flag is set. This prevents accidental
+    // production behavior changes due to process-global env during integration tests.
+    let allow_env_overrides = cfg!(test)
+        || env::var_os("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES") == Some(OsString::from("1"));
+    if allow_env_overrides {
+        if let Ok(v) = env::var("SWITCHYARD_FORCE_RESCUE_OK") {
+            let v = v.trim();
+            if v == "1" {
+                return Ok(RescueStatus::GNU {
+                    found: min_count,
+                    min: min_count,
+                });
+            }
+            if v == "0" {
+                return Err(RescueError::Unavailable);
+            }
         }
     }
     // If exec checks are disabled and minimum required count is zero, treat as OK.
