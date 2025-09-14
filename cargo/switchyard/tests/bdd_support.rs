@@ -4,6 +4,14 @@ use std::sync::{Arc, Mutex};
 
 use switchyard::logging::{AuditSink, FactsEmitter};
 
+// New helper submodules for tests (explicit paths to support both crate-root and submodule use)
+#[path = "bdd_support/env.rs"]
+pub mod env;
+#[path = "bdd_support/facts.rs"]
+pub mod facts;
+#[path = "bdd_support/schema.rs"]
+pub mod schema;
+
 #[derive(Debug, Clone, Default)]
 pub struct CollectingEmitter(pub Arc<Mutex<Vec<Value>>>);
 

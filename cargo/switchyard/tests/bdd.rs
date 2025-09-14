@@ -7,6 +7,7 @@ use cucumber::World as _; // bring trait into scope for World::cucumber()
 use serde_json::Value;
 use std::path::Path;
 use switchyard::adapters::{DefaultSmokeRunner, FileLockManager};
+use switchyard::adapters::LockGuard;
 use switchyard::api::{DebugAttestor, Switchyard};
 use switchyard::policy::types::{ExdevPolicy, LockingPolicy, SmokePolicy};
 use switchyard::policy::Policy;
@@ -16,6 +17,8 @@ use switchyard::types::report::{ApplyReport, PreflightReport};
 
 mod bdd_support;
 use bdd_support::{util, CollectingAudit, CollectingEmitter};
+use bdd_support::env::EnvGuard;
+use bdd_support::{facts, schema};
 
 #[derive(Default, cucumber::World)]
 pub struct World {
@@ -32,6 +35,9 @@ pub struct World {
     lock_path: Option<std::path::PathBuf>,
     facts_dry: Option<Vec<Value>>,
     facts_real: Option<Vec<Value>>,
+    // Scoped guards to ensure no cross-scenario leakage
+    env_guards: Vec<EnvGuard>,
+    lock_guards: Vec<Box<dyn LockGuard>>,
 }
 
 impl World {
@@ -96,6 +102,27 @@ impl World {
         let plan = self.api.as_ref().unwrap().plan(input);
         self.plan = Some(plan);
     }
+
+    /// Ensure there is at least a minimal single-action plan available.
+    fn ensure_plan_min(&mut self) {
+        if self.plan.is_some() {
+            return;
+        }
+        let link = self
+            .last_link
+            .clone()
+            .unwrap_or_else(|| "/usr/bin/ls".to_string());
+        let src = self
+            .last_src
+            .clone()
+            .unwrap_or_else(|| "providerB/ls".to_string());
+        self.build_single_swap(&link, &src);
+    }
+
+    /// Snapshot all emitted facts so far.
+    fn all_facts(&self) -> Vec<Value> {
+        self.facts.0.lock().unwrap().clone()
+    }
 }
 
 impl std::fmt::Debug for World {
@@ -112,10 +139,8 @@ impl std::fmt::Debug for World {
 mod steps {
     use super::*;
     use cucumber::{given, then, when};
-    use jsonschema::JSONSchema;
     use switchyard::adapters::LockManager;
     use switchyard::adapters::{AttestationError, Attestor, Signature};
-    use switchyard::logging::redact::redact_event;
 
     // Given steps
     #[given(regex = r"^(/.+) is a symlink to (.+)$")]
@@ -137,8 +162,10 @@ mod steps {
     }
 
     #[given(regex = r"^the target and staging directories reside on different filesystems$")]
-    async fn given_exdev_env(_world: &mut World) {
-        std::env::set_var("SWITCHYARD_FORCE_EXDEV", "1");
+    async fn given_exdev_env(world: &mut World) {
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_EXDEV", "1"));
     }
 
     #[given(regex = r"^a production deployment with a LockManager$")]
@@ -207,9 +234,7 @@ mod steps {
         } else {
             world.ensure_api();
         }
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap();
         let _ = world.api.as_ref().unwrap().preflight(plan).unwrap();
         let _ = world
@@ -233,9 +258,7 @@ mod steps {
         } else {
             world.ensure_api();
         }
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap();
         let _ = world
             .api
@@ -254,9 +277,7 @@ mod steps {
     #[when(regex = r"^I run preflight$")]
     async fn when_preflight(world: &mut World) {
         world.ensure_api();
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap();
         world.preflight = Some(world.api.as_ref().unwrap().preflight(plan).unwrap());
     }
@@ -264,9 +285,7 @@ mod steps {
     #[when(regex = r"^I run preflight in DryRun and Commit modes$")]
     async fn when_preflight_both(world: &mut World) {
         world.ensure_api();
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap();
         let _ = world.api.as_ref().unwrap().preflight(plan).unwrap();
         // preflight is always dry-run; re-run to simulate commit parity
@@ -295,9 +314,7 @@ mod steps {
     #[when(regex = r"^I run in dry-run mode$")]
     async fn when_run_dry(world: &mut World) {
         world.ensure_api();
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         world.clear_facts();
         let plan = world.plan.as_ref().unwrap();
         let _ = world
@@ -311,9 +328,7 @@ mod steps {
 
     #[when(regex = r"^two apply\(\) calls overlap in time$")]
     async fn when_two_apply_overlap(world: &mut World) {
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap().clone();
         let plan1 = plan.clone();
         let plan2 = plan.clone();
@@ -352,9 +367,7 @@ mod steps {
 
     #[when(regex = r"^I attempt apply in Commit mode$")]
     async fn when_attempt_apply_commit(world: &mut World) {
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap();
         let _ = world.api.as_ref().unwrap().apply(plan, ApplyMode::Commit);
     }
@@ -371,25 +384,13 @@ mod steps {
         }
     }
 
-    fn normalize_for_compare(mut v: Value) -> Value {
-        if let Some(obj) = v.as_object_mut() {
-            obj.remove("run_id");
-            obj.remove("event_id");
-            obj.remove("seq");
-            obj.remove("switchyard_version");
-        }
-        v
-    }
+    
 
     #[then(
         regex = r"^(every|each) stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json$"
     )]
     async fn then_validate_schema(world: &mut World) {
-        let schema_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("SPEC/audit_event.v2.schema.json");
-        let schema_data = std::fs::read_to_string(schema_path).expect("read schema");
-        let schema_json: Value = serde_json::from_str(&schema_data).expect("parse schema");
-        let compiled = JSONSchema::compile(&schema_json).expect("compile schema");
+        let compiled = schema::compiled_v2();
         for ev in all_facts(world) {
             if !compiled.is_valid(&ev) {
                 // On failure, try to extract a single error message for context
@@ -421,51 +422,25 @@ mod steps {
         // First run
         world.clear_facts();
         let _ = world.api.as_ref().unwrap().preflight(&plan).unwrap();
-        let mut a: Vec<Value> = all_facts(world)
-            .into_iter()
-            .filter(|e| {
-                matches!(
-                    e.get("stage").and_then(|v| v.as_str()),
-                    Some("plan") | Some("preflight") | Some("preflight.summary")
-                )
-            })
-            .map(redact_event)
-            .map(normalize_for_compare)
-            .collect();
+        let mut a: Vec<Value> = facts::filter_by_stage(
+            all_facts(world),
+            &["plan", "preflight", "preflight.summary"],
+        )
+        .into_iter()
+        .map(facts::redact_and_normalize)
+        .collect();
         // Second run
         world.clear_facts();
         let _ = world.api.as_ref().unwrap().preflight(&plan).unwrap();
-        let mut b: Vec<Value> = all_facts(world)
-            .into_iter()
-            .filter(|e| {
-                matches!(
-                    e.get("stage").and_then(|v| v.as_str()),
-                    Some("plan") | Some("preflight") | Some("preflight.summary")
-                )
-            })
-            .map(redact_event)
-            .map(normalize_for_compare)
-            .collect();
-        let key = |e: &Value| {
-            let st = e
-                .get("stage")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let aid = e
-                .get("action_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let p = e
-                .get("path")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            (st, aid, p)
-        };
-        a.sort_by_key(key);
-        b.sort_by_key(key);
+        let mut b: Vec<Value> = facts::filter_by_stage(
+            all_facts(world),
+            &["plan", "preflight", "preflight.summary"],
+        )
+        .into_iter()
+        .map(facts::redact_and_normalize)
+        .collect();
+        facts::sort_by_stage_action_path(&mut a);
+        facts::sort_by_stage_action_path(&mut b);
         assert_eq!(a, b, "plan+preflight facts not identical after redaction");
     }
 
@@ -479,32 +454,16 @@ mod steps {
             world.facts_real = Some(all_facts(world));
         }
         let real = world.facts_real.clone().unwrap();
-        let mut a: Vec<Value> = dry
+        let mut a: Vec<Value> = facts::filter_apply_result_per_action(dry)
             .into_iter()
-            .filter(|e| {
-                e.get("stage").and_then(|v| v.as_str()) == Some("apply.result")
-                    && e.get("action_id").is_some()
-            })
-            .map(redact_event)
-            .map(normalize_for_compare)
+            .map(facts::redact_and_normalize)
             .collect();
-        let mut b: Vec<Value> = real
+        let mut b: Vec<Value> = facts::filter_apply_result_per_action(real)
             .into_iter()
-            .filter(|e| {
-                e.get("stage").and_then(|v| v.as_str()) == Some("apply.result")
-                    && e.get("action_id").is_some()
-            })
-            .map(redact_event)
-            .map(normalize_for_compare)
+            .map(facts::redact_and_normalize)
             .collect();
-        let key = |e: &Value| {
-            e.get("action_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string()
-        };
-        a.sort_by_key(key);
-        b.sort_by_key(key);
+        facts::sort_by_action_id(&mut a);
+        facts::sort_by_action_id(&mut b);
         assert_eq!(
             a, b,
             "apply.result per-action not identical after redaction"
@@ -548,8 +507,10 @@ mod steps {
     #[given(
         regex = r"^at least one fallback binary set \(GNU or BusyBox\) is installed and on PATH$"
     )]
-    async fn given_fallback_present(_world: &mut World) {
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
+    async fn given_fallback_present(world: &mut World) {
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "1"));
     }
 
     // Observability audit extra steps
@@ -558,7 +519,9 @@ mod steps {
         // Require rescue and set exec_check true without making it available -> preflight STOP
         world.policy.rescue.require = true;
         world.policy.rescue.exec_check = true;
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "0");
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "0"));
         world.rebuild_api();
     }
     #[when(regex = r"^I inspect summary events$")]
@@ -625,9 +588,7 @@ mod steps {
     #[when(regex = r"^I inspect preflight and emitted facts$")]
     async fn when_inspect_preflight(world: &mut World) {
         world.ensure_api();
-        if world.plan.is_none() {
-            given_plan_min(world).await;
-        }
+        world.ensure_plan_min();
         let plan = world.plan.as_ref().unwrap();
         let _ = world.api.as_ref().unwrap().preflight(plan).unwrap();
     }
@@ -768,9 +729,9 @@ mod steps {
             .clone()
             .unwrap_or_else(|| world.ensure_root().join("switchyard.lock"));
         let mgr = FileLockManager::new(lock_path);
-        // Leak guard to keep it held for the duration of scenario
+        // Hold guard for the duration of the scenario by storing in World
         let guard = mgr.acquire_process_lock(10_000).expect("acquire lock");
-        Box::leak(Box::new(guard));
+        world.lock_guards.push(guard);
     }
 
     #[given(regex = r"^a LockManager configured with a short timeout$")]
@@ -834,18 +795,24 @@ mod steps {
     }
 
     #[given(regex = r"^a configured rescue profile consisting of backup symlinks$")]
-    async fn given_rescue_configured(_world: &mut World) {
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
+    async fn given_rescue_configured(world: &mut World) {
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "1"));
     }
 
     #[given(regex = r"^a system with configured rescue profile$")]
-    async fn given_rescue_system(_world: &mut World) {
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
+    async fn given_rescue_system(world: &mut World) {
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "1"));
     }
 
     #[given(regex = r"^no BusyBox but GNU core utilities are present on PATH$")]
-    async fn given_gnu_subset_ok(_world: &mut World) {
-        std::env::set_var("SWITCHYARD_FORCE_RESCUE_OK", "1");
+    async fn given_gnu_subset_ok(world: &mut World) {
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "1"));
     }
 
     #[given(regex = r"^a plan that mutates a file$")]
@@ -864,7 +831,9 @@ mod steps {
 
     #[given(regex = r"^a plan with environment-derived values that may be sensitive$")]
     async fn given_plan_env_sensitive(world: &mut World) {
-        std::env::set_var("SWITCHYARD_HELPER", "paru");
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_HELPER", "paru"));
         given_plan_min(world).await;
     }
 
@@ -903,7 +872,9 @@ mod steps {
     async fn then_exdev_fail(world: &mut World) {
         world.policy.apply.exdev = ExdevPolicy::Fail;
         world.rebuild_api();
-        std::env::set_var("SWITCHYARD_FORCE_EXDEV", "1");
+        world
+            .env_guards
+            .push(EnvGuard::new("SWITCHYARD_FORCE_EXDEV", "1"));
         let plan = world.plan.as_ref().unwrap();
         let _ = world
             .api
