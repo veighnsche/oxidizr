@@ -12,11 +12,13 @@ struct TestEmitter {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct FailingLockGuard;
 
 impl LockGuard for FailingLockGuard {}
 
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 struct FailingLockManager;
 
 impl LockManager for FailingLockManager {

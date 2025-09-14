@@ -8,11 +8,13 @@ use switchyard::adapters::{LockManager, LockGuard};
 use switchyard::types::errors::{Error, ErrorKind, Result};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct FailingLockGuard;
 
 impl LockGuard for FailingLockGuard {}
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct FailingLockManager;
 
 impl LockManager for FailingLockManager {

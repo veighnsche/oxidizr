@@ -3,6 +3,7 @@ use cucumber::{given, when, then};
 use crate::bdd_world::World;
 use crate::bdd_support::{schema};
 use serde_json::Value;
+use switchyard::api::Overrides;
 
 #[then(regex = r"^each fact carries schema_version=2$")]
 pub async fn then_schema_v2(world: &mut World) {
@@ -47,10 +48,15 @@ pub async fn given_failing_preflight(world: &mut World) {
     // Require rescue and set exec_check true without making it available -> preflight STOP
     world.policy.rescue.require = true;
     world.policy.rescue.exec_check = true;
-    world
-        .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new("SWITCHYARD_FORCE_RESCUE_OK", "0"));
-    world.rebuild_api();
+    // Prefer per-instance Overrides over env to avoid process-global side effects
+    if world.plan.is_none() { crate::steps::plan_steps::given_plan_min(world).await; }
+    let api = switchyard::api::Switchyard::new(
+        world.facts.clone(),
+        world.audit.clone(),
+        world.policy.clone(),
+    )
+    .with_overrides(Overrides::rescue_ok(false));
+    world.api = Some(api);
 }
 
 #[when(regex = r"^I inspect summary events$")]
