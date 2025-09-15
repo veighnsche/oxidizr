@@ -80,6 +80,21 @@ pub(crate) fn evaluate_action(
                     }
                 }
             }
+            // REQ-S3 (bounded for testability): STOP when source is world-writable.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                if let Ok(md) = std::fs::metadata(&source.as_path()) {
+                    let mode = md.mode();
+                    if (mode & 0o002) != 0 {
+                        stops.push(format!(
+                            "source world-writable: {}",
+                            source.as_path().display()
+                        ));
+                        notes.push("untrusted source ownership or mode".to_string());
+                    }
+                }
+            }
             match crate::preflight::checks::check_source_trust(
                 &source.as_path(),
                 policy.risks.source_trust != SourceTrustPolicy::RequireTrusted,

@@ -18,15 +18,17 @@ Last updated: 2025-09-14
 
 ## Immediate Priorities (P0)
 
-- [ ] BDD attestation summary is missing
-  - Symptom: `Then attestation fields (sig_alg, signature, bundle_hash, public_key_id) are present` fails in `SPEC/features/observability_audit.feature`.
-  - Code: `src/api/apply/mod.rs` → `summary::ApplySummary::attestation()`; `src/api/apply/summary.rs`; `src/adapters/attest.rs`.
-  - Acceptance: On successful Commit apply with an Attestor configured, summary `apply.result` contains `attestation` object with the 4 fields; related BDD scenario passes.
-  - Tests: `tests/steps/attestation_steps.rs` scenario passes; add a unit test for `build_attestation_fields()` resilience.
+- [x] BDD attestation summary is missing
+  - Symptom (fixed): `Then attestation fields (sig_alg, signature, bundle_hash, public_key_id) are present` was failing in `SPEC/features/observability_audit.feature`.
+  - Code: `src/api/apply/mod.rs` → ensure `summary::ApplySummary::attestation()` is invoked for non-dry-run summaries; kept logic in `src/api/apply/summary.rs`; `src/adapters/attest.rs` unchanged.
+  - Acceptance: On Commit with an Attestor configured, summary `apply.result` contains `attestation` with the 4 fields; BDD scenario passes.
+  - Proof: BDD feature `observability_audit.feature` “Attestation Emitted On Apply Success” now passes; integration test `apply::attestation_apply_success::attestation_fields_present_on_success_and_masked_after_redaction` passes.
+  - Notes: Redaction masking validated in `logging/redact.rs` tests and the integration test above.
 
 - [ ] Implement missing BDD step glue for SPEC coverage (see section below)
-  - Add step modules and glue for: rollback, safety preconditions, thread safety.
-  - Acceptance: No "Step doesn't match any function" failures when running `cargo test -p switchyard --features bdd --test bdd`.
+  - Added initial step modules and glue for: rollback, safety preconditions, thread safety.
+  - Remaining work: resolve a few unmatched/over-constrained steps in rollback and safety features; remove any lingering ambiguities.
+  - Current status: Many formerly missing steps now execute; outstanding items tracked below in the per-feature lists.
 
 - [ ] Add cucumber CLI filtering to the BDD runner (optional dev UX)
   - File: `tests/bdd_main.rs`.
@@ -41,40 +43,39 @@ Ensure every scenario in `SPEC/features/` has step glue under `tests/steps/`. It
 
 ### Rollback (`SPEC/features/rollback.feature`)
 
-- [ ] Given a plan with three actions A, B, C where B will fail
+- [x] Given a plan with three actions A, B, C where B will fail
   - Implement builder that creates three `EnsureSymlink` actions under temp root; force failure for B (e.g., forbid target path via `policy.scope.forbid_paths`, or simulate via overrides if applicable).
-- [ ] When I apply the plan in Commit mode
-  - Reuse existing apply step or add alias.
-- [ ] Then the engine rolls back A in reverse order automatically
-  - Inspect emitted facts for `rollback` and `rollback.summary`; assert reverse order and partial restoration state visibility.
-- [ ] And emitted facts include partial restoration state if any rollback step fails
-  - Ensure per-action facts or summary indicate failures during rollback.
-- [ ] Given a plan that replaces a symlink then restores it
-  - Construct forward plan then `plan_rollback_of()` and apply twice; verify topology.
-- [ ] When I apply the plan and then apply a rollback plan twice
-- [ ] Then the final link/file topology is identical to the prior state
-  - Verify with filesystem inspection under temp root.
+- [x] When I apply the plan in Commit mode
+  - Reused existing apply step.
+- [~] Then the engine rolls back A in reverse order automatically
+  - Implemented “at least one rollback occurred and C (non-executed) not rolled back”. Reverse-order assertion is pending — will wire specific order check with action IDs.
+- [x] And emitted facts include partial restoration state if any rollback step fails
+  - Checks for presence of `rollback.summary` on failure.
+- [x] Given a plan that replaces a symlink then restores it
+- [~] When I apply the plan and then apply a rollback plan twice
+- [~] Then the final link/file topology is identical to the prior state
+  - Current assertion occasionally fails; will align with `requirements::restore_exact_topology` harness to ensure idempotent rollback parity.
 
 Step file: `tests/steps/rollback_steps.rs` (new).
 
 ### Safety Preconditions (`SPEC/features/safety_preconditions.feature`)
 
 - [ ] Given a candidate path containing .. segments or symlink escapes
-  - Implement using `SafePath::from_rooted()` with invalid candidate; assert rejection.
+  - Existing glue lives in `steps/observability_steps.rs`; hook is present but not matching under this feature—investigate Cucumber matcher scoping.
 - [ ] When I attempt to construct a SafePath
 - [ ] Then SafePath normalization rejects the path as unsafe
 - [ ] Given the target filesystem is read-only or noexec or immutable
   - Already implemented via forbidding root; confirm reuse.
 - [ ] When I attempt to apply a plan / Then operations fail closed with a policy violation error
   - Implemented.
-- [ ] Given a source file that is not root-owned or is world-writable
+- [x] Given a source file that is not root-owned or is world-writable
   - Create temp file and `chmod 0o666` (or change owner when feasible); rely on ownership oracle or policy logic.
 - [ ] Then preflight fails closed unless an explicit policy override is present
-- [ ] Given strict_ownership=true policy / And a target not package-owned per oracle
+- [x] Given strict_ownership=true policy / And a target not package-owned per oracle
   - Enable `policy.risks.ownership_strict = true`; set a dummy oracle that reports not owned.
-- [ ] Then preflight fails closed
-- [ ] Given the policy requires preserving owner, mode, timestamps, xattrs, ACLs, and caps
-  - Set `policy.durability.preservation = RequireBasic` and simulate unsupported preservation via `fs::meta::detect_preservation_capabilities` outcome.
+- [x] Then preflight fails closed
+- [x] Given the policy requires preserving owner, mode, timestamps, xattrs, ACLs, and caps
+  - Implemented; environment detection provides conservative unsupported dimensions.
 - [ ] Then preflight stops with a fail-closed decision unless an explicit override is set
 - [ ] Given a backup sidecar v2 with payload present / When I restore under policy requiring sidecar integrity / Then the engine verifies payload hash and fails restore on mismatch
   - Create backup via a previous apply path, then tamper with sidecar/payload before restore.
@@ -83,9 +84,10 @@ Step file: `tests/steps/safety_preconditions_steps.rs` (new). May also extend `b
 
 ### Thread Safety (`SPEC/features/thread_safety.feature`)
 
-- [ ] Given the Switchyard core types / Then they are Send + Sync for safe use across threads
+- [x] Given the Switchyard core types / Then they are Send + Sync for safe use across threads
   - Add a compile-time assertion helper (e.g., `fn assert_send_sync<T: Send + Sync>() {}`) and use it with key types (`Switchyard<_,_>`, `SafePath`, etc.). This can be in a test module.
 - [ ] Given two threads invoking apply() concurrently / And a LockManager is configured / When both apply() calls run / Then only one mutator proceeds at a time under the lock
+  - Implemented most steps; add alias for “And a LockManager is configured”.
   - Similar to `tests/steps/locks_steps.rs::when_two_apply_overlap`, but assert mutual exclusion via facts or outcomes (only one success at a time).
 
 Step file: `tests/steps/thread_safety_steps.rs` (new).

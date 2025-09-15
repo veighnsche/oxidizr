@@ -10,7 +10,8 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
     dry: bool,
     slog: &StageLogger<'_>,
     rollback_errors: &mut Vec<String>,
-) {
+) -> Vec<String> {
+    let mut rolled_paths: Vec<String> = Vec::new();
     for prev in executed.iter().rev() {
         match prev {
             Action::EnsureSymlink {
@@ -27,6 +28,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                         slog.rollback()
                             .path(target.as_path().display().to_string())
                             .emit_success();
+                        rolled_paths.push(target.as_path().display().to_string());
                     }
                     Err(e) => {
                         rollback_errors.push(format!(
@@ -37,6 +39,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                         slog.rollback()
                             .path(target.as_path().display().to_string())
                             .emit_failure();
+                        rolled_paths.push(target.as_path().display().to_string());
                     }
                 }
             }
@@ -49,6 +52,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
             }
         }
     }
+    rolled_paths
 }
 
 pub(crate) fn emit_summary(slog: &StageLogger<'_>, rollback_errors: &[String]) {

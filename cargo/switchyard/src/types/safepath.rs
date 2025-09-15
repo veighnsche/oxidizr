@@ -32,13 +32,17 @@ impl SafePath {
     ///
     /// Returns an error if the root path is not absolute, if the candidate path escapes the root,
     /// or if the candidate path contains unsafe components like dotdot (..).
+    ///
+    /// # Panics
+    ///
+    /// Panics when `root` is not absolute. This mirrors historical semantics and
+    /// preserves SPEC/BDD expectations for construction invariants in tests.
+    #[allow(
+        clippy::panic,
+        reason = "Root absoluteness is a construction invariant"
+    )]
     pub fn from_rooted(root: &Path, candidate: &Path) -> Result<Self> {
-        if !root.is_absolute() {
-            return Err(Error {
-                kind: ErrorKind::InvalidPath,
-                msg: "root must be absolute".into(),
-            });
-        }
+        assert!(root.is_absolute(), "root must be absolute");
         let effective = if candidate.is_absolute() {
             match candidate.strip_prefix(root) {
                 Ok(p) => p.to_path_buf(),

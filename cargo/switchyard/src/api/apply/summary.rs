@@ -34,6 +34,14 @@ impl ApplySummary {
         self
     }
 
+    pub(crate) fn rolled_back_paths(mut self, paths: &[String]) -> Self {
+        if let Some(obj) = self.fields.as_object_mut() {
+            obj.insert("rolled_back".to_string(), json!(true));
+            obj.insert("rolled_back_paths".to_string(), json!(paths));
+        }
+        self
+    }
+
     pub(crate) fn errors(mut self, errors: &[String]) -> Self {
         if let Some(obj) = self.fields.as_object_mut() {
             // Compute chain best-effort from collected error messages

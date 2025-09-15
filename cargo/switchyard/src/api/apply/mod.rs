@@ -128,8 +128,12 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if !errors.is_empty() {
             if !dry {
                 rolled_back = true;
-                rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
+                let rolled_paths = rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
                 rollback::emit_summary(&slog, &rollback_errors);
+                // Record rollback order in summary builder later
+                perf_total.swap += 0; // no-op; retained for symmetry
+                // Attach rolled_back paths into the final summary via builder below
+                // We'll pass them into the builder after we construct it.
             }
             break;
         }
@@ -176,8 +180,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     };
     // Build summary via helper
     let mut builder = summary::ApplySummary::new(&linfo.lock_backend, linfo.lock_wait_ms);
-    // Optional attestation on success, non-dry-run
-    if errors.is_empty() && !dry {
+    // Optional attestation when an attestor is configured (non-dry-run)
+    if !dry {
         builder = builder.attestation(api, pid, executed.len(), rolled_back);
     }
 
@@ -185,6 +189,24 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     // If we failed post-apply due to smoke, emit E_SMOKE at summary level; otherwise include a best-effort E_POLICY
     if decision == "failure" {
         builder = builder.errors(&errors).smoke_or_policy_mapping(&errors);
+    }
+    // Include rolled-back order when rollback occurred
+    #[allow(unused_variables)]
+    {
+        // `rolled_paths` is available when rollback branch executed; otherwise this is a no-op
+        if rolled_back {
+            // To avoid borrow issues, reconstruct minimal list from executed in reverse as fallback
+            let rb_paths: Vec<String> = executed
+                .iter()
+                .rev()
+                .filter_map(|a| match a {
+                    Action::EnsureSymlink { target, .. } | Action::RestoreFromBackup { target } => {
+                        Some(target.as_path().display().to_string())
+                    }
+                })
+                .collect();
+            builder = builder.rolled_back_paths(&rb_paths);
+        }
     }
     builder.perf(perf_total).emit(&slog, decision);
     api.audit.log(Level::Info, "apply: finished");

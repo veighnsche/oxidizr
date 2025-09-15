@@ -60,19 +60,28 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
     let emitter = RowEmitter { api, plan };
     for act in &plan.actions {
         match act {
-            Action::EnsureSymlink { target, .. } => {
+            Action::EnsureSymlink { source, target } => {
                 let eval = gating::evaluate_action(&api.policy, api.owner.as_deref(), act);
-                // Aggregate stops for summary
-                if !eval.stops.is_empty() {
-                    stops.extend(eval.stops.clone());
-                }
-                // Warnings: promote policy-allowed notes as warnings
+                if !eval.stops.is_empty() { stops.extend(eval.stops.clone()); }
                 warnings.extend(
                     eval.notes
                         .iter()
                         .filter(|n| n.contains("allowed by policy"))
                         .cloned(),
                 );
+                // Additional world-writable check at preflight orchestrator level to ensure STOP when required
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::MetadataExt;
+                    if let Ok(md) = std::fs::metadata(&source.as_path()) {
+                        if (md.mode() & 0o002) != 0 {
+                            stops.push(format!(
+                                "source world-writable: {}",
+                                source.as_path().display()
+                            ));
+                        }
+                    }
+                }
                 // Provenance best-effort
                 let prov = match &api.owner {
                     Some(oracle) => match oracle.owner_of(target) {
@@ -113,6 +122,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                         restore_ready: None,
                     },
                 );
+                // Warnings: promote policy-allowed notes as warnings
             }
             Action::RestoreFromBackup { target } => {
                 let eval = gating::evaluate_action(&api.policy, api.owner.as_deref(), act);
@@ -171,6 +181,10 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         }
     }
 
+    // Respect explicit override knob for preflight STOP conditions.
+    if api.policy.apply.override_preflight {
+        stops.clear();
+    }
     // Per-action preflight facts are emitted above with extended fields.
     // Minimal Facts v1: preflight summary
     let decision = if stops.is_empty() {

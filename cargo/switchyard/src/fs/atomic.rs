@@ -113,9 +113,9 @@ pub fn atomic_symlink_swap(
     let t0 = Instant::now();
     let rename_res = renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str());
     // Prefer per-instance override when provided; fallback to gated env for legacy tests only.
-    let allow_env_overrides = cfg!(test)
-        || std::env::var_os("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES")
-            == Some(std::ffi::OsString::from("1"));
+    // Note: do not enable env overrides by default in tests to avoid cross-scenario interference.
+    let allow_env_overrides =
+        std::env::var_os("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES") == Some(std::ffi::OsString::from("1"));
     let inject_exdev = match force_exdev {
         Some(true) => true,
         Some(false) => false,

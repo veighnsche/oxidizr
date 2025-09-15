@@ -134,34 +134,8 @@ pub async fn when_inspect_preflight(world: &mut World) {
     let _ = world.api.as_ref().unwrap().preflight(plan).unwrap();
 }
 
-// Safety preconditions minimal flow
-#[given(regex = r"^a candidate path containing \.\\. segments or symlink escapes$")]
-pub async fn given_candidate_unsafe(world: &mut World) {
-    // Store an obviously unsafe candidate
-    world.last_src = Some("../etc/passwd".to_string());
-}
-
-#[when(regex = r"^I attempt to construct a SafePath$")]
-pub async fn when_construct_safepath(world: &mut World) {
-    let root = world.ensure_root().to_path_buf();
-    let cand = world
-        .last_src
-        .clone()
-        .unwrap_or_else(|| "../etc/passwd".to_string());
-    let res =
-        switchyard::types::safepath::SafePath::from_rooted(&root, std::path::Path::new(&cand));
-    // Record the result as a fact in audit memory via world fields (ephemeral)
-    if res.is_ok() {
-        world.last_src = Some("SAFE_OK".to_string());
-    } else {
-        world.last_src = Some("SAFE_ERR".to_string());
-    }
-}
-
-#[then(regex = r"^SafePath normalization rejects the path as unsafe$")]
-pub async fn then_safepath_rejects(world: &mut World) {
-    assert_eq!(world.last_src.as_deref(), Some("SAFE_ERR"));
-}
+// (moved) Safety preconditions minimal flow now lives in safety_preconditions_steps.rs to avoid
+// step ambiguity across features.
 
 // Operational bounds fsync steps
 #[given(regex = r"^a rename completes for a staged swap$")]
