@@ -205,8 +205,10 @@ pub async fn when_run_engine(world: &mut World) {
 }
 
 #[then(regex = r"^it runs in dry-run mode by default$")]
-pub async fn then_runs_dry_default(_world: &mut World) {
-    // Already executed dry-run in when_run_engine; assertion is covered elsewhere.
+pub async fn then_runs_dry_default(world: &mut World) {
+    // Delegate to the concrete assertion that no apply-stage facts were emitted.
+    // This turns the placeholder into an assertive check tied to observed facts.
+    then_side_effects_not_performed(world).await;
 }
 
 // Conservatism and modes (specific wording)
@@ -262,7 +264,15 @@ pub async fn given_ci_violation(_world: &mut World) {}
 pub async fn when_ci_runs(_world: &mut World) {}
 
 #[then(regex = r"^the CI job fails$")]
-pub async fn then_ci_fails(_world: &mut World) {}
+pub async fn then_ci_fails(_world: &mut World) {
+    // Assert that the test runner is configured to fail on skipped scenarios.
+    // This verifies the CI gate rather than being a no-op.
+    const BDD_MAIN: &str = include_str!("../../tests/bdd_main.rs");
+    assert!(
+        BDD_MAIN.contains(".fail_on_skipped()"),
+        "bdd_main.rs should enable fail_on_skipped() to enforce zero-SKIP CI gate"
+    );
+}
 
 #[given(regex = r"^a newly constructed Switchyard$")]
 pub async fn given_new_switchyard(world: &mut World) {
@@ -645,7 +655,23 @@ pub async fn then_emitted_degraded_false_reason(world: &mut World) {
 pub async fn when_run_acceptance_tests(_world: &mut World) {}
 
 #[then(regex = r"^semantics for rename and degraded path are verified per filesystem$")]
-pub async fn then_semantics_verified(_world: &mut World) {}
+pub async fn then_semantics_verified(world: &mut World) {
+    // Exercise EXDEV semantics under both policies and assert concrete outcomes.
+    // 1) DegradedFallback policy -> expect degraded=true with reason exdev_fallback.
+    world.policy.apply.exdev = switchyard::policy::types::ExdevPolicy::DegradedFallback;
+    world.rebuild_api();
+    crate::steps::plan_steps::given_exdev_env(world).await;
+    when_apply_plan_replaces_cp(world).await;
+    then_emitted_degraded_true_reason(world).await;
+
+    // 2) Fail policy -> expect E_EXDEV with exit_code=50.
+    world.clear_facts();
+    world.policy.apply.exdev = switchyard::policy::types::ExdevPolicy::Fail;
+    world.rebuild_api();
+    crate::steps::plan_steps::given_exdev_env(world).await;
+    when_apply_plan_replaces_cp(world).await;
+    then_apply_fails_exdev_50(world).await;
+}
 
 // ----------------------
 // Locking feature aliases
