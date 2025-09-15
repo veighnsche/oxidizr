@@ -42,6 +42,25 @@ impl ApplySummary {
         self
     }
 
+    /// Ensure summary contains explicit no-rollback fields for shape stability.
+    pub(crate) fn no_rollback(mut self) -> Self {
+        if let Some(obj) = self.fields.as_object_mut() {
+            obj.insert("rolled_back".to_string(), json!(false));
+            // Emit an empty array to keep the shape stable across success/failure
+            obj.insert("rolled_back_paths".to_string(), json!([]));
+        }
+        self
+    }
+
+    /// Record simple counts useful for UIs and tests.
+    pub(crate) fn executed_counts(mut self, executed_count: usize, rolled_back_count: usize) -> Self {
+        if let Some(obj) = self.fields.as_object_mut() {
+            obj.insert("executed_count".to_string(), json!(executed_count));
+            obj.insert("rolled_back_count".to_string(), json!(rolled_back_count));
+        }
+        self
+    }
+
     pub(crate) fn errors(mut self, errors: &[String]) -> Self {
         if let Some(obj) = self.fields.as_object_mut() {
             // Compute chain best-effort from collected error messages

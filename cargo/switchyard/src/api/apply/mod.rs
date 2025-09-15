@@ -221,10 +221,16 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     if decision == "failure" {
         builder = builder.errors(&errors).smoke_or_policy_mapping(&errors);
     }
-    // Include rolled-back order when rollback occurred
+    // Include rolled-back order when rollback occurred; otherwise ensure explicit no-rollback fields for shape stability
     if let Some(ref rb_paths) = rolled_paths_opt {
         builder = builder.rolled_back_paths(rb_paths);
+    } else {
+        builder = builder.no_rollback();
     }
+    // Always include simple counts for observability
+    let executed_count = executed.len();
+    let rolled_back_count = rolled_paths_opt.as_ref().map(|v| v.len()).unwrap_or(0);
+    builder = builder.executed_counts(executed_count, rolled_back_count);
     builder.perf(perf_total).emit(&slog, decision);
     api.audit.log(Level::Info, "apply: finished");
 

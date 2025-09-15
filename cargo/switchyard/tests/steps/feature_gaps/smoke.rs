@@ -21,6 +21,7 @@ pub async fn given_failing_smoke_runner(world: &mut World) {
         .with_smoke_runner(Box::new(Failing))
         .build();
     world.api = Some(api);
+    world.smoke_runner = Some(crate::bdd_world::SmokeRunnerKind::Failing);
 }
 
 #[then(regex = r"^the smoke suite runs and detects the failure$")]
@@ -30,6 +31,12 @@ pub async fn then_smoke_detects_failure(world: &mut World) {
         if ev.get("error_id").and_then(|v| v.as_str()) == Some("E_SMOKE") {
             saw = true;
             break;
+        }
+        if let Some(arr) = ev.get("summary_error_ids").and_then(|v| v.as_array()) {
+            if arr.iter().any(|x| x.as_str() == Some("E_SMOKE")) {
+                saw = true;
+                break;
+            }
         }
     }
     assert!(saw, "expected E_SMOKE in facts");
@@ -58,12 +65,33 @@ pub async fn given_configured_smoke_runner(world: &mut World) {
 #[given(regex = r"^auto_rollback is enabled$")]
 pub async fn given_auto_rollback_enabled(world: &mut World) {
     world.policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true };
-    world.rebuild_api();
+    // Preserve any configured runner when rebuilding API
+    let mut builder = Switchyard::builder(world.facts.clone(), world.audit.clone(), world.policy.clone());
+    if let Some(kind) = world.smoke_runner {
+        match kind {
+            crate::bdd_world::SmokeRunnerKind::Default => {
+                builder = builder.with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner));
+            }
+            crate::bdd_world::SmokeRunnerKind::Failing => {
+                #[derive(Debug, Default)]
+                struct Failing;
+                impl switchyard::adapters::SmokeTestRunner for Failing {
+                    fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::smoke::SmokeFailure> { Err(switchyard::adapters::smoke::SmokeFailure) }
+                }
+                builder = builder.with_smoke_runner(Box::new(Failing));
+            }
+        }
+    }
+    world.api = Some(builder.build());
 }
 
 #[given(regex = r"^at least one smoke command will fail with a non-zero exit$")]
 pub async fn given_smoke_command_will_fail(world: &mut World) {
     given_failing_smoke_runner(world).await;
+    // Remember the failing runner kind so apply_current_plan_commit reattaches it
+    world.smoke_runner = Some(crate::bdd_world::SmokeRunnerKind::Failing);
+    // Ensure smoke is required so failures map to E_SMOKE and trigger rollback
+    world.policy.governance.smoke = switchyard::policy::types::SmokePolicy::Require { auto_rollback: true };
 }
 
 #[then(regex = r"^the minimal smoke suite runs after apply$")]

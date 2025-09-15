@@ -72,10 +72,11 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
         })();
         let hash_ms = u64::try_from(th0.elapsed().as_millis()).unwrap_or(u64::MAX);
 
-        // Idempotence fast-path: if the latest snapshot's prior state matches the current state,
-        // performing a restore would be a no-op. In that case, skip restore entirely to avoid
-        // toggling between snapshots on repeated rollback applications.
-        if !dry {
+        // Idempotence fast-path: only when not using the previous snapshot selector.
+        // If `capture_restore_snapshot` is enabled, we intend to restore to the state prior to
+        // the snapshot we are about to capture, so we must NOT short-circuit.
+        let will_use_prev = !dry && api.policy.apply.capture_restore_snapshot;
+        if !dry && !will_use_prev {
             if let Some((_bopt, sc_path)) = crate::fs::backup::find_latest_backup_and_sidecar(
                 &target.as_path(),
                 &api.policy.backup.tag,
@@ -207,14 +208,10 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             }
         }
         ensure_provenance(&mut extra);
-        // After a successful restore, also capture a snapshot of the restored state to enable
-        // idempotent repeated rollbacks (Latest will reflect the restored topology).
-        if !dry && api.policy.apply.capture_restore_snapshot {
-            let tb2 = Instant::now();
-            let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
-            backup_ms = backup_ms
-                .saturating_add(u64::try_from(tb2.elapsed().as_millis()).unwrap_or(u64::MAX));
-        }
+        // Note: Do not capture a post-restore snapshot here. Keeping only the pre-restore snapshot
+        // ensures that a subsequent inverse restore selects the intended pre-restore state via the
+        // 'previous' selector. Capturing a post-restore snapshot would shift the window such that
+        // 'previous' no longer points to the pre-restore symlink snapshot, breaking invertibility.
 
         StageLogger::new(tctx)
             .apply_result()

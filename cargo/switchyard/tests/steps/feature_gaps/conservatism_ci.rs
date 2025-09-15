@@ -7,7 +7,8 @@ pub async fn given_no_approval(_world: &mut World) {}
 
 #[when(regex = r"^I run the engine$")]
 pub async fn when_run_engine(world: &mut World) {
-    world.run_dry_and_store();
+    // Default behavior: perform preflight only (no apply facts in DryRun-by-default scenario)
+    crate::steps::preflight_steps::when_preflight(world).await;
 }
 
 #[then(regex = r"^it runs in dry-run mode by default$")]
@@ -54,6 +55,11 @@ pub async fn when_run_engine_default(world: &mut World) {
 
 #[then(regex = r"^the operation fails closed unless an explicit override is present$")]
 pub async fn then_fail_closed_alias(world: &mut World) {
+    crate::steps::apply_steps::then_policy_violation(world).await;
+}
+
+#[then(regex = r"^the operation fails closed unless an explicit policy override is set$")]
+pub async fn then_fail_closed_policy_override(world: &mut World) {
     crate::steps::apply_steps::then_policy_violation(world).await;
 }
 

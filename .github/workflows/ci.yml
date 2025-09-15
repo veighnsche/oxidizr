@@ -189,6 +189,43 @@ jobs:
         run: |
           python3 test_ci_runner.py -p switchyard --nocapture
 
+  bdd:
+    name: BDD Gating (Switchyard)
+    runs-on: ubuntu-latest
+    needs: test-ci-runner
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run BDD suite (fail-only output on failure)
+        run: |
+          set -e
+          python3 scripts/bdd_filter_results.py --fail-only
+      - name: Upload BDD lastrun log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bdd-lastrun
+          path: target/bdd-lastrun.log
+          if-no-files-found: ignore
+
   golden-fixtures:
     name: Golden Fixtures Diff
     runs-on: ubuntu-latest

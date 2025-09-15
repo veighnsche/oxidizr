@@ -1,0 +1,13 @@
+[package]
+name = "oxidizr-deb"
+version = "0.1.0"
+edition = "2021"
+description = "Debian-family CLI to swap GNU coreutils with uutils-coreutils and sudo with sudo-rs using Switchyard."
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/veighnsche/oxidizr-arch"
+keywords = ["cli", "debian", "switchyard", "uutils", "sudo-rs"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+switchyard = { path = "../switchyard" }

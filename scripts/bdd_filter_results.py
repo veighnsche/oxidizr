@@ -47,7 +47,7 @@ def run_bdd(feature_path: str | None = None) -> subprocess.CompletedProcess:
         env["SWITCHYARD_BDD_FEATURE_PATH"] = feature_path
     return subprocess.run(
         CMD,
-        cwd=str(ROOT.parent.parent),
+        cwd=str(ROOT),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

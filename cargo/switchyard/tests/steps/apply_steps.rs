@@ -121,20 +121,13 @@ pub async fn then_degraded_flag(world: &mut World) {
 
 #[then(regex = r"^the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$")]
 pub async fn then_exdev_fail(world: &mut World) {
+    // Prepare a fresh EXDEV environment and a plan that will attempt a swap
+    crate::steps::plan_steps::given_exdev_env(world).await;
+    crate::steps::plan_steps::given_plan_mutates(world).await;
+    // Disallow degraded fallback so EXDEV triggers a failure
     world.policy.apply.exdev = ExdevPolicy::Fail;
+    world.policy.governance.allow_unlocked_commit = true;
     world.rebuild_api();
-    world
-        .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new(
-            "SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES",
-            "1",
-        ));
-    world
-        .env_guards
-        .push(crate::bdd_support::env::EnvGuard::new(
-            "SWITCHYARD_FORCE_EXDEV",
-            "1",
-        ));
     let plan = world.plan.as_ref().unwrap();
     let _ = world
         .api

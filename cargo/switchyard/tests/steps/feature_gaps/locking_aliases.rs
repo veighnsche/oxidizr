@@ -1,4 +1,4 @@
-use cucumber::then;
+use cucumber::{given, then};
 
 use crate::bdd_world::World;
 
@@ -15,4 +15,9 @@ pub async fn then_warn_unsupported(world: &mut World) {
 #[then(regex = r"^apply\.attempt includes lock_wait_ms$")]
 pub async fn then_apply_attempt_includes_lock_wait(world: &mut World) {
     crate::steps::locks_steps::then_lock_wait(world).await;
+}
+
+#[given(regex = r"^two apply\(\) operations targeting overlapping paths$")]
+pub async fn given_two_apply_overlap(world: &mut World) {
+    crate::steps::locks_steps::when_two_apply_overlap(world).await;
 }
