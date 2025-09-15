@@ -5,7 +5,7 @@ It is structured for day-to-day engineering, with explicit code pointers, accept
 criteria, and suggested test coverage. Use this as the single source of truth for
 work planning within the crate.
 
-Last updated: 2025-09-14
+Last updated: 2025-09-15
 
 ## Conventions
 
@@ -29,6 +29,20 @@ Last updated: 2025-09-14
   - Added initial step modules and glue for: rollback, safety preconditions, thread safety.
   - Remaining work: resolve a few unmatched/over-constrained steps in rollback and safety features; remove any lingering ambiguities.
   - Current status: Many formerly missing steps now execute; outstanding items tracked below in the per-feature lists.
+
+- [x] Rollback idempotence and deterministic planning stabilized
+  - Code: `src/api/apply/executors/restore.rs` now restores from latest, with optional post-restore snapshot for idempotence; `src/api/plan.rs` restores deterministic sorting.
+  - Tests: BDD rollback scenarios pass (reverse-order rollback and two-time rollback topology), integration tests updated.
+
+- [x] Prune timestamp semantics and backup filename uniqueness fixed
+  - Code: `src/fs/backup/snapshot.rs` uses millisecond timestamps and ensures unique names within the same millisecond; `src/fs/backup/prune.rs` parses embedded timestamps from filenames and deduplicates `.bak`/`.bak.meta.json` pairs.
+  - Tests: Age-limit prune tests now pass; retain newest invariant preserved.
+
+- [x] Schema extension for apply summaries (rolled back fields)
+  - Code: `SPEC/audit_event.v2.schema.json` — added optional `rolled_back` and `rolled_back_paths` to support richer apply summaries (guarded in implementation).
+
+- [x] EXDEV environment behavior tests added
+  - Code: `tests/apply/exdev_env.rs` — asserts behavior with and without `SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES` when `SWITCHYARD_FORCE_EXDEV=1`.
 
 - [ ] Add cucumber CLI filtering to the BDD runner (optional dev UX)
   - File: `tests/bdd_main.rs`.
@@ -217,3 +231,91 @@ Step file: `tests/steps/thread_safety_steps.rs` (new).
 3. Add CLI filtering to BDD runner for dev speed.
 4. Land CI job for BDD behind a feature flag.
 5. Keep SPEC and tests in lockstep for any behavior changes.
+
+## Unimplemented BDD Steps (no matching function)
+
+These steps failed with “Step doesn't match any function” in the latest BDD run. Implement glue in `cargo/switchyard/tests/steps/` to cover each.
+
+- __Feature__: API safety and TOCTOU sequence (`SPEC/features/api_toctou.feature`)
+  - Scenario: Mutating public APIs require SafePath
+    - Given a mutating public API endpoint
+  - Scenario: TOCTOU-safe syscall sequence is normative
+    - Given a mutation of a final path component under a parent directory
+
+- __Feature__: Atomic swap and recovery (`SPEC/features/atomic_swap.feature`)
+  - Scenario: Enable and rollback
+    - Then /usr/bin/ls resolves to providerB/ls atomically
+  - Scenario: Cross-filesystem EXDEV fallback
+    - When I apply a plan that replaces /usr/bin/cp
+  - Scenario: Automatic rollback on mid-plan failure
+    - Given a plan with three actions A, B, C
+  - Scenario: Smoke test failure triggers rollback
+    - And at least one smoke command will fail with a non-zero exit
+
+- __Feature__: Atomic swap and no broken visibility (`SPEC/features/atomicity.feature`)
+  - Scenario: Enable And Rollback Remains Atomic And Visible
+    - Given a plan with a single symlink replacement action
+  - Scenario: All-Or-Nothing Per Plan
+    - Given a plan with two actions where the second will fail
+
+- __Feature__: Conservatism and CI gates (`SPEC/features/conservatism_ci.feature`)
+  - Scenario: Dry-run is the default mode
+    - Given no explicit approval flag is provided
+  - Scenario: Fail-closed on critical violations
+    - Given a critical compatibility violation is detected in preflight
+  - Scenario: CI gates for golden fixtures and zero-SKIP
+    - Given golden fixtures for plan, preflight, apply, and rollback
+
+- __Feature__: Conservatism and modes (`SPEC/features/conservatism_modes.feature`)
+  - Scenario: Dry-Run Is Default Mode
+    - Given a newly constructed Switchyard
+  - Scenario: Fail-Closed On Critical Violations Unless Overridden
+    - Given a policy requiring strict ownership and unsupported preservation
+
+- __Feature__: Determinism and redaction (`SPEC/features/determinism.feature`)
+  - Scenario: Deterministic IDs Are UUIDv5 Over Normalized Inputs
+    - Given a plan built from a stable set of inputs
+  - Scenario: Dry-Run Facts Byte-Identical After Redaction
+    - Then facts are byte-identical after timestamp redaction
+
+- __Feature__: Determinism and attestation (`SPEC/features/determinism_attestation.feature`)
+  - Scenario: Deterministic UUIDv5 plan and action IDs
+    - Given normalized plan input and a stable namespace
+  - Scenario: Signed attestation per apply bundle
+    - Given an apply bundle
+
+- __Feature__: Error taxonomy and exit codes (`SPEC/features/error_taxonomy.feature`)
+  - Scenario: Stable Error Identifiers Emitted In Facts
+    - Given failures during preflight or apply
+  - Scenario: Preflight Summary Maps To Policy Exit Code
+    - Given preflight STOP conditions are present
+
+- __Feature__: Cross-filesystem EXDEV degraded fallback (`SPEC/features/filesystems_degraded.feature`)
+  - Scenario: Degraded Fallback When Policy Allows
+    - Given staging and target parents reside on different filesystems (EXDEV)
+  - Scenario: Disallowed Degraded Fallback Fails With Classification
+    - Given EXDEV conditions
+  - Scenario: Supported Filesystems Verified
+    - Given an environment matrix with ext4, xfs, btrfs, and tmpfs
+
+- __Feature__: Health verification and auto-rollback (`SPEC/features/health_verification.feature`)
+  - Scenario: Minimal Smoke Suite Runs In Commit
+    - Given a Switchyard with SmokePolicy Require
+  - Scenario: Smoke Failure Triggers Auto-Rollback
+    - Given a failing SmokeTestRunner
+
+- __Feature__: Locking and single mutator (`SPEC/features/locking.feature`)
+  - Scenario: Single Mutator Enforced In Commit
+    - And two apply() operations targeting overlapping paths
+  - Scenario: Warn Fact When No Lock Manager
+    - When I apply a plan in Commit mode
+  - Scenario: Bounded Lock Wait Emits Timeout And Metrics
+    - And another process holds the lock
+  - Scenario: Lock Attempts Included In Apply Attempt
+    - When I apply a plan in Commit mode
+
+- __Feature__: Locking and rescue behavior (`SPEC/features/locking_rescue.feature`)
+  - Scenario: No LockManager in dev/test emits WARN
+    - Then concurrent apply is UNSUPPORTED and a WARN fact is emitted
+  - Scenario: Rescue profile and fallback toolset verified
+    - Then preflight verifies a functional fallback path

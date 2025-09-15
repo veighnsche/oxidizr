@@ -1,5 +1,7 @@
 pub mod apply_steps;
 pub mod attestation_steps;
+pub mod api_toctou_steps;
+pub mod feature_gaps_steps;
 pub mod locks_steps;
 pub mod observability_steps;
 pub mod plan_steps;

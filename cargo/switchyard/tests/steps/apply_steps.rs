@@ -23,6 +23,9 @@ pub async fn when_run_both_modes(world: &mut World) {
 
 #[when(regex = r"^I apply the plan$")]
 pub async fn when_apply(world: &mut World) {
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_min(world).await;
+    }
     world.apply_current_plan_commit();
 }
 
@@ -160,6 +163,9 @@ pub async fn when_attempt_apply(world: &mut World) {
     if world.lock_path.is_none() {
         world.policy.governance.allow_unlocked_commit = true;
         world.rebuild_api();
+    }
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_min(world).await;
     }
     let plan = world.plan.as_ref().unwrap();
     let _ = world.api.as_ref().unwrap().apply(plan, ApplyMode::Commit);
