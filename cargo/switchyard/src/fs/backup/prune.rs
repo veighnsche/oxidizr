@@ -35,7 +35,7 @@ pub fn prune_backups(
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
     let prefix = format!(".{name}.{tag}.");
 
-    // Collect unique (timestamp, base .bak path)
+    // Collect unique (timestamp, base .bak path) from both payload and sidecar filenames
     let mut seen = HashSet::<u128>::new();
     let mut stamps: Vec<(u128, PathBuf)> = Vec::new();
 
@@ -51,21 +51,19 @@ pub fn prune_backups(
         let Some(rest) = s.strip_prefix(&prefix) else {
             continue;
         };
-        let Some(num_s) = rest
+        // Strip payload or sidecar suffix and parse the numeric timestamp part
+        let core_opt = rest
             .strip_suffix(".bak")
-            .or_else(|| rest.strip_suffix(".bak.meta.json"))
-        else {
-            continue;
-        };
-
-        let Ok(ts) = num_s.parse::<u128>() else {
+            .or_else(|| rest.strip_suffix(".bak.meta.json"));
+        let Some(core) = core_opt else { continue };
+        let ts_s = core.rsplit('.').next().unwrap_or("");
+        let Ok(ts) = ts_s.parse::<u128>() else {
             continue;
         };
         if !seen.insert(ts) {
             continue;
         }
-
-        // Construct the base .bak path; sidecar resolved later.
+        // Construct the base .bak path; sidecar resolved later
         let base = parent.join(format!("{prefix}{ts}.bak"));
         stamps.push((ts, base));
     }
@@ -77,10 +75,10 @@ pub fn prune_backups(
         });
     }
 
-    // Sort newest → oldest
+    // Sort newest → oldest by embedded timestamp
     stamps.sort_unstable_by_key(|(ts, _)| std::cmp::Reverse(*ts));
 
-    // Compute age threshold in milliseconds (we assume ts is ms since epoch)
+    // Compute age threshold in milliseconds (embedded ts is ms since epoch)
     let now_ms: u128 = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

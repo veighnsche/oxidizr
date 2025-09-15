@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+  --> tests/trybuild/mutate_with_raw_path.rs:15:31
+   |
+15 |     let _ = api.prune_backups(&target);
+   |                 ------------- ^^^^^^^ expected `&SafePath`, found `&PathBuf`
+   |                 |
+   |                 arguments to this method are incorrect
+   |
+   = note: expected reference `&SafePath`
+              found reference `&PathBuf`
+note: method defined here
+  --> src/api/mod.rs
+   |
+   |     pub fn prune_backups(
+   |            ^^^^^^^^^^^^^

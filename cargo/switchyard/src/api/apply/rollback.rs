@@ -6,13 +6,17 @@ use crate::types::Action;
 
 pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
     api: &super::super::Switchyard<E, A>,
+    plan_id: &uuid::Uuid,
     executed: &[Action],
+    executed_indices: &[usize],
     dry: bool,
     slog: &StageLogger<'_>,
     rollback_errors: &mut Vec<String>,
 ) -> Vec<String> {
     let mut rolled_paths: Vec<String> = Vec::new();
-    for prev in executed.iter().rev() {
+    for (pos, prev) in executed.iter().enumerate().rev() {
+        let idx = executed_indices.get(pos).copied().unwrap_or(pos);
+        let aid = crate::types::ids::action_id(plan_id, prev, idx).to_string();
         match prev {
             Action::EnsureSymlink {
                 source: _source,
@@ -26,6 +30,7 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                 ) {
                     Ok(()) => {
                         slog.rollback()
+                            .action_id(aid)
                             .path(target.as_path().display().to_string())
                             .emit_success();
                         rolled_paths.push(target.as_path().display().to_string());
@@ -37,7 +42,11 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                             e
                         ));
                         slog.rollback()
+                            .action_id(aid)
                             .path(target.as_path().display().to_string())
+                            .field("error_detail", json!(e.to_string()))
+                            .error_id(crate::api::errors::ErrorId::E_RESTORE_FAILED)
+                            .exit_code_for(crate::api::errors::ErrorId::E_RESTORE_FAILED)
                             .emit_failure();
                         rolled_paths.push(target.as_path().display().to_string());
                     }
@@ -48,7 +57,12 @@ pub(crate) fn do_rollback<E: FactsEmitter, A: AuditSink>(
                 rollback_errors.push(
                     "rollback of RestoreFromBackup not supported (no prior state)".to_string(),
                 );
-                slog.rollback().emit_failure();
+                slog.rollback()
+                    .action_id(aid)
+                    .field("error_detail", json!("restore inverse unavailable"))
+                    .error_id(crate::api::errors::ErrorId::E_RESTORE_FAILED)
+                    .exit_code_for(crate::api::errors::ErrorId::E_RESTORE_FAILED)
+                    .emit_failure();
             }
         }
     }

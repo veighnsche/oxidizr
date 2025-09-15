@@ -45,9 +45,11 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
 ) -> ApplyReport {
     let t0 = Instant::now();
     let mut executed: Vec<Action> = Vec::new();
+    let mut executed_indices: Vec<usize> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut rollback_errors: Vec<String> = Vec::new();
     let mut rolled_back = false;
+    let mut rolled_paths_opt: Option<Vec<String>> = None;
     let dry = matches!(mode, ApplyMode::DryRun);
     let pid = plan_id(plan);
     let ts_now = ts_for_mode(&mode);
@@ -107,6 +109,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 }
                 if let Some(a) = exec {
                     executed.push(a);
+                    executed_indices.push(idx);
                 }
             }
             Action::RestoreFromBackup { .. } => {
@@ -120,6 +123,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 }
                 if let Some(a) = exec {
                     executed.push(a);
+                    executed_indices.push(idx);
                 }
             }
         }
@@ -128,12 +132,21 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         if !errors.is_empty() {
             if !dry {
                 rolled_back = true;
-                let rolled_paths = rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
+                let rolled_paths = rollback::do_rollback(
+                    api,
+                    &pid,
+                    &executed,
+                    &executed_indices,
+                    dry,
+                    &slog,
+                    &mut rollback_errors,
+                );
+                rolled_paths_opt = Some(rolled_paths);
                 rollback::emit_summary(&slog, &rollback_errors);
                 // Record rollback order in summary builder later
                 perf_total.swap += 0; // no-op; retained for symmetry
-                // Attach rolled_back paths into the final summary via builder below
-                // We'll pass them into the builder after we construct it.
+                                      // Attach rolled_back paths into the final summary via builder below
+                                      // We'll pass them into the builder after we construct it.
             }
             break;
         }
@@ -150,7 +163,16 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 };
                 if auto_rb {
                     rolled_back = true;
-                    rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
+                    let rolled_paths = rollback::do_rollback(
+                        api,
+                        &pid,
+                        &executed,
+                        &executed_indices,
+                        dry,
+                        &slog,
+                        &mut rollback_errors,
+                    );
+                    rolled_paths_opt = Some(rolled_paths);
                 }
             }
         } else {
@@ -166,7 +188,16 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
                 };
                 if auto_rb {
                     rolled_back = true;
-                    rollback::do_rollback(api, &executed, dry, &slog, &mut rollback_errors);
+                    let rolled_paths = rollback::do_rollback(
+                        api,
+                        &pid,
+                        &executed,
+                        &executed_indices,
+                        dry,
+                        &slog,
+                        &mut rollback_errors,
+                    );
+                    rolled_paths_opt = Some(rolled_paths);
                 }
             }
         }
@@ -191,22 +222,8 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
         builder = builder.errors(&errors).smoke_or_policy_mapping(&errors);
     }
     // Include rolled-back order when rollback occurred
-    #[allow(unused_variables)]
-    {
-        // `rolled_paths` is available when rollback branch executed; otherwise this is a no-op
-        if rolled_back {
-            // To avoid borrow issues, reconstruct minimal list from executed in reverse as fallback
-            let rb_paths: Vec<String> = executed
-                .iter()
-                .rev()
-                .filter_map(|a| match a {
-                    Action::EnsureSymlink { target, .. } | Action::RestoreFromBackup { target } => {
-                        Some(target.as_path().display().to_string())
-                    }
-                })
-                .collect();
-            builder = builder.rolled_back_paths(&rb_paths);
-        }
+    if let Some(ref rb_paths) = rolled_paths_opt {
+        builder = builder.rolled_back_paths(rb_paths);
     }
     builder.perf(perf_total).emit(&slog, decision);
     api.audit.log(Level::Info, "apply: finished");

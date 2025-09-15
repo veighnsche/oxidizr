@@ -60,7 +60,9 @@
     "error_id": { "type": ["string", "null"] },
     "error_detail": { "type": ["string", "null"] },
     "error": { "$ref": "#/$defs/error" },
-    "summary_error_ids": { "type": ["array", "null"], "items": { "type": "string" } }
+    "summary_error_ids": { "type": ["array", "null"], "items": { "type": "string" } },
+    "rolled_back": { "type": ["boolean", "null"] },
+    "rolled_back_paths": { "type": ["array", "null"], "items": { "type": "string" } }
   },
   "allOf": [
     { "$ref": "#/$defs/stage_plan" },

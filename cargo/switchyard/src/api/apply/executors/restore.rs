@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::time::Instant;
 
 use serde_json::json;
@@ -52,30 +51,16 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             .emit_success();
 
         let before_kind = kind_of(&target.as_path());
-        let mut used_prev = false;
         let mut backup_ms = 0u64;
-        if !dry && api.policy.apply.capture_restore_snapshot {
-            let tb0 = Instant::now();
-            let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
-            backup_ms = u64::try_from(tb0.elapsed().as_millis()).unwrap_or(u64::MAX);
-            used_prev = true;
-        }
         let force =
             api.policy.apply.best_effort_restore || !api.policy.durability.sidecar_integrity;
         // Pre-compute sidecar integrity verification (best-effort) before restore
         let th0 = Instant::now();
         let integrity_verified = (|| {
-            let pair = if used_prev {
-                crate::fs::backup::find_previous_backup_and_sidecar(
-                    &target.as_path(),
-                    &api.policy.backup.tag,
-                )
-            } else {
-                crate::fs::backup::find_latest_backup_and_sidecar(
-                    &target.as_path(),
-                    &api.policy.backup.tag,
-                )
-            }?;
+            let pair = crate::fs::backup::find_latest_backup_and_sidecar(
+                &target.as_path(),
+                &api.policy.backup.tag,
+            )?;
             let (backup_opt, sc_path) = pair;
             let sc = crate::fs::backup::read_sidecar(&sc_path).ok()?;
             if let (Some(backup), Some(hash)) = (backup_opt, sc.payload_hash) {
@@ -86,52 +71,10 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             }
         })();
         let hash_ms = u64::try_from(th0.elapsed().as_millis()).unwrap_or(u64::MAX);
-
-        let restore_res = if used_prev {
-            crate::fs::restore::restore_file_prev(target, dry, force, &api.policy.backup.tag)
-        } else {
-            crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag)
-        };
-        match restore_res {
-            Ok(()) => {
-                // success
-            }
-            Err(mut e) => {
-                // If we tried previous and it was NotFound (no previous), fall back to latest
-                if used_prev && e.kind() == ErrorKind::NotFound {
-                    if let Err(e2) =
-                        crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag)
-                    {
-                        e = e2;
-                    } else {
-                        // success on fallback
-                        let mut extra = json!({
-                            "action_id": aid.to_string(),
-                            "path": target.as_path().display().to_string(),
-                            "before_kind": before_kind,
-                            "after_kind": if dry { before_kind } else { kind_of(&target.as_path()) },
-                        });
-                        if let Some(iv) = integrity_verified {
-                            if let Some(obj) = extra.as_object_mut() {
-                                obj.insert("sidecar_integrity_verified".into(), json!(iv));
-                            }
-                        }
-                        ensure_provenance(&mut extra);
-                        StageLogger::new(tctx)
-                            .apply_result()
-                            .merge(&extra)
-                            .emit_success();
-                        return (
-                            Some(act.clone()),
-                            None,
-                            PerfAgg {
-                                hash: hash_ms,
-                                backup: backup_ms,
-                                swap: 0,
-                            },
-                        );
-                    }
-                }
+        // Perform restore from the latest backup set
+        match crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag) {
+            Ok(()) => {}
+            Err(e) => {
                 let id = map_restore_error_kind(e.kind());
                 let msg = format!("restore {} failed: {}", target.as_path().display(), e);
                 let mut extra = json!({
@@ -206,6 +149,13 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             }
         }
         ensure_provenance(&mut extra);
+        // After a successful restore, optionally capture a snapshot of the restored state
+        if !dry && api.policy.apply.capture_restore_snapshot {
+            let tb1 = Instant::now();
+            let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
+            backup_ms = backup_ms
+                .saturating_add(u64::try_from(tb1.elapsed().as_millis()).unwrap_or(u64::MAX));
+        }
         StageLogger::new(tctx)
             .apply_result()
             .merge(&extra)

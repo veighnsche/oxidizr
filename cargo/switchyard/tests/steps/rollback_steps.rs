@@ -49,7 +49,7 @@ pub async fn given_three_actions_b_fails(world: &mut World) {
     // Make A a regular file so the swap will snapshot and succeed
     std::fs::write(&t_a, b"old-A").unwrap();
     let _ = std::fs::create_dir_all(&t_b); // directory to trigger unlink failure
-    // Keep B as a directory so unlink will fail during mutation
+                                           // Keep B as a directory so unlink will fail during mutation
     std::fs::write(&t_c, b"old-C").unwrap();
 
     let sp_sa = SafePath::from_rooted(&root, &s_a).unwrap();
@@ -97,27 +97,39 @@ pub async fn when_apply_commit(world: &mut World) {
 
 #[then(regex = r"^the engine rolls back A in reverse order automatically$")]
 pub async fn then_rollback_of_a(world: &mut World) {
-    // Validate via rollback events: must include rollback of A and must not include rollback of C
-    let root = world.ensure_root().to_path_buf();
-    let path_a = root.join("usr/bin/A").display().to_string();
-    let path_c = root.join("usr/bin/C").display().to_string();
-    let mut saw_a = false;
-    let mut saw_c = false;
+    // Build the list of executed apply.success paths in order, and ensure rollback occurs in reverse order.
+    let mut executed: Vec<String> = Vec::new();
+    let mut rollback: Vec<String> = Vec::new();
     let mut dbg: Vec<String> = Vec::new();
     for ev in world.all_facts() {
         let stage = ev.get("stage").and_then(|v| v.as_str()).unwrap_or("");
-        let path = ev.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        let path_s = ev.get("path").and_then(|v| v.as_str()).unwrap_or("");
         let decision = ev.get("decision").and_then(|v| v.as_str()).unwrap_or("");
-        let err = ev.get("error_id").and_then(|v| v.as_str()).unwrap_or("");
-        let det = ev.get("error_detail").and_then(|v| v.as_str()).unwrap_or("");
-        dbg.push(format!("{} {} {} {} {}", stage, decision, path, err, det));
-        if stage == "rollback" {
-            if ev.get("path").and_then(|v| v.as_str()) == Some(&path_a) { saw_a = true; }
-            if ev.get("path").and_then(|v| v.as_str()) == Some(&path_c) { saw_c = true; }
+        dbg.push(format!("{} {} {}", stage, decision, path_s));
+        if stage == "apply.result" && decision == "success" && !path_s.is_empty() {
+            executed.push(path_s.to_string());
+        }
+        if stage == "rollback" && !path_s.is_empty() {
+            rollback.push(path_s.to_string());
         }
     }
-    assert!(saw_a, "expected rollback of A to occur; events=\n{}", dbg.join("\n"));
-    assert!(!saw_c, "did not expect rollback of C (should not have executed)");
+    assert!(
+        !executed.is_empty(),
+        "expected at least one executed action; events=\n{}",
+        dbg.join("\n")
+    );
+    assert!(
+        !rollback.is_empty(),
+        "expected rollback events to be emitted; events=\n{}",
+        dbg.join("\n")
+    );
+    let expected: Vec<String> = executed.into_iter().rev().collect();
+    assert_eq!(
+        rollback,
+        expected,
+        "rollback order should be exact reverse of executed order; events=\n{}",
+        dbg.join("\n")
+    );
 }
 
 #[then(regex = r"^emitted facts include partial restoration state if any rollback step fails$")]

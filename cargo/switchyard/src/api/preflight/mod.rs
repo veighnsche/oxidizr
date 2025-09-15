@@ -62,7 +62,9 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
         match act {
             Action::EnsureSymlink { source, target } => {
                 let eval = gating::evaluate_action(&api.policy, api.owner.as_deref(), act);
-                if !eval.stops.is_empty() { stops.extend(eval.stops.clone()); }
+                if !eval.stops.is_empty() {
+                    stops.extend(eval.stops.clone());
+                }
                 warnings.extend(
                     eval.notes
                         .iter()

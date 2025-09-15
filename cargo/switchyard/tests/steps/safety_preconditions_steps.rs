@@ -17,7 +17,10 @@ pub async fn then_preflight_fails_unless_override(world: &mut World) {
     world.rebuild_api();
     crate::steps::preflight_steps::when_preflight(world).await;
     let pf2 = world.preflight.as_ref().expect("preflight report");
-    assert!(pf2.ok, "expected preflight success when override_preflight=true");
+    assert!(
+        pf2.ok,
+        "expected preflight success when override_preflight=true"
+    );
 }
 
 #[then(regex = r"^preflight stops with a fail-closed decision unless an explicit override is set$")]
@@ -31,7 +34,10 @@ pub async fn then_preservation_fail_unless_override(world: &mut World) {
     world.rebuild_api();
     crate::steps::preflight_steps::when_preflight(world).await;
     let pf2 = world.preflight.as_ref().expect("preflight report");
-    assert!(pf2.ok, "expected preflight success when override_preflight=true");
+    assert!(
+        pf2.ok,
+        "expected preflight success when override_preflight=true"
+    );
 }
 
 // Local helper: scan for the latest backup payload file for a given target path.

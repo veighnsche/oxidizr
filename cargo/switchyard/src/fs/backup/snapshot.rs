@@ -44,7 +44,27 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
     if is_symlink {
         let current_dest = fs::read_link(target).ok();
         if let Some(curr) = current_dest.as_ref() {
-            let backup = backup_path_with_tag(target, backup_tag);
+            // Compute a unique backup path for this instant
+            let mut backup = backup_path_with_tag(target, backup_tag);
+            while backup.exists() {
+                // Bump the numeric timestamp suffix until unique
+                if let Some(stem) = backup.file_name().and_then(|s| s.to_str()) {
+                    if let Some(prefix) = stem.strip_suffix(".bak") {
+                        if let Some((pre, ts_s)) = prefix.rsplit_once('.') {
+                            if let Ok(ts) = ts_s.parse::<u128>() {
+                                let bumped = format!("{pre}.{}.bak", ts.saturating_add(1));
+                                backup = backup
+                                    .parent()
+                                    .unwrap_or_else(|| Path::new("."))
+                                    .join(bumped);
+                                continue;
+                            }
+                        }
+                    }
+                }
+                // Fallback: break to avoid infinite loop
+                break;
+            }
             let _ = fs::remove_file(&backup);
             // Create a symlink backup pointing to the same destination
             let _ = unix::fs::symlink(curr, &backup);
@@ -73,7 +93,25 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("target");
-            let backup_pb = backup_path_with_tag(target, backup_tag);
+            // Compute a unique backup path for this instant
+            let mut backup_pb = backup_path_with_tag(target, backup_tag);
+            while backup_pb.exists() {
+                if let Some(stem) = backup_pb.file_name().and_then(|s| s.to_str()) {
+                    if let Some(prefix) = stem.strip_suffix(".bak") {
+                        if let Some((pre, ts_s)) = prefix.rsplit_once('.') {
+                            if let Ok(ts) = ts_s.parse::<u128>() {
+                                let bumped = format!("{pre}.{}.bak", ts.saturating_add(1));
+                                backup_pb = backup_pb
+                                    .parent()
+                                    .unwrap_or_else(|| Path::new("."))
+                                    .join(bumped);
+                                continue;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
             let bname = backup_pb
                 .file_name()
                 .and_then(|s| s.to_str())
@@ -132,7 +170,24 @@ pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
     }
 
     // Target did not exist: create a tombstone and sidecar
-    let backup = backup_path_with_tag(target, backup_tag);
+    let mut backup = backup_path_with_tag(target, backup_tag);
+    while backup.exists() {
+        if let Some(stem) = backup.file_name().and_then(|s| s.to_str()) {
+            if let Some(prefix) = stem.strip_suffix(".bak") {
+                if let Some((pre, ts_s)) = prefix.rsplit_once('.') {
+                    if let Ok(ts) = ts_s.parse::<u128>() {
+                        let bumped = format!("{pre}.{}.bak", ts.saturating_add(1));
+                        backup = backup
+                            .parent()
+                            .unwrap_or_else(|| Path::new("."))
+                            .join(bumped);
+                        continue;
+                    }
+                }
+            }
+        }
+        break;
+    }
     let _ = fs::remove_file(&backup);
     let f = fs::File::create(&backup)?;
     let _ = f.sync_all();
