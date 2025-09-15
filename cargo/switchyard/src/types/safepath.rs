@@ -37,6 +37,20 @@ impl SafePath {
     ///
     /// Panics when `root` is not absolute. This mirrors historical semantics and
     /// preserves SPEC/BDD expectations for construction invariants in tests.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use switchyard::types::safepath::SafePath;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let td = tempfile::tempdir()?;
+    /// let root = td.path();
+    /// std::fs::create_dir_all(root.join("usr/bin"))?;
+    /// let sp = SafePath::from_rooted(root, &root.join("usr/bin/ls"))?;
+    /// assert!(sp.as_path().starts_with(root));
+    /// # Ok(())
+    /// # }
+    /// ```
     #[allow(
         clippy::panic,
         reason = "Root absoluteness is a construction invariant"

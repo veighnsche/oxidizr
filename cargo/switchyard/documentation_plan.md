@@ -4,11 +4,11 @@ Note: This plan targets production operators/SREs and Rust integrators on Debian
 
 ## 1) Goals & Non-Goals
 
-- [ ] Safety-first operator guidance for using the library in production (SafePath, locking, rollback, deterministic behavior) (see `cargo/switchyard/src/lib.rs`:4-10)
-- [ ] Clear, deterministic behavior documentation including plan/action IDs, dry-run redaction, and stage parity (see `cargo/switchyard/src/types/ids.rs`:7-13,31-46; `cargo/switchyard/src/logging/redact.rs`:54-63)
-- [ ] Complete rollback procedures with evidence of reverse-order rollback and idempotence (see `cargo/switchyard/src/api/apply/mod.rs`; `cargo/switchyard/src/fs/restore/`)
-- [ ] Audit trail and facts schema usage with provenance and exit codes mapping (see `cargo/switchyard/src/logging/audit.rs`:1-12,166-171; `cargo/switchyard/SPEC/SPEC.md`:166-229)
-- [ ] Locking model, timeouts, and error mapping to E_LOCKING with lock_wait_ms fact (see `cargo/switchyard/src/api/apply/mod.rs`:70-117; `cargo/switchyard/tests/locking_required.rs`:44-61)
+- [x] Safety-first operator guidance for using the library in production (SafePath, locking, rollback, deterministic behavior) (see `cargo/switchyard/src/lib.rs`:4-10)
+- [x] Clear, deterministic behavior documentation including plan/action IDs, dry-run redaction, and stage parity (see `cargo/switchyard/src/types/ids.rs`; `cargo/switchyard/src/logging/redact.rs`)
+- [x] Complete rollback procedures with evidence of reverse-order rollback and idempotence (see `cargo/switchyard/src/api/apply/mod.rs`; `cargo/switchyard/src/fs/restore/`)
+- [x] Audit trail and facts schema usage with provenance and exit codes mapping (see `cargo/switchyard/src/logging/audit.rs`; `cargo/switchyard/SPEC/SPEC.md`)
+- [x] Locking model, timeouts, and error mapping to E_LOCKING with lock_wait_ms fact (see `cargo/switchyard/src/api/apply/mod.rs`; `cargo/switchyard/tests/locking_required.rs`)
 
 Non-Goals
 
@@ -227,21 +227,21 @@ What we’ll cite
 
 Small (S)
 
-- [ ] Add crate-level rustdoc overview with Quickstart snippet (acceptance: compiles).
-- [ ] Document `SafePath` with examples; add doctest (acceptance: doctest passes) (`types/safepath.rs`).
-- [ ] Add reference page for `ErrorId`→exit codes (acceptance: matches `SPEC/error_codes.toml`).
-- [ ] Add example `01_dry_run.rs` using temp root and `SafePath`.
+- [x] Add crate-level rustdoc overview with Quickstart snippet (acceptance: compiles).
+- [x] Document `SafePath` with examples; add doctest (acceptance: doctest passes) (`types/safepath.rs`).
+- [x] Add reference page for `ErrorId`→exit codes (acceptance: matches `SPEC/error_codes.toml`).
+- [x] Add example `01_dry_run.rs` using temp root and `SafePath`.
 
 Medium (M)
 
 - [ ] Generate API surface table from rustdoc JSON and reconcile with this inventory (acceptance: table checked into docs with symbol paths).
-- [ ] Draft mdBook Quickstart + Concepts chapters with citations (acceptance: mdbook build + linkcheck pass).
-- [ ] Write Reference: Preflight schema and Audit schema chapters (acceptance: matches SPEC exactly).
+- [x] Draft mdBook Quickstart + Concepts chapters with citations (acceptance: mdbook build + linkcheck pass).
+- [x] Write Reference: Preflight schema and Audit schema chapters (acceptance: matches SPEC exactly).
 
 Large (L)
 
-- [ ] Full mdBook first pass (all chapters in §7) including Debian-first examples (acceptance: book builds; code snippets compile or `no_run`).
-- [ ] Troubleshooting section with verified snippets and references to tests (acceptance: steps reproducible on Debian/Ubuntu in temp roots).
+- [x] Full mdBook first pass (all chapters in §7) including Debian-first examples (acceptance: book builds; code snippets compile or `no_run`).
+- [x] Troubleshooting section with verified snippets and references to tests (acceptance: steps reproducible on Debian/Ubuntu in temp roots).
 
 ## 10) Risks, Gaps, Open Questions
 

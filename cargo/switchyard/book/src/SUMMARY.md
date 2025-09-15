@@ -15,10 +15,12 @@
   - [Configure a Lock Manager](how-tos/lock-manager.md)
   - [Use SafePath](how-tos/safepath.md)
   - [Capture and Verify Audit](how-tos/audit-capture.md)
+  - [Prune Backups](how-tos/prune-backups.md)
 - Reference
   - [Public API (rustdoc)](reference/public-api.md)
   - [Error Codes](reference/error-codes.md)
   - [Preflight Schema](reference/preflight-schema.md)
   - [Audit Event Schema (v2)](reference/audit-schema.md)
+  - [Policy Knobs](reference/policy-knobs.md)
   - [Operational Bounds](reference/operational-bounds.md)
 - [Troubleshooting](troubleshooting.md)

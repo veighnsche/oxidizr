@@ -28,27 +28,39 @@ mod overrides;
 mod plan;
 mod preflight;
 mod rollback;
+/// Public API builder.
 pub use builder::ApiBuilder;
+/// Public API overrides.
 pub use overrides::Overrides;
 /// DX alias for `ApiBuilder`.
+/// 
+/// This type alias provides a more convenient and readable way to construct a `Switchyard` instance.
 pub type SwitchyardBuilder<E, A> = ApiBuilder<E, A>;
 
-/// Trait for lock managers that can be debugged
+/// Trait marker to bound `LockManager` with `Debug` for use inside the public API.
+///
+/// This is not a user-implemented trait; it is a convenience alias for
+/// `LockManager + std::fmt::Debug` so adapters can be boxed and passed to the builder.
 pub trait DebugLockManager: LockManager + std::fmt::Debug {}
 impl<T: LockManager + std::fmt::Debug> DebugLockManager for T {}
 
-/// Trait for ownership oracles that can be debugged
+/// Trait marker to bound `OwnershipOracle` with `Debug` for use inside the public API.
 pub trait DebugOwnershipOracle: OwnershipOracle + std::fmt::Debug {}
 impl<T: OwnershipOracle + std::fmt::Debug> DebugOwnershipOracle for T {}
 
-/// Trait for attestors that can be debugged
+/// Trait marker to bound `Attestor` with `Debug` for use inside the public API.
 pub trait DebugAttestor: Attestor + std::fmt::Debug {}
 impl<T: Attestor + std::fmt::Debug> DebugAttestor for T {}
 
-/// Trait for smoke test runners that can be debugged
+/// Trait marker to bound `SmokeTestRunner` with `Debug` for use inside the public API.
 pub trait DebugSmokeTestRunner: SmokeTestRunner + std::fmt::Debug {}
 impl<T: SmokeTestRunner + std::fmt::Debug> DebugSmokeTestRunner for T {}
 
+/// Facade for orchestrating Switchyard stages over a configured `Policy` and adapters.
+///
+/// Construct via [`ApiBuilder`] or `Switchyard::builder` and then call `plan`,
+/// `preflight`, and `apply` in sequence. The type parameters `E` and `A` are
+/// emitter types implementing [`FactsEmitter`] and [`AuditSink`], respectively.
 #[derive(Debug)]
 pub struct Switchyard<E: FactsEmitter, A: AuditSink> {
     facts: E,
@@ -72,6 +84,8 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
     }
 
     /// Entrypoint for constructing via the builder (default construction path).
+    ///
+    /// Prefer this over `new` so you can configure optional adapters and timeouts.
     pub fn builder(facts: E, audit: A, policy: Policy) -> ApiBuilder<E, A> {
         ApiBuilder::new(facts, audit, policy)
     }
@@ -132,13 +146,18 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         self
     }
 
+    /// Build a `Plan` from the provided `PlanInput` with stable action ordering.
+    ///
+    /// This emits planning facts and returns a `Plan` suitable for `preflight` and `apply`.
     pub fn plan(&self, input: PlanInput) -> Plan {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.plan").entered();
         plan::build(self, input)
     }
 
-    /// Execute preflight analysis for a plan. Returns a report with policy evaluation results.
+    /// Execute preflight analysis for a plan.
+    ///
+    /// Returns a `PreflightReport` containing rows (one per action), warnings, and stops.
     ///
     /// # Errors
     ///
@@ -149,7 +168,10 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         Ok(preflight::run(self, plan))
     }
 
-    /// Apply a plan in the specified mode. Returns a report with execution results.
+    /// Apply a plan in the specified mode.
+    ///
+    /// Returns an `ApplyReport` with execution results. In `Commit` mode, missing
+    /// required adapters such as a `LockManager` may be mapped to `ApiError::LockingTimeout`.
     ///
     /// # Errors
     ///
@@ -169,6 +191,9 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         Ok(report)
     }
 
+    /// Construct a rollback `Plan` that inverses executed actions from an `ApplyReport`.
+    ///
+    /// Emits a planning fact for visibility and then builds the inverse plan.
     pub fn plan_rollback_of(&self, report: &ApplyReport) -> Plan {
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!("switchyard.plan_rollback").entered();
@@ -201,14 +226,13 @@ impl<E: FactsEmitter, A: AuditSink> Switchyard<E, A> {
         rollback::inverse_with_policy(&self.policy, report)
     }
 
-    /// Prune backup artifacts for a given target according to retention policy knobs.
+    /// Prune backup artifacts for a given target according to retention policy.
     ///
     /// Emits a `prune.result` fact with details about counts and policy used.
-    /// Prune backups for a target path according to policy retention settings.
     ///
     /// # Errors
     ///
-    /// Returns an `ApiError` if the backup pruning fails.
+    /// Returns an `ApiError` if backup pruning fails.
     pub fn prune_backups(
         &self,
         target: &crate::types::safepath::SafePath,

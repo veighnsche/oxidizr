@@ -1,14 +1,22 @@
 use log::Level;
 use serde_json::Value;
 
+/// Sink interface for structured fact emission.
+///
+/// Implement this trait to integrate Switchyard facts with your logging/telemetry stack.
+/// Consumers receive a JSON value with an envelope added by the audit layer.
 pub trait FactsEmitter: std::fmt::Debug {
+    /// Emit a fact under the given subsystem and event name with a decision label.
     fn emit(&self, subsystem: &str, event: &str, decision: &str, fields: Value);
 }
 
+/// Lightweight audit sink for human-readable lines.
 pub trait AuditSink {
+    /// Log a human-readable message at the given level.
     fn log(&self, level: Level, msg: &str);
 }
 
+/// No-op JSONL sink for development and testing.
 #[derive(Default, Debug, Copy, Clone)]
 pub struct JsonlSink;
 
@@ -30,6 +38,7 @@ pub struct FileJsonlSink {
 
 #[cfg(feature = "file-logging")]
 impl FileJsonlSink {
+    /// Create a new file-backed sink writing one JSON object per line.
     pub fn new<P: Into<std::path::PathBuf>>(path: P) -> Self {
         Self { path: path.into() }
     }

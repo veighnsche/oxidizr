@@ -38,6 +38,30 @@ Status: Core flows implemented with structured audit and locking; some features 
 - `src/api/`: facade (`Switchyard`) delegating to `plan`, `preflight`, `apply`, `rollback`
 - `src/logging/`: `StageLogger` audit facade, `FactsEmitter`/`AuditSink`, and `redact`
 
+## Documentation
+
+- Guide (mdBook) lives under `cargo/switchyard/book/`.
+  - Build: `mdbook build`
+  - Serve: `mdbook serve -n 127.0.0.1 -p 3000`
+  - Start with `src/introduction.md` and `src/quickstart.md`.
+- Operator checklists: `cargo/switchyard/DOCS/OPERATOR_CHECKLISTS.md`
+- Reference pages:
+  - Error codes: `cargo/switchyard/DOCS/REFERENCE_ERROR_CODES.md`
+  - Preflight schema: `cargo/switchyard/DOCS/REFERENCE_PREFLIGHT_SCHEMA.md`
+  - Audit schema v2: `cargo/switchyard/DOCS/AUDIT_SCHEMA_V2.md`
+
+### Examples
+
+Run examples locally:
+
+```bash
+cargo run -p switchyard --example 01_dry_run
+cargo run -p switchyard --example 02_commit_with_lock
+cargo run -p switchyard --example 03_rollback
+cargo run -p switchyard --example 04_audit_and_redaction
+cargo run -p switchyard --example 05_exdev_degraded
+```
+
 ## Quick Start
 
 Build and run tests for this crate only:

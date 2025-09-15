@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+/// Risk handling level for potentially dangerous conditions (e.g., SUID/SGID bits, hardlinks).
 #[derive(Clone, Copy, Debug)]
 pub enum RiskLevel {
     Stop,
@@ -7,6 +8,7 @@ pub enum RiskLevel {
     Allow,
 }
 
+/// Cross‑filesystem behavior policy for atomic rename failures (EXDEV).
 #[derive(Clone, Copy, Debug, Default)]
 pub enum ExdevPolicy {
     #[default]
@@ -14,18 +16,21 @@ pub enum ExdevPolicy {
     DegradedFallback,
 }
 
+/// Locking policy for serialize‑mutations requirement in Commit mode.
 #[derive(Clone, Copy, Debug)]
 pub enum LockingPolicy {
     Required,
     Optional,
 }
 
+/// Preservation requirement policy for metadata dimensions.
 #[derive(Clone, Copy, Debug)]
 pub enum PreservationPolicy {
     Off,
     RequireBasic,
 }
 
+/// Source trust policy for evaluating whether a source path is acceptable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceTrustPolicy {
     RequireTrusted,
@@ -33,18 +38,21 @@ pub enum SourceTrustPolicy {
     AllowUntrusted,
 }
 
+/// Smoke testing policy for Commit mode.
 #[derive(Clone, Copy, Debug)]
 pub enum SmokePolicy {
     Off,
     Require { auto_rollback: bool },
 }
 
+/// Scope policy restricting allowed roots and forbidding specific absolute paths.
 #[derive(Clone, Debug, Default)]
 pub struct Scope {
     pub allow_roots: Vec<PathBuf>,
     pub forbid_paths: Vec<PathBuf>,
 }
 
+/// Rescue expectations for production safety.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Rescue {
     pub require: bool,
@@ -52,6 +60,7 @@ pub struct Rescue {
     pub min_count: usize,
 }
 
+/// Risk controls toggles.
 #[derive(Debug, Copy, Clone)]
 pub struct Risks {
     pub suid_sgid: RiskLevel,
@@ -71,6 +80,7 @@ impl Default for Risks {
     }
 }
 
+/// Durability requirements for backups and preservation.
 #[derive(Debug, Copy, Clone)]
 pub struct Durability {
     pub backup_durability: bool,
@@ -88,6 +98,7 @@ impl Default for Durability {
     }
 }
 
+/// Apply stage policy affecting degraded paths and preflight parity.
 #[derive(Clone, Debug, Default)]
 pub struct ApplyFlow {
     pub exdev: ExdevPolicy,
@@ -97,6 +108,7 @@ pub struct ApplyFlow {
     pub capture_restore_snapshot: bool,
 }
 
+/// Governance policy defining required adapters and allowances.
 #[derive(Debug, Copy, Clone)]
 pub struct Governance {
     pub locking: LockingPolicy,
@@ -114,6 +126,7 @@ impl Default for Governance {
     }
 }
 
+/// Backup configuration.
 #[derive(Clone, Debug, Default)]
 pub struct Backup {
     pub tag: String,
