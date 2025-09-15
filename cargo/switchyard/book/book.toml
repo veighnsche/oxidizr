@@ -1,0 +1,11 @@
+[book]
+authors = ["Switchyard Team"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Switchyard: Operator and Integrator Guide"
+
+[output.html]
+no-section-label = true
+
+# Optional preprocessors can be added later (e.g., linkcheck, mermaid)

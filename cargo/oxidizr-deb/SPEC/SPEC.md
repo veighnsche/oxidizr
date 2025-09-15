@@ -54,10 +54,10 @@ apply transitively to oxidizr-deb.
 
 ### 2.4 Packages & Implicit Policies
 
-- REQ-PKG-1: `rustify coreutils` and `rustify findutils` **MUST** apply implicit policies tuned for their link topologies,
+- REQ-PKG-1: `use coreutils` and `use findutils` **MUST** apply implicit policies tuned for their link topologies,
   including disallowing degraded cross‑filesystem fallback (EXDEV → fail), strict ownership and preservation where
   applicable, and forbidding untrusted sources.
-- REQ-PKG-2: `rustify sudo` **MUST** apply a production‑grade policy tuned for replacing `/usr/bin/sudo` safely.
+- REQ-PKG-2: `use sudo` **MUST** apply a production‑grade policy tuned for replacing `/usr/bin/sudo` safely.
 - REQ-PKG-3: Cross‑filesystem degraded fallback **MUST** be disallowed by default for all built‑in packages.
 
 ### 2.5 Health Verification
@@ -85,11 +85,18 @@ apply transitively to oxidizr-deb.
 
 ### 2.9 Fetching & Verification
 
-- REQ-FETCH-1: `rustify <package>` **MUST** fetch the appropriate replacement artifact for the current architecture and
+- REQ-FETCH-1: `use <package>` **MUST** fetch the appropriate replacement artifact for the current architecture and
   verify its integrity (SHA‑256, and signature when available) before applying any changes.
 - REQ-FETCH-2: The default selection **MUST** be the latest stable release, with an option to choose a channel
   (e.g., stable vs. latest) in future versions.
 - REQ-FETCH-3: An offline mode **MUST** allow providing a local artifact path, still subject to integrity checks.
+
+### 2.10 Persistence & Cleanup
+
+- REQ-PERM-1: After a successful `use <package>` commit, the CLI **MUST** keep the user’s selection active across
+  package upgrades; no extra user steps are required.
+- REQ-CLEAN-1: After a successful `restore <package>`, the CLI **MUST** remove cached replacement artifacts for the
+  restored package to avoid clutter.
 
 ---
 
@@ -108,7 +115,7 @@ Global options:
 
 ### 3.2 Commands
 
-- rustify
+- use
   - Arguments: `<package>` where `<package>` ∈ {`coreutils`, `findutils`, `sudo`} (extensible).
   - Semantics: fetches and verifies the replacement for the given package, then plans and applies a safe link topology
     with backups. No applet selection is exposed; coreutils/findutils mappings are internal.
@@ -146,22 +153,22 @@ Dry‑run outputs are byte‑identical to real‑run (after redactions) and foll
 
 ```gherkin
 Feature: Safe swaps via CLI
-  Scenario: Dry-run rustify of coreutils
+  Scenario: Dry-run use of coreutils
     Given a staging root at /tmp/fakeroot
-    When I run `oxidizr-deb --root /tmp/fakeroot rustify coreutils`
+    When I run `oxidizr-deb --root /tmp/fakeroot use coreutils`
     Then the command exits 0
     And it reports a dry-run with a non-zero planned action count
 
-  Scenario: Commit sudo rustify
+  Scenario: Commit sudo use
     Given a verified sudo-rs artifact is available
-    When I run `oxidizr-deb --commit rustify sudo`
+    When I run `oxidizr-deb --commit use sudo`
     Then the command exits 0
     And subsequent reads of /usr/bin/sudo resolve to the rust replacement
 
-  Scenario: Rustify and restore findutils
+  Scenario: Use and restore findutils
     Given a staging root at /tmp/fakeroot
     And a verified findutils artifact is available
-    When I run `oxidizr-deb --commit rustify findutils`
+    When I run `oxidizr-deb --commit use findutils`
     Then the command exits 0
     And representative findutils commands resolve to the rust replacement
     When I run `oxidizr-deb restore findutils`

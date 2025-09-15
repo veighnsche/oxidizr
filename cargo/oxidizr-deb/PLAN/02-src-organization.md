@@ -13,11 +13,11 @@ src/
   main.rs                      # parse args, init logging in future (if added), dispatch
   cli/
     mod.rs
-    args.rs                    # clap structs: global flags, subcommands (rustify/restore/status)
+    args.rs                    # clap structs: global flags, subcommands (use/restore/status)
     handler.rs                 # top-level dispatch
     completions.rs             # generate shell completions (bash/zsh/fish)
   commands/
-    rustify.rs                 # package-level rustify entrypoint
+    use.rs                     # package-level 'use' entrypoint
     restore.rs                 # restore package (or all) from backups
     status.rs                  # report current rustified state
   packages/

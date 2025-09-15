@@ -148,7 +148,7 @@ cargo run -p oxidizr-deb -- restore coreutils
   - Idempotence: safe to re-run; if already restored, the plan becomes a no‑op.
 
 - `status`
-  - What it does: reports which packages are rustified, which are restorable, and where backups/artifacts live.
+  - What it does: reports which packages are active and which are restorable.
 
 ---
 
@@ -159,7 +159,7 @@ cargo run -p oxidizr-deb -- restore coreutils
 - Backup sidecar: saved original binaries/links created for restoration.
 - Use: safely switch a package to its Rust replacement (download, verify, link with backups).
 - Restore: switch back to GNU/stock binaries using backups; remove CLI‑managed symlinks.
-- Make permanent (seal): protect against package‑manager overwrites and/or remove GNU packages after validation.
+- Make permanent (seal): ensures your selection persists across upgrades.
 
 ---
 
@@ -246,8 +246,8 @@ Diagnostics aim to mention the stage (preflight/apply) and a one-line cause. Deb
 - Dry-run then commit:
 
 ```bash
-cargo run -p oxidizr-deb -- rustify coreutils
-cargo run -p oxidizr-deb -- --commit rustify coreutils
+cargo run -p oxidizr-deb -- use coreutils
+cargo run -p oxidizr-deb -- --commit use coreutils
 ```
 
 - Restore back to GNU:

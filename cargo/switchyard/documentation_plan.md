@@ -6,7 +6,7 @@ Note: This plan targets production operators/SREs and Rust integrators on Debian
 
 - [ ] Safety-first operator guidance for using the library in production (SafePath, locking, rollback, deterministic behavior) (see `cargo/switchyard/src/lib.rs`:4-10)
 - [ ] Clear, deterministic behavior documentation including plan/action IDs, dry-run redaction, and stage parity (see `cargo/switchyard/src/types/ids.rs`:7-13,31-46; `cargo/switchyard/src/logging/redact.rs`:54-63)
-- [ ] Complete rollback procedures with evidence of reverse-order rollback and idempotence (see `cargo/switchyard/src/api/apply/mod.rs`:249-299; `cargo/switchyard/src/fs/restore.rs`:14-28,291-400)
+- [ ] Complete rollback procedures with evidence of reverse-order rollback and idempotence (see `cargo/switchyard/src/api/apply/mod.rs`; `cargo/switchyard/src/fs/restore/`)
 - [ ] Audit trail and facts schema usage with provenance and exit codes mapping (see `cargo/switchyard/src/logging/audit.rs`:1-12,166-171; `cargo/switchyard/SPEC/SPEC.md`:166-229)
 - [ ] Locking model, timeouts, and error mapping to E_LOCKING with lock_wait_ms fact (see `cargo/switchyard/src/api/apply/mod.rs`:70-117; `cargo/switchyard/tests/locking_required.rs`:44-61)
 
@@ -35,13 +35,13 @@ What we’ll cite
 - Normative source: `cargo/switchyard/SPEC/SPEC.md` (guarantees, schemas, error codes) (see `SPEC.md` sections 1–6: `cargo/switchyard/SPEC/SPEC.md`:10-92,94-229,234-252)
 - Key terms (as used in code/spec):
   - Plan / Action: Structured steps (`EnsureSymlink`, `RestoreFromBackup`) built from `PlanInput` (see `cargo/switchyard/src/types/plan.rs`:26-41,33-36)
-  - Preflight: Policy gating and probes; emits per-action rows and a summary (see `cargo/switchyard/src/api/preflight/mod.rs`:1-9,286-317)
-  - Apply: Executes actions with atomic swap + backups, emits facts, enforces locking, optional smoke + attestation, reverse-order rollback (see `cargo/switchyard/src/api/apply/mod.rs`:1-9,70-117,227-246,249-299,371-446)
-  - Rollback: Automatic reverse-order restore on failure; idempotent (see `cargo/switchyard/src/api/apply/mod.rs`:249-299; `cargo/switchyard/src/fs/restore.rs`:291-375)
+  - Preflight: Policy gating and probes; emits per-action rows and a summary (see `cargo/switchyard/src/api/preflight/mod.rs`)
+  - Apply: Executes actions with atomic swap + backups, emits facts, enforces locking, optional smoke + attestation, reverse-order rollback (see `cargo/switchyard/src/api/apply/mod.rs`)
+  - Rollback: Automatic reverse-order restore on failure; idempotent (see `cargo/switchyard/src/api/apply/mod.rs`; `cargo/switchyard/src/fs/restore/`)
   - SafePath: Root-anchored, `..`-rejecting typed path for all mutations (see `cargo/switchyard/src/types/safepath.rs`:11-27,28-47,60-67)
   - LockManager: Adapter enforcing single mutator with bounded wait (see `cargo/switchyard/src/adapters/lock/mod.rs`:4-8; `cargo/switchyard/src/adapters/lock/file.rs`:34-61)
   - EXDEV degraded mode: Policy-controlled fallback for cross-filesystem swap (see `cargo/switchyard/src/fs/atomic.rs`:86-95; `cargo/switchyard/src/api/apply/handlers.rs`:101-115)
-  - Audit Facts: Minimal Facts v1 with `schema_version`, `ts`, `plan_id`, `path`, error ids/exit codes, optional attestation (see `cargo/switchyard/src/logging/audit.rs`:1-12,13-26,44-66; `cargo/switchyard/SPEC/SPEC.md`:166-229)
+  - Audit Facts: Facts schema v2 with envelope fields (`schema_version`, `ts`, `plan_id`, `run_id`, `event_id`), error ids/exit codes, optional attestation (see `cargo/switchyard/src/logging/audit.rs`; `cargo/switchyard/SPEC/audit_event.v2.schema.json`)
 
 What we’ll cite
 
@@ -60,14 +60,14 @@ Crate/Package
 
 Modules and Public Items (major, grouped)
 
-- `switchyard::api` (see `cargo/switchyard/src/api.rs`:1-20,21-86)
-  - `struct Switchyard<E: FactsEmitter, A: AuditSink>` with builder methods (`with_lock_manager`, `with_ownership_oracle`, `with_attestor`, `with_smoke_runner`, `with_lock_timeout_ms`) and API surface `plan`, `preflight`, `apply`, `plan_rollback_of` (doc: partial Y; doctest: N)
+- `switchyard::api` (see `cargo/switchyard/src/api/mod.rs`)
+  - `struct Switchyard<E: FactsEmitter, A: AuditSink>` with builder methods (`with_lock_manager`, `with_ownership_oracle`, `with_attestor`, `with_smoke_runner`, `with_lock_timeout_ms`) and API surface `plan`, `preflight`, `apply`, `plan_rollback_of`, `prune_backups` (doc: partial Y; doctest: N)
   - Submodules:
     - `api/apply/mod.rs` (`run`) — apply engine (doc: Y; doctest: N)
     - `api/apply/handlers.rs` — per-action handlers; before/after hashes; degraded flags (doc: Y; doctest: N)
     - `api/apply/audit_fields.rs` — `insert_hashes`, `maybe_warn_fsync` (doc: Y; doctest: N)
     - `api/preflight/mod.rs` (`run`) — preflight stage, rows emission (doc: Y; doctest: N)
-    - `api/preflight/rows.rs` — row assembly and fact emission (doc: partial Y; doctest: N)
+    - `api/preflight/row_emitter.rs` — row assembly and fact emission (doc: partial Y; doctest: N)
     - `api/plan.rs` — plan builder (delegated) (doc: N; doctest: N)
     - `api/errors.rs` — `ApiError`, `ErrorId`, mapping to exit codes (doc: Y; doctest: N)
 
@@ -81,14 +81,14 @@ Modules and Public Items (major, grouped)
 - `switchyard::fs` (see `cargo/switchyard/src/fs/mod.rs`:1-15,16-26)
   - `atomic::{open_dir_nofollow, atomic_symlink_swap, fsync_parent_dir}` (doc: Y; doctest: N) (`cargo/switchyard/src/fs/atomic.rs`:1-8,22-33,72-97)
   - `swap::replace_file_with_symlink` (backs up → atomic swap) (doc: Y; doctest: Y via unit tests) (`cargo/switchyard/src/fs/swap.rs`:11-22,82-133,135-209)
-  - `backup::{backup_path_with_tag, create_snapshot, has_backup_artifacts}` + sidecar schema v1/v2 (hash) (doc: Y; doctest: Y via unit tests) (`cargo/switchyard/src/fs/backup.rs`:9-23,202-335,347-365)
-  - `restore::{restore_file, restore_file_prev}` (doc: Y; doctest: Y via unit tests) (`cargo/switchyard/src/fs/restore.rs`:14-28,402-675)
+  - `backup::{index::backup_path_with_tag, snapshot::create_snapshot, index::has_backup_artifacts, sidecar::{...}, prune::prune_backups}` + sidecar schema v1/v2 (hash) (doc: Y; doctest: Y via unit tests) (`cargo/switchyard/src/fs/backup/{index.rs,snapshot.rs,sidecar.rs,prune.rs}`)
+  - `restore::{engine, steps, idempotence, selector, types}` including `restore_file` and integrity checks (doc: Y; doctest: Y via unit tests) (`cargo/switchyard/src/fs/restore/`)
   - `meta::{sha256_hex_of, resolve_symlink_target, kind_of, detect_preservation_capabilities}` (doc: Y) (`cargo/switchyard/src/fs/meta.rs`:19-26,28-44,46-63,65-106)
   - `mount::{ensure_rw_exec, ProcStatfsInspector}` (doc: Y; doctest: Y via unit tests) (`cargo/switchyard/src/fs/mount.rs`:69-80,82-132)
 
 - `switchyard::logging` (see `cargo/switchyard/src/logging/mod.rs`:1-7)
   - `facts::{FactsEmitter, AuditSink, JsonlSink}` (doc: Y; doctest: N; feature `file-logging` adds FileJsonlSink) (`cargo/switchyard/src/logging/facts.rs`:4-21,23-31,52-75)
-  - `audit::{emit_* helpers, ensure_provenance, SCHEMA_VERSION}` (doc: Y) (`cargo/switchyard/src/logging/audit.rs`:1-12,13-26,44-66,143-171,199-207)
+  - `audit::{StageLogger, ensure_provenance, SCHEMA_VERSION}` (doc: Y) (`cargo/switchyard/src/logging/audit.rs`)
   - `redact::{redact_event, ts_for_mode, TS_ZERO}` (doc: Y; tests present) (`cargo/switchyard/src/logging/redact.rs`:54-63,64-105)
 
 - `switchyard::adapters`
@@ -109,27 +109,27 @@ What we’ll cite
 
 ## 5) Guarantees & Safety Model (Evidence-Backed)
 
-- Atomic swap and TOCTOU-safe sequence: open parent with `O_DIRECTORY|O_NOFOLLOW`, `symlinkat` on tmp, `renameat` tmp→final, `fsync(parent)` (see `cargo/switchyard/src/fs/atomic.rs`:22-33,63-71,72-85). SPEC reiterates normative sequence (see `cargo/switchyard/SPEC/SPEC.md`:14-16,124-126).
+- Atomic swap and TOCTOU-safe sequence: open parent with `O_DIRECTORY|O_NOFOLLOW`, `symlinkat` on tmp, `renameat` tmp→final, `fsync(parent)` (see `cargo/switchyard/src/fs/atomic.rs`:22-33,63-71,72-85). SPEC reiterates normative sequence (see `cargo/switchyard/SPEC/SPEC.md`).
 - Deterministic IDs/ordering: UUIDv5 `plan_id` over serialized actions; `action_id` = v5(plan_id, action+index) (see `cargo/switchyard/src/types/ids.rs`:7-13,31-46). SPEC Determinism (see `cargo/switchyard/SPEC/SPEC.md`:70-74,15-16).
 - Preflight gates, preservation/probes: rw+exec mounts, immutability, hardlink, suid/sgid risk, source trust, ownership, allow_roots/forbid_paths, preservation capability map (see `cargo/switchyard/src/api/preflight/mod.rs`:51-168,170-201,256-281; `cargo/switchyard/src/preflight/checks.rs`:5-16,18-31,33-58,60-90,92-121; `cargo/switchyard/src/fs/meta.rs`:65-106). SPEC Preflight schema (see `cargo/switchyard/SPEC/SPEC.md`:129-160).
 - Apply behavior, fail-closed decisions: gating parity; without lock manager in Commit and require_lock_manager → E_LOCKING; per-action attempt/result facts; degraded EXDEV handling with telemetry (see `cargo/switchyard/src/api/apply/mod.rs`:70-150,172-181,182-224,371-433; `cargo/switchyard/src/api/apply/handlers.rs`:63-99,101-115).
-- Reverse-order rollback and idempotence: on first failure, restore executed actions in reverse; smoke failure triggers auto-rollback unless disabled (see `cargo/switchyard/src/api/apply/mod.rs`:249-299,301-369). Restore idempotence paths (see `cargo/switchyard/src/fs/restore.rs`:42-87,357-375).
+- Reverse-order rollback and idempotence: on first failure, restore executed actions in reverse; smoke failure triggers auto-rollback unless disabled (see `cargo/switchyard/src/api/apply/mod.rs`:249-299,301-369). Restore idempotence paths (see `cargo/switchyard/src/fs/restore/*`).
 - Locking requirements and timeouts: `LockManager` required in production; bounded wait → E_LOCKING; `lock_wait_ms` recorded (see `cargo/switchyard/src/api/apply/mod.rs`:70-117,172-180; tests `cargo/switchyard/tests/locking_required.rs`:44-61).
 - Rescue/fallback expectations: verify BusyBox or GNU subset with exec bits; policy gates require rescue in Commit (see `cargo/switchyard/src/policy/rescue.rs`:11-21,25-41,46-84; `cargo/switchyard/src/api/preflight/mod.rs`:39-46,293-317 summary). SPEC §6 Rescue (see `cargo/switchyard/SPEC/SPEC.md`:64-69).
-- Audit facts schema, redaction, provenance, attestation: minimal envelope, redaction in dry-run, before/after hashes, attestation bundle on success (see `cargo/switchyard/src/logging/audit.rs`:44-66,143-171,209-220; `cargo/switchyard/src/logging/redact.rs`:64-105; `cargo/switchyard/src/api/apply/handlers.rs`:9-19,45-51,101-115; SPEC schema `cargo/switchyard/SPEC/SPEC.md`:166-229).
-- Backups and integrity: sidecar `backup_meta.v1/v2` with `prior_kind`, `mode`, optional `payload_hash` (sha256); restore verifies hash when present; durability fsync of parent (see `cargo/switchyard/src/fs/backup.rs`:202-310,291-302,308-310; `cargo/switchyard/src/fs/restore.rs`:111-126,145-156).
+- Audit facts schema v2, redaction, provenance, attestation: envelope fields, redaction in dry-run, before/after hashes, attestation bundle on success (see `cargo/switchyard/src/logging/audit.rs`; `cargo/switchyard/src/logging/redact.rs`; `cargo/switchyard/src/api/apply/handlers.rs`; SPEC schema `cargo/switchyard/SPEC/audit_event.v2.schema.json`).
+- Backups and integrity: sidecar `backup_meta.v1/v2` with `prior_kind`, `mode`, optional `payload_hash` (sha256); restore verifies hash when present; durability fsync of parent (see `cargo/switchyard/src/fs/backup/{index.rs,snapshot.rs,sidecar.rs}`; `cargo/switchyard/src/fs/restore/{engine.rs,steps.rs,integrity.rs}`).
 - Cross-filesystem support (EXDEV): degraded fallback allowed by policy sets `degraded=true`; otherwise mapped to `E_EXDEV` with reason (see `cargo/switchyard/src/fs/atomic.rs`:86-95; `cargo/switchyard/src/api/apply/handlers.rs`:63-71,83-96,101-107). SPEC Filesystems (see `cargo/switchyard/SPEC/SPEC.md`:86-91,304-317).
 
 What we’ll cite
 
-- `fs/atomic.rs`, `fs/swap.rs`, `fs/backup.rs`, `fs/restore.rs`, `api/apply/*`, `api/preflight/*`, `logging/*`, `types/ids.rs`, SPEC sections 1–6, 10–11.
+- `fs/atomic.rs`, `fs/swap.rs`, `fs/backup/*`, `fs/restore/*`, `api/apply/*`, `api/preflight/*`, `logging/*`, `types/ids.rs`, SPEC sections 1–6, 10–11.
 
 ## 6) Documentation Artifacts to Produce
 
 - Crate-level rustdoc overview + minimal examples
   - Purpose: One-stop safety + determinism summary and how to compose adapters.
   - Audience: Rust integrators, security reviewers.
-  - Acceptance: Example compiles; links to `Policy::production_preset` and `Switchyard::with_*` (see `cargo/switchyard/src/api.rs`:32-86; `cargo/switchyard/src/policy/config.rs`:141-170).
+  - Acceptance: Example compiles; links to `Policy::production_preset` and `Switchyard::with_*` (see `cargo/switchyard/src/api/mod.rs`; `cargo/switchyard/src/policy/config.rs`:141-170).
 
 - API item coverage
   - Document every `pub` item in `api`, `types`, `logging`, `fs`, `adapters`, `policy`.
@@ -150,7 +150,7 @@ What we’ll cite
 - Reference pages
   - Error/exit codes mapped to `ErrorId` and SPEC TOML (see `cargo/switchyard/SPEC/error_codes.toml`:1-12; `cargo/switchyard/src/api/errors.rs`:31-73)
   - Preflight schema reference mapped to SPEC §4 and `preflight/yaml.rs` exporter (see `cargo/switchyard/src/preflight/yaml.rs`:1-34)
-  - Audit event schema Minimal Facts v1 (SPEC §5)
+  - Audit event schema v2 (`cargo/switchyard/SPEC/audit_event.v2.schema.json`)
   - Policy knobs (selected `Policy` fields with security rationale) (see `cargo/switchyard/src/policy/config.rs`:15-108)
 
 - Operator checklists
@@ -168,13 +168,13 @@ What we’ll cite
 
 - Quickstart (Debian)
   - Objective: plan → preflight → dry-run → commit with locking → smoke check → rollback on failure → capture facts.
-  - Sources: `cargo/switchyard/src/api.rs`:32-86; `policy/config.rs`:141-170; `adapters/lock/file.rs`:34-61; `api/apply/mod.rs`:70-117,301-369; `logging/redact.rs`:54-63
+  - Sources: `cargo/switchyard/src/api/mod.rs`; `policy/config.rs`:141-170; `adapters/lock/file.rs`:34-61; `api/apply/mod.rs`:70-117,301-369; `logging/redact.rs`:54-63
 
 - Core Concepts
   - Plan/Actions/IDs — `PlanInput`, `Plan`, `Action`, UUIDv5 (sources: `types/plan.rs`:26-41; `types/ids.rs`:31-46)
   - Preflight — gating and rows (sources: `api/preflight/mod.rs`:51-168,256-281; SPEC §4)
-  - Apply — atomic swap + backup/restore (sources: `fs/swap.rs`:82-133; `fs/backup.rs`:202-310; `fs/restore.rs`:14-28)
-  - Rollback — reverse-order and idempotence (sources: `api/apply/mod.rs`:249-299; `fs/restore.rs`:357-375)
+    - Apply — atomic swap + backup/restore (sources: `fs/swap.rs`; `fs/backup/*`; `fs/restore/*`)
+  - Rollback — reverse-order and idempotence (sources: `api/apply/mod.rs`; `fs/restore/*`)
   - Locking — bounded wait, E_LOCKING (sources: `api/apply/mod.rs`:70-117; test `tests/locking_required.rs`)
   - Rescue — BusyBox/GNU subset (sources: `policy/rescue.rs`:25-41,46-84)
   - EXDEV degraded mode — policy and telemetry (sources: `fs/atomic.rs`:86-95; `api/apply/handlers.rs`:101-107)
@@ -186,7 +186,7 @@ What we’ll cite
   - Audit capture and verification (redaction parity) (sources: `logging/redact.rs`:64-105; tests `tests/locking_required.rs` for stage/ids)
 
 - Reference
-  - Public API map (points to rustdoc) (sources: `api.rs`:32-86; `types/mod.rs`:7-12)
+  - Public API map (points to rustdoc) (sources: `api/mod.rs`; `types/mod.rs`:7-12)
   - Exit codes table (sources: `SPEC/error_codes.toml`:1-12; `api/errors.rs`:61-73)
   - Preflight schema (SPEC §4; `preflight/yaml.rs`)
   - Audit event schema (SPEC §5)
@@ -196,7 +196,7 @@ What we’ll cite
   - Lock timeout (sources: `api/apply/mod.rs`:70-117; tests `tests/locking_timeout.rs`)
   - EXDEV disallowed (sources: `api/apply/handlers.rs`:63-71,83-96)
   - Smoke failures and auto-rollback (sources: `api/apply/mod.rs`:301-369)
-  - Partial restoration (sources: `fs/restore.rs`:199-220,220-250)
+  - Partial restoration (sources: `fs/restore/*`)
 
 What we’ll cite
 

@@ -14,7 +14,7 @@ This addendum specifies CLI ergonomics and guardrails tailored for Debian/Ubuntu
 
 Acceptance (pseudo):
 
-- Given `/bin` is a symlink to `/usr/bin`, when `oxidizr-deb rustify coreutils` runs, then targets under `/usr/bin` are shown in the plan output.
+- Given `/bin` is a symlink to `/usr/bin`, when `oxidizr-deb use coreutils` runs, then targets under `/usr/bin` are shown in the plan output.
 
 ---
 
@@ -31,28 +31,28 @@ Acceptance:
 
 ---
 
-## 3. Alternatives Integration (Optional Mode)
+## 3. Alternatives Integration (Implementation Detail)
 
-- REQ-ALT-1: The CLI **MAY** support `--use-alternatives` to register linked binaries with `update-alternatives` instead of creating direct symlinks.
-- REQ-ALT-2: When `--use-alternatives` is active, the CLI **MUST** ensure idempotent registration and report the chosen priority.
-- REQ-ALT-3: The CLI **SHOULD** form appropriate groups when applicable (e.g., `[` vs `test`), without exposing applet selection to users.
-- REQ-ALT-4: The CLI **MUST** still back up the previous link/file topology such that `restore` brings back prior state even if alternatives are in use.
+- REQ-ALT-1: The CLI **MAY** use `update-alternatives` under the hood to register linked binaries instead of creating direct symlinks.
+- REQ-ALT-2: When used, registration **MUST** be idempotent and compatible with `restore`.
+- REQ-ALT-3: The CLI **SHOULD** form appropriate groups when applicable (e.g., `[` vs `test`), without exposing applet selection.
+- REQ-ALT-4: The CLI **MUST** revert the prior topology on `restore` when alternatives are in use.
 
 Acceptance:
 
-- When rustifying coreutils with `--use-alternatives`, subsequent `update-alternatives --display ls` shows the configured provider pointing to the uutils source; `oxidizr-deb restore coreutils` reverts prior topology.
+- After `use coreutils`, `update-alternatives --display ls` shows the configured provider pointing to the chosen source; `oxidizr-deb restore coreutils` reverts the prior topology.
 
 ---
 
-## 4. dpkg-divert Strategy (Optional Mode)
+## 4. dpkg-divert Strategy (Implementation Detail)
 
-- REQ-DIVERT-1: The CLI **MAY** support `--use-divert` to move the original binary aside using `dpkg-divert` and place a replacement symlink.
+- REQ-DIVERT-1: The CLI **MAY** use `dpkg-divert` under the hood to move the original binary aside and place a replacement symlink.
 - REQ-DIVERT-2: When diversion fails, the CLI **MUST** stop and leave the filesystem unchanged.
 - REQ-DIVERT-3: `restore` **MUST** undo diversions it created.
 
 Acceptance:
 
-- When rustifying `sudo` with `--use-divert`, `dpkg-divert --list | grep /usr/bin/sudo` lists the diversion; `oxidizr-deb restore sudo` removes it.
+- After `use sudo`, `dpkg-divert --list | grep /usr/bin/sudo` lists the diversion; `oxidizr-deb restore sudo` removes it.
 
 ---
 
@@ -64,7 +64,7 @@ Acceptance:
 
 Acceptance:
 
-- Given the replacement `sudo-rs` is not setuid root, when I run `oxidizr-deb --commit rustify sudo`, then preflight fails closed with an explanation about setuid ownership/mode.
+- Given the replacement `sudo-rs` is not setuid root, when I run `oxidizr-deb --commit use sudo`, then preflight fails closed with an explanation about setuid ownership/mode.
 
 ---
 
@@ -124,6 +124,6 @@ Acceptance:
 
 ## 12. Fetching & Verification (Debian UX specifics)
 
-- REQ-FETCH-D-1: For `rustify <package>`, the CLI **MUST** select artifacts appropriate for the distro and architecture.
+- REQ-FETCH-D-1: For `use <package>`, the CLI **MUST** select artifacts appropriate for the distro and architecture.
 - REQ-FETCH-D-2: The CLI **MUST** verify SHA‑256 and, when available, signatures before any mutation.
 - REQ-FETCH-D-3: An offline local artifact path **MAY** be provided; verification still applies.

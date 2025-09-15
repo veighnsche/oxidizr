@@ -12,11 +12,11 @@
 ## 3) Feature Suites (Draft)
 - `features/dry_run_default.feature`
   - Dry-run is default; commit only with `--commit`.
-- `features/coreutils_rustify_restore.feature`
-  - `rustify coreutils` performs internal applet mapping to a unified binary; `restore coreutils` reverts to GNU.
-- `features/findutils_rustify_restore.feature`
-  - `rustify findutils` performs internal mapping to the uutils findutils binary; `restore findutils` reverts to GNU.
-- `features/sudo_rustify_guard.feature`
+- `features/coreutils_use_restore.feature`
+  - `use coreutils` performs internal mapping to the replacement binary; `restore coreutils` reverts to GNU.
+- `features/findutils_use_restore.feature`
+  - `use findutils` performs internal mapping to the replacement binary; `restore findutils` reverts to GNU.
+- `features/sudo_use_guard.feature`
   - Commit blocks if replacement cannot satisfy `root:root` and `4755` requirements.
 - `features/apt_locks.feature`
   - When dpkg/apt locks present, commit refuses with friendly diagnostic.
@@ -25,11 +25,7 @@
 - `features/fetch_and_verify.feature`
   - Fetch selects the correct artifact by arch/distro; SHA-256 (and signature when available) verified before plan.
 - `features/status_reporting.feature`
-  - `status` reports current rustified packages and restorable state.
-- `features/alternatives_mode.feature` (optional)
-  - `--use-alternatives` registers idempotently and `restore` reverts prior topology.
-- `features/divert_mode.feature` (optional)
-  - `--use-divert` moves original aside and `restore` cleanly reverts.
+  - `status` reports current active and restorable packages.
 
 ## 4) Step Definitions (Sketch)
 - World: temp root directory, seeded tree with dummy binaries & perms; optional local artifact for `--offline --use-local`.

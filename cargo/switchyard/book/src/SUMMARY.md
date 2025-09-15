@@ -1,0 +1,24 @@
+# Summary
+
+- [Introduction](introduction.md)
+- [Quickstart](quickstart.md)
+- Concepts
+  - [Plan, Actions, and IDs](concepts/plan-actions-ids.md)
+  - [Preflight](concepts/preflight.md)
+  - [Apply](concepts/apply.md)
+  - [Rollback](concepts/rollback.md)
+  - [Locking](concepts/locking.md)
+  - [Rescue](concepts/rescue.md)
+  - [Cross-filesystem (EXDEV)](concepts/exdev.md)
+  - [Audit Facts and Redaction](concepts/audit-facts.md)
+- How-Tos
+  - [Configure a Lock Manager](how-tos/lock-manager.md)
+  - [Use SafePath](how-tos/safepath.md)
+  - [Capture and Verify Audit](how-tos/audit-capture.md)
+- Reference
+  - [Public API (rustdoc)](reference/public-api.md)
+  - [Error Codes](reference/error-codes.md)
+  - [Preflight Schema](reference/preflight-schema.md)
+  - [Audit Event Schema (v2)](reference/audit-schema.md)
+  - [Operational Bounds](reference/operational-bounds.md)
+- [Troubleshooting](troubleshooting.md)

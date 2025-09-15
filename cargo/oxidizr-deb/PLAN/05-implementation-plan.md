@@ -7,7 +7,7 @@
 
 ## Phase 1 — CLI Surface & Safety (package-level)
 
-- Commands: `rustify <package>`, `restore <package|all>`, `status`, `completions`.
+- Commands: `use <package>`, `restore <package|all>`, `status`, `completions`.
 - Flags: `--assume-yes`, `--commit`, global `--root`.
 - Debian safety: dpkg/apt lock detection (no mutations if busy), friendly diagnostics.
 - Sudo guard: preflight check for `root:root` + `4755` on replacement in commit mode.
@@ -42,7 +42,7 @@
 
 ## Deliverables & Done Criteria
 
-- Package-level CLI (`rustify`, `restore`, `status`) functional with unit + BDD coverage.
+- Package-level CLI (`use`, `restore`, `status`) functional with unit + BDD coverage.
 - Fetch-and-verify implemented and covered by tests.
 - Debian UX acceptance items satisfied.
 - CI matrix green; fixtures stable; zero SKIP.
