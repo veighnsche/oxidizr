@@ -66,8 +66,18 @@ pub fn restore_impl(
     if opts.dry_run {
         return Ok(());
     }
-    let (_backup_opt, _sidecar_opt, action) = RestorePlanner::plan(&target_path, sel, opts)?;
-    RestorePlanner::execute(&target_path, action)
+    match RestorePlanner::plan(&target_path, sel, opts) {
+        Ok((_backup_opt, _sidecar_opt, action)) => RestorePlanner::execute(&target_path, action),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && matches!(sel, SnapshotSel::Previous) => {
+            // Fallback: if no previous snapshot exists (e.g., first snapshot just captured),
+            // attempt restore from the latest snapshot instead.
+            match RestorePlanner::plan(&target_path, SnapshotSel::Latest, opts) {
+                Ok((_b2, _s2, action2)) => RestorePlanner::execute(&target_path, action2),
+                Err(e2) => Err(e2),
+            }
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Planned action for restore execution.

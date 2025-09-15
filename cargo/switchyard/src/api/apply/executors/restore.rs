@@ -71,8 +71,66 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             }
         })();
         let hash_ms = u64::try_from(th0.elapsed().as_millis()).unwrap_or(u64::MAX);
-        // Perform restore from the latest backup set
-        match crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag) {
+
+        // Idempotence fast-path: if the latest snapshot's prior state matches the current state,
+        // performing a restore would be a no-op. In that case, skip restore entirely to avoid
+        // toggling between snapshots on repeated rollback applications.
+        if !dry {
+            if let Some((_bopt, sc_path)) = crate::fs::backup::find_latest_backup_and_sidecar(
+                &target.as_path(),
+                &api.policy.backup.tag,
+            ) {
+                if let Some(sc) = crate::fs::backup::read_sidecar(&sc_path).ok() {
+                    if crate::fs::restore::idempotence::is_idempotent(
+                        &target.as_path(),
+                        sc.prior_kind.as_str(),
+                        sc.prior_dest.as_deref(),
+                    ) {
+                        let mut extra = json!({
+                            "action_id": aid.to_string(),
+                            "path": target.as_path().display().to_string(),
+                            "before_kind": before_kind,
+                            "after_kind": before_kind,
+                            "idempotent": true,
+                            "backup_durable": api.policy.durability.backup_durability,
+                        });
+                        ensure_provenance(&mut extra);
+                        StageLogger::new(tctx)
+                            .apply_result()
+                            .merge(&extra)
+                            .emit_success();
+                        return (
+                            Some(act.clone()),
+                            None,
+                            PerfAgg {
+                                hash: hash_ms,
+                                backup: 0,
+                                swap: 0,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
+        // If configured, capture a pre-restore snapshot of the current state to enable invertibility.
+        // When we capture pre-restore, we will restore from the previous snapshot (second newest)
+        // so that the inverse plan can later restore the pre-restore state via the latest snapshot.
+        if !dry && api.policy.apply.capture_restore_snapshot {
+            let tb1 = Instant::now();
+            let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
+            backup_ms = backup_ms
+                .saturating_add(u64::try_from(tb1.elapsed().as_millis()).unwrap_or(u64::MAX));
+        }
+
+        // Perform restore from backup set using appropriate selector
+        let restore_res = if !dry && api.policy.apply.capture_restore_snapshot {
+            crate::fs::restore::restore_file_prev(target, dry, force, &api.policy.backup.tag)
+        } else {
+            crate::fs::restore::restore_file(target, dry, force, &api.policy.backup.tag)
+        };
+
+        match restore_res {
             Ok(()) => {}
             Err(e) => {
                 let id = map_restore_error_kind(e.kind());
@@ -149,13 +207,15 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
             }
         }
         ensure_provenance(&mut extra);
-        // After a successful restore, optionally capture a snapshot of the restored state
+        // After a successful restore, also capture a snapshot of the restored state to enable
+        // idempotent repeated rollbacks (Latest will reflect the restored topology).
         if !dry && api.policy.apply.capture_restore_snapshot {
-            let tb1 = Instant::now();
+            let tb2 = Instant::now();
             let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
             backup_ms = backup_ms
-                .saturating_add(u64::try_from(tb1.elapsed().as_millis()).unwrap_or(u64::MAX));
+                .saturating_add(u64::try_from(tb2.elapsed().as_millis()).unwrap_or(u64::MAX));
         }
+
         StageLogger::new(tctx)
             .apply_result()
             .merge(&extra)
