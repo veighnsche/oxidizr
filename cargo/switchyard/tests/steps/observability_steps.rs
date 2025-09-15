@@ -2,7 +2,7 @@ use cucumber::{given, then, when};
 
 use crate::bdd_support::schema;
 use crate::bdd_world::World;
-use serde_json::Value;
+use serde_json::Value as _;
 use switchyard::api::Overrides;
 
 #[then(regex = r"^each fact carries schema_version=2$")]

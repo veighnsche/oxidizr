@@ -2,7 +2,6 @@ use cucumber::{given, then, when};
 
 use crate::bdd_world::World;
 use switchyard::api::Switchyard;
-use switchyard::logging::{AuditSink, FactsEmitter};
 
 // Compile-time Send + Sync assertions
 fn assert_send_sync<T: Send + Sync>() {}

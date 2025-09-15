@@ -32,12 +32,18 @@ pub fn redact_event(mut v: Value) -> Value {
         obj.insert("ts".into(), Value::String(TS_ZERO.to_string()));
         // Remove or normalize volatile timings (keep lock_wait_ms for assertions)
         obj.remove("duration_ms");
+        // Normalize fsync_ms for deterministic comparisons across DryRun and Commit
+        if obj.contains_key("fsync_ms") {
+            obj.insert("fsync_ms".into(), Value::from(0));
+        }
         // Remove volatile flags derived from runtime conditions (keep degraded for assertions)
         obj.remove("severity");
+        // Keep topology descriptors for assertions in tests (do not remove)
         // Remove content-hash fields for determinism gating (kept in raw logs)
         obj.remove("before_hash");
         obj.remove("after_hash");
         obj.remove("hash_alg");
+        // Keep dry_run/redacted flags; these are asserted in audit tests
         // Placeholder secret masking: if provenance.helper exists, replace with "***"
         if let Some(p) = obj.get_mut("provenance") {
             if let Some(pobj) = p.as_object_mut() {

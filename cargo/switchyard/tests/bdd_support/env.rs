@@ -27,6 +27,3 @@ impl Drop for EnvGuard {
     }
 }
 
-pub fn set_var_scoped<K: Into<String>, V: Into<String>>(key: K, value: V) -> EnvGuard {
-    EnvGuard::new(key, value)
-}

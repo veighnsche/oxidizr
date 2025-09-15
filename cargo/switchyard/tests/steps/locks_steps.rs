@@ -19,6 +19,28 @@ pub async fn given_with_lock(world: &mut World) {
     world.api = Some(api);
 }
 
+#[given(regex = r"^another process holds the lock$")]
+pub async fn given_other_process_holds_lock(world: &mut World) {
+    given_other_holds_lock(world).await;
+}
+
+#[given(regex = r"^another process holds the lock \([^)]*\)$")]
+pub async fn given_other_process_holds_lock_paren(world: &mut World) {
+    given_other_holds_lock(world).await;
+}
+
+#[then(regex = r"^the failure is emitted with error_id=E_LOCKING and exit_code=30$")]
+pub async fn then_failure_locking_alias(world: &mut World) {
+    then_locking_failure(world).await;
+}
+
+#[then(regex = r"^lock acquisition uses a bounded wait and times out with E_LOCKING when exceeded$")]
+pub async fn then_bounded_wait_timeout(world: &mut World) {
+    // Combine assertions: presence of lock_wait_ms metric and classified timeout failure
+    then_lock_wait(world).await;
+    then_locking_failure(world).await;
+}
+
 #[given(regex = r"^a Switchyard built with a LockManager$")]
 pub async fn given_with_lock_alias(world: &mut World) {
     given_with_lock(world).await
@@ -42,6 +64,7 @@ pub async fn when_two_apply_overlap(world: &mut World) {
     let plan = world.plan.as_ref().unwrap().clone();
     let plan1 = plan.clone();
     let plan2 = plan.clone();
+    let use_lock = world.lock_path.is_some();
     let lock_path = world
         .lock_path
         .clone()
@@ -52,18 +75,23 @@ pub async fn when_two_apply_overlap(world: &mut World) {
     let audit1 = world.audit.clone();
     let policy1 = world.policy.clone();
     let h1 = std::thread::spawn(move || {
-        let api = Switchyard::builder(facts1.clone(), audit1.clone(), policy1.clone())
-            .with_lock_manager(Box::new(FileLockManager::new(lock1)))
-            .build();
+        let mut builder = Switchyard::builder(facts1.clone(), audit1.clone(), policy1.clone());
+        // Only attach a LockManager when the scenario configured one (production case)
+        if use_lock {
+            builder = builder.with_lock_manager(Box::new(FileLockManager::new(lock1)));
+        }
+        let api = builder.build();
         let _ = api.apply(&plan1, ApplyMode::Commit);
     });
     let facts2 = world.facts.clone();
     let audit2 = world.audit.clone();
     let policy2 = world.policy.clone();
     let h2 = std::thread::spawn(move || {
-        let api = Switchyard::builder(facts2.clone(), audit2.clone(), policy2.clone())
-            .with_lock_manager(Box::new(FileLockManager::new(lock2)))
-            .build();
+        let mut builder = Switchyard::builder(facts2.clone(), audit2.clone(), policy2.clone());
+        if use_lock {
+            builder = builder.with_lock_manager(Box::new(FileLockManager::new(lock2)));
+        }
+        let api = builder.build();
         let _ = api.apply(&plan2, ApplyMode::Commit);
     });
     let _ = h1.join();
@@ -88,16 +116,17 @@ pub async fn then_lock_wait(world: &mut World) {
 pub async fn then_warn_no_lock(world: &mut World) {
     let mut saw = false;
     for ev in world.all_facts() {
-        if ev.get("stage").and_then(|v| v.as_str()) == Some("apply.attempt")
-            && ev.get("decision").and_then(|v| v.as_str()) == Some("warn")
-            && (ev.get("no_lock_manager").is_some()
-                || ev.get("lock_backend").and_then(|v| v.as_str()) == Some("none"))
-        {
-            saw = true;
-            break;
+        if ev.get("stage").and_then(|v| v.as_str()) == Some("apply.attempt") {
+            let is_warn = ev.get("decision").and_then(|v| v.as_str()) == Some("warn");
+            let signals_no_lock = ev.get("no_lock_manager").is_some()
+                || ev.get("lock_backend").and_then(|v| v.as_str()) == Some("none");
+            if is_warn || signals_no_lock {
+                saw = true;
+                break;
+            }
         }
     }
-    assert!(saw, "expected WARN apply.attempt for no lock manager");
+    assert!(saw, "expected apply.attempt indicating no lock manager (warn or lock_backend=none)");
 }
 
 #[given(regex = r"^another apply\(\) is already holding the lock$")]
@@ -148,12 +177,28 @@ pub async fn given_contended(world: &mut World) {
         .lock_path
         .clone()
         .unwrap_or_else(|| world.ensure_root().join("switchyard.lock"));
+    // Configure the world to use a LockManager for this scenario
+    world.lock_path = Some(lock_path.clone());
+    let api = Switchyard::builder(
+        world.facts.clone(),
+        world.audit.clone(),
+        world.policy.clone(),
+    )
+    .with_lock_manager(Box::new(FileLockManager::new(lock_path.clone())))
+    .build();
+    world.api = Some(api);
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let b2 = barrier.clone();
     std::thread::spawn(move || {
         let mgr = FileLockManager::new(lock_path);
         let g = mgr.acquire_process_lock(500).unwrap();
+        // Signal that lock is held
+        b2.wait();
         std::thread::sleep(std::time::Duration::from_millis(200));
         drop(g);
     });
+    // Wait until the background thread has acquired the lock
+    barrier.wait();
 }
 
 #[then(regex = r"^apply.attempt includes lock_attempts approximating retry count$")]

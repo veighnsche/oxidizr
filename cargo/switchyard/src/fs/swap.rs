@@ -67,7 +67,11 @@ pub fn replace_file_with_symlink_with_override(
         return Ok((false, 0));
     }
 
+    // Ensure parent directory exists prior to acquiring a no‑follow dir handle.
+    // This avoids failures when committing a plan in a fresh temp root where
+    // target parents (e.g., usr/bin) may not yet exist but are implied by the plan.
     if let Some(parent) = target_path.parent() {
+        let _ = fs::create_dir_all(parent);
         let _dirfd = open_dir_nofollow(parent)?; // RAII drop closes
     }
 

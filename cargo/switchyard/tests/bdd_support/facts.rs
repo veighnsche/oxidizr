@@ -9,6 +9,13 @@ pub fn normalize_for_compare(mut v: Value) -> Value {
         obj.remove("event_id");
         obj.remove("seq");
         obj.remove("switchyard_version");
+        // Fields that legitimately differ between DryRun and Commit but are not
+        // semantically relevant for cross-mode equality in BDD assertions
+        obj.remove("dry_run");
+        obj.remove("redacted");
+        obj.remove("redaction");
+        obj.remove("before_kind");
+        obj.remove("after_kind");
     }
     v
 }

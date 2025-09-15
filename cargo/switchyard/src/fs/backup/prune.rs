@@ -23,16 +23,17 @@ use crate::fs::atomic::fsync_parent_dir;
 /// Both policies apply together: a backup is pruned if it violates either count or age policy.
 /// Sidecar files are deleted alongside their payloads. The directory containing entries is fsynced best‑effort.
 pub fn prune_backups(
-    target: &Path,
+    target: &crate::types::safepath::SafePath,
     tag: &str,
     count_limit: Option<usize>,
     age_limit: Option<Duration>,
 ) -> io::Result<crate::types::PruneResult> {
-    let name = target
+    let tpath = target.as_path();
+    let name = tpath
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("target");
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let parent = tpath.parent().unwrap_or_else(|| Path::new("."));
     let prefix = format!(".{name}.{tag}.");
 
     // Collect unique (timestamp, base .bak path) from both payload and sidecar filenames
@@ -123,7 +124,7 @@ pub fn prune_backups(
     }
 
     // Fsync the directory that contains the entries (same dir as `target`)
-    let _ = fsync_parent_dir(target);
+    let _ = fsync_parent_dir(&tpath);
 
     Ok(crate::types::PruneResult {
         pruned_count: pruned,

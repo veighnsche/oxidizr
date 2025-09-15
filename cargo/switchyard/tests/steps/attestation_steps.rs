@@ -1,4 +1,4 @@
-use cucumber::{given, then};
+use cucumber::{given, then, when};
 
 use crate::bdd_world::World;
 use switchyard::adapters::{AttestationError, Attestor, Signature};
@@ -14,6 +14,45 @@ impl Attestor for DummyAttestor {
     fn key_id(&self) -> String {
         "test-key".to_string()
     }
+}
+
+#[when(regex = r"^I complete an apply$")]
+pub async fn when_complete_apply(world: &mut World) {
+    // Ensure we have a minimal plan and an API instance; allow unlocked commit for tests
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_min(world).await;
+    }
+    world.policy.governance.allow_unlocked_commit = true;
+    world.policy.apply.override_preflight = true;
+    // Ensure an attestor is configured so the summary includes attestation fields
+    let att: Box<dyn DebugAttestor> = Box::new(DummyAttestor);
+    if world.api.is_none() {
+        let api = switchyard::api::Switchyard::builder(
+            world.facts.clone(),
+            world.audit.clone(),
+            world.policy.clone(),
+        )
+        .with_attestor(att)
+        .build();
+        world.api = Some(api);
+    } else {
+        // Rebuild to attach attestor while preserving policy/facts/audit
+        let api = switchyard::api::Switchyard::builder(
+            world.facts.clone(),
+            world.audit.clone(),
+            world.policy.clone(),
+        )
+        .with_attestor(att)
+        .build();
+        world.api = Some(api);
+    }
+    let plan = world.plan.as_ref().unwrap();
+    let _ = world
+        .api
+        .as_ref()
+        .unwrap()
+        .apply(plan, ApplyMode::Commit)
+        .unwrap();
 }
 
 #[given(regex = r"^an attestor is configured and apply succeeds in Commit mode$")]

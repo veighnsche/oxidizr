@@ -92,8 +92,13 @@ pub async fn then_hash_fields_present(world: &mut World) {
 
 #[then(regex = r"^facts record degraded=true when policy allow_degraded_fs is enabled$")]
 pub async fn then_degraded_flag(world: &mut World) {
+    // Ensure we have a plan and policy configured for degraded EXDEV
+    if world.plan.is_none() {
+        crate::steps::plan_steps::given_plan_mutates(world).await;
+    }
     // enable degraded and run apply to produce fact
     world.policy.apply.exdev = ExdevPolicy::DegradedFallback;
+    world.policy.governance.allow_unlocked_commit = true;
     world.rebuild_api();
     let plan = world.plan.as_ref().unwrap();
     let _ = world

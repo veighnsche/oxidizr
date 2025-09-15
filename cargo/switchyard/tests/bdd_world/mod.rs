@@ -5,15 +5,19 @@
 
 use serde_json::Value;
 use std::path::Path;
-use switchyard::adapters::{DefaultSmokeRunner, FileLockManager};
 use switchyard::api::Switchyard;
-use switchyard::policy::types::SmokePolicy;
 use switchyard::policy::Policy;
 use switchyard::types::plan::{ApplyMode, LinkRequest, PlanInput};
 use switchyard::types::report::{ApplyReport, PreflightReport};
 
 use crate::bdd_support::env::EnvGuard;
 use crate::bdd_support::{util, CollectingAudit, CollectingEmitter};
+
+#[derive(Clone, Copy, Debug)]
+pub enum SmokeRunnerKind {
+    Default,
+    Failing,
+}
 
 #[derive(Default, cucumber::World)]
 pub struct World {
@@ -33,6 +37,7 @@ pub struct World {
     // Scoped guards to ensure no cross-scenario leakage
     pub(crate) env_guards: Vec<EnvGuard>,
     pub(crate) lock_guards: Vec<Box<dyn switchyard::adapters::LockGuard>>,
+    pub(crate) smoke_runner: Option<SmokeRunnerKind>,
 }
 
 impl World {
@@ -163,20 +168,32 @@ impl World {
             .unwrap();
     }
 
-    pub fn run_preflight_capture(&mut self) {
-        self.ensure_api();
-        self.ensure_plan_min();
-        let plan = self.plan.as_ref().unwrap();
-        self.preflight = Some(self.api.as_ref().unwrap().preflight(plan).unwrap());
-    }
+    
 
     pub fn apply_current_plan_commit(&mut self) {
+        // Allow unlocked commit in test scenarios without a LockManager
         if self.lock_path.is_none() {
             self.policy.governance.allow_unlocked_commit = true;
-            self.rebuild_api();
-        } else {
-            self.ensure_api();
         }
+        // Rebuild API to propagate any policy changes; preserve smoke runner configuration
+        let mut builder = Switchyard::builder(self.facts.clone(), self.audit.clone(), self.policy.clone());
+        if let Some(kind) = self.smoke_runner {
+            match kind {
+                SmokeRunnerKind::Default => {
+                    builder = builder.with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner));
+                }
+                SmokeRunnerKind::Failing => {
+                    #[derive(Debug, Default)]
+                    struct Failing;
+                    impl switchyard::adapters::SmokeTestRunner for Failing {
+                        fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::smoke::SmokeFailure> { Err(switchyard::adapters::smoke::SmokeFailure) }
+                    }
+                    builder = builder.with_smoke_runner(Box::new(Failing));
+                }
+            }
+        }
+        let api = builder.build();
+        self.api = Some(api);
         let plan = self.plan.as_ref().unwrap();
         self.apply_report = Some(
             self.api
@@ -201,15 +218,7 @@ impl World {
         self.facts_dry = Some(self.facts.0.lock().unwrap().clone());
     }
 
-    pub fn enable_smoke(&mut self) {
-        self.policy.governance.smoke = SmokePolicy::Require {
-            auto_rollback: true,
-        };
-        let api = Switchyard::builder(self.facts.clone(), self.audit.clone(), self.policy.clone())
-            .with_smoke_runner(Box::new(DefaultSmokeRunner))
-            .build();
-        self.api = Some(api);
-    }
+    // Deprecated: enable_smoke removed; use steps::plan_steps::given_smoke instead
 }
 
 impl std::fmt::Debug for World {

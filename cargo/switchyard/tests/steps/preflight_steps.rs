@@ -1,6 +1,6 @@
 use cucumber::{then, when};
 
-use crate::bdd_support::{facts, schema};
+use crate::bdd_support::facts;
 use crate::bdd_world::World;
 use serde_json::Value;
 use switchyard::preflight::yaml as preflight_yaml;

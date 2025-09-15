@@ -45,6 +45,7 @@ pub async fn given_smoke(world: &mut World) {
     .with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner))
     .build();
     world.api = Some(api);
+    world.smoke_runner = Some(crate::bdd_world::SmokeRunnerKind::Default);
 }
 
 #[when(regex = r"^I plan a swap to (\S+)$")]

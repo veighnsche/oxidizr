@@ -2,6 +2,7 @@
 //! Implements E2E-PRUNE-009 (365d max) and E2E-PRUNE-010 (1s min)
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use switchyard::types::safepath::SafePath;
 
 #[test]
 fn prune_max_age_365d_prunes_older() {
@@ -42,8 +43,9 @@ fn prune_max_age_365d_prunes_older() {
     let new_b = mk(ts_new);
 
     // Run prune with age_limit = 365d, no count limit
+    let sp_tgt = SafePath::from_rooted(root, &target).unwrap();
     let res = switchyard::fs::backup::prune::prune_backups(
-        &target,
+        &sp_tgt,
         tag,
         None,
         Some(Duration::from_secs(365 * 24 * 60 * 60)),
@@ -95,8 +97,9 @@ fn prune_min_age_1s_prunes_older() {
     let mid_b = mk(ts_mid);
     let new_b = mk(ts_new);
 
+    let sp_tgt = SafePath::from_rooted(root, &target).unwrap();
     let res = switchyard::fs::backup::prune::prune_backups(
-        &target,
+        &sp_tgt,
         tag,
         None,
         Some(Duration::from_millis(1000)),
