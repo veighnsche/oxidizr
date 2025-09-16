@@ -1,0 +1,3 @@
+[submodule "cargo/switchyard"]
+	path = cargo/switchyard
+	url = git@github.com:veighnsche/switchyard.git
