@@ -1,0 +1,24 @@
+# Rust / Cargo
+target
+/target/
+**/*.rs.bk
+
+# Temp and logs
+tmp
+/tmp/
+*.log
+*.bak
+*.old
+
+# BDD logs
+/target/bdd-lastrun.log
+
+# Editors/OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Generated artifacts
+golden-diff
+/golden-diff/

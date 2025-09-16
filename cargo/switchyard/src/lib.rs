@@ -1,4 +1,12 @@
 #![deny(unsafe_code)]
+// Tests may use unit-struct defaults and complex types for world/test scaffolding
+#![cfg_attr(
+    test,
+    allow(
+        clippy::default_constructed_unit_structs,
+        clippy::type_complexity
+    )
+)]
 #![doc = include_str!("../README.md")]
 /* ---- unwrap/expect policy ---- */
 // Warn everywhere (incl. tests), but deny in non-test builds.

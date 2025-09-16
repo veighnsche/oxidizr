@@ -2,12 +2,12 @@
 
 [![Crates.io](https://img.shields.io/crates/v/switchyard.svg)](https://crates.io/crates/switchyard)
 [![docs.rs](https://img.shields.io/docsrs/switchyard)](https://docs.rs/switchyard)
-[![CI](https://github.com/veighnsche/oxidizr-arch/actions/workflows/ci.yml/badge.svg)](https://github.com/veighnsche/oxidizr-arch/actions/workflows/ci.yml)
-[![mdBook](https://img.shields.io/badge/book-mdBook-blue)](https://veighnsche.github.io/oxidizr-arch/)
+[![CI](https://github.com/veighnsche/switchyard/actions/workflows/test.yml/badge.svg)](https://github.com/veighnsche/switchyard/actions/workflows/test.yml)
+[![mdBook](https://img.shields.io/badge/book-mdBook-blue)](https://veighnsche.github.io/switchyard/)
 [![License: Apache-2.0/MIT](https://img.shields.io/badge/license-Apache--2.0%2FMIT-blue.svg)](./LICENSE)
 [![MSRV 1.75+](https://img.shields.io/badge/MSRV-1.75%2B-informational)](./Cargo.toml)
 
-> Operator & Integrator Guide (mdBook): <https://veighnsche.github.io/oxidizr-arch/>
+> Operator & Integrator Guide (mdBook): <https://veighnsche.github.io/switchyard/>
 >
 > API docs on docs.rs: <https://docs.rs/switchyard>
 
@@ -20,22 +20,22 @@ Switchyard is a Rust library that provides a safe, deterministic, and auditable 
 - Optional post-apply smoke checks with auto-rollback
 - Structured facts and audit emission with provenance and exit codes
 
-This crate lives inside the `oxidizr-arch` monorepo and is designed to be embedded by higher-level CLIs.
+Switchyard can be used standalone or embedded by higher‑level CLIs. In some workspaces it may be included as a Git submodule.
 
-Status: Core flows implemented with structured audit and locking; some features are intentionally minimal while SPEC v1.1 evolves. See `SPEC/SPEC.md`, `SPEC_CHECKLIST.md`, and `TODO.md` for current coverage and roadmap.
+Status: Core flows implemented with structured audit and locking; some features are intentionally minimal while SPEC v1.1 evolves. See the mdBook for coverage and roadmap.
 
 ---
 
 ## Features
 
-- SafePath and TOCTOU-safe FS ops via capability-style handles (`rustix`)
+- `SafePath` and TOCTOU-safe FS ops via capability-style handles (`rustix`)
 - Transactional symlink replacement with backup/restore (reverse-ordered rollback)
 - Cross-filesystem degraded fallback for symlink replacement (EXDEV → unlink+symlink when policy allows)
 - Locking with bounded wait; timeouts emit `E_LOCKING` and include `lock_wait_ms`
-- Deterministic `plan_id` and `action_id` (UUIDv5)
+- Deterministic `plan_id` and `action_id` (`UUIDv5`)
 - Facts emission (JSON) with minimal provenance and optional attestation bundle
 - Redaction layer: removes timing/severity and masks secrets for canon comparison
-- Rescue policy: `require_rescue` verification (BusyBox or ≥6/10 GNU tools on PATH), fail-closed gates
+- Rescue policy: `require_rescue` verification (`BusyBox` or ≥6/10 GNU tools on PATH), fail-closed gates
 - Optional smoke runner; default deterministic subset validates symlink targets resolve to sources
 
 ---
@@ -72,14 +72,14 @@ cargo run -p switchyard --example 05_exdev_degraded
 Build and run tests for this crate only:
 
 ```bash
-cargo test -p switchyard
+cargo test
 ```
 
 Add as a dependency (when used standalone):
 
 ```toml
 [dependencies]
-switchyard = { path = "./cargo/switchyard" }
+switchyard = "0.1"
 ```
 
 ### Minimal Example
@@ -148,7 +148,7 @@ let api = Switchyard::builder(facts, audit, policy)
 
 ## Core Concepts
 
-### SafePath and TOCTOU Safety
+### `SafePath` and TOCTOU Safety
 
 - All mutating APIs accept `SafePath` to avoid path traversal (`..`) and ensure operations anchor under a known root.
 - Filesystem operations use TOCTOU-safe sequences (open parent `O_DIRECTORY|O_NOFOLLOW` → `openat` → `renameat` → `fsync(parent)`).
@@ -185,7 +185,7 @@ let api = Switchyard::builder(facts, audit, policy)
 
 ### Determinism and Redaction
 
-- `plan_id` and `action_id` are UUIDv5 for stable ordering.
+- `plan_id` and `action_id` are `UUIDv5` for stable ordering.
 - `DryRun` timestamps are zeroed (`1970-01-01T00:00:00Z`); volatile fields like durations and severity are removed; secrets are masked.
 - Use the `redact_event()` helper to compare facts for `DryRun` vs `Commit` parity.
 
@@ -214,7 +214,7 @@ Conformance and acceptance:
 - Some golden fixtures live under `tests/golden/*`.
 - A non-blocking CI job runs `SPEC/tools/traceability.py` and publishes coverage artifacts.
 
-See `docs/testing/TESTING_POLICY.md` for project-wide rules (zero SKIPs, harness constraints, and CI behavior).
+See the mdBook for testing guidance, troubleshooting, and conventions.
 
 ---
 

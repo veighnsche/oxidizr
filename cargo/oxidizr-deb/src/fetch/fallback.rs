@@ -1,6 +1,5 @@
 use std::ffi::OsString;
 use std::fs;
-use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -98,9 +97,7 @@ fn cargo_install(crate_name: &str) -> Result<(), String> {
     }
 }
 
-fn is_root() -> bool {
-    nix::unistd::Uid::effective().is_root()
-}
+fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 fn chown_root(p: &Path) -> Result<(), String> {
     // Try to set owner to root:root using `chown` command to avoid extra deps

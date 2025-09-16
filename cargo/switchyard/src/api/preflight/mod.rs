@@ -75,7 +75,7 @@ pub(crate) fn run<E: FactsEmitter, A: crate::logging::AuditSink>(
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::MetadataExt;
-                    if let Ok(md) = std::fs::metadata(&source.as_path()) {
+                    if let Ok(md) = std::fs::metadata(source.as_path()) {
                         if (md.mode() & 0o002) != 0 {
                             stops.push(format!(
                                 "source world-writable: {}",

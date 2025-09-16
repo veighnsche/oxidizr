@@ -33,6 +33,7 @@ pub fn backup_path_with_tag(target: &Path, tag: &str) -> std::path::PathBuf {
 /// - If target is a regular file: copy bytes to a timestamped backup and record mode in sidecar.
 /// - If target is a symlink: create a symlink backup pointing to current dest and write sidecar with `prior_dest`.
 /// - If target is absent: create a tombstone payload and sidecar with `prior_kind="none"`.
+#[allow(clippy::too_many_lines)]
 pub fn create_snapshot(target: &Path, backup_tag: &str) -> std::io::Result<()> {
     let metadata = fs::symlink_metadata(target);
     let existed = metadata.is_ok();

@@ -2,10 +2,10 @@
 name = "switchyard"
 version = "0.1.0"
 edition = "2021"
-description = "Switchyard library crate (monorepo skeleton)"
+description = "Switchyard: safe, atomic, reversible filesystem swaps with policy and audit"
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/veighnsche/oxidizr-arch"
-homepage = "https://veighnsche.github.io/oxidizr-arch/"
+repository = "https://github.com/veighnsche/switchyard"
+homepage = "https://veighnsche.github.io/switchyard/"
 documentation = "https://docs.rs/switchyard"
 readme = "README.md"
 keywords = ["filesystem", "atomic", "swap", "reversible"]
@@ -32,7 +32,7 @@ exclude = [
 ]
 
 [badges]
-github-actions = { repository = "veighnsche/oxidizr-arch", workflow = "Continuous Integration" }
+github-actions = { repository = "veighnsche/switchyard", workflow = "Test" }
 
 [package.metadata.docs.rs]
 all-features = false
