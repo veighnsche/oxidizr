@@ -1,8 +1,15 @@
 # Switchyard (Library Crate)
 
-> Operator & Integrator Guide (mdBook): https://veighnsche.github.io/oxidizr-arch/
+[![Crates.io](https://img.shields.io/crates/v/switchyard.svg)](https://crates.io/crates/switchyard)
+[![docs.rs](https://img.shields.io/docsrs/switchyard)](https://docs.rs/switchyard)
+[![CI](https://github.com/veighnsche/oxidizr-arch/actions/workflows/ci.yml/badge.svg)](https://github.com/veighnsche/oxidizr-arch/actions/workflows/ci.yml)
+[![mdBook](https://img.shields.io/badge/book-mdBook-blue)](https://veighnsche.github.io/oxidizr-arch/)
+[![License: Apache-2.0/MIT](https://img.shields.io/badge/license-Apache--2.0%2FMIT-blue.svg)](./LICENSE)
+[![MSRV 1.75+](https://img.shields.io/badge/MSRV-1.75%2B-informational)](./Cargo.toml)
+
+> Operator & Integrator Guide (mdBook): <https://veighnsche.github.io/oxidizr-arch/>
 >
-> API docs on docs.rs: https://docs.rs/switchyard
+> API docs on docs.rs: <https://docs.rs/switchyard>
 
 Switchyard is a Rust library that provides a safe, deterministic, and auditable engine for applying system changes with:
 
@@ -44,15 +51,9 @@ Status: Core flows implemented with structured audit and locking; some features 
 
 ## Documentation
 
-- Guide (mdBook) lives under `cargo/switchyard/book/`.
-  - Build: `mdbook build`
-  - Serve: `mdbook serve -n 127.0.0.1 -p 3000`
-  - Start with `src/introduction.md` and `src/quickstart.md`.
-- Operator checklists: `cargo/switchyard/DOCS/OPERATOR_CHECKLISTS.md`
-- Reference pages:
-  - Error codes: `cargo/switchyard/DOCS/REFERENCE_ERROR_CODES.md`
-  - Preflight schema: `cargo/switchyard/DOCS/REFERENCE_PREFLIGHT_SCHEMA.md`
-  - Audit schema v2: `cargo/switchyard/DOCS/AUDIT_SCHEMA_V2.md`
+- Operator & Integrator Guide (mdBook): <https://veighnsche.github.io/oxidizr-arch/>
+  - Quickstart, Concepts, How‑Tos, and Reference live in the book.
+- API docs on docs.rs: <https://docs.rs/switchyard>
 
 ### Examples
 
@@ -185,8 +186,8 @@ let api = Switchyard::builder(facts, audit, policy)
 ### Determinism and Redaction
 
 - `plan_id` and `action_id` are UUIDv5 for stable ordering.
-- DryRun timestamps are zeroed (`1970-01-01T00:00:00Z`); volatile fields like durations and severity are removed; secrets are masked.
-- Use the `redact_event()` helper to compare facts for DryRun vs Commit parity.
+- `DryRun` timestamps are zeroed (`1970-01-01T00:00:00Z`); volatile fields like durations and severity are removed; secrets are masked.
+- Use the `redact_event()` helper to compare facts for `DryRun` vs `Commit` parity.
 
 ### Provenance and Attestation
 
@@ -332,7 +333,7 @@ ls -1a .<name>.*.bak* | sort -t '.' -k 4,4n | tail -n 2
 jq -r '.prior_kind,.prior_dest,.mode' .<name>.<tag>.<millis>.bak.meta.json
 ```
 
-3) Restore according to prior_kind:
+3) Restore according to `prior_kind`:
 
 - file
 
@@ -387,3 +388,5 @@ This crate is dual-licensed under either:
 - Apache License, Version 2.0 — see repository root `LICENSE`
 - MIT License — see repository root `LICENSE-MIT`
 at your option.
+
+Minimum Supported Rust Version (MSRV): 1.75

@@ -81,7 +81,7 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
                 &target.as_path(),
                 &api.policy.backup.tag,
             ) {
-                if let Some(sc) = crate::fs::backup::read_sidecar(&sc_path).ok() {
+                if let Ok(sc) = crate::fs::backup::read_sidecar(&sc_path) {
                     if crate::fs::restore::idempotence::is_idempotent(
                         &target.as_path(),
                         sc.prior_kind.as_str(),
@@ -118,10 +118,11 @@ impl<E: FactsEmitter, A: AuditSink> ActionExecutor<E, A> for RestoreFromBackupEx
         // When we capture pre-restore, we will restore from the previous snapshot (second newest)
         // so that the inverse plan can later restore the pre-restore state via the latest snapshot.
         if !dry && api.policy.apply.capture_restore_snapshot {
-            let tb1 = Instant::now();
+            let t_backup_start = Instant::now();
             let _ = crate::fs::backup::create_snapshot(&target.as_path(), &api.policy.backup.tag);
-            backup_ms = backup_ms
-                .saturating_add(u64::try_from(tb1.elapsed().as_millis()).unwrap_or(u64::MAX));
+            backup_ms = backup_ms.saturating_add(
+                u64::try_from(t_backup_start.elapsed().as_millis()).unwrap_or(u64::MAX),
+            );
         }
 
         // Perform restore from backup set using appropriate selector

@@ -27,7 +27,8 @@ struct FileGuard {
 
 impl Drop for FileGuard {
     fn drop(&mut self) {
-        let _ = self.file.unlock();
+        // Use trait-qualified call (via import) to avoid MSRV conflicts and satisfy clippy
+        let _ = FileExt::unlock(&self.file);
     }
 }
 

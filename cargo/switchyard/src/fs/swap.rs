@@ -196,7 +196,7 @@ pub fn replace_file_with_symlink_with_override(
 }
 
 #[cfg(test)]
-#[allow(clippy::panic)]
+#[allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::constants::DEFAULT_BACKUP_TAG;

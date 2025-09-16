@@ -62,7 +62,10 @@ pub(crate) fn find_latest_backup_and_sidecar(
             parent.join(s)
         };
 
-        let is_better = best.as_ref().is_none_or(|(cur, _)| ts > *cur);
+        let is_better = match best.as_ref() {
+            None => true,
+            Some((cur, _)) => ts > *cur,
+        };
         if is_better {
             best = Some((ts, base));
         }

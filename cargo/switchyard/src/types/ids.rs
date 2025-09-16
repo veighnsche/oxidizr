@@ -1,4 +1,4 @@
-//! Deterministic UUIDv5 identifiers for plans and actions.
+//! Deterministic `UUIDv5` identifiers for plans and actions.
 //!
 //! The UUID namespace is derived from a stable tag (`NS_TAG`) so that
 //! `plan_id` and `action_id` are reproducible across runs for the same
@@ -25,7 +25,7 @@ fn sp_rel(p: &SafePath) -> String {
     p.rel().to_string_lossy().to_string()
 }
 
-/// Serialize an action into a stable, human-readable string used for UUIDv5 input.
+/// Serialize an action into a stable, human-readable string used for `UUIDv5` input.
 fn serialize_action(a: &Action) -> String {
     match a {
         Action::EnsureSymlink { source, target } => {
@@ -37,7 +37,7 @@ fn serialize_action(a: &Action) -> String {
     }
 }
 
-/// Compute a deterministic UUIDv5 for a plan by serializing actions in order.
+/// Compute a deterministic `UUIDv5` for a plan by serializing actions in order.
 ///
 /// Two plans with identical action sequences (including ordering) will have the
 /// same `plan_id`, independent of the root directories used by `SafePath`.
@@ -53,7 +53,7 @@ pub fn plan_id(plan: &Plan) -> Uuid {
     Uuid::new_v5(&ns, s.as_bytes())
 }
 
-/// Compute a deterministic UUIDv5 for an action as a function of the plan ID and
+/// Compute a deterministic `UUIDv5` for an action as a function of the plan ID and
 /// the action's serialized form, including the stable position index.
 #[must_use]
 pub fn action_id(plan_id: &Uuid, action: &Action, idx: usize) -> Uuid {

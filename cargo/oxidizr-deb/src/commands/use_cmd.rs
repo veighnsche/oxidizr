@@ -9,7 +9,8 @@ use switchyard::Switchyard;
 use crate::adapters::debian::pm_lock_message;
 use crate::adapters::preflight::sudo_guard;
 use crate::cli::args::Package;
-use crate::fetch::resolver::resolve_artifact;
+use crate::fetch::resolver::{resolve_artifact, staged_default_path};
+use crate::fetch::fallback::ensure_artifact_available;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
 
@@ -35,7 +36,7 @@ pub fn exec(
         }
     }
 
-    let (source_bin, dest_dir, applets) = match package {
+    let (mut source_bin, dest_dir, applets) = match package {
         Package::Coreutils => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
             (
@@ -65,45 +66,35 @@ pub fn exec(
         }
     };
 
-    // Ensure replacement is installed when committing if the artifact is missing
+    // Ensure replacement is present when committing; prefer APT on live root, else fallback fetch/build
     if matches!(mode, ApplyMode::Commit) && !offline {
         if !source_bin.exists() {
-            // APT/DPKG ops require live root
-            if root != Path::new("/") {
+            if root == Path::new("/") {
+                // Try to ensure artifact via apt (live root) or fallback (cargo/github) and stage under --root
+                match ensure_artifact_available(root, package, true) {
+                    Ok(p) => {
+                        source_bin = p;
+                    }
+                    Err(e) => {
+                        return Err(format!(
+                            "failed to ensure replacement artifact for {:?}: {}",
+                            package, e
+                        ));
+                    }
+                }
+            } else {
                 return Err(format!(
                     "replacement artifact missing at {}; installing requires --root=/ (live system)",
                     source_bin.display()
                 ));
             }
-            let pkgname = replacement_pkg_name(package);
-            let args = vec!["install".to_string(), "-y".to_string(), pkgname.to_string()];
-            eprintln!(
-                "[info] replacement artifact not found; ensuring installation via apt-get {} {}",
-                "install", pkgname
-            );
-            // In commit mode, execute; in dry-run we would have printed a [dry-run] message above
-            let mut cmd = Command::new("apt-get");
-            cmd.args(&args);
-            cmd.stdin(Stdio::null());
-            cmd.stdout(Stdio::inherit());
-            cmd.stderr(Stdio::piped());
-            match cmd.output() {
-                Ok(out) => {
-                    let code = out.status.code().unwrap_or(1);
-                    if code != 0 {
-                        return Err(format!(
-                            "apt-get install {} failed with exit code {}",
-                            pkgname, code
-                        ));
-                    }
-                }
-                Err(e) => return Err(format!("failed to spawn apt-get: {e}")),
-            }
         }
     } else if matches!(mode, ApplyMode::DryRun) && !offline {
         if !source_bin.exists() {
             let pkgname = replacement_pkg_name(package);
-            eprintln!("[dry-run] would run: apt-get install -y {}", pkgname);
+            eprintln!("[dry-run] would run: apt-get install -y {} (or fallback to cargo/github if unavailable)", pkgname);
+            let staged = staged_default_path(root, package);
+            eprintln!("[dry-run] would stage artifact at {}", staged.display());
         }
     }
 

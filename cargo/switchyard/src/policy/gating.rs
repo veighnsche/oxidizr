@@ -27,7 +27,7 @@ pub(crate) fn evaluate_action(
 
     match act {
         Action::EnsureSymlink { source, target } => {
-            // Policy-driven extra mount checks (replaces any hard-coded paths)
+            // Policy-driven extra mount checks (replaces any hard-coded paths)@@
             for p in &policy.apply.extra_mount_checks {
                 if let Err(e) = crate::preflight::checks::ensure_mount_rw_exec(p.as_path()) {
                     stops.push(format!("{} not rw+exec: {}", p.display(), e));
@@ -84,7 +84,7 @@ pub(crate) fn evaluate_action(
             #[cfg(unix)]
             {
                 use std::os::unix::fs::MetadataExt;
-                if let Ok(md) = std::fs::metadata(&source.as_path()) {
+                if let Ok(md) = std::fs::metadata(source.as_path()) {
                     let mode = md.mode();
                     if (mode & 0o002) != 0 {
                         stops.push(format!(

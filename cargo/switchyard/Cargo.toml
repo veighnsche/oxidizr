@@ -15,11 +15,20 @@ rust-version = "1.75"
 # Keep the published crate small; crates.io serves README and links only.
 exclude = [
   "/book/**",
+  "/SPEC/**",
+  "/INVENTORY/**",
+  "/DOCS/**",
+  "/tests/**",
   "/.github/**",
   "/scripts/**",
   "/target/**",
   "/golden-diff/**",
   "/**/*.log",
+  "BUGS.md",
+  "documentation_plan.md",
+  "ER_CAT.json",
+  "TODO.md",
+  "Cargo.toml.orig",
 ]
 
 [badges]

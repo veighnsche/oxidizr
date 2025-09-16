@@ -229,7 +229,7 @@ pub(crate) fn run<E: FactsEmitter, A: AuditSink>(
     }
     // Always include simple counts for observability
     let executed_count = executed.len();
-    let rolled_back_count = rolled_paths_opt.as_ref().map(|v| v.len()).unwrap_or(0);
+    let rolled_back_count = rolled_paths_opt.as_ref().map_or(0, Vec::len);
     builder = builder.executed_counts(executed_count, rolled_back_count);
     builder.perf(perf_total).emit(&slog, decision);
     api.audit.log(Level::Info, "apply: finished");

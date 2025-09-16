@@ -94,9 +94,9 @@ mod tests {
         assert_eq!(out.get("ts").and_then(|v| v.as_str()), Some(TS_ZERO));
         assert!(out.get("duration_ms").is_none());
         // We keep lock_wait_ms and degraded in redacted output for test assertions
-        assert_eq!(out.get("lock_wait_ms").and_then(|v| v.as_i64()), Some(45));
+        assert_eq!(out.get("lock_wait_ms").and_then(Value::as_i64), Some(45));
         assert!(out.get("severity").is_none());
-        assert_eq!(out.get("degraded").and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(out.get("degraded").and_then(Value::as_bool), Some(true));
         assert!(out.get("before_hash").is_none());
         assert!(out.get("after_hash").is_none());
         assert!(out.get("hash_alg").is_none());

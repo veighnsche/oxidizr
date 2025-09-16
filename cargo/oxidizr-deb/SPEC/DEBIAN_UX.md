@@ -169,16 +169,15 @@ Acceptance:
 - REQ-FETCH-D-1: For `use <package>` and `replace <package>`, the CLI **MUST** ensure the appropriate replacement package for the
   distro and architecture is installed via APT/DPKG.
 - REQ-FETCH-D-2: Integrity and provenance **MUST** rely on the package manager’s signature verification and repository trust.
-- REQ-FETCH-D-3: For development and testing under a fakeroot/chroot, `--offline --use-local PATH` **IS SUPPORTED** to inject a
-  local artifact and bypass APT (still validated in future versions). This mode is not intended for production.
+  Offline/manual artifact injection is **NOT** part of acceptance proof; acceptance must exercise APT/DPKG.
 
 ---
 
 ## 15. Operator tooling (dev shell)
 
-- REQ-DEV-1: The repository **MUST** provide a helper to launch a disposable Ubuntu shell with replacements applied on the live
-  root inside the container so an operator can manually verify versions (e.g., `ls --version`). The helper **MUST NOT** mutate
-  the host system.
-  - Reference implementation: `scripts/ubuntu_dev_shell.sh`.
+- REQ-DEV-1: The repository **MUST** provide a helper to launch a disposable Debian-family shell with replacements applied on the
+  live root inside the container via the CLI using APT/DPKG, so an operator can manually verify versions (e.g., `ls --version`).
+  The helper **MUST NOT** mutate the host system.
+  - Reference implementation: `scripts/ubuntu_dev_shell.sh` (container image may be Debian/Ubuntu).
   - Behavior: builds oxidizr-deb in the container, runs `--commit use coreutils`, `--commit use findutils`, `--commit use sudo`
-    (subject to setuid 4755), and drops the operator into an interactive shell.
+    (subject to setuid 4755), with APT/DPKG performing installs/removals, and drops the operator into an interactive shell.

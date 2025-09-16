@@ -92,13 +92,18 @@ apply transitively to oxidizr-deb.
 - REQ-F1: Cross‑filesystem behavior is governed by the package’s implicit policy. Degraded fallback **MUST** be disallowed
   by default (apply fails with a stable reason; no visible change).
 
-### 2.9 Retrieval & Versioning (APT/DPKG)
+### 2.9 Retrieval & Versioning (APT/DPKG and Fallbacks)
 
 - REQ-RV-1: `use <package>` **MUST** ensure the appropriate replacement package is installed via APT/DPKG for the
   current architecture, installing/upgrading to the latest available version when unspecified.
-- REQ-RV-2: Integrity and provenance **MUST** rely on the package manager’s signature verification and repository
-  trust configuration; no separate manual checksum is required.
-- REQ-RV-3: Offline/manual artifact paths are **OUT OF SCOPE** for `use` and `replace`.
+- REQ-RV-1A: When the replacement is not available via APT/DPKG or installation fails, the CLI **MUST** attempt an
+  online fallback retrieval from a trusted upstream (e.g., `cargo install coreutils` / `uutils-findutils`, or official
+  GitHub releases for `sudo-rs`) and stage the artifact under `--root` for use. This path is secondary and used only
+  when the package manager cannot satisfy the dependency.
+- REQ-RV-2: Integrity and provenance **SHOULD** rely on the package manager’s signature verification and repository
+  trust configuration. Fallback retrievals **MUST** be clearly surfaced in CLI output and are acceptable for operator
+  evaluation but should not replace PM-based installs where available.
+- REQ-RV-3: Offline/manual artifact injection is not part of acceptance proof.
 - REQ-RV-4: Future versions **MAY** allow pinning a specific version via flags on `use`/`replace`; latest remains the default.
 
 ### 2.10 Persistence & Cleanup

@@ -102,7 +102,7 @@ mod tests {
     }
     impl MountInspector for MockInspector {
         fn flags_for(&self, _path: &Path) -> Result<MountFlags, MountError> {
-            self.flags.clone()
+            self.flags
         }
     }
 
