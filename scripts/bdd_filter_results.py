@@ -13,7 +13,7 @@ CMD = [
     "cargo",
     "test",
     "-p",
-    "switchyard",
+    "switchyard-fs",
     "--features",
     "bdd",
     "--test",

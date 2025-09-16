@@ -187,7 +187,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Run CI test runner (switchyard crate)
         run: |
-          python3 test_ci_runner.py -p switchyard --nocapture
+          set -e
+          python3 test_ci_runner.py -p switchyard-fs --nocapture
 
   bdd:
     name: BDD Gating (Switchyard)

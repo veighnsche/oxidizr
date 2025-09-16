@@ -97,7 +97,8 @@ def main() -> int:
             outdir = Path(tmpd)
             env["GOLDEN_OUT_DIR"] = str(outdir)
 
-            cargo_cmd = ["cargo", "test", "-p", "switchyard", test_name]
+            pkg = args.package or "switchyard-fs"
+            cargo_cmd = ["cargo", "test", "-p", pkg, test_name]
             if args.nocapture:
                 cargo_cmd += ["--", "--nocapture"]
 
