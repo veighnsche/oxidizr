@@ -1,31 +1,14 @@
-use std::ffi::OsString;
-use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::cli::args::Package;
-use crate::fetch::resolver::{staged_default_path};
+ 
 
 pub fn apt_pkg_name(pkg: Package) -> &'static str {
     match pkg {
         Package::Coreutils => "rust-coreutils",
         Package::Findutils => "rust-findutils",
         Package::Sudo => "sudo-rs",
-    }
-}
-
-fn home_bin() -> PathBuf {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/root"))
-        .join(".cargo/bin")
-}
-
-fn is_exe(p: &Path) -> bool {
-    match fs::metadata(p) {
-        Ok(md) => md.is_file() && (md.permissions().mode() & 0o111) != 0,
-        Err(_) => false,
     }
 }
 
@@ -92,76 +75,7 @@ fn dpkg_locate_binary(pkgname: &str, candidates: &[&str]) -> Option<PathBuf> {
     None
 }
 
-fn ensure_rustup_and_cargo() -> Result<(), String> {
-    if Command::new("cargo").arg("--version").stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok() {
-        return Ok(());
-    }
-    // Install rustup non-interactively
-    let (code, _so, se) = run("bash", &["-lc", "curl https://sh.rustup.rs -sSf | sh -s -- -y"]) ?;
-    if code != 0 { return Err(format!("rustup install failed: {}", se)); }
-    Ok(())
-}
-
-fn cargo_install(crate_name: &str) -> Result<(), String> {
-    // Ensure cargo in PATH by prefixing HOME/.cargo/bin
-    let home_bin = home_bin();
-    let mut cmd = Command::new("bash");
-    cmd.arg("-lc");
-    let mut env_path = OsString::from(home_bin.to_string_lossy().to_string());
-    env_path.push(OsString::from(":"));
-    env_path.push(std::env::var_os("PATH").unwrap_or_default());
-    cmd.env("PATH", env_path);
-    let mut install_cmd = format!("cargo install --locked {}", crate_name);
-    if let Some(ver) = std::env::var("OXIDIZR_DEB_CARGO_VERSION").ok() {
-        install_cmd.push_str(&format!(" --version {}", ver));
-    }
-    cmd.arg(install_cmd);
-    cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::inherit());
-    cmd.stderr(Stdio::inherit());
-    match cmd.status() {
-        Ok(st) if st.success() => Ok(()),
-        Ok(st) => Err(format!("cargo install {} exited with {}", crate_name, st.code().unwrap_or(1))),
-        Err(e) => Err(format!("failed to run cargo install {}: {}", crate_name, e)),
-    }
-}
-
-fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
-
-fn chown_root(p: &Path) -> Result<(), String> {
-    // Try to set owner to root:root using `chown` command to avoid extra deps
-    let st = Command::new("chown")
-        .args(["root:root", &p.to_string_lossy()])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|e| format!("failed to spawn chown: {}", e))?;
-    if !st.success() {
-        return Err("chown root:root failed".to_string());
-    }
-    Ok(())
-}
-
-fn stage_into(root: &Path, pkg: Package, src: &Path, setuid_root: bool) -> Result<PathBuf, String> {
-    let dest = staged_default_path(root, pkg);
-    if let Some(parent) = dest.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
-    fs::copy(src, &dest).map_err(|e| format!("copy {} -> {} failed: {}", src.display(), dest.display(), e))?;
-    let mut perm = fs::metadata(&dest).map_err(|e| e.to_string())?.permissions();
-    if setuid_root {
-        if !is_root() {
-            return Err("sudo replacement requires root to set setuid root:root".to_string());
-        }
-        perm.set_mode(0o4755);
-    } else {
-        perm.set_mode(0o755);
-    }
-    fs::set_permissions(&dest, perm).map_err(|e| e.to_string())?;
-    if setuid_root {
-        chown_root(&dest)?;
-    }
-    Ok(dest)
-}
+// Online fallbacks removed; apt-only path is supported.
 
 pub fn ensure_artifact_available(root: &Path, pkg: Package, commit: bool) -> Result<PathBuf, String> {
     let setuid = matches!(pkg, Package::Sudo);

@@ -94,8 +94,7 @@ pub fn exec(
             let apt_ver = std::env::var("OXIDIZR_DEB_APT_VERSION").ok();
             let apt_arg = if let Some(v) = apt_ver { format!("{}={}", pkgname, v) } else { pkgname.to_string() };
             eprintln!("[dry-run] would run: apt-get install -y {}", apt_arg);
-            let staged = staged_default_path(root, package);
-            eprintln!("[dry-run] would stage artifact at {}", staged.display());
+            // No online fallback; apt-only path.
         }
     }
 
@@ -164,7 +163,7 @@ pub fn exec(
         #[cfg(unix)]
         {
             use std::fs;
-            let mut ok = false;
+            let mut count = 0usize;
             let src = SafePath::from_rooted(root, &source_bin)
                 .map_err(|e| format!("invalid source_bin: {e:?}"))?
                 .as_path()
@@ -175,16 +174,17 @@ pub fn exec(
                 if let Ok(md) = fs::symlink_metadata(&dst) {
                     if md.file_type().is_symlink() {
                         if let Ok(cur) = fs::read_link(&dst) {
-                            if cur == src {
-                                ok = true;
-                                break;
-                            }
+                            if cur == src { count += 1; }
                         }
                     }
                 }
             }
-            if !ok {
-                return Err("post-apply smoke failed: no applet points to replacement binary".to_string());
+            let need = if matches!(package, Package::Coreutils) { 2 } else { 1 };
+            if count < need {
+                return Err(format!(
+                    "post-apply smoke failed: expected >={} applet symlinks to point to replacement, found {}",
+                    need, count
+                ));
             }
         }
     }
