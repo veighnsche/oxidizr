@@ -1,6 +1,6 @@
-# oxidizr-deb — Debian/Ubuntu CLI to rustify your system safely
+# oxidizr-deb — Debian/Ubuntu CLI to use Rust replacements safely
 
-oxidizr-deb is a small, safety-first CLI that “rustifies” key system toolchains by swapping them to their
+oxidizr-deb is a small, safety-first CLI that switches key system toolchains to their
 Rust replacements (e.g., GNU coreutils → uutils-coreutils, sudo → sudo-rs). It performs safe, atomic,
 reversible changes under the hood and keeps a one-step restore path.
 
@@ -9,7 +9,9 @@ This CLI focuses on safety and UX:
 - You do not choose applets, sources, or targets manually.
 - The CLI fetches the right, verified replacement for your system and applies it safely.
 - You can restore to GNU/stock tools at any time.
-- After validating your workloads, you can make the swap permanent and then remove GNU packages yourself.
+After validating your workloads, you can fully replace distro packages with the Rust replacements using `replace`, which
+removes the legacy distro packages under guardrails (lock checks, confirmations, dry‑run safety). No standalone package-
+manager commands are exposed; installs/removals happen inside `use`, `replace`, and `restore` flows.
 
 ---
 
@@ -54,6 +56,9 @@ cargo run -p oxidizr-deb -- use sudo
 
 # Apply changes
 cargo run -p oxidizr-deb -- --commit use coreutils
+
+# Make it a full replacement (remove GNU coreutils under guardrails)
+cargo run -p oxidizr-deb -- --commit replace coreutils
 ```
 
 At any time you can check status or restore back to GNU tools:
@@ -77,24 +82,16 @@ Roadmap (pending drop-in compatibility assessment):
 
 - grep → ripgrep, ps → procs, du → dust, ls → eza/lsd
 
-Tip: Start on a fakeroot or non-critical machine; validate your workloads before making it permanent.
+Tip: Start on a fakeroot or non-critical machine; validate your workloads before moving to `replace`.
 
 ---
 
-## How oxidizr-deb fetches replacements (supply-chain safety)
+## How oxidizr-deb ensures replacements (supply-chain safety)
 
-oxidizr-deb automatically fetches the appropriate replacement package for your system and verifies it before use.
-
-- Source of truth: official upstream release artifacts (e.g., GitHub Releases) or distro packages when available.
-- Verification: SHA‑256 and, when provided by upstream, signature verification.
-- Selection: latest stable release by default; architecture and distro layout are detected automatically.
-
-Advanced (optional):
-
-- `--channel stable|latest` to prefer latest stable vs. latest pre-release where applicable.
-- `--offline --use-local PATH` to bypass fetching and use a local artifact you provide.
-
-The CLI applies ownership/mode guards as needed. For example, `sudo` replacement must be `root:root` with mode `4755` when committed.
+oxidizr-deb ensures the appropriate replacement package for your system is installed via APT/DPKG and relies on the
+package manager’s signature verification and repository trust. In this Debian/Ubuntu variant, offline/manual artifact
+paths are out of scope. The CLI applies ownership/mode guards as needed. For example, `sudo` replacement must be
+`root:root` with mode `4755` when committed.
 
 ---
 
@@ -109,9 +106,10 @@ oxidizr-deb [--root PATH] [--commit] <COMMAND> [ARGS]
 
 Commands:
 
-- `use <package>` — download, verify, and safely switch a package to its Rust replacement
+- `use <package>` — ensure the replacement is installed via APT/DPKG and safely switch to it
+- `replace <package|all>` — ensure the replacement is active, then remove/purge the distro packages under guardrails
 - `restore <package|all>` — restore GNU/stock tools for a package (or all) from backups
-- `status` — show what is rustified, queued, or restorable
+- `status` — show what is active, queued, or restorable
 - `completions` — generate shell completions (bash/zsh/fish)
 
 Examples:
@@ -129,6 +127,9 @@ cargo run -p oxidizr-deb -- --commit use coreutils
 # Use sudo
 cargo run -p oxidizr-deb -- --commit use sudo
 
+# Fully replace GNU coreutils with uutils and remove GNU packages
+cargo run -p oxidizr-deb -- --commit replace coreutils
+
 # Restore (rollback) coreutils
 cargo run -p oxidizr-deb -- restore coreutils
 ```
@@ -138,13 +139,17 @@ cargo run -p oxidizr-deb -- restore coreutils
 ## Command semantics (clear and confident)
 
 - `use <package>`
-  - What it does: downloads (or uses `--offline --use-local`) the verified Rust replacement for `<package>`, plans a safe swap with backups, and only mutates with `--commit`.
-  - Idempotence: safe to re-run; if already rustified, the plan becomes a no-op.
+  - What it does: ensures the verified Rust replacement for `<package>` is installed via APT/DPKG, plans a safe swap with backups, and only mutates with `--commit`.
+  - Idempotence: safe to re-run; if already active, the plan becomes a no-op.
   - Safety: refuses to commit while apt/dpkg locks are held; runs minimal smoke checks and auto‑rolls back on failure.
 
+- `replace <package|all>`
+  - What it does: ensures the replacement is installed and active; then removes/purges the legacy distro packages via APT/DPKG under guardrails. Performs `use` semantics first if needed.
+  - Idempotence: safe to re-run; if already fully replaced, the PM step becomes a no‑op.
+  - Safety: checks invariants; refuses if it would leave zero providers.
+
 - `restore <package|all>`
-  - What it does: restores original GNU/stock binaries from backups and removes CLI‑managed symlinks for the chosen package(s).
-  - Artifacts: replacement artifacts for restored packages are removed automatically (no clutter).
+  - What it does: restores original GNU/stock binaries from backups and ensures distro packages are installed and preferred. By default removes RS packages; keep them with `--keep-replacements`.
   - Idempotence: safe to re-run; if already restored, the plan becomes a no‑op.
 
 - `status`
@@ -159,13 +164,13 @@ cargo run -p oxidizr-deb -- restore coreutils
 - Backup sidecar: saved original binaries/links created for restoration.
 - Use: safely switch a package to its Rust replacement (download, verify, link with backups).
 - Restore: switch back to GNU/stock binaries using backups; remove CLI‑managed symlinks.
-- Make permanent (seal): ensures your selection persists across upgrades.
 
 ---
 
 ## Permanence
 
 After a successful `use <package> --commit`, oxidizr‑deb keeps your selection active across upgrades. No extra steps are required.
+If you decide to remove the legacy distro packages, use `oxidizr-deb --commit replace <package>` to do so safely.
 
 ---
 
@@ -179,10 +184,7 @@ Tip: to experiment safely, use a fakeroot:
 sudo mkdir -p /tmp/fakeroot/usr/bin
 cargo run -p oxidizr-deb -- --root /tmp/fakeroot use coreutils
 ```
-
----
-
-## Full command and option reference
+- Stage 7 — Product: Pool manager readiness (aligns with README_LLM Stage 7)
 
 Global flags
 
@@ -191,13 +193,13 @@ Global flags
 
 Commands
 
-- `rustify <package>`:
+- `use <package>`:
   - Packages: `coreutils`, `findutils`, `sudo`
-  - Behavior: fetch + verify the correct replacement, plan a safe swap with backups, and apply on `--commit`.
+  - Behavior: ensure the correct replacement is installed, plan a safe swap with backups, and apply on `--commit`.
 - `restore <package|all>`:
   - Behavior: restore GNU/stock tools for the chosen package (or all) from backups.
 - `status`:
-  - Behavior: show current rustified state and what can be restored.
+  - Behavior: show current active state and what can be restored.
 
 Advanced flags (may be behind features; see `SPEC/DEBIAN_UX.md`)
 
@@ -283,7 +285,8 @@ cargo run -p oxidizr-deb -- status
 ## FAQs
 
 - Is it safe to purge legacy packages after enabling replacements?
-  - The CLI keeps your system functional by repointing applets to replacements and preserving backups. Removal of packages is your decision and should be made after verifying your workload.
+  - Yes, if your workloads are validated. Use `oxidizr-deb --commit replace <package>` to remove/purge under guardrails
+    (lock checks, confirmations). You can always `restore` later from backups if needed.
 
 - Do I need root privileges?
   - To mutate live system paths like `/usr/bin`, yes. For development and testing, use `--root /tmp/fakeroot`.

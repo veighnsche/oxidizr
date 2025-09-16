@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use switchyard::logging::JsonlSink;
 use switchyard::types::{ApplyMode, LinkRequest, PlanInput};
@@ -11,6 +12,14 @@ use crate::cli::args::Package;
 use crate::fetch::resolver::resolve_artifact;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
+
+fn replacement_pkg_name(pkg: Package) -> &'static str {
+    match pkg {
+        Package::Coreutils => "uutils-coreutils",
+        Package::Findutils => "uutils-findutils",
+        Package::Sudo => "sudo-rs",
+    }
+}
 
 pub fn exec(
     api: &Switchyard<JsonlSink, JsonlSink>,
@@ -43,6 +52,42 @@ pub fn exec(
             (src, PathBuf::from(packages::DEST_DIR), packages::sudo::applets())
         }
     };
+
+    // Ensure replacement is installed when committing if the artifact is missing
+    if matches!(mode, ApplyMode::Commit) && !offline {
+        if !source_bin.exists() {
+            // APT/DPKG ops require live root
+            if root != Path::new("/") {
+                return Err(format!(
+                    "replacement artifact missing at {}; installing requires --root=/ (live system)",
+                    source_bin.display()
+                ));
+            }
+            let pkgname = replacement_pkg_name(package);
+            let args = vec!["install".to_string(), "-y".to_string(), pkgname.to_string()];
+            eprintln!("[info] replacement artifact not found; ensuring installation via apt-get {} {}", "install", pkgname);
+            // In commit mode, execute; in dry-run we would have printed a [dry-run] message above
+            let mut cmd = Command::new("apt-get");
+            cmd.args(&args);
+            cmd.stdin(Stdio::null());
+            cmd.stdout(Stdio::inherit());
+            cmd.stderr(Stdio::piped());
+            match cmd.output() {
+                Ok(out) => {
+                    let code = out.status.code().unwrap_or(1);
+                    if code != 0 {
+                        return Err(format!("apt-get install {} failed with exit code {}", pkgname, code));
+                    }
+                }
+                Err(e) => return Err(format!("failed to spawn apt-get: {e}")),
+            }
+        }
+    } else if matches!(mode, ApplyMode::DryRun) && !offline {
+        if !source_bin.exists() {
+            let pkgname = replacement_pkg_name(package);
+            eprintln!("[dry-run] would run: apt-get install -y {}", pkgname);
+        }
+    }
 
     let mut links = Vec::new();
     for app in &applets {

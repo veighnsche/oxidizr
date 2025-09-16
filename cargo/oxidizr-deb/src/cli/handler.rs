@@ -1,14 +1,13 @@
-use std::path::PathBuf;
-
-use clap::Parser;
 use switchyard::adapters::{DefaultSmokeRunner, FileLockManager, FsOwnershipOracle};
 use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
 use switchyard::Switchyard;
 use switchyard::types::ApplyMode;
 
-use crate::cli::args::{Cli, Commands, Package, Shell};
+use crate::cli::args::{Cli, Commands};
 use crate::commands::{restore, status, r#use};
+use crate::commands::doctor;
+use crate::commands::replace;
 
 pub fn dispatch(cli: Cli) -> Result<(), String> {
     // Default policy: conservative, disallow degraded EXDEV for built-ins
@@ -32,12 +31,24 @@ pub fn dispatch(cli: Cli) -> Result<(), String> {
 
     match cli.command {
         Commands::Use { package, offline, use_local } => {
+            if matches!(apply_mode, ApplyMode::Commit) {
+                if !crate::util::prompts::should_proceed(cli.assume_yes, &cli.root) {
+                    return Err("aborted by user".to_string());
+                }
+            }
             r#use::exec(&api, &cli.root, package, offline, use_local, apply_mode)
         }
-        Commands::Restore { package } => {
-            restore::exec(&api, &cli.root, package, apply_mode)
+        Commands::Restore { package, all, keep_replacements } => {
+            if matches!(apply_mode, ApplyMode::Commit) {
+                if !crate::util::prompts::should_proceed(cli.assume_yes, &cli.root) {
+                    return Err("aborted by user".to_string());
+                }
+            }
+            restore::exec(&api, &cli.root, package, all, keep_replacements, apply_mode, cli.assume_yes)
         }
-        Commands::Status => status::exec(&cli.root),
+        Commands::Status { json } => status::exec(&cli.root, json),
+        Commands::Doctor { json } => doctor::exec(&cli.root, json),
+        Commands::Replace { package, all } => replace::exec(&api, &cli.root, package, all, apply_mode, cli.assume_yes),
         Commands::Completions { shell } => crate::cli::completions::emit(shell),
     }
 }

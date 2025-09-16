@@ -22,7 +22,7 @@ Ensure broad coverage across flags and environment conditions without exploding 
 - `use_alternatives` only meaningful for coreutils and findutils; for sudo, mark N/A.
 - `use_divert` not valid in pure dry-run (or becomes a no-op mock); mark as xfail for dry-run path.
 - `sudo perms` only relevant when package=sudo.
-- `exdev` only meaningful on rustify operations (not restore-only scenarios).
+- `exdev` only meaningful on `use` operations (not restore-only scenarios).
 - `offline/local` requires a provided artifact; otherwise invalid.
 
 ## 4) Strategy

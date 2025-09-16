@@ -1,6 +1,6 @@
 Feature: Use and restore coreutils
   As an operator
-  I want to rustify coreutils and be able to restore
+  I want to use coreutils and be able to restore
 
   Scenario: Commit use coreutils then restore
     Given a staging root at /tmp/fakeroot

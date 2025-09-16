@@ -48,7 +48,7 @@
 
 - `trace-check`: parse `SPEC_TRACE.toml`, confirm paths exist, run a lightweight `rg` on REQ tags in code/test headers.
 - `fixtures-check`: confirm golden files exist for marked scenarios and match byte-for-byte.
-- `doc-sync`: verify README and manpage reference only package-level commands (`rustify`, `restore`, `status`).
+- `doc-sync`: verify README and manpage reference only package-level commands (`use`, `restore`, `status`).
 
 ## 5) Documentation
 

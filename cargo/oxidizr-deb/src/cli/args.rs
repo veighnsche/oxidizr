@@ -19,15 +19,19 @@ pub struct Cli {
     #[arg(long, global = true, default_value_t = false)]
     pub commit: bool,
 
+    /// Assume "yes" to any confirmation prompts (non-interactive by default in non-TTY)
+    #[arg(long, global = true, default_value_t = false)]
+    pub assume_yes: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Rustify a package (fetch/verify + safe swap)
+    /// Use a replacement for a package (install if needed + safe swap)
     Use {
-        /// Which package to rustify
+        /// Which package to use
         #[arg(value_enum)]
         package: Package,
         /// Offline mode: use a local artifact instead of fetching
@@ -42,9 +46,34 @@ pub enum Commands {
         /// Package to restore; when omitted, restores all known packages
         #[arg(value_enum)]
         package: Option<Package>,
+        /// Restore all known packages
+        #[arg(long, conflicts_with = "package")]
+        all: bool,
+        /// Keep RS packages installed but de-preferred
+        #[arg(long, default_value_t = false)]
+        keep_replacements: bool,
     },
-    /// Report current rustified state
-    Status,
+    /// Replace distro packages with Rust replacements (ensure install + safe swap + remove GNU)
+    Replace {
+        /// Package to replace; when omitted, targets all known packages
+        #[arg(value_enum)]
+        package: Option<Package>,
+        /// Target all known packages
+        #[arg(long, conflicts_with = "package")]
+        all: bool,
+    },
+    /// Report current active state
+    Status {
+        /// Output machine-readable JSON
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    /// Run diagnostics and environment checks
+    Doctor {
+        /// Output machine-readable JSON
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for

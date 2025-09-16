@@ -19,7 +19,7 @@ src/
   commands/
     use.rs                     # package-level 'use' entrypoint
     restore.rs                 # restore package (or all) from backups
-    status.rs                  # report current rustified state
+    status.rs                  # report current active state
   packages/
     coreutils.rs               # internal mapping/policy for coreutils (no applet exposure)
     findutils.rs               # internal mapping/policy for findutils (no applet exposure)
@@ -51,7 +51,7 @@ src/
 ## 4) Public CLI Surface
 
 - Global flags: `--root`, `--commit`, `--assume-yes`.
-- Commands: `rustify <package>`, `restore <package|all>`, `status`, `completions`.
+- Commands: `use <package>`, `restore <package|all>`, `status`, `completions`.
 
 ## 5) Testing Strategy
 

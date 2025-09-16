@@ -1,6 +1,6 @@
 Feature: Use and restore findutils
   As an operator
-  I want to rustify findutils and be able to restore
+  I want to use findutils and be able to restore
 
   Scenario: Commit use findutils then restore
     Given a staging root at /tmp/fakeroot

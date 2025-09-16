@@ -282,3 +282,90 @@ jobs:
             cargo/switchyard/SPEC/traceability.json
             cargo/switchyard/SPEC/traceability/*.json
           if-no-files-found: ignore
+
+  e2e-oxidizr-deb:
+    name: E2E oxidizr-deb (Ubuntu)
+    runs-on: ubuntu-latest
+    needs: bdd
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build oxidizr-deb
+        run: |
+          set -euxo pipefail
+          cargo build -p oxidizr-deb --release
+      - name: Install tools for fetching uutils
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq xz-utils
+      - name: Prepare hermetic root and uutils artifact
+        id: prep
+        run: |
+          set -euxo pipefail
+          ROOT=$(mktemp -d)
+          echo "root=$ROOT" >> $GITHUB_OUTPUT
+          mkdir -p "$ROOT/usr/bin" "$ROOT/var/lock" "$ROOT/opt/uutils"
+          # Fetch latest uutils-coreutils release for x86_64-unknown-linux-gnu
+          URL=$(curl -sSL https://api.github.com/repos/uutils/coreutils/releases/latest | jq -r '.assets[] | select(.name|test("x86_64-unknown-linux-gnu.tar.xz$")) | .browser_download_url' | head -n1)
+          if [ -z "$URL" ]; then echo "Failed to locate uutils release URL" >&2; exit 1; fi
+          TMPDIR=$(mktemp -d)
+          curl -L "$URL" -o "$TMPDIR/uutils.tar.xz"
+          tar -C "$TMPDIR" -xJf "$TMPDIR/uutils.tar.xz"
+          UU=$(find "$TMPDIR" -type f -name uutils -perm -u+x | head -n1)
+          if [ -z "$UU" ]; then echo "uutils binary not found in archive" >&2; exit 1; fi
+          install -Dm0755 "$UU" "$ROOT/opt/uutils/uutils"
+      - name: Switch coreutils into hermetic root
+        run: |
+          set -euxo pipefail
+          ROOT='${{ steps.prep.outputs.root }}'
+          ./target/release/oxidizr-deb --root "$ROOT" --commit use coreutils --offline --use-local "$ROOT/opt/uutils/uutils"
+          test -L "$ROOT/usr/bin/ls"
+      - name: Verify ls is from uutils
+        run: |
+          set -euxo pipefail
+          ROOT='${{ steps.prep.outputs.root }}'
+          set +e
+          "$ROOT/usr/bin/ls" --version > /tmp/ls_version.txt 2>&1
+          set -e
+          cat /tmp/ls_version.txt
+          grep -i "uutils" /tmp/ls_version.txt
+      - name: Status JSON smoke check
+        run: |
+          set -euxo pipefail
+          ROOT='${{ steps.prep.outputs.root }}'
+          ./target/release/oxidizr-deb --root "$ROOT" status --json | tee /tmp/status.json
+          test "$(jq -r .coreutils /tmp/status.json)" = "active"
+      - name: Doctor JSON smoke check
+        run: |
+          set -euxo pipefail
+          ROOT='${{ steps.prep.outputs.root }}'
+          ./target/release/oxidizr-deb --root "$ROOT" doctor --json | tee /tmp/doctor.json
+          # basic checks
+          test "$(jq -r .paths_ok /tmp/doctor.json)" = "true"
+          # locks should not be present in this hermetic root
+          test "$(jq -r .locks_present /tmp/doctor.json)" = "false"
+      - name: Upload E2E logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-oxidizr-deb-logs
+          path: |
+            /tmp/ls_version.txt
+            /tmp/status.json
+            /tmp/doctor.json
+          if-no-files-found: warn

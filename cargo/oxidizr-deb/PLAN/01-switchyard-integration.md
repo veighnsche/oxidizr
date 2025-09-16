@@ -1,8 +1,8 @@
-# Plan: Engine Integration for oxidizr-deb (package-level rustify)
+# Plan: Engine Integration for oxidizr-deb (package-level use)
 
 ## 1) Goal
 
-Provide a robust, reproducible integration of the safety engine into the oxidizr-deb CLI, honoring engine SPEC invariants and the Debian/Ubuntu UX addendum, with a simple package-level `rustify/restore/status` UX.
+Provide a robust, reproducible integration of the safety engine into the oxidizr-deb CLI, honoring engine SPEC invariants and the Debian/Ubuntu UX addendum, with a simple package-level `use/restore/status` UX.
 
 ## 2) Current State
 

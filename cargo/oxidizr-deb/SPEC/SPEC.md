@@ -5,11 +5,17 @@
 oxidizr-deb is a Debian-family CLI that orchestrates safe, atomic, reversible filesystem swaps
 (e.g., GNU coreutils → uutils-coreutils; sudo → sudo-rs) with a simple package-level UX.
 
-- Users do not choose applets, sources, or targets. The CLI provides a high-level `rustify` command per package
+- oxidizr-deb is a thin CLI front-end to the Switchyard engine. All filesystem mutations are delegated to
+  Switchyard via `plan → preflight → apply`; the CLI composes inputs, configures adapters, and handles
+  Debian/Ubuntu package lifecycle tasks.
+- Users do not choose applets, sources, or targets. The CLI provides a high-level `use` command per package
   and executes a safe plan under the hood.
-- The CLI includes an integrated fetch-and-verify step to obtain the correct replacement artifacts.
-- Package manager operations (install/remove) are out of scope; after a successful rustify, users may remove legacy
-  packages themselves if they choose to make the change permanent.
+- Replacement and distro packages are managed via the system package manager (APT/DPKG). The CLI ensures installation
+  and removal happen as part of the high-level flows (`use`, `replace`, `restore`) — not as standalone commands. It installs
+  the appropriate replacement packages (`uutils-coreutils`, `uutils-findutils`, `sudo-rs`) as needed and ensures distro
+  packages (`coreutils`, `findutils`, `sudo`) are present when restoring, under guardrails.
+- The CLI is responsible for the full package lifecycle under these flows: install/upgrade when enabling, removal when
+  replacing, and re-installation when restoring; all under an availability invariant.
 
 ---
 
@@ -71,6 +77,9 @@ apply transitively to oxidizr-deb.
 - REQ-O2: When compiled with file‑logging support, deployments **MAY** configure file‑backed JSONL sinks; otherwise a
   no‑op sink satisfies development usage.
 - REQ-O3: The CLI **MUST NOT** emit secrets in its own logs; redaction is enforced by the engine’s sinks.
+- REQ-O4: Package manager operations performed by the CLI (e.g., `apt-get install/remove/purge`) **SHOULD** be
+  logged as structured CLI events (e.g., `pm.install`, `pm.remove`, `pm.purge`) including tool, args, exit code, and
+  stderr summary. These are CLI-level logs and do not alter the engine’s audit facts schema.
 
 ### 2.7 Error Reporting & Exit Codes
 
@@ -83,13 +92,14 @@ apply transitively to oxidizr-deb.
 - REQ-F1: Cross‑filesystem behavior is governed by the package’s implicit policy. Degraded fallback **MUST** be disallowed
   by default (apply fails with a stable reason; no visible change).
 
-### 2.9 Fetching & Verification
+### 2.9 Retrieval & Versioning (APT/DPKG)
 
-- REQ-FETCH-1: `use <package>` **MUST** fetch the appropriate replacement artifact for the current architecture and
-  verify its integrity (SHA‑256, and signature when available) before applying any changes.
-- REQ-FETCH-2: The default selection **MUST** be the latest stable release, with an option to choose a channel
-  (e.g., stable vs. latest) in future versions.
-- REQ-FETCH-3: An offline mode **MUST** allow providing a local artifact path, still subject to integrity checks.
+- REQ-RV-1: `use <package>` **MUST** ensure the appropriate replacement package is installed via APT/DPKG for the
+  current architecture, installing/upgrading to the latest available version when unspecified.
+- REQ-RV-2: Integrity and provenance **MUST** rely on the package manager’s signature verification and repository
+  trust configuration; no separate manual checksum is required.
+- REQ-RV-3: Offline/manual artifact paths are **OUT OF SCOPE** for `use` and `replace`.
+- REQ-RV-4: Future versions **MAY** allow pinning a specific version via flags on `use`/`replace`; latest remains the default.
 
 ### 2.10 Persistence & Cleanup
 
@@ -97,6 +107,28 @@ apply transitively to oxidizr-deb.
   package upgrades; no extra user steps are required.
 - REQ-CLEAN-1: After a successful `restore <package>`, the CLI **MUST** remove cached replacement artifacts for the
   restored package to avoid clutter.
+
+### 2.11 Package Lifecycle via Package Manager & Availability Invariants
+
+- REQ-PM-1 (Install replacements): Under `use` or `replace`, the CLI **MUST** ensure replacement packages are
+  installed/upgraded via APT/DPKG (`uutils-coreutils`, `uutils-findutils`, `sudo-rs`). Absent a user-specified
+  version, the CLI **MUST** install/upgrade to the latest available version.
+- REQ-PM-2 (Replace removes distro): Under `replace`, once replacements are active and healthy, the CLI **MUST** remove
+  or purge the corresponding distro packages via APT/DPKG.
+- REQ-PM-3 (Restore ensures distro and handles replacements): Under `restore`, the CLI **MUST** (re)install the distro
+  packages if missing and make them preferred. By default, it **MUST** remove the replacement packages; when
+  `--keep-replacements` is provided, it **MUST** keep them installed but de‑preferred.
+- REQ-PM-4 (Locks): Before any package manager mutation, the CLI **MUST** check for dpkg/apt locks and fail closed with a
+  friendly diagnostic when locks are present.
+- REQ-PM-5 (Dry‑run): In dry‑run, the CLI **MUST NOT** execute package manager mutations and **SHOULD** print the exact
+  command(s) that would run.
+- REQ-PM-6 (Confirmations): When a TTY is present and `--assume-yes` is not set, the CLI **MUST** require explicit
+  confirmation before invoking install/remove/purge.
+- REQ-PM-7 (Availability invariant): At all times there **MUST** be at least one functional provider of `coreutils`
+  and one functional provider of `sudo` installed. The CLI **MUST** refuse any operation that would leave zero
+  providers (e.g., removing both `coreutils` and `uutils-coreutils`, or removing `sudo` and `sudo-rs`).
+- REQ-PM-8 (Pre/Post checks): The CLI **MUST** verify provider counts before and after package manager operations and
+  abort/rollback when invariants would be violated.
 
 ---
 
@@ -117,16 +149,30 @@ Global options:
 
 - use
   - Arguments: `<package>` where `<package>` ∈ {`coreutils`, `findutils`, `sudo`} (extensible).
-  - Semantics: fetches and verifies the replacement for the given package, then plans and applies a safe link topology
-    with backups. No applet selection is exposed; coreutils/findutils mappings are internal.
-- restore
+  - Semantics: ensures the appropriate replacement package is installed via APT/DPKG (installing/upgrading to latest if
+    needed), then plans and applies a safe link topology with backups using Switchyard. No applet selection is exposed;
+    mappings are internal.
+- replace
   - Arguments: `<package|all>`.
-  - Semantics: restores GNU/stock tools for the package (or all packages) from backups.
+  - Semantics: ensures the appropriate replacement package is installed and active; then removes/purges the
+    corresponding distro packages via APT/DPKG under guardrails. Performs `use` semantics first if not already active.
+- restore
+  - Arguments: `<package|all>`; flags: `--keep-replacements` to keep RS packages installed but de‑preferred.
+  - Semantics: restores GNU/stock tools for the package (or all) from backups and ensures distro packages are installed
+    and preferred. By default removes RS packages; with `--keep-replacements`, keeps them installed but de‑preferred.
 - status
   - Arguments: none.
-  - Semantics: reports current rustified state and what can be restored.
+  - Semantics: reports current active/linked state and what can be restored.
+- doctor
+  - Arguments: `--json` (optional).
+  - Semantics: runs environment checks (paths, locks) and outputs a summary; non-mutating.
+- completions
+  - Arguments: `<shell>` where `<shell>` ∈ {`bash`,`zsh`,`fish`}.
+  - Semantics: generates shell completions.
 
-All commands execute `plan → preflight → apply` through the engine and honor policy gates.
+Engine-backed file operations within `use`, `replace`, and `restore` execute `plan → preflight → apply` through Switchyard
+and honor policy gates. Package‑manager steps are orchestrated by the CLI before/after engine phases; the engine itself
+never invokes APT/DPKG.
 
 ---
 
@@ -160,14 +206,14 @@ Feature: Safe swaps via CLI
     And it reports a dry-run with a non-zero planned action count
 
   Scenario: Commit sudo use
-    Given a verified sudo-rs artifact is available
+    Given apt can install sudo-rs
     When I run `oxidizr-deb --commit use sudo`
     Then the command exits 0
     And subsequent reads of /usr/bin/sudo resolve to the rust replacement
 
   Scenario: Use and restore findutils
     Given a staging root at /tmp/fakeroot
-    And a verified findutils artifact is available
+    And apt can install uutils-findutils
     When I run `oxidizr-deb --commit use findutils`
     Then the command exits 0
     And representative findutils commands resolve to the rust replacement
@@ -180,6 +226,35 @@ Feature: Safe swaps via CLI
     When I run `oxidizr-deb restore coreutils`
     Then the command exits 0
     And the original binaries are restored
+
+  Scenario: Make permanent for coreutils
+    Given coreutils is active and smoke checks have passed
+    And no dpkg/apt locks are present
+    When I run `oxidizr-deb --commit replace coreutils`
+    Then the command exits 0
+    And the legacy `coreutils` package is removed/purged via apt/dpkg
+    And a structured CLI event is emitted with the outcome
+
+  Scenario: Use ensures replacement installed
+    Given `uutils-coreutils` is not installed
+    And apt is not locked
+    When I run `oxidizr-deb --commit use coreutils`
+    Then `apt-get install -y uutils-coreutils` is invoked
+    And the command exits 0
+    And a `pm.install` event is emitted
+
+  Scenario: Availability guard prevents removing last coreutils provider
+    Given only `coreutils` (GNU) is installed and `uutils-coreutils` is not installed
+    When I run `oxidizr-deb --commit replace coreutils`
+    Then the command fails with an invariant error
+    And no package manager changes are performed
+
+  Scenario: Restore ensures distro present
+    Given `coreutils` is not installed
+    And apt is not locked
+    When I run `oxidizr-deb --commit restore coreutils`
+    Then `apt-get install -y coreutils` is invoked
+    And the command exits 0
 ```
 
 ---
@@ -200,6 +275,7 @@ Feature: Safe swaps via CLI
 - Minimal smoke checks post‑apply; failure triggers auto‑rollback unless disabled by policy.
 - Cross‑filesystem degraded mode disallowed by default for built‑in packages.
 - Fetch and verify replacement artifacts before any mutation.
+- Explicit `replace` command for safe removal/purge of legacy packages under guardrails.
 
 ---
 
