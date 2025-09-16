@@ -19,6 +19,8 @@ walkdir = "2.5"
 tempfile = "3.10"
 libc = "0.2"
 fs2 = "0.4"
+sha2 = "0.10"
+hex = "0.4"
 
 [features]
 default = []

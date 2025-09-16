@@ -51,7 +51,7 @@ Status: Core flows implemented with structured audit and locking; some features 
 
 ## Documentation
 
-- Operator & Integrator Guide (mdBook): <https://veighnsche.github.io/oxidizr-arch/>
+- Operator & Integrator Guide (mdBook): <https://veighnsche.github.io/switchyard/>
   - Quickstart, Concepts, How‑Tos, and Reference live in the book.
 - API docs on docs.rs: <https://docs.rs/switchyard>
 
@@ -60,11 +60,11 @@ Status: Core flows implemented with structured audit and locking; some features 
 Run examples locally:
 
 ```bash
-cargo run -p switchyard --example 01_dry_run
-cargo run -p switchyard --example 02_commit_with_lock
-cargo run -p switchyard --example 03_rollback
-cargo run -p switchyard --example 04_audit_and_redaction
-cargo run -p switchyard --example 05_exdev_degraded
+cargo run --example 01_dry_run
+cargo run --example 02_commit_with_lock
+cargo run --example 03_rollback
+cargo run --example 04_audit_and_redaction
+cargo run --example 05_exdev_degraded
 ```
 
 ## Quick Start
@@ -80,6 +80,21 @@ Add as a dependency (when used standalone):
 ```toml
 [dependencies]
 switchyard = "0.1"
+```
+
+Add as a dependency (when used as a workspace submodule):
+
+```toml
+[dependencies]
+# Adjust the path to where the submodule lives in your workspace
+switchyard = { path = "../switchyard" }
+```
+
+Recommended: add this repository as a Git submodule at the desired path, e.g.:
+
+```bash
+git submodule add https://github.com/veighnsche/switchyard ../switchyard
+git submodule update --init --recursive
 ```
 
 ### Minimal Example

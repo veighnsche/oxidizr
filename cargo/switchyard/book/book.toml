@@ -9,3 +9,10 @@ title = "Switchyard: Operator and Integrator Guide"
 no-section-label = true
 
 # Optional preprocessors can be added later (e.g., linkcheck, mermaid)
+
+[output.linkcheck]
+follow-web-links = false
+traverse-parent-directories = false
+exclude = [
+  # Linkcheck configuration examples; add patterns here if needed
+]

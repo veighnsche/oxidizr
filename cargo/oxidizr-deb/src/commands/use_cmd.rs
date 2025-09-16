@@ -65,26 +65,24 @@ pub fn exec(
 
     // Ensure replacement is present when committing; prefer APT on live root, else fallback fetch/build
     if matches!(mode, ApplyMode::Commit) && !offline {
-        if !source_bin.exists() {
-            if root == Path::new("/") {
-                // Try to ensure artifact via apt (live root) or fallback (cargo/github) and stage under --root
-                match ensure_artifact_available(root, package, true) {
-                    Ok(p) => {
-                        source_bin = p;
-                    }
-                    Err(e) => {
-                        return Err(format!(
-                            "failed to ensure replacement artifact for {:?}: {}",
-                            package, e
-                        ));
-                    }
+        if root == Path::new("/") {
+            // Always attempt apt-first ensure on live system; overrides any pre-existing fallback path
+            match ensure_artifact_available(root, package, true) {
+                Ok(p) => {
+                    source_bin = p;
                 }
-            } else {
-                return Err(format!(
-                    "replacement artifact missing at {}; installing requires --root=/ (live system)",
-                    source_bin.display()
-                ));
+                Err(e) => {
+                    return Err(format!(
+                        "failed to ensure replacement artifact for {:?}: {}",
+                        package, e
+                    ));
+                }
             }
+        } else if !source_bin.exists() {
+            return Err(format!(
+                "replacement artifact missing at {}; installing requires --root=/ (live system)",
+                source_bin.display()
+            ));
         }
         // Post-ensure: if sudo, enforce setuid/owner guard
         if matches!(package, Package::Sudo) {
@@ -95,7 +93,7 @@ pub fn exec(
             let pkgname = apt_pkg_name(package);
             let apt_ver = std::env::var("OXIDIZR_DEB_APT_VERSION").ok();
             let apt_arg = if let Some(v) = apt_ver { format!("{}={}", pkgname, v) } else { pkgname.to_string() };
-            eprintln!("[dry-run] would run: apt-get install -y {} (or fallback to cargo/github if unavailable)", apt_arg);
+            eprintln!("[dry-run] would run: apt-get install -y {}", apt_arg);
             let staged = staged_default_path(root, package);
             eprintln!("[dry-run] would stage artifact at {}", staged.display());
         }
