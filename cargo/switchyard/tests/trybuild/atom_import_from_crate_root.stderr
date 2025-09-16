@@ -1,5 +1,0 @@
-error[E0432]: unresolved import `switchyard::atomic`
- --> tests/trybuild/atom_import_from_crate_root.rs:3:17
-  |
-3 | use switchyard::atomic::atomic_symlink_swap;
-  |                 ^^^^^^ could not find `atomic` in `switchyard`
