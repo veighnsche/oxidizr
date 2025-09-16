@@ -9,7 +9,7 @@ use switchyard::Switchyard;
 use crate::adapters::debian::pm_lock_message;
 use crate::adapters::preflight::sudo_guard;
 use crate::cli::args::Package;
-use crate::fetch::resolver::{resolve_artifact, staged_default_path};
+use crate::fetch::resolver::resolve_artifact;
 use crate::fetch::fallback::ensure_artifact_available;
 use crate::packages;
 use crate::util::paths::ensure_under_root;

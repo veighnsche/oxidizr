@@ -18,10 +18,8 @@ pub fn dispatch(cli: Cli) -> Result<(), String> {
 
     let lock_path = cli.root.join("var/lock/oxidizr-deb.lock");
 
-    // Bridge optional version pins to fetch layer via env vars
+    // Bridge optional apt version pin to fetch layer via env var
     if let Some(v) = &cli.apt_version { std::env::set_var("OXIDIZR_DEB_APT_VERSION", v); }
-    if let Some(v) = &cli.cargo_version { std::env::set_var("OXIDIZR_DEB_CARGO_VERSION", v); }
-    if let Some(v) = &cli.github_tag { std::env::set_var("OXIDIZR_DEB_GITHUB_TAG", v); }
     let api: Switchyard<JsonlSink, JsonlSink> =
         Switchyard::builder(JsonlSink::default(), JsonlSink::default(), policy)
             .with_lock_manager(Box::new(FileLockManager::new(lock_path)))

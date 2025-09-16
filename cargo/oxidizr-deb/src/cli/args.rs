@@ -31,13 +31,7 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub apt_version: Option<String>,
 
-    /// Pin cargo crate version (semver) for cargo fallback
-    #[arg(long, global = true)]
-    pub cargo_version: Option<String>,
-
-    /// Pin GitHub tag for sudo-rs fallback (e.g., v0.1.0)
-    #[arg(long, global = true)]
-    pub github_tag: Option<String>,
+    
 
     #[command(subcommand)]
     pub command: Commands,

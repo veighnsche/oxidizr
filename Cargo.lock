@@ -1424,18 +1424,14 @@ dependencies = [
  "clap_complete",
  "cucumber",
  "fs2",
- "hex",
- "libc",
  "predicates",
  "regex",
  "serde",
  "serde_json",
- "sha2",
  "shlex",
  "switchyard",
  "tempfile",
  "tokio",
- "walkdir",
 ]
 
 [[package]]
