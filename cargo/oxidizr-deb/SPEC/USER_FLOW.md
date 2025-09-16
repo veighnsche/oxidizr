@@ -8,7 +8,7 @@ replacement and distro packages via APT/DPKG, and uses Switchyard for safe files
 ## Guardrails and Invariants (Always On)
 
 - At least one provider of coreutils and one provider of sudo must always be installed.
-  - Providers (coreutils): GNU `coreutils` or `uutils-coreutils` (replacement).
+  - Providers (coreutils): GNU `coreutils` or `rust-coreutils` (replacement).
   - Providers (sudo): GNU `sudo` or `sudo-rs` (replacement).
 - Package manager operations require the live root (`--root=/`).
 - Package manager locks abort operations with a friendly message.
@@ -27,19 +27,21 @@ replacement and distro packages via APT/DPKG, and uses Switchyard for safe files
 
 `<target>` ∈ { `coreutils`, `findutils`, `sudo` }
 
+Note: Mutating flows (`use`, `replace`) ensure the relevant rust replacement packages are installed and upgraded to the latest available version via APT/DPKG.
+
 ---
 
-## Flow 1 — Switch coreutils to the latest uutils (safe swap)
+## Flow 1 — Switch coreutils to the latest rust-coreutils (safe swap)
 
 1) Preview (dry‑run):
    - `oxidizr-deb use coreutils`
-   - Ensures `uutils-coreutils` can be installed (will be installed during commit if missing).
+   - Ensures `rust-coreutils` can be installed (will be installed during commit if missing).
    - Prints planned action count; no changes.
 
 2) Commit:
    - `oxidizr-deb --commit use coreutils`
    - Pre-checks APT locks; confirms (unless `--assume-yes`).
-   - Installs/updates `uutils-coreutils` (latest) via apt if missing/outdated.
+   - Installs/updates `rust-coreutils` (latest) via apt if missing/outdated.
    - Switchyard plan → preflight → apply to set the symlink topology under `/usr/bin` with backups.
    - Runs minimal smoke tests; auto‑rollback on failure; exits non‑zero with diagnostics if failed.
 
@@ -51,7 +53,7 @@ replacement and distro packages via APT/DPKG, and uses Switchyard for safe files
 ## Flow 2 — Replace coreutils (remove GNU `coreutils`)
 
 1) Preconditions:
-  - `coreutils` is active (symlinks point to uutils).
+  - `coreutils` is active (symlinks point to rust-coreutils).
   - APT is not holding locks.
 
 2) Command:
@@ -59,8 +61,8 @@ replacement and distro packages via APT/DPKG, and uses Switchyard for safe files
 
 3) Behavior:
   - Confirms (unless `--assume-yes`).
-   - Ensures `uutils-coreutils` is installed/updated and preferred (performs "use" semantics if not already active).
-   - Verifies availability invariant will still hold (uutils remains installed).
+   - Ensures `rust-coreutils` is installed/updated and preferred (performs "use" semantics if not already active).
+   - Verifies availability invariant will still hold (rust replacement remains installed).
    - Runs `apt-get purge -y coreutils` and emits a `pm.purge` event with tool/args/exit code/stderr tail.
 
 ---
@@ -72,7 +74,7 @@ replacement and distro packages via APT/DPKG, and uses Switchyard for safe files
 
 2) Behavior:
   - Ensures GNU `coreutils` is installed (installs if missing) and makes it preferred: Switchyard restores backups and removes CLI‑managed symlinks to reinstate the prior GNU topology.
-  - By default, removes the replacement package (`uutils-coreutils`) via apt; if `--keep-replacements` is provided, keeps it installed but de‑preferred.
+  - By default, removes the replacement package (`rust-coreutils`) via apt; if `--keep-replacements` is provided, keeps it installed but de‑preferred.
   - Runs minimal smoke tests; auto‑rollback on failure; exits non‑zero with diagnostics if failed.
 
 ---

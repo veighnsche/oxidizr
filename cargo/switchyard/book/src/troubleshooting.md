@@ -21,14 +21,14 @@
   - Fix: Follow the [Recovery Playbook](recovery-playbook.md). Verify backup payload/sidecar integrity; restore topology manually if necessary.
 
 References
-- `cargo/switchyard/src/api/apply/mod.rs`
-- `cargo/switchyard/src/adapters/lock/file.rs`
-- `cargo/switchyard/src/fs/backup/*`
-- `cargo/switchyard/src/fs/restore/*`
+- `src/api/apply/mod.rs`
+- `src/adapters/lock/file.rs`
+- `src/fs/backup/*`
+- `src/fs/restore/*`
 - SPEC §6 (Error Taxonomy & Exit Codes), §11 (Smoke)
 
 Citations:
-- `cargo/switchyard/src/api/apply/mod.rs`
-- `cargo/switchyard/src/adapters/lock/file.rs`
-- `cargo/switchyard/src/fs/backup/*`
-- `cargo/switchyard/src/fs/restore/*`
+- `src/api/apply/mod.rs`
+- `src/adapters/lock/file.rs`
+- `src/fs/backup/*`
+- `src/fs/restore/*`

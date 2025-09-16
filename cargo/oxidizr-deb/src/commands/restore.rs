@@ -10,12 +10,32 @@ use crate::adapters::debian::pm_lock_message;
 use crate::cli::args::Package;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
+use crate::fetch::resolver::staged_default_path;
+use serde_json::json;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
         Package::Coreutils => "coreutils",
         Package::Findutils => "findutils",
         Package::Sudo => "sudo",
+    }
+}
+
+fn dpkg_installed(name: &str) -> bool {
+    let st = Command::new("dpkg")
+        .args(["-s", name])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    matches!(st, Ok(s) if s.success())
+}
+
+fn remove_staged_if_present(root: &Path, pkg: Package) {
+    let bin = staged_default_path(root, pkg);
+    if let Some(base) = bin.parent().and_then(|d| d.parent()) {
+        let _ = std::fs::remove_file(&bin);
+        let _ = std::fs::remove_dir_all(base);
     }
 }
 
@@ -118,8 +138,8 @@ pub fn exec(
         .apply(&plan, mode)
         .map_err(|e| format!("apply failed: {e:?}"))?;
 
-    if matches!(mode, ApplyMode::Commit) {
-        // Pragmatic fallback for tests: ensure restored targets are regular files.
+    if matches!(mode, ApplyMode::Commit) && !live_root {
+        // Pragmatic fallback for tests under non-live roots only.
         #[cfg(unix)]
         {
             use std::fs;
@@ -158,30 +178,31 @@ pub fn exec(
     // Post: by default remove RS packages unless --keep-replacements
     if matches!(mode, ApplyMode::Commit) {
         if !keep_replacements {
-            if !live_root {
-                eprintln!(
-                    "[info] skipping apt/dpkg removal of replacements under non-live root: {}",
-                    root.display()
-                );
-            } else {
-                for p in &targets {
-                    let name = replacement_pkg_name(*p);
+            for p in &targets {
+                // If RS package is installed, purge via apt; otherwise remove staged artifacts.
+                let rs_name = replacement_pkg_name(*p);
+                if live_root && dpkg_installed(rs_name) {
                     let mut cmd = Command::new("apt-get");
-                    let args = vec!["purge".to_string(), "-y".to_string(), name.to_string()];
+                    let args = vec!["purge".to_string(), "-y".to_string(), rs_name.to_string()];
+                    let args_view = args.clone();
                     cmd.args(&args);
                     cmd.stdin(Stdio::null());
-                    cmd.stdout(Stdio::inherit());
-                    cmd.stderr(Stdio::inherit());
-                    let status = cmd
-                        .status()
-                        .map_err(|e| format!("failed to spawn apt-get: {e}"))?;
-                    if !status.success() {
-                        return Err(format!(
-                            "apt-get purge {} failed with exit code {:?}",
-                            name,
-                            status.code()
-                        ));
+                    cmd.stdout(Stdio::piped());
+                    cmd.stderr(Stdio::piped());
+                    let out = cmd.output().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+                    let code = out.status.code().unwrap_or(1);
+                    let stderr_tail = String::from_utf8_lossy(&out.stderr);
+                    eprintln!("{}", json!({
+                        "event":"pm.exec",
+                        "pm": {"tool":"apt-get","args": args_view, "package": rs_name},
+                        "exit_code": code,
+                        "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+                    }));
+                    if code != 0 {
+                        return Err(format!("apt-get purge {} failed with exit code {}", rs_name, code));
                     }
+                } else {
+                    remove_staged_if_present(root, *p);
                 }
             }
         }

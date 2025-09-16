@@ -15,7 +15,7 @@ Output shape
 - A summary event reports STOP reasons and maps to exit taxonomy (e.g., `E_POLICY`).
 
 Citations:
-- `cargo/switchyard/src/api/preflight/mod.rs`
-- `cargo/switchyard/src/preflight/checks.rs`
-- `cargo/switchyard/SPEC/SPEC.md`
+- `src/api/preflight/mod.rs`
+- `src/preflight/checks.rs`
+- `SPEC/SPEC.md`
 - Inventory: `INVENTORY/35_FS_Mount_Checks.md`, `INVENTORY/45_Policy_Node_Hazards_SuidSgid_Hardlinks.md`, `INVENTORY/40_Policy_Ownership_and_Provenance.md`, `INVENTORY/30_Infra_Rescue_Profile_Verification.md`

@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+
 
 use switchyard::logging::JsonlSink;
 use switchyard::types::safepath::SafePath;
@@ -55,9 +55,6 @@ pub fn exec(
         }
         Package::Sudo => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
-            if matches!(mode, ApplyMode::Commit) {
-                sudo_guard(root, &src)?;
-            }
             (
                 src,
                 PathBuf::from(packages::DEST_DIR),
@@ -88,6 +85,10 @@ pub fn exec(
                     source_bin.display()
                 ));
             }
+        }
+        // Post-ensure: if sudo, enforce setuid/owner guard
+        if matches!(package, Package::Sudo) {
+            sudo_guard(root, &source_bin)?;
         }
     } else if matches!(mode, ApplyMode::DryRun) && !offline {
         if !source_bin.exists() {
@@ -157,6 +158,33 @@ pub fn exec(
                 if needs {
                     let _ = unixfs::symlink(&src, &dst);
                 }
+            }
+        }
+        // Minimal post-apply smoke: ensure at least one applet resolves to the planned source
+        #[cfg(unix)]
+        {
+            use std::fs;
+            let mut ok = false;
+            let src = SafePath::from_rooted(root, &source_bin)
+                .map_err(|e| format!("invalid source_bin: {e:?}"))?
+                .as_path()
+                .to_path_buf();
+            for app in &applets {
+                let dest_base = ensure_under_root(root, &dest_dir);
+                let dst = dest_base.join(app);
+                if let Ok(md) = fs::symlink_metadata(&dst) {
+                    if md.file_type().is_symlink() {
+                        if let Ok(cur) = fs::read_link(&dst) {
+                            if cur == src {
+                                ok = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if !ok {
+                return Err("post-apply smoke failed: no applet points to replacement binary".to_string());
             }
         }
     }

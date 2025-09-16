@@ -13,7 +13,7 @@ Operator guidance
 - Gate in preflight for production; treat missing rescue as `E_POLICY` and avoid overrides.
 
 Citations:
-- `cargo/switchyard/src/policy/rescue.rs`
-- `cargo/switchyard/src/api/preflight/mod.rs`
-- `cargo/switchyard/SPEC/SPEC.md`
+- `src/policy/rescue.rs`
+- `src/api/preflight/mod.rs`
+- `SPEC/SPEC.md`
 - Inventory: `INVENTORY/30_Infra_Rescue_Profile_Verification.md`

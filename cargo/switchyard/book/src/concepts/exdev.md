@@ -12,6 +12,6 @@ Operator guidance
 - If degradation is acceptable, document its impact and monitor `degraded` telemetry in `apply.result`.
 
 Citations:
-- `cargo/switchyard/src/fs/atomic.rs`
-- `cargo/switchyard/src/api/apply/handlers.rs`
-- `cargo/switchyard/SPEC/SPEC.md`
+- `src/fs/atomic.rs`
+- `src/api/apply/handlers.rs`
+- `SPEC/SPEC.md`

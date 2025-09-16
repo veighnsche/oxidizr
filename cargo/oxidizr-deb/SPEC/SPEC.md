@@ -3,7 +3,7 @@
 ## 0. Domain & Purpose
 
 oxidizr-deb is a Debian-family CLI that orchestrates safe, atomic, reversible filesystem swaps
-(e.g., GNU coreutils → uutils-coreutils; sudo → sudo-rs) with a simple package-level UX.
+(e.g., GNU coreutils/findutils → rust-coreutils/rust-findutils; sudo → sudo-rs) with a simple package-level UX.
 
 - oxidizr-deb is a thin CLI front-end to the Switchyard engine. All filesystem mutations are delegated to
   Switchyard via `plan → preflight → apply`; the CLI composes inputs, configures adapters, and handles
@@ -12,7 +12,7 @@ oxidizr-deb is a Debian-family CLI that orchestrates safe, atomic, reversible fi
   and executes a safe plan under the hood.
 - Replacement and distro packages are managed via the system package manager (APT/DPKG). The CLI ensures installation
   and removal happen as part of the high-level flows (`use`, `replace`, `restore`) — not as standalone commands. It installs
-  the appropriate replacement packages (`uutils-coreutils`, `uutils-findutils`, `sudo-rs`) as needed and ensures distro
+  the appropriate replacement packages (`rust-coreutils`, `rust-findutils`, `sudo-rs`) as needed and ensures distro
   packages (`coreutils`, `findutils`, `sudo`) are present when restoring, under guardrails.
 - The CLI is responsible for the full package lifecycle under these flows: install/upgrade when enabling, removal when
   replacing, and re-installation when restoring; all under an availability invariant.
@@ -97,8 +97,8 @@ apply transitively to oxidizr-deb.
 - REQ-RV-1: `use <package>` **MUST** ensure the appropriate replacement package is installed via APT/DPKG for the
   current architecture, installing/upgrading to the latest available version when unspecified.
 - REQ-RV-1A: When the replacement is not available via APT/DPKG or installation fails, the CLI **MUST** attempt an
-  online fallback retrieval from a trusted upstream (e.g., `cargo install coreutils` / `uutils-findutils`, or official
-  GitHub releases for `sudo-rs`) and stage the artifact under `--root` for use. This path is secondary and used only
+  online fallback retrieval from a trusted upstream (e.g., official project releases for `rust-coreutils`, `rust-findutils`, or `sudo-rs`) and
+  stage the artifact under `--root` for use. This path is secondary and used only
   when the package manager cannot satisfy the dependency.
 - REQ-RV-2: Integrity and provenance **SHOULD** rely on the package manager’s signature verification and repository
   trust configuration. Fallback retrievals **MUST** be clearly surfaced in CLI output and are acceptable for operator
@@ -116,7 +116,7 @@ apply transitively to oxidizr-deb.
 ### 2.11 Package Lifecycle via Package Manager & Availability Invariants
 
 - REQ-PM-1 (Install replacements): Under `use` or `replace`, the CLI **MUST** ensure replacement packages are
-  installed/upgraded via APT/DPKG (`uutils-coreutils`, `uutils-findutils`, `sudo-rs`). Absent a user-specified
+  installed/upgraded via APT/DPKG (`rust-coreutils`, `rust-findutils`, `sudo-rs`). Absent a user-specified
   version, the CLI **MUST** install/upgrade to the latest available version.
 - REQ-PM-2 (Replace removes distro): Under `replace`, once replacements are active and healthy, the CLI **MUST** remove
   or purge the corresponding distro packages via APT/DPKG.
@@ -131,9 +131,17 @@ apply transitively to oxidizr-deb.
   confirmation before invoking install/remove/purge.
 - REQ-PM-7 (Availability invariant): At all times there **MUST** be at least one functional provider of `coreutils`
   and one functional provider of `sudo` installed. The CLI **MUST** refuse any operation that would leave zero
-  providers (e.g., removing both `coreutils` and `uutils-coreutils`, or removing `sudo` and `sudo-rs`).
+  providers (e.g., removing both `coreutils` and `rust-coreutils`, or removing `sudo` and `sudo-rs`).
 - REQ-PM-8 (Pre/Post checks): The CLI **MUST** verify provider counts before and after package manager operations and
   abort/rollback when invariants would be violated.
+
+### 2.12 Updates & Ongoing Maintenance
+
+- REQ-UPD-1: On any mutating run of `use <package>` or `replace <package>`, the CLI **MUST** ensure the corresponding
+  rust replacement package is installed and upgraded to the latest available version via APT/DPKG (unless version pinning
+  is explicitly requested in a future flag; latest remains the default).
+- REQ-UPD-2: The CLI **SHOULD** surface when a replacement package is out of date in `status` and `doctor` output to
+  guide operators to run an update via the high-level flows.
 
 ---
 
@@ -218,7 +226,7 @@ Feature: Safe swaps via CLI
 
   Scenario: Use and restore findutils
     Given a staging root at /tmp/fakeroot
-    And apt can install uutils-findutils
+    And apt can install rust-findutils
     When I run `oxidizr-deb --commit use findutils`
     Then the command exits 0
     And representative findutils commands resolve to the rust replacement
@@ -241,15 +249,15 @@ Feature: Safe swaps via CLI
     And a structured CLI event is emitted with the outcome
 
   Scenario: Use ensures replacement installed
-    Given `uutils-coreutils` is not installed
+    Given `rust-coreutils` is not installed
     And apt is not locked
     When I run `oxidizr-deb --commit use coreutils`
-    Then `apt-get install -y uutils-coreutils` is invoked
+    Then `apt-get install -y rust-coreutils` is invoked
     And the command exits 0
     And a `pm.install` event is emitted
 
   Scenario: Availability guard prevents removing last coreutils provider
-    Given only `coreutils` (GNU) is installed and `uutils-coreutils` is not installed
+    Given only `coreutils` (GNU) is installed and `rust-coreutils` is not installed
     When I run `oxidizr-deb --commit replace coreutils`
     Then the command fails with an invariant error
     And no package manager changes are performed

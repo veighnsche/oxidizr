@@ -7,6 +7,8 @@ use switchyard::Switchyard;
 
 use crate::adapters::debian::pm_lock_message;
 use crate::cli::args::Package;
+use crate::fetch::resolver::staged_default_path;
+use serde_json::json;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -14,6 +16,29 @@ fn distro_pkg_name(pkg: Package) -> &'static str {
         Package::Findutils => "findutils",
         Package::Sudo => "sudo",
     }
+}
+
+fn replacement_pkg_name(pkg: Package) -> &'static str {
+    match pkg {
+        Package::Coreutils => "uutils-coreutils",
+        Package::Findutils => "uutils-findutils",
+        Package::Sudo => "sudo-rs",
+    }
+}
+
+fn dpkg_installed(name: &str) -> bool {
+    let st = Command::new("dpkg")
+        .args(["-s", name])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    matches!(st, Ok(s) if s.success())
+}
+
+fn staged_exists(root: &Path, pkg: Package) -> bool {
+    let p = staged_default_path(root, pkg);
+    p.is_file()
 }
 
 fn is_active(root: &Path, pkg: Package) -> bool {
@@ -77,20 +102,34 @@ pub fn exec(
             eprintln!("[dry-run] would run: apt-get purge -y {}", name);
             continue;
         }
+        // Provider invariant pre-check: ensure at least one provider remains available
+        let rs_name = replacement_pkg_name(*p);
+        let have_rs_pkg = dpkg_installed(rs_name);
+        let have_staged = staged_exists(root, *p);
+        if !is_active(root, *p) {
+            return Err(format!("invariant violation: replacement for {:?} not active before purge", p));
+        }
+        if !(have_rs_pkg || have_staged) {
+            return Err(format!("invariant violation: no replacement package/staged provider present for {:?}", p));
+        }
         let mut cmd = Command::new("apt-get");
         let args = vec!["purge".to_string(), "-y".to_string(), name.to_string()];
+        let args_view = args.clone();
         cmd.args(&args);
         cmd.stdin(Stdio::null());
-        cmd.stdout(Stdio::inherit());
+        cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
-        match cmd.output() {
-            Ok(out) => {
-                let code = out.status.code().unwrap_or(1);
-                if code != 0 {
-                    return Err(format!("apt-get purge {} failed with exit code {}", name, code));
-                }
-            }
-            Err(e) => return Err(format!("failed to spawn apt-get: {e}")),
+        let out = cmd.output().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+        let code = out.status.code().unwrap_or(1);
+        let stderr_tail = String::from_utf8_lossy(&out.stderr);
+        eprintln!("{}", json!({
+            "event":"pm.exec",
+            "pm": {"tool":"apt-get","args": args_view, "package": name},
+            "exit_code": code,
+            "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+        }));
+        if code != 0 {
+            return Err(format!("apt-get purge {} failed with exit code {}", name, code));
         }
         // Pre-check: replacement must be active before purging GNU packages
         if matches!(mode, ApplyMode::Commit) {
@@ -100,11 +139,15 @@ pub fn exec(
         }
     }
 
-    // Post-check: replacement must remain active after purging GNU packages
+    // Post-check: replacement must remain active after purging GNU packages and provider remains
     if matches!(mode, ApplyMode::Commit) {
         for p in &targets {
             if !is_active(root, *p) {
                 return Err(format!("invariant violation: replacement for {:?} not active after purge", p));
+            }
+            let rs_name = replacement_pkg_name(*p);
+            if !(dpkg_installed(rs_name) || staged_exists(root, *p)) {
+                return Err(format!("invariant violation: no provider present for {:?} after purge", p));
             }
         }
     }

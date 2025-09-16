@@ -2,7 +2,7 @@
 
 Switchyard is designed with a safety-first mindset. This page distills the safety model from the SPEC into practical guarantees, operator checklists, and what-to-do guidance.
 
-> Note: Source of truth for normative requirements is `cargo/switchyard/SPEC/SPEC.md`.
+> Note: Source of truth for normative requirements is `SPEC/SPEC.md`.
 
 ## Atomicity
 

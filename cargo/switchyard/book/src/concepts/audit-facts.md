@@ -5,9 +5,9 @@
 - Use `StageLogger` facade for emission.
 
 Citations:
-- `cargo/switchyard/src/logging/audit.rs`
-- `cargo/switchyard/src/logging/redact.rs`
-- `cargo/switchyard/SPEC/audit_event.v2.schema.json`
+- `src/logging/audit.rs`
+- `src/logging/redact.rs`
+- `SPEC/audit_event.v2.schema.json`
 
 What’s recorded (highlights)
 - Stages: `plan`, `preflight` (rows + summary), `apply.attempt`, `apply.result`, `rollback` (and summary), `prune.result`.

@@ -35,19 +35,26 @@ fn detect_distro(root: &Path) -> (String, Option<String>) {
 }
 
 fn check_locks(root: &Path) -> (bool, Vec<String>) {
+    use fs2::FileExt;
+    use std::fs::OpenOptions;
     let locks = [
         "/var/lib/dpkg/lock-frontend",
         "/var/lib/dpkg/lock",
         "/var/lib/apt/lists/lock",
     ];
-    let mut present = vec![];
+    let mut held = vec![];
     for l in locks {
         let p = root.join(l.trim_start_matches('/'));
-        if p.exists() {
-            present.push(l.to_string());
+        if !p.exists() { continue; }
+        if let Ok(f) = OpenOptions::new().read(true).write(true).open(&p) {
+            if f.try_lock_exclusive().is_err() {
+                held.push(l.to_string());
+            } else {
+                let _ = f.unlock();
+            }
         }
     }
-    (!present.is_empty(), present)
+    (!held.is_empty(), held)
 }
 
 fn check_paths(root: &Path) -> bool {

@@ -13,8 +13,8 @@ Operator guidance
 - Use the [Recovery Playbook](../recovery-playbook.md) when library-guided restore is not possible.
 
 Citations:
-- `cargo/switchyard/src/api/apply/mod.rs`
-- `cargo/switchyard/src/fs/restore/*`
-- `cargo/switchyard/DOCS/BACKUPS_AND_RESTORE.md`
+- `src/api/apply/mod.rs`
+- `src/fs/restore/*`
+- `DOCS/BACKUPS_AND_RESTORE.md`
 - Inventory: `INVENTORY/15_FS_Restore_and_Rollback.md`, `INVENTORY/10_FS_Backup_and_Sidecar.md`
 - SPEC: §2.2 (Rollback), §5 (Audit Facts)

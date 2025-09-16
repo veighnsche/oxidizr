@@ -46,7 +46,7 @@ Acceptance:
 
 Acceptance:
 
-- Given only `coreutils` is installed and `uutils-coreutils` is not installed, when I run `oxidizr-deb --commit replace coreutils`, then the command fails with an invariant error and no PM changes are performed.
+- Given only `coreutils` is installed and `rust-coreutils` is not installed, when I run `oxidizr-deb --commit replace coreutils`, then the command fails with an invariant error and no PM changes are performed.
 
 ---
 
@@ -181,3 +181,13 @@ Acceptance:
   - Reference implementation: `scripts/ubuntu_dev_shell.sh` (container image may be Debian/Ubuntu).
   - Behavior: builds oxidizr-deb in the container, runs `--commit use coreutils`, `--commit use findutils`, `--commit use sudo`
     (subject to setuid 4755), with APT/DPKG performing installs/removals, and drops the operator into an interactive shell.
+
+---
+
+## 16. Updates & Upgrades (Debian UX specifics)
+
+- REQ-UPDATE-D-1: On mutating runs of `use <package>` or `replace <package>`, the CLI **MUST** ensure the corresponding rust
+  replacement package is installed and upgraded to the latest available version via APT/DPKG (latest by default; future
+  version pinning is out of scope here).
+- REQ-UPDATE-D-2: `status` and `doctor` **SHOULD** surface when a replacement package is outdated to guide operators to run an
+  update via the high-level flows.

@@ -10,4 +10,4 @@ assert!(safe.as_path().starts_with(root));
 ```
 
 Citations:
-- `cargo/switchyard/src/types/safepath.rs`
+- `src/types/safepath.rs`

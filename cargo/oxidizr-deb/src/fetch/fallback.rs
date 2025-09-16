@@ -21,7 +21,7 @@ fn is_exe(p: &Path) -> bool {
     }
 }
 
-fn run(cmd: &str, args: &[&str]) -> Result<(i32, String), String> {
+fn run(cmd: &str, args: &[&str]) -> Result<(i32, String, String), String> {
     let mut c = Command::new(cmd);
     c.args(args);
     c.stdin(Stdio::null());
@@ -30,23 +30,30 @@ fn run(cmd: &str, args: &[&str]) -> Result<(i32, String), String> {
     match c.output() {
         Ok(out) => {
             let code = out.status.code().unwrap_or(1);
-            let mut s = String::new();
-            s.push_str(&String::from_utf8_lossy(&out.stdout));
-            s.push_str(&String::from_utf8_lossy(&out.stderr));
-            Ok((code, s))
+            let so = String::from_utf8_lossy(&out.stdout).to_string();
+            let se = String::from_utf8_lossy(&out.stderr).to_string();
+            Ok((code, so, se))
         }
         Err(e) => Err(format!("failed to spawn {}: {}", cmd, e)),
     }
 }
 
 fn apt_install(pkg: &str) -> Result<(), String> {
-    let (code, out) = run("apt-get", &["update"])?;
+    let (code, _so, se) = run("apt-get", &["update"])?;
+    eprintln!("{}", serde_json::json!({
+        "event":"pm.exec","pm":{"tool":"apt-get","args":["update"]},"exit_code":code,
+        "stderr_tail": se.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+    }));
     if code != 0 {
-        return Err(format!("apt-get update failed: {}", out));
+        return Err("apt-get update failed".to_string());
     }
-    let (code, out) = run("apt-get", &["install", "-y", pkg])?;
+    let (code, _so, se) = run("apt-get", &["install", "-y", pkg])?;
+    eprintln!("{}", serde_json::json!({
+        "event":"pm.exec","pm":{"tool":"apt-get","args":["install","-y",pkg],"package":pkg},"exit_code":code,
+        "stderr_tail": se.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+    }));
     if code != 0 {
-        return Err(format!("apt-get install {} failed: {}", pkg, out));
+        return Err(format!("apt-get install {} failed", pkg));
     }
     Ok(())
 }
@@ -72,8 +79,8 @@ fn ensure_rustup_and_cargo() -> Result<(), String> {
         return Ok(());
     }
     // Install rustup non-interactively
-    let (code, out) = run("bash", &["-lc", "curl https://sh.rustup.rs -sSf | sh -s -- -y"]) ?;
-    if code != 0 { return Err(format!("rustup install failed: {}", out)); }
+    let (code, _so, se) = run("bash", &["-lc", "curl https://sh.rustup.rs -sSf | sh -s -- -y"]) ?;
+    if code != 0 { return Err(format!("rustup install failed: {}", se)); }
     Ok(())
 }
 
@@ -119,10 +126,17 @@ fn stage_into(root: &Path, pkg: Package, src: &Path, setuid_root: bool) -> Resul
     if let Some(parent) = dest.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
     fs::copy(src, &dest).map_err(|e| format!("copy {} -> {} failed: {}", src.display(), dest.display(), e))?;
     let mut perm = fs::metadata(&dest).map_err(|e| e.to_string())?.permissions();
-    if setuid_root { perm.set_mode(0o4755); } else { perm.set_mode(0o755); }
+    if setuid_root {
+        if !is_root() {
+            return Err("sudo replacement requires root to set setuid root:root".to_string());
+        }
+        perm.set_mode(0o4755);
+    } else {
+        perm.set_mode(0o755);
+    }
     fs::set_permissions(&dest, perm).map_err(|e| e.to_string())?;
-    if setuid_root && is_root() {
-        let _ = chown_root(&dest);
+    if setuid_root {
+        chown_root(&dest)?;
     }
     Ok(dest)
 }
@@ -174,15 +188,24 @@ pub fn ensure_artifact_available(root: &Path, pkg: Package, commit: bool) -> Res
 
     // 3) Fallback for sudo: GitHub releases
     if matches!(pkg, Package::Sudo) {
+        // Detect arch for asset selection
+        let (arch_code, arch_out, _) = run("uname", &["-m"])?;
+        if arch_code != 0 { return Err("failed to detect architecture".to_string()); }
+        let arch = arch_out.trim();
         // Fetch latest release JSON
-        let (code, body) = run("curl", &["-sSL", "https://api.github.com/repos/oxidecomputer/sudo-rs/releases/latest"])?;
+        let (code, body, _) = run("curl", &["-sSL", "https://api.github.com/repos/oxidecomputer/sudo-rs/releases/latest"])?;
         if code != 0 { return Err(format!("curl failed: {}", body)); }
         let v: serde_json::Value = serde_json::from_str(&body).map_err(|e| format!("parse json: {}", e))?;
         let assets = v.get("assets").and_then(|a| a.as_array()).ok_or_else(|| "missing assets array".to_string())?;
         let mut url: Option<String> = None;
         for a in assets {
             let name = a.get("name").and_then(|s| s.as_str()).unwrap_or("");
-            if name.contains("x86_64") && (name.contains("linux") || name.contains("gnu")) && (name.ends_with(".tar.gz") || name.ends_with(".tar.xz")) {
+            let arch_ok = match arch {
+                "x86_64" => name.contains("x86_64"),
+                "aarch64" | "arm64" => name.contains("aarch64") || name.contains("arm64"),
+                _ => false,
+            };
+            if arch_ok && (name.contains("linux") || name.contains("gnu")) && (name.ends_with(".tar.gz") || name.ends_with(".tar.xz")) {
                 url = a.get("browser_download_url").and_then(|s| s.as_str()).map(|s| s.to_string());
                 if url.is_some() { break; }
             }
@@ -201,12 +224,12 @@ pub fn ensure_artifact_available(root: &Path, pkg: Package, commit: bool) -> Res
         if !status.success() { return Err(format!("curl download failed: {}", status)); }
         // Extract
         let tarfile = tar_path.to_string_lossy().to_string();
-        let (code, out) = if url.ends_with(".tar.gz") {
+        let (code, _so, se) = if url.ends_with(".tar.gz") {
             run("bash", &["-lc", &format!("tar -C '{}' -xzf '{}'", tmpd.path().display(), tarfile)])
         } else {
             run("bash", &["-lc", &format!("tar -C '{}' -xJf '{}'", tmpd.path().display(), tarfile)])
         }?;
-        if code != 0 { return Err(format!("tar extract failed: {}", out)); }
+        if code != 0 { return Err(format!("tar extract failed: {}", se)); }
         // Locate sudo-rs binary in tmpd
         let mut found: Option<PathBuf> = None;
         for entry in walkdir::WalkDir::new(tmpd.path()) {

@@ -15,7 +15,7 @@ Operator guidance
 - For safety, keep plan sizes reasonable (see Operational Bounds) and avoid long-held locks.
 
 Citations:
-- `cargo/switchyard/src/adapters/lock/mod.rs`
-- `cargo/switchyard/src/adapters/lock/file.rs`
-- `cargo/switchyard/src/api/errors.rs`
-- SPEC §2.5 Locking; `cargo/switchyard/SPEC/SPEC.md`
+- `src/adapters/lock/mod.rs`
+- `src/adapters/lock/file.rs`
+- `src/api/errors.rs`
+- SPEC §2.5 Locking; `SPEC/SPEC.md`

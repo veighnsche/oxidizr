@@ -13,7 +13,7 @@ npm install -g ajv-cli
 2) Validate each JSON line against the schema:
 
 ```bash
-schema="$(pwd)/cargo/switchyard/SPEC/audit_event.v2.schema.json"
+schema="$(pwd)/SPEC/audit_event.v2.schema.json"
 file="/var/log/switchyard/facts.jsonl"
 cat "$file" | while IFS= read -r line; do
   printf "%s" "$line" | ajv validate -s "$schema" -d - || exit 1
@@ -27,7 +27,7 @@ import json, sys
 from jsonschema import validate
 from pathlib import Path
 
-schema = json.loads(Path('cargo/switchyard/SPEC/audit_event.v2.schema.json').read_text())
+schema = json.loads(Path('SPEC/audit_event.v2.schema.json').read_text())
 
 ok = True
 for line in Path('/var/log/switchyard/facts.jsonl').read_text().splitlines():
@@ -46,6 +46,6 @@ sys.exit(0 if ok else 1)
 - Run validation in CI against a curated subset of scenarios for fast feedback.
 
 Citations:
-- `cargo/switchyard/SPEC/audit_event.v2.schema.json`
-- `cargo/switchyard/src/logging/audit.rs`
+- `SPEC/audit_event.v2.schema.json`
+- `src/logging/audit.rs`
 - Inventory: `INVENTORY/70_Observability_Facts_Schema_Validation.md`

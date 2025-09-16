@@ -19,7 +19,7 @@ Operator notes
 - Keep policy conservative in production; prefer fail‑closed on unsupported capabilities.
 
 Citations:
-- `cargo/switchyard/src/api/apply/mod.rs`
-- `cargo/switchyard/src/fs/{atomic.rs,swap.rs}`
+- `src/api/apply/mod.rs`
+- `src/fs/{atomic.rs,swap.rs}`
 - Inventory: `INVENTORY/10_FS_Backup_and_Sidecar.md`, `INVENTORY/80_FS_Backup_Retention_Prune.md`
 - SPEC: §2.1 (Atomicity), §2.10 (Filesystems & Degraded Mode), §5 (Audit Facts)

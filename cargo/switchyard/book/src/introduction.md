@@ -31,5 +31,5 @@ What to read next
 - Then follow the [Quickstart](quickstart.md) and scan the [Architecture Overview](architecture.md).
 
 Citations:
-- SPEC overview: `cargo/switchyard/SPEC/SPEC.md`
-- Module map: `cargo/switchyard/src/`
+- SPEC overview: `SPEC/SPEC.md`
+- Module map: `src/`

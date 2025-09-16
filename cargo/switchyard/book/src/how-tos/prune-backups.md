@@ -20,6 +20,6 @@ println!("pruned={}, retained={}", res.pruned_count, res.retained_count);
 ```
 
 Citations:
-- `cargo/switchyard/src/api/mod.rs`
-- `cargo/switchyard/src/fs/backup/prune.rs`
-- `cargo/switchyard/src/policy/config.rs`
+- `src/api/mod.rs`
+- `src/fs/backup/prune.rs`
+- `src/policy/config.rs`
