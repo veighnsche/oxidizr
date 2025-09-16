@@ -143,6 +143,25 @@ apply transitively to oxidizr-deb.
 - REQ-UPD-2: The CLI **SHOULD** surface when a replacement package is out of date in `status` and `doctor` output to
   guide operators to run an update via the high-level flows.
 
+### 2.13 Replacement Coverage & No Missing Commands
+
+- REQ-COVER-1: Under `replace coreutils` (and analogously for `findutils`), the CLI **MUST** guarantee that every command
+  provided by the distro package under `/usr/bin` (and legacy `/bin`) remains present and resolves to the replacement after
+  commit. There **MUST NOT** be any missing commands or dangling/missing symlinks.
+- REQ-COVER-2: Before purging the distro package, the CLI **MUST** perform a coverage preflight by enumerating the
+  distro-provided command set (e.g., via `dpkg-query -L coreutils`) and intersecting it with the replacement’s supported
+  applet set (e.g., by interrogating the unified binary). If coverage is incomplete, `replace` **MUST** stop with a clear
+  error that lists the missing commands. No filesystem mutation may leave the system partially missing commands.
+- REQ-COVER-3: Under `use <package>`, the CLI **MUST** link all applets supported by the replacement for the current
+  system. On live roots, it **MUST** intersect with the distro-provided set to avoid stray/nonexistent targets.
+- REQ-COVER-4: Post-apply verification under `replace` **MUST** assert zero missing commands before reporting success.
+  If verification fails, the CLI **MUST** abort and rely on the engine’s rollback to preserve prior availability.
+
+Acceptance hints:
+
+- Given `dpkg-query -L coreutils` lists N commands under `/usr/bin`, when `oxidizr-deb --commit replace coreutils` completes,
+  then for each listed command, the path exists and resolves to the replacement provider, and no missing entries are observed.
+
 ---
 
 ## 3. Public Interfaces (CLI)

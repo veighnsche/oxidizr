@@ -64,9 +64,14 @@ Acceptance:
   `stderr_tail`, and `package`. Logs **MUST NOT** contain secrets.
 - REQ-REP-6: Dry‑run **MUST NOT** execute any package manager mutations and **SHOULD** print the exact command that would run.
 
+- REQ-REP-7 (No Missing Commands): Before purging distro packages for `coreutils` (and analogously for `findutils`), the CLI **MUST** ensure that every command provided by the distro package remains present after commit and resolves to a functional provider. The CLI **MUST** enumerate distro-provided commands (e.g., `dpkg-query -L coreutils`) and intersect with the replacement’s supported applets (interrogated from the unified binary). If coverage is incomplete, `replace` **MUST** stop with a clear error listing missing commands; no partial state with missing commands is permitted.
+- REQ-REP-8 (Post Verification): After purge, the CLI **MUST** verify zero missing commands and abort/report failure otherwise; the engine’s rollback semantics apply.
+
 Acceptance:
 
 - Given coreutils is active and healthy and no locks are present, when I run `oxidizr-deb --commit replace coreutils`, then `apt-get purge -y coreutils` is invoked and the command exits 0.
+- Given `dpkg-query -L coreutils` lists command names A..Z and the replacement reports a supported set that includes A..Z, when I run `oxidizr-deb --commit replace coreutils`, then every A..Z resolves to the replacement after commit (no missing commands), and verification passes.
+- Given `dpkg-query -L coreutils` lists a command M that the replacement does not support, when I run `oxidizr-deb --commit replace coreutils`, then the command fails closed with an error listing `M` as missing and no PM mutations are performed.
 - Given locks are present, when I run `oxidizr-deb replace coreutils --commit`, then the command exits non-zero without invoking `apt-get` and prints a lock diagnostic.
 
 ---
@@ -110,7 +115,7 @@ Acceptance:
 
 ## 8. Coreutils and Findutils Package Ergonomics
 
-- REQ-CU-1: Applet selection **MUST NOT** be exposed in the CLI; mappings to unified binaries are internal and conservative for both coreutils and findutils.
+- REQ-CU-1: Applet selection **MUST NOT** be exposed in the CLI; mappings to unified binaries are internal and complete from the operator’s perspective. After commit, all distro-provided command names remain present and resolve to a provider. The CLI dynamically resolves/links the applet set appropriate for the current system (live root: dpkg-derived).
 - REQ-CU-2: After commit, the CLI **SHOULD** print a short "Next steps" hint that references `oxidizr-deb --commit replace <package>` to remove legacy packages safely under guardrails.
 
 Acceptance:

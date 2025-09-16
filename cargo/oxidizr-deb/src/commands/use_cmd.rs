@@ -13,6 +13,8 @@ use crate::fetch::resolver::resolve_artifact;
 use crate::fetch::fallback::ensure_artifact_available;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
+use oxidizr_cli_core::{resolve_applets_for_use, PackageKind};
+use crate::adapters::debian_adapter::DebianAdapter;
 
 fn apt_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -36,13 +38,12 @@ pub fn exec(
         }
     }
 
-    let (mut source_bin, dest_dir, applets) = match package {
+    let (mut source_bin, dest_dir) = match package {
         Package::Coreutils => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
             (
                 src,
                 PathBuf::from(packages::DEST_DIR),
-                packages::coreutils::applets(),
             )
         }
         Package::Findutils => {
@@ -50,7 +51,6 @@ pub fn exec(
             (
                 src,
                 PathBuf::from(packages::DEST_DIR),
-                packages::findutils::applets(),
             )
         }
         Package::Sudo => {
@@ -58,7 +58,6 @@ pub fn exec(
             (
                 src,
                 PathBuf::from(packages::DEST_DIR),
-                packages::sudo::applets(),
             )
         }
     };
@@ -97,6 +96,15 @@ pub fn exec(
             // No online fallback; apt-only path.
         }
     }
+
+    // Compute applets after source_bin path is finalized via shared core (dynamic discovery + distro intersection)
+    let adapter = DebianAdapter;
+    let pkg_kind = match package {
+        Package::Coreutils => PackageKind::Coreutils,
+        Package::Findutils => PackageKind::Findutils,
+        Package::Sudo => PackageKind::Sudo,
+    };
+    let applets: Vec<String> = resolve_applets_for_use(&adapter, root, pkg_kind, &source_bin);
 
     let mut links = Vec::new();
     for app in &applets {

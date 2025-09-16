@@ -53,29 +53,33 @@ Note: Mutating flows (`use`, `replace`) ensure the relevant rust replacement pac
 ## Flow 2 — Replace coreutils (remove GNU `coreutils`)
 
 1) Preconditions:
-  - `coreutils` is active (symlinks point to rust-coreutils).
-  - APT is not holding locks.
+
+- `coreutils` is active (symlinks point to rust-coreutils).
+- APT is not holding locks.
 
 2) Command:
    - `oxidizr-deb --commit replace coreutils`
 
 3) Behavior:
-  - Confirms (unless `--assume-yes`).
-   - Ensures `rust-coreutils` is installed/updated and preferred (performs "use" semantics if not already active).
-   - Verifies availability invariant will still hold (rust replacement remains installed).
-   - Runs `apt-get purge -y coreutils` and emits a `pm.purge` event with tool/args/exit code/stderr tail.
+
+- Confirms (unless `--assume-yes`).
+- Ensures `rust-coreutils` is installed/updated and preferred (performs "use" semantics if not already active).
+- Verifies availability invariant will still hold (rust replacement remains installed).
+- Runs `apt-get purge -y coreutils` and emits a `pm.purge` event with tool/args/exit code/stderr tail.
 
 ---
 
 ## Flow 3 — Restore coreutils to GNU (with optional keep)
 
 1) Command:
-  - `oxidizr-deb --commit restore coreutils [--keep-replacements]`
+
+- `oxidizr-deb --commit restore coreutils [--keep-replacements]`
 
 2) Behavior:
-  - Ensures GNU `coreutils` is installed (installs if missing) and makes it preferred: Switchyard restores backups and removes CLI‑managed symlinks to reinstate the prior GNU topology.
-  - By default, removes the replacement package (`rust-coreutils`) via apt; if `--keep-replacements` is provided, keeps it installed but de‑preferred.
-  - Runs minimal smoke tests; auto‑rollback on failure; exits non‑zero with diagnostics if failed.
+
+- Ensures GNU `coreutils` is installed (installs if missing) and makes it preferred: Switchyard restores backups and removes CLI‑managed symlinks to reinstate the prior GNU topology.
+- By default, removes the replacement package (`rust-coreutils`) via apt; if `--keep-replacements` is provided, keeps it installed but de‑preferred.
+- Runs minimal smoke tests; auto‑rollback on failure; exits non‑zero with diagnostics if failed.
 
 ---
 

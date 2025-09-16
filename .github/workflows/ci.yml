@@ -408,3 +408,40 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ubuntu_full_smoke.sh
+
+  oxidizr-arch-smoke:
+    name: Smoke (oxidizr-arch in Arch container)
+    runs-on: ubuntu-latest
+    needs: bdd
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Arch runner image
+        run: |
+          set -euxo pipefail
+          docker build -t oxidizr-arch-ci -f test-orch/docker/Dockerfile .
+      - name: Compile oxidizr-arch inside Arch container
+        run: |
+          set -euxo pipefail
+          docker run --rm -v "$PWD:/workspace" -w /workspace --entrypoint bash oxidizr-arch-ci -lc '
+            set -euxo pipefail
+            cargo build -p oxidizr-arch --release
+          '
+      - name: Run minimal smoke (status/doctor under hermetic root)
+        run: |
+          set -euxo pipefail
+          docker run --rm -v "$PWD:/workspace" -w /workspace --entrypoint bash oxidizr-arch-ci -lc '
+            set -euxo pipefail
+            ROOT=$(mktemp -d)
+            mkdir -p "$ROOT/usr/bin" "$ROOT/var/lock"
+            ./target/release/oxidizr-arch --root "$ROOT" status --json | tee /tmp/arch_status.json
+            ./target/release/oxidizr-arch --root "$ROOT" doctor --json | tee /tmp/arch_doctor.json
+          '
+      - name: Upload oxidizr-arch smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-smoke-logs
+          path: |
+            /tmp/arch_status.json
+            /tmp/arch_doctor.json
+          if-no-files-found: ignore

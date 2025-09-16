@@ -1,0 +1,12 @@
+[package]
+name = "oxidizr-cli-core"
+version = "0.1.0"
+edition = "2021"
+description = "Common helpers for oxidizr-* CLIs (API builder, prompts)"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/veighnsche/oxidizr-arch"
+keywords = ["cli", "switchyard"]
+
+[dependencies]
+switchyard = { package = "switchyard-fs", path = "../switchyard" }
+atty = "0.2"

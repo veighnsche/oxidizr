@@ -12,6 +12,8 @@ use crate::packages;
 use crate::util::paths::ensure_under_root;
 use serde_json::json;
 use crate::fetch::fallback::apt_pkg_name;
+use oxidizr_cli_core::{PackageKind, static_fallback_applets};
+use crate::adapters::debian_adapter::DebianAdapter;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -50,16 +52,33 @@ pub fn exec(
         }
     }
     let dest_dir = PathBuf::from(packages::DEST_DIR);
+    let adapter = DebianAdapter;
     let applets = if all || package.is_none() {
-        let mut all = packages::coreutils::applets();
-        all.extend(packages::findutils::applets());
-        all.extend(packages::sudo::applets());
-        all
+        let mut out: Vec<String> = Vec::new();
+        let cu = {
+            let d = adapter.enumerate_package_commands(root, PackageKind::Coreutils);
+            if d.is_empty() { static_fallback_applets(PackageKind::Coreutils) } else { d }
+        };
+        let fu = {
+            let d = adapter.enumerate_package_commands(root, PackageKind::Findutils);
+            if d.is_empty() { static_fallback_applets(PackageKind::Findutils) } else { d }
+        };
+        let su = static_fallback_applets(PackageKind::Sudo);
+        out.extend(cu);
+        out.extend(fu);
+        out.extend(su);
+        out
     } else {
         match package.unwrap() {
-            Package::Coreutils => packages::coreutils::applets(),
-            Package::Findutils => packages::findutils::applets(),
-            Package::Sudo => packages::sudo::applets(),
+            Package::Coreutils => {
+                let d = adapter.enumerate_package_commands(root, PackageKind::Coreutils);
+                if d.is_empty() { static_fallback_applets(PackageKind::Coreutils) } else { d }
+            }
+            Package::Findutils => {
+                let d = adapter.enumerate_package_commands(root, PackageKind::Findutils);
+                if d.is_empty() { static_fallback_applets(PackageKind::Findutils) } else { d }
+            }
+            Package::Sudo => static_fallback_applets(PackageKind::Sudo),
         }
     };
 

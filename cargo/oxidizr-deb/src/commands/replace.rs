@@ -4,11 +4,16 @@ use std::process::{Command, Stdio};
 use switchyard::logging::JsonlSink;
 use switchyard::types::ApplyMode;
 use switchyard::Switchyard;
+use oxidizr_cli_core::prompts::should_proceed;
+use oxidizr_cli_core::{coverage_preflight, PackageKind};
 
 use crate::adapters::debian::pm_lock_message;
 use crate::cli::args::Package;
 use serde_json::json;
 use crate::fetch::fallback::apt_pkg_name;
+use crate::fetch::resolver::resolve_artifact;
+use crate::packages;
+use crate::adapters::debian_adapter::DebianAdapter;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -61,7 +66,7 @@ pub fn exec(
             );
         }
         // Confirm if interactive
-        if !assume_yes && !crate::util::prompts::should_proceed(assume_yes, root) {
+        if !assume_yes && !should_proceed(assume_yes, root) {
             return Err("aborted by user".to_string());
         }
     }
@@ -81,6 +86,22 @@ pub fn exec(
         // Provider pre-check: replacement must now be active
         if !is_active(root, *p) {
             return Err(format!("replacement for {:?} is not active after use; aborting replace", p));
+        }
+        // Coverage preflight: replacement must cover all distro-provided applets (coreutils/findutils)
+        let kind = match p {
+            Package::Coreutils => Some(PackageKind::Coreutils),
+            Package::Findutils => Some(PackageKind::Findutils),
+            Package::Sudo => None,
+        };
+        if let Some(k) = kind {
+            let src = resolve_artifact(root, *p, false, None);
+            if let Err(missing) = coverage_preflight(&DebianAdapter, root, k, &src) {
+                return Err(format!(
+                    "cannot replace {:?}: replacement does not cover all applets; missing: {}",
+                    p,
+                    missing.join(", ")
+                ));
+            }
         }
     }
 

@@ -1,14 +1,11 @@
 use oxidizr_cli_core::api::build_api;
 use oxidizr_cli_core::prompts::should_proceed;
-use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
 use switchyard::types::ApplyMode;
 use switchyard::Switchyard;
+use switchyard::logging::JsonlSink;
 
 use crate::cli::args::{Cli, Commands};
-use crate::commands::doctor;
-use crate::commands::replace;
-use crate::commands::{r#use, restore, status};
 
 pub fn dispatch(cli: Cli) -> Result<(), String> {
     // Default policy: conservative, disallow degraded EXDEV for built-ins
@@ -17,10 +14,8 @@ pub fn dispatch(cli: Cli) -> Result<(), String> {
     // Narrow scope to requested root
     policy.scope.allow_roots.push(cli.root.clone());
 
-    let lock_path = cli.root.join("var/lock/oxidizr-deb.lock");
+    let lock_path = cli.root.join("var/lock/oxidizr-arch.lock");
 
-    // Bridge optional apt version pin to fetch layer via env var
-    if let Some(v) = &cli.apt_version { std::env::set_var("OXIDIZR_DEB_APT_VERSION", v); }
     let api: Switchyard<JsonlSink, JsonlSink> = build_api(policy, lock_path);
 
     let apply_mode = if cli.commit {
@@ -40,7 +35,7 @@ pub fn dispatch(cli: Cli) -> Result<(), String> {
                     return Err("aborted by user".to_string());
                 }
             }
-            r#use::exec(&api, &cli.root, package, offline, use_local, apply_mode)
+            crate::commands::r#use::exec(&api, &cli.root, package, offline, use_local, apply_mode)
         }
         Commands::Restore {
             package,
@@ -52,20 +47,12 @@ pub fn dispatch(cli: Cli) -> Result<(), String> {
                     return Err("aborted by user".to_string());
                 }
             }
-            restore::exec(
-                &api,
-                &cli.root,
-                package,
-                all,
-                keep_replacements,
-                apply_mode,
-                cli.assume_yes,
-            )
+            crate::commands::restore::exec(&api, &cli.root, package, all, keep_replacements, apply_mode, cli.assume_yes)
         }
-        Commands::Status { json } => status::exec(&cli.root, json),
-        Commands::Doctor { json } => doctor::exec(&cli.root, json),
+        Commands::Status { json } => crate::commands::status::exec(&cli.root, json),
+        Commands::Doctor { json } => crate::commands::doctor::exec(&cli.root, json),
         Commands::Replace { package, all } => {
-            replace::exec(&api, &cli.root, package, all, apply_mode, cli.assume_yes)
+            crate::commands::replace::exec(&api, &cli.root, package, all, apply_mode, cli.assume_yes)
         }
         Commands::Completions { shell } => crate::cli::completions::emit(shell),
     }
