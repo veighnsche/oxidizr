@@ -14,6 +14,6 @@
 - Exporter for YAML lives under `preflight::yaml`.
 
 Citations:
-- `cargo/switchyard/src/api/preflight/mod.rs`
-- `cargo/switchyard/src/preflight/yaml.rs`
-- `cargo/switchyard/SPEC/SPEC.md`
+- `src/api/preflight/mod.rs`
+- `src/preflight/yaml.rs`
+- `SPEC/SPEC.md`

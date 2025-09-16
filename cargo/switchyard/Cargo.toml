@@ -28,6 +28,7 @@ exclude = [
   "documentation_plan.md",
   "ER_CAT.json",
   "TODO.md",
+  "PUBLISH_BLOCKERS.md",
   "Cargo.toml.orig",
 ]
 

@@ -9,6 +9,7 @@ use crate::adapters::debian::pm_lock_message;
 use crate::cli::args::Package;
 use crate::fetch::resolver::staged_default_path;
 use serde_json::json;
+use crate::fetch::fallback::apt_pkg_name;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -18,13 +19,7 @@ fn distro_pkg_name(pkg: Package) -> &'static str {
     }
 }
 
-fn replacement_pkg_name(pkg: Package) -> &'static str {
-    match pkg {
-        Package::Coreutils => "uutils-coreutils",
-        Package::Findutils => "uutils-findutils",
-        Package::Sudo => "sudo-rs",
-    }
-}
+fn replacement_pkg_name(pkg: Package) -> &'static str { apt_pkg_name(pkg) }
 
 fn dpkg_installed(name: &str) -> bool {
     let st = Command::new("dpkg")

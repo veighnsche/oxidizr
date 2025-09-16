@@ -4,5 +4,5 @@
 - Stages: `plan`, `preflight` (rows + summary), `apply.attempt`, `apply.result`, `rollback` (and summary), `prune.result`.
 
 Citations:
-- `cargo/switchyard/SPEC/audit_event.v2.schema.json`
-- `cargo/switchyard/src/logging/audit.rs`
+- `SPEC/audit_event.v2.schema.json`
+- `src/logging/audit.rs`

@@ -12,6 +12,7 @@ use crate::packages;
 use crate::util::paths::ensure_under_root;
 use crate::fetch::resolver::staged_default_path;
 use serde_json::json;
+use crate::fetch::fallback::apt_pkg_name;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -39,13 +40,8 @@ fn remove_staged_if_present(root: &Path, pkg: Package) {
     }
 }
 
-fn replacement_pkg_name(pkg: Package) -> &'static str {
-    match pkg {
-        Package::Coreutils => "uutils-coreutils",
-        Package::Findutils => "uutils-findutils",
-        Package::Sudo => "sudo-rs",
-    }
-}
+// Replacement package name in apt (Debian-correct)
+fn replacement_pkg_name(pkg: Package) -> &'static str { apt_pkg_name(pkg) }
 
 pub fn exec(
     api: &Switchyard<JsonlSink, JsonlSink>,

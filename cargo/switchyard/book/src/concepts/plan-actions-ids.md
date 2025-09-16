@@ -10,5 +10,5 @@ Traceability
 - `SPEC/traceability.md` maps requirements to scenarios for coverage.
 
 Citations:
-- `cargo/switchyard/src/types/plan.rs`
-- `cargo/switchyard/src/types/ids.rs`
+- `src/types/plan.rs`
+- `src/types/ids.rs`

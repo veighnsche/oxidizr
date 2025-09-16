@@ -13,5 +13,5 @@ let api = ApiBuilder::new(JsonlSink::default(), JsonlSink::default(), Policy::de
 ```
 
 Citations:
-- `cargo/switchyard/src/adapters/lock/file.rs`
-- `cargo/switchyard/src/api/mod.rs`
+- `src/adapters/lock/file.rs`
+- `src/api/mod.rs`

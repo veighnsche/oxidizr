@@ -40,5 +40,5 @@ Core groups:
   - `preservation_tier: PreservationTier` — tiered preservation expectations (basic/extended/full).
 
 Citations:
-- `cargo/switchyard/src/policy/config.rs`
-- `cargo/switchyard/src/policy/types.rs`
+- `src/policy/config.rs`
+- `src/policy/types.rs`

@@ -1,8 +1,8 @@
 # Error Codes
 
 Source of truth:
-- `cargo/switchyard/SPEC/error_codes.toml`
-- Mapping helpers: `cargo/switchyard/src/api/errors.rs`
+- `SPEC/error_codes.toml`
+- Mapping helpers: `src/api/errors.rs`
 
 Usage:
 - Stable identifiers are emitted in facts (e.g., `E_POLICY`, `E_LOCKING`). Summary events include a `summary_error_ids` chain from specific→general.

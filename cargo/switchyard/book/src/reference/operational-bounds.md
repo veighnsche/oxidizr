@@ -9,4 +9,4 @@ Notes
 - Smoke runs are part of Commit; see SPEC §11 (minimal suite and auto‑rollback).
 
 Citations:
-- `cargo/switchyard/SPEC/SPEC.md`
+- `SPEC/SPEC.md`

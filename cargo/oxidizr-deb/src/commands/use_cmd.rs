@@ -14,10 +14,10 @@ use crate::fetch::fallback::ensure_artifact_available;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
 
-fn replacement_pkg_name(pkg: Package) -> &'static str {
+fn apt_pkg_name(pkg: Package) -> &'static str {
     match pkg {
-        Package::Coreutils => "uutils-coreutils",
-        Package::Findutils => "uutils-findutils",
+        Package::Coreutils => "rust-coreutils",
+        Package::Findutils => "rust-findutils",
         Package::Sudo => "sudo-rs",
     }
 }
@@ -92,8 +92,10 @@ pub fn exec(
         }
     } else if matches!(mode, ApplyMode::DryRun) && !offline {
         if !source_bin.exists() {
-            let pkgname = replacement_pkg_name(package);
-            eprintln!("[dry-run] would run: apt-get install -y {} (or fallback to cargo/github if unavailable)", pkgname);
+            let pkgname = apt_pkg_name(package);
+            let apt_ver = std::env::var("OXIDIZR_DEB_APT_VERSION").ok();
+            let apt_arg = if let Some(v) = apt_ver { format!("{}={}", pkgname, v) } else { pkgname.to_string() };
+            eprintln!("[dry-run] would run: apt-get install -y {} (or fallback to cargo/github if unavailable)", apt_arg);
             let staged = staged_default_path(root, package);
             eprintln!("[dry-run] would stage artifact at {}", staged.display());
         }
