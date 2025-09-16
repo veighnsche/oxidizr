@@ -2,7 +2,7 @@
 
 This is a quick tour of the major modules and how they collaborate to deliver safe, atomic, and reversible swaps.
 
-> Note: This guide focuses on reading the code with a safety lens. For normative requirements, see `cargo/switchyard/SPEC/SPEC.md`.
+> Note: This guide focuses on reading the code with a safety lens. For normative requirements, see `SPEC/SPEC.md`.
 
 ## Layered Map
 

@@ -58,6 +58,6 @@ Production‑grade checklist
 - Minimal smoke suite via a `SmokeTestRunner`; failures auto‑rollback unless policy disables it.
 
 Citations:
-- `cargo/switchyard/src/api/mod.rs`
-- `cargo/switchyard/src/policy/config.rs`
-- `cargo/switchyard/src/adapters/lock/file.rs`
+- `src/api/mod.rs`
+- `src/policy/config.rs`
+- `src/adapters/lock/file.rs`
