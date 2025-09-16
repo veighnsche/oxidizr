@@ -5,8 +5,30 @@ edition = "2021"
 description = "Switchyard library crate (monorepo skeleton)"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/veighnsche/oxidizr-arch"
+homepage = "https://veighnsche.github.io/oxidizr-arch/"
+documentation = "https://docs.rs/switchyard"
+readme = "README.md"
 keywords = ["filesystem", "atomic", "swap", "reversible"]
-categories = ["filesystem"]
+categories = ["filesystem", "os::unix-apis"]
+rust-version = "1.75"
+
+# Keep the published crate small; crates.io serves README and links only.
+exclude = [
+  "/book/**",
+  "/.github/**",
+  "/scripts/**",
+  "/target/**",
+  "/golden-diff/**",
+  "/**/*.log",
+]
+
+[badges]
+github-actions = { repository = "veighnsche/oxidizr-arch", workflow = "Continuous Integration" }
+
+[package.metadata.docs.rs]
+all-features = false
+features = []
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "switchyard"

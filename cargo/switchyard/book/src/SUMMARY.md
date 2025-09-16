@@ -2,6 +2,8 @@
 
 - [Introduction](introduction.md)
 - [Quickstart](quickstart.md)
+- [Safety First](safety-first.md)
+- [Architecture Overview](architecture.md)
 - Concepts
   - [Plan, Actions, and IDs](concepts/plan-actions-ids.md)
   - [Preflight](concepts/preflight.md)
@@ -15,6 +17,7 @@
   - [Configure a Lock Manager](how-tos/lock-manager.md)
   - [Use SafePath](how-tos/safepath.md)
   - [Capture and Verify Audit](how-tos/audit-capture.md)
+  - [Validate Facts Against Schema v2](how-tos/validate-facts.md)
   - [Prune Backups](how-tos/prune-backups.md)
 - Reference
   - [Public API (rustdoc)](reference/public-api.md)
@@ -23,4 +26,9 @@
   - [Audit Event Schema (v2)](reference/audit-schema.md)
   - [Policy Knobs](reference/policy-knobs.md)
   - [Operational Bounds](reference/operational-bounds.md)
+- [Recovery Playbook](recovery-playbook.md)
 - [Troubleshooting](troubleshooting.md)
+- [Common Pitfalls](common-pitfalls.md)
+- [FAQ](faq.md)
+- [Glossary](glossary.md)
+

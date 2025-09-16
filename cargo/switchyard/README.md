@@ -1,5 +1,9 @@
 # Switchyard (Library Crate)
 
+> Operator & Integrator Guide (mdBook): https://veighnsche.github.io/oxidizr-arch/
+>
+> API docs on docs.rs: https://docs.rs/switchyard
+
 Switchyard is a Rust library that provides a safe, deterministic, and auditable engine for applying system changes with:
 
 - Atomic symlink replacement with backup/restore

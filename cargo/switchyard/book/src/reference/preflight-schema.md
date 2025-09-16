@@ -1,6 +1,16 @@
 # Preflight Schema
 
-- Preflight rows contain: `action_id`, `path`, `current_kind`, `planned_kind`, `policy_ok`, optional `provenance`, `preservation`, and `restore_ready`.
+- Rows contain (SPEC §4):
+  - `action_id`, `path`
+  - `current_kind` ∈ {missing, file, dir, symlink}
+  - `planned_kind` ∈ {symlink, restore_from_backup, skip}
+  - `policy_ok: bool`
+  - `provenance` (optional): `uid`, `gid`, `pkg`
+  - `notes: string[]`
+  - `preservation` (optional): `owner`, `mode`, `timestamps`, `xattrs`, `acls`, `caps`
+  - `preservation_supported: bool`
+
+- Deterministic ordering: rows ordered by (`path`, `action_id`) to stabilize goldens.
 - Exporter for YAML lives under `preflight::yaml`.
 
 Citations:

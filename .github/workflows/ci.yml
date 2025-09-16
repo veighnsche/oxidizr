@@ -369,3 +369,41 @@ jobs:
             /tmp/status.json
             /tmp/doctor.json
           if-no-files-found: warn
+
+  oxidizr-deb-bdd:
+    name: BDD (oxidizr-deb CLI)
+    runs-on: ubuntu-latest
+    needs: e2e-oxidizr-deb
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run oxidizr-deb BDD tests (safe fakeroot + dry-run)
+        run: |
+          set -euo pipefail
+          cargo check -p oxidizr-deb
+          cargo test -p oxidizr-deb --features bdd -q
+
+  oxidizr-deb-full-smoke:
+    name: Full Smoke (oxidizr-deb, disposable Ubuntu container)
+    runs-on: ubuntu-latest
+    needs: oxidizr-deb-bdd
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run full destructive smoke in Ubuntu container
+        run: |
+          set -euo pipefail
+          bash scripts/ubuntu_full_smoke.sh

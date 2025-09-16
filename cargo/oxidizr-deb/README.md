@@ -89,9 +89,9 @@ Tip: Start on a fakeroot or non-critical machine; validate your workloads before
 ## How oxidizr-deb ensures replacements (supply-chain safety)
 
 oxidizr-deb ensures the appropriate replacement package for your system is installed via APT/DPKG and relies on the
-package manager’s signature verification and repository trust. In this Debian/Ubuntu variant, offline/manual artifact
-paths are out of scope. The CLI applies ownership/mode guards as needed. For example, `sudo` replacement must be
-`root:root` with mode `4755` when committed.
+package manager’s signature verification and repository trust. For development and tests, `--offline --use-local PATH`
+is supported to inject a local artifact under a fakeroot; this bypasses apt (still validated in future versions). The CLI
+applies ownership/mode guards as needed. For example, `sudo` replacement must be `root:root` with mode `4755` when committed.
 
 ---
 
@@ -290,6 +290,31 @@ cargo run -p oxidizr-deb -- status
 
 - Do I need root privileges?
   - To mutate live system paths like `/usr/bin`, yes. For development and testing, use `--root /tmp/fakeroot`.
+
+---
+
+## Interactive dev shell (Docker Ubuntu)
+
+To manually verify replacements with `--version` on a real live root (inside a disposable container), use the helper script:
+
+```bash
+bash scripts/ubuntu_dev_shell.sh
+```
+
+This will:
+
+- Start an `ubuntu:24.04` container.
+- Build `oxidizr-deb` inside it.
+- Apply replacements on the container’s live root:
+  - `--commit use coreutils`
+  - `--commit use findutils`
+  - `--commit use sudo` (setuid 4755 required)
+- Drop you into an interactive shell to validate:
+  - `which ls && ls --version | head -n1`
+  - `which find && find --version` (or `find --help` when version output is not present)
+  - `which sudo && sudo --version`
+
+Your host is never modified; all changes occur inside the disposable container.
 
 - Can I run this on Ubuntu, Debian, or derivatives?
   - Yes. The CLI includes Debian/Ubuntu-friendly behaviors and conservative defaults.

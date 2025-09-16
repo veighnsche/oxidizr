@@ -1,4 +1,5 @@
 #![deny(unsafe_code)]
+#![doc = include_str!("../README.md")]
 /* ---- unwrap/expect policy ---- */
 // Warn everywhere (incl. tests), but deny in non-test builds.
 #![warn(clippy::unwrap_used, clippy::expect_used)]

@@ -45,6 +45,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+Safety callouts
+- The API builder is the standard way to construct the engine; prefer it over ad‑hoc wiring.
+- Commit in production requires a `LockManager`; configure `.with_lock_manager(...)` and set `.with_lock_timeout_ms(...)`.
+- Set rescue/policy knobs up front (see [Policy Knobs](reference/policy-knobs.md)).
+- If cross‑filesystem swaps are possible, decide `apply.exdev` behavior (Fail vs DegradedFallback) and monitor `degraded` facts.
+
+Production‑grade checklist
+- Durable sinks for facts/audit (e.g., JSONL file sink) and retention.
+- Lock manager configured with bounded wait; observe `apply.attempt.lock_wait_ms`.
+- Rescue profile required in preflight on production; STOP if unavailable.
+- Minimal smoke suite via a `SmokeTestRunner`; failures auto‑rollback unless policy disables it.
+
 Citations:
 - `cargo/switchyard/src/api/mod.rs`
 - `cargo/switchyard/src/policy/config.rs`
