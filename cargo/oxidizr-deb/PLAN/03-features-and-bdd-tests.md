@@ -1,15 +1,18 @@
 # Plan: Features and Gherkin/BDD Tests for oxidizr-deb
 
 ## 1) Goals
+
 - Validate CLI surface and engine integration end-to-end at the package level.
 - Cover Debian UX addendum requirements.
 
 ## 2) Test Harness Options
+
 - Rust `cucumber` crate similar to engine BDD wiring (see `cargo/switchyard/tests/BDD_WIRING.md`).
 - Place oxidizr-deb BDD under `cargo/oxidizr-deb/tests/bdd_*` with `[[test]]` harness disabled if needed.
 - Alternatively, high-level YAML runner (existing test-orch) can invoke the CLI in containers; start with Rust cucumber for local speed.
 
 ## 3) Feature Suites (Draft)
+
 - `features/dry_run_default.feature`
   - Dry-run is default; commit only with `--commit`.
 - `features/coreutils_use_restore.feature`
@@ -28,6 +31,7 @@
   - `status` reports current active and restorable packages.
 
 ## 4) Step Definitions (Sketch)
+
 - World: temp root directory, seeded tree with dummy binaries & perms; optional local artifact for `--offline --use-local`.
 - Steps
   - Given a fakeroot with …
@@ -39,13 +43,16 @@
   - And output contains …
 
 ## 5) Fixtures & Goldens
+
 - Capture plan/preflight/apply summaries for golden diff where deterministic.
 - Keep timestamps redacted per engine rules.
 
 ## 6) CI Integration
+
 - Run BDD in CI as part of oxidizr-deb job.
 - Optional container jobs for Ubuntu LTS images to validate apt lock paths and merged-/usr assumptions.
 
 ## 7) Acceptance
+
 - Each SPEC requirement in `SPEC.md` and `DEBIAN_UX.md` mapped to ≥1 scenario.
 - No SKIP in CI; flakes documented if infra-related.
