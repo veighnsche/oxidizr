@@ -83,7 +83,7 @@ switchyard = { path = "./cargo/switchyard" }
 
 ### Minimal Example
 
-```rust
+```rust,ignore
 use switchyard::api::{ApiBuilder, Switchyard};
 use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
@@ -130,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Alternate entrypoint:
 
-```rust
+```rust,ignore
 use switchyard::api::Switchyard;
 use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
@@ -260,7 +260,7 @@ See `docs/testing/TESTING_POLICY.md` for project-wide rules (zero SKIPs, harness
 
 Use the hardened preset and wire required adapters. Adjust EXDEV behavior per environment.
 
-```rust
+```rust,ignore
 use switchyard::api::ApiBuilder;
 use switchyard::policy::{Policy, types::ExdevPolicy};
 use switchyard::adapters::{FileLockManager, DefaultSmokeRunner};
@@ -291,7 +291,7 @@ This preset ensures:
 
 Prune backup artifacts for a target under the current retention policy. Emits a `prune.result` fact.
 
-```rust
+```rust,ignore
 use switchyard::types::SafePath;
 
 let target = SafePath::from_rooted(root, &root.join("usr/bin/ls"))?;

@@ -25,15 +25,24 @@ OXI="target/debug/oxidizr-deb"
 
 mkdir -p /opt/uutils /opt/uutils-findutils /opt/sudo-rs
 
-# Install uutils-coreutils via cargo
-echo "[dev-shell] Installing uutils-coreutils via cargo..."
-cargo install --locked --git https://github.com/uutils/coreutils uutils
-install -Dm0755 "$HOME/.cargo/bin/uutils" "/opt/uutils/uutils"
+echo "[dev-shell] Installing uutils coreutils via cargo (crates.io)..."
+cargo install coreutils
+if [ -x "$HOME/.cargo/bin/uutils" ]; then
+  install -Dm0755 "$HOME/.cargo/bin/uutils" "/opt/uutils/uutils"
+elif [ -x "$HOME/.cargo/bin/coreutils" ]; then
+  install -Dm0755 "$HOME/.cargo/bin/coreutils" "/opt/uutils/uutils"
+else
+  echo "[dev-shell] ERROR: Neither uutils nor coreutils binary found in cargo bin" >&2
+  ls -l "$HOME/.cargo/bin" || true
+  exit 1
+fi
 
 # Install uutils-findutils (best effort); fallback to stub
 echo "[dev-shell] Installing uutils-findutils via cargo (best effort)..."
-if cargo install --locked --git https://github.com/uutils/findutils uutils-findutils >/dev/null 2>&1; then
-  install -Dm0755 "$HOME/.cargo/bin/uutils-findutils" "/opt/uutils-findutils/uutils-findutils"
+if cargo install uutils-findutils >/dev/null 2>&1; then
+  if [ -x "$HOME/.cargo/bin/uutils-findutils" ]; then
+    install -Dm0755 "$HOME/.cargo/bin/uutils-findutils" "/opt/uutils-findutils/uutils-findutils"
+  fi
 else
   echo -e "#!/usr/bin/env bash\necho uutils-findutils-dev-shell-stub" > /opt/uutils-findutils/uutils-findutils
   chmod 0755 /opt/uutils-findutils/uutils-findutils
@@ -42,18 +51,26 @@ fi
 # Try to fetch sudo-rs (skipped in dev shell)
 echo "[dev-shell] sudo-rs fetch skipped in dev shell (optional)"
 
-# Apply replacements on the container live root using offline artifacts
+# Apply replacements under a fakeroot to avoid touching container live /
+FROOT="/opt/fakeroot"
+mkdir -p "$FROOT/usr/bin" "$FROOT/var/lock"
+
 set -x
-"$OXI" --commit use coreutils --offline --use-local /opt/uutils/uutils || { echo "failed to use coreutils" >&2; exit 1; }
-"$OXI" --commit use findutils --offline --use-local /opt/uutils-findutils/uutils-findutils || { echo "failed to use findutils" >&2; exit 1; }
+# Copy artifacts inside fakeroot so SafePath can validate sources
+install -Dm0755 "/opt/uutils/uutils" "$FROOT/opt/uutils/uutils"
+install -Dm0755 "/opt/uutils-findutils/uutils-findutils" "$FROOT/opt/uutils-findutils/uutils-findutils"
+
+"$OXI" --root "$FROOT" --commit use coreutils --offline --use-local "$FROOT/opt/uutils/uutils" || { echo "failed to use coreutils" >&2; exit 1; }
+"$OXI" --root "$FROOT" --commit use findutils --offline --use-local "$FROOT/opt/uutils-findutils/uutils-findutils" || { echo "failed to use findutils" >&2; exit 1; }
 set +x
 
-echo "\n[INFO] Replacements applied. You are now in an interactive shell.\n"
+echo "\n[INFO] Replacements applied under fakeroot: $FROOT"
+echo "[INFO] Launching interactive shell with PATH prefixed so \"ls\" resolves to uutils.\n"
 echo "Commands to try:"
 echo "  which ls && ls --version | head -n1"
-echo "  which find && find --version 2>/dev/null || echo find-version-may-not-print-run-find-help"
-echo "  which sudo && sudo --version 2>/dev/null || echo sudo-may-require-setuid-root-4755"
+echo "  readlink -f \"$(command -v ls)\""
 echo
 
-exec bash
+export PATH="$FROOT/usr/bin:$PATH"
+exec bash --noprofile --norc
 '

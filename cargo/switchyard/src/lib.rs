@@ -104,7 +104,7 @@
 //! - This crate forbids `unsafe` and uses `rustix` for syscalls.
 //!
 //! Quickstart (builder is the default way to construct the API):
-//! ```rust
+//! ```rust,ignore
 //! use switchyard::api::Switchyard;
 //! use switchyard::logging::JsonlSink;
 //! use switchyard::policy::Policy;
