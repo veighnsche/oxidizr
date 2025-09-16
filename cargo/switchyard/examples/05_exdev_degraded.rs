@@ -1,7 +1,7 @@
 use switchyard::api::ApiBuilder;
 use switchyard::logging::JsonlSink;
-use switchyard::policy::{Policy, types::ExdevPolicy};
-use switchyard::types::{PlanInput, LinkRequest, SafePath, ApplyMode};
+use switchyard::policy::{types::ExdevPolicy, Policy};
+use switchyard::types::{ApplyMode, LinkRequest, PlanInput, SafePath};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Allow test-only env overrides inside the library to simulate EXDEV
@@ -25,7 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = SafePath::from_rooted(root, &root.join("bin/new"))?;
     let target = SafePath::from_rooted(root, &root.join("usr/bin/tool"))?;
 
-    let plan = api.plan(PlanInput { link: vec![LinkRequest { source, target }], restore: vec![] });
+    let plan = api.plan(PlanInput {
+        link: vec![LinkRequest { source, target }],
+        restore: vec![],
+    });
     let _report = api.apply(&plan, ApplyMode::Commit)?;
     Ok(())
 }

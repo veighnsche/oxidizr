@@ -33,11 +33,17 @@ pub async fn then_rollback_restores_providera(world: &mut World) {
     let root = world.ensure_root().to_path_buf();
     let target = root.join("usr/bin/ls");
     // Capture current (post-swap) snapshot
-    let _ = switchyard::fs::backup::create_snapshot(&target, switchyard::constants::DEFAULT_BACKUP_TAG);
+    let _ =
+        switchyard::fs::backup::create_snapshot(&target, switchyard::constants::DEFAULT_BACKUP_TAG);
     let sp_t = switchyard::types::safepath::SafePath::from_rooted(&root, &target).unwrap();
     // Restore to the state before the just-captured snapshot (i.e., pre-swap providerA)
-    let _ = switchyard::fs::restore::restore_file_prev(&sp_t, false, false, switchyard::constants::DEFAULT_BACKUP_TAG)
-        .expect("restore_file_prev");
+    let _ = switchyard::fs::restore::restore_file_prev(
+        &sp_t,
+        false,
+        false,
+        switchyard::constants::DEFAULT_BACKUP_TAG,
+    )
+    .expect("restore_file_prev");
     let link = root.join("usr/bin/ls");
     let target = std::fs::read_link(&link).unwrap_or_else(|_| link.clone());
     assert!(
@@ -65,7 +71,10 @@ pub async fn when_apply_plan_replaces_cp(world: &mut World) {
     let s = SafePath::from_rooted(&root, &src_b).unwrap();
     let t = SafePath::from_rooted(&root, &tgt).unwrap();
     let plan = PlanInput {
-        link: vec![LinkRequest { source: s, target: t }],
+        link: vec![LinkRequest {
+            source: s,
+            target: t,
+        }],
         restore: vec![],
     };
     // Ensure API is present and allow commit without lock for this test path
@@ -80,7 +89,9 @@ pub async fn when_apply_plan_replaces_cp(world: &mut World) {
     let _ = world.api.as_ref().unwrap().apply(&plan, ApplyMode::Commit);
 }
 
-#[then(regex = r"^the target path resolves to providerB/ls without any intermediate missing path visible$")]
+#[then(
+    regex = r"^the target path resolves to providerB/ls without any intermediate missing path visible$"
+)]
 pub async fn then_target_resolves_provb_no_missing(world: &mut World) {
     // Assert final topology: /usr/bin/ls -> providerB/ls
     let root = world.ensure_root().to_path_buf();
@@ -136,17 +147,27 @@ pub async fn when_apply_plan_commit(world: &mut World) {
     // Allow unlocked commit to avoid E_LOCKING unless a scenario configures a lock
     world.policy.governance.allow_unlocked_commit = true;
     // Rebuild API preserving any configured smoke runner
-    let mut builder = Switchyard::builder(world.facts.clone(), world.audit.clone(), world.policy.clone());
+    let mut builder = Switchyard::builder(
+        world.facts.clone(),
+        world.audit.clone(),
+        world.policy.clone(),
+    );
     if let Some(kind) = world.smoke_runner {
         match kind {
             crate::bdd_world::SmokeRunnerKind::Default => {
-                builder = builder.with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner));
+                builder =
+                    builder.with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner));
             }
             crate::bdd_world::SmokeRunnerKind::Failing => {
                 #[derive(Debug, Default)]
                 struct Failing;
                 impl switchyard::adapters::SmokeTestRunner for Failing {
-                    fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::smoke::SmokeFailure> { Err(switchyard::adapters::smoke::SmokeFailure) }
+                    fn run(
+                        &self,
+                        _plan: &switchyard::types::plan::Plan,
+                    ) -> Result<(), switchyard::adapters::smoke::SmokeFailure> {
+                        Err(switchyard::adapters::smoke::SmokeFailure)
+                    }
                 }
                 builder = builder.with_smoke_runner(Box::new(Failing));
             }
@@ -185,10 +206,17 @@ pub async fn then_auto_reverse_alias(world: &mut World) {
             // no executed actions. Consider this scenario satisfied since rollback engaged.
             return;
         } else {
-            assert!(!rb.is_empty(), "expected rolled_back_paths in apply.result summary");
+            assert!(
+                !rb.is_empty(),
+                "expected rolled_back_paths in apply.result summary"
+            );
             // If we observed any successful executions, expect reverse ordering.
             if let Some(last_exec) = executed.last() {
-                assert_eq!(rb.first(), Some(last_exec), "rolled_back_paths should start with last executed path");
+                assert_eq!(
+                    rb.first(),
+                    Some(last_exec),
+                    "rolled_back_paths should start with last executed path"
+                );
             }
             return;
         }
@@ -245,9 +273,18 @@ pub async fn given_three_actions(world: &mut World) {
     let (sc, tc) = mk("C");
     let plan = PlanInput {
         link: vec![
-            LinkRequest { source: sa, target: ta },
-            LinkRequest { source: sb, target: tb },
-            LinkRequest { source: sc, target: tc },
+            LinkRequest {
+                source: sa,
+                target: ta,
+            },
+            LinkRequest {
+                source: sb,
+                target: tb,
+            },
+            LinkRequest {
+                source: sc,
+                target: tc,
+            },
         ],
         restore: vec![],
     };

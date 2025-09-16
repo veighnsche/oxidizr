@@ -39,7 +39,9 @@ impl World {
 
     pub fn write_file<P: AsRef<Path>>(&mut self, rel: P, contents: &[u8], exec: bool) {
         let p = self.under_root(&rel);
-        if let Some(parent) = p.parent() { std::fs::create_dir_all(parent).unwrap(); }
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
         std::fs::write(&p, contents).expect("write file");
         if exec {
             #[cfg(unix)]

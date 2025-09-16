@@ -53,7 +53,11 @@ impl ApplySummary {
     }
 
     /// Record simple counts useful for UIs and tests.
-    pub(crate) fn executed_counts(mut self, executed_count: usize, rolled_back_count: usize) -> Self {
+    pub(crate) fn executed_counts(
+        mut self,
+        executed_count: usize,
+        rolled_back_count: usize,
+    ) -> Self {
         if let Some(obj) = self.fields.as_object_mut() {
             obj.insert("executed_count".to_string(), json!(executed_count));
             obj.insert("rolled_back_count".to_string(), json!(rolled_back_count));

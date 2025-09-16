@@ -73,57 +73,55 @@ pub fn atomic_symlink_swap(
     force_exdev: Option<bool>,
 ) -> std::io::Result<(bool, u64)> {
     use std::os::unix::ffi::OsStrExt;
-    // Open parent directory with O_DIRECTORY | O_NOFOLLOW to prevent traversal and races
+
     let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    let fname = target
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("target");
+    let fname = target.file_name().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "target must not end with a slash",
+        )
+    })?;
+
     let pid = std::process::id();
     let ctr = NEXT_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp_name = format!(".{fname}.{pid}.{ctr}{TMP_SUFFIX}");
+    let tmp_name = format!(".{}.{}.{}{}", fname.to_string_lossy(), pid, ctr, TMP_SUFFIX);
 
     let dirfd = open_dir_nofollow(parent)?;
 
-    // Best-effort unlink temporary name if present (ignore ENOENT only)
-    let tmp_c = std::ffi::CString::new(tmp_name.as_str())
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-    match unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty()) {
-        Ok(()) => {}
-        Err(e) if e == Errno::NOENT => {}
-        Err(e) => return Err(errno_to_io(e)),
-    }
-
-    // Create symlink using symlinkat relative to parent dirfd
+    // Build CStrings once
+    let tmp_c = std::ffi::CString::new(tmp_name.as_str()).map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid tmp cstring")
+    })?;
+    let new_c = std::ffi::CString::new(fname.as_bytes()).map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid target name")
+    })?;
     let src_c = std::ffi::CString::new(source.as_os_str().as_bytes()).map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid source path")
     })?;
-    let tmp_c2 = std::ffi::CString::new(tmp_name.as_str())
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?;
-    symlinkat(src_c.as_c_str(), &dirfd, tmp_c2.as_c_str()).map_err(errno_to_io)?;
 
-    // Atomically rename tmp -> final name within the same directory (bytes-safe)
-    let new_c = if let Some(name_os) = target.file_name() {
-        std::ffi::CString::new(name_os.as_bytes())
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
-    } else {
-        std::ffi::CString::new("target")
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid cstring"))?
-    };
-    let t0 = Instant::now();
-    let rename_res = renameat(&dirfd, tmp_c2.as_c_str(), &dirfd, new_c.as_c_str());
-    // Prefer per-instance override when provided; fallback to gated env for legacy tests only.
-    // Note: do not enable env overrides by default in tests to avoid cross-scenario interference.
+    // Best-effort cleanup of stray tmp
+    match unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty()) {
+        Ok(()) | Err(Errno::NOENT) => {}
+        Err(e) => return Err(errno_to_io(e)),
+    }
+
+    // Create tmp symlink
+    symlinkat(src_c.as_c_str(), &dirfd, tmp_c.as_c_str()).map_err(errno_to_io)?;
+
+    // Attempt atomic rename
+    let rename_res = renameat(&dirfd, tmp_c.as_c_str(), &dirfd, new_c.as_c_str());
+
+    // Test injection gate
     let allow_env_overrides = std::env::var_os("SWITCHYARD_TEST_ALLOW_ENV_OVERRIDES")
         == Some(std::ffi::OsString::from("1"));
     let inject_exdev = match force_exdev {
-        Some(true) => true,
-        Some(false) => false,
+        Some(b) => b,
         None => {
             allow_env_overrides
                 && std::env::var_os("SWITCHYARD_FORCE_EXDEV") == Some(std::ffi::OsString::from("1"))
         }
     };
+
     let rename_res = if inject_exdev {
         match rename_res {
             Ok(()) => Err(Errno::XDEV),
@@ -132,24 +130,54 @@ pub fn atomic_symlink_swap(
     } else {
         rename_res
     };
+
     match rename_res {
         Ok(()) => {
-            let _ = fsync_dirfd(&dirfd);
-            let fsync_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
+            // Measure true fsync duration only
+            let t_fsync = Instant::now();
+            let res = fsync_dirfd(&dirfd);
+            let fsync_ms = u64::try_from(t_fsync.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+            if let Err(e) = res {
+                // Optional: decide if you want to surface or log; here we return best-effort success.
+                // return Err(e); // <-- flip this if fsync must be strict
+                let _ = e;
+            }
+
             Ok((false, fsync_ms))
         }
         Err(e) if e == Errno::XDEV && allow_degraded => {
-            // Fall back: best-effort non-atomic replacement
+            // Non-atomic: remove final, place new symlink
             match unlinkat(&dirfd, new_c.as_c_str(), AtFlags::empty()) {
-                Ok(()) => {}
-                Err(e) if e == Errno::NOENT => {}
-                Err(e) => return Err(errno_to_io(e)),
+                Ok(()) | Err(Errno::NOENT) => {}
+                Err(e) => {
+                    // Cleanup tmp before returning
+                    let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
+                    return Err(errno_to_io(e));
+                }
             }
-            symlinkat(src_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(errno_to_io)?;
-            let _ = fsync_dirfd(&dirfd);
-            let fsync_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
+            if let Err(e) =
+                symlinkat(src_c.as_c_str(), &dirfd, new_c.as_c_str()).map_err(errno_to_io)
+            {
+                let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
+                return Err(e);
+            }
+
+            // We no longer need tmp; best-effort cleanup
+            let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
+
+            let t_fsync = Instant::now();
+            let res = fsync_dirfd(&dirfd);
+            let fsync_ms = u64::try_from(t_fsync.elapsed().as_millis()).unwrap_or(u64::MAX);
+            if let Err(e) = res {
+                let _ = e;
+            }
             Ok((true, fsync_ms))
         }
-        Err(e) => Err(errno_to_io(e)),
+        Err(e) => {
+            // General failure: best-effort cleanup of tmp
+            let _ = unlinkat(&dirfd, tmp_c.as_c_str(), AtFlags::empty());
+            Err(errno_to_io(e))
+        }
     }
 }

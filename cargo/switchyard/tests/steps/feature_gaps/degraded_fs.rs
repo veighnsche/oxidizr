@@ -33,14 +33,19 @@ pub async fn when_apply_symlink_replacement_plan(world: &mut World) {
     super::when_apply_plan_replaces_cp(world).await;
 }
 
-#[then(regex = r"^the operation completes via safe copy \+ fsync \+ rename preserving atomic visibility$")]
+#[then(
+    regex = r"^the operation completes via safe copy \+ fsync \+ rename preserving atomic visibility$"
+)]
 pub async fn then_operation_completes_atomic(world: &mut World) {
     let root = world.ensure_root().to_path_buf();
     let link = root.join("usr/bin/cp");
     let md = std::fs::symlink_metadata(&link).expect("target exists");
     assert!(md.file_type().is_symlink(), "expected symlink at target");
     let target = std::fs::read_link(&link).unwrap_or_else(|_| link.clone());
-    assert!(target.ends_with("providerB/cp"), "expected providerB/cp after degraded path");
+    assert!(
+        target.ends_with("providerB/cp"),
+        "expected providerB/cp after degraded path"
+    );
 }
 
 #[then(regex = r#"^emitted facts record degraded=true with degraded_reason=\"exdev_fallback\"$"#)]
@@ -54,7 +59,10 @@ pub async fn then_emitted_degraded_true_reason(world: &mut World) {
             break;
         }
     }
-    assert!(ok, "expected degraded=true with reason exdev_fallback in facts");
+    assert!(
+        ok,
+        "expected degraded=true with reason exdev_fallback in facts"
+    );
 }
 
 #[then(regex = r"^the apply fails with error_id=E_EXDEV and exit_code=50$")]
@@ -82,7 +90,10 @@ pub async fn then_emitted_degraded_false_reason(world: &mut World) {
             }
         }
     }
-    assert!(ok, "expected degraded=false with reason exdev_fallback in facts");
+    assert!(
+        ok,
+        "expected degraded=false with reason exdev_fallback in facts"
+    );
 }
 
 #[when(regex = r"^I run acceptance tests$")]
@@ -90,8 +101,8 @@ pub async fn when_run_acceptance_tests(_world: &mut World) {}
 
 #[then(regex = r"^semantics for rename and degraded path are verified per filesystem$")]
 pub async fn then_semantics_verified(world: &mut World) {
+    use switchyard::types::plan::{LinkRequest, PlanInput};
     use switchyard::types::safepath::SafePath;
-    use switchyard::types::plan::{PlanInput, LinkRequest};
     // Common plan builder for cp
     let build_cp_plan = |world: &mut World| -> PlanInput {
         let root = world.ensure_root().to_path_buf();
@@ -102,7 +113,13 @@ pub async fn then_semantics_verified(world: &mut World) {
         let _ = std::fs::write(&src_b, b"b");
         let s = SafePath::from_rooted(&root, &src_b).unwrap();
         let t = SafePath::from_rooted(&root, &tgt).unwrap();
-        PlanInput { link: vec![LinkRequest { source: s, target: t }], restore: vec![] }
+        PlanInput {
+            link: vec![LinkRequest {
+                source: s,
+                target: t,
+            }],
+            restore: vec![],
+        }
     };
 
     // 1) DegradedFallback policy -> expect degraded=true or reason=exdev_fallback.
@@ -113,7 +130,11 @@ pub async fn then_semantics_verified(world: &mut World) {
     world.rebuild_api();
     crate::steps::plan_steps::given_exdev_env(world).await;
     let plan = world.api.as_ref().unwrap().plan(build_cp_plan(world));
-    let _ = world.api.as_ref().unwrap().apply(&plan, switchyard::types::plan::ApplyMode::Commit);
+    let _ = world
+        .api
+        .as_ref()
+        .unwrap()
+        .apply(&plan, switchyard::types::plan::ApplyMode::Commit);
     then_best_effort_degraded(world).await;
 
     // 2) Fail policy -> expect E_EXDEV with exit_code=50.
@@ -124,11 +145,17 @@ pub async fn then_semantics_verified(world: &mut World) {
     world.rebuild_api();
     crate::steps::plan_steps::given_exdev_env(world).await;
     let plan2 = world.api.as_ref().unwrap().plan(build_cp_plan(world));
-    let _ = world.api.as_ref().unwrap().apply(&plan2, switchyard::types::plan::ApplyMode::Commit);
+    let _ = world
+        .api
+        .as_ref()
+        .unwrap()
+        .apply(&plan2, switchyard::types::plan::ApplyMode::Commit);
     then_apply_fails_exdev_50(world).await;
 }
 
-#[then(regex = r"^the operation uses a best-effort degraded fallback for symlink replacement \(unlink \+ symlink\) when EXDEV occurs$")]
+#[then(
+    regex = r"^the operation uses a best-effort degraded fallback for symlink replacement \(unlink \+ symlink\) when EXDEV occurs$"
+)]
 pub async fn then_best_effort_degraded(world: &mut World) {
     let mut ok = false;
     for ev in world.all_facts() {
@@ -141,5 +168,8 @@ pub async fn then_best_effort_degraded(world: &mut World) {
             }
         }
     }
-    assert!(ok, "expected degraded fallback evidence (degraded=true or reason=exdev_fallback)");
+    assert!(
+        ok,
+        "expected degraded fallback evidence (degraded=true or reason=exdev_fallback)"
+    );
 }

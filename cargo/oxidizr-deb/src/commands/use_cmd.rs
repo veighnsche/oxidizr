@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use switchyard::logging::JsonlSink;
-use switchyard::types::{ApplyMode, LinkRequest, PlanInput};
 use switchyard::types::safepath::SafePath;
+use switchyard::types::{ApplyMode, LinkRequest, PlanInput};
 use switchyard::Switchyard;
 
 use crate::adapters::debian::pm_lock_message;
@@ -38,18 +38,30 @@ pub fn exec(
     let (source_bin, dest_dir, applets) = match package {
         Package::Coreutils => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
-            (src, PathBuf::from(packages::DEST_DIR), packages::coreutils::applets())
+            (
+                src,
+                PathBuf::from(packages::DEST_DIR),
+                packages::coreutils::applets(),
+            )
         }
         Package::Findutils => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
-            (src, PathBuf::from(packages::DEST_DIR), packages::findutils::applets())
+            (
+                src,
+                PathBuf::from(packages::DEST_DIR),
+                packages::findutils::applets(),
+            )
         }
         Package::Sudo => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
             if matches!(mode, ApplyMode::Commit) {
                 sudo_guard(root, &src)?;
             }
-            (src, PathBuf::from(packages::DEST_DIR), packages::sudo::applets())
+            (
+                src,
+                PathBuf::from(packages::DEST_DIR),
+                packages::sudo::applets(),
+            )
         }
     };
 
@@ -65,7 +77,10 @@ pub fn exec(
             }
             let pkgname = replacement_pkg_name(package);
             let args = vec!["install".to_string(), "-y".to_string(), pkgname.to_string()];
-            eprintln!("[info] replacement artifact not found; ensuring installation via apt-get {} {}", "install", pkgname);
+            eprintln!(
+                "[info] replacement artifact not found; ensuring installation via apt-get {} {}",
+                "install", pkgname
+            );
             // In commit mode, execute; in dry-run we would have printed a [dry-run] message above
             let mut cmd = Command::new("apt-get");
             cmd.args(&args);
@@ -76,7 +91,10 @@ pub fn exec(
                 Ok(out) => {
                     let code = out.status.code().unwrap_or(1);
                     if code != 0 {
-                        return Err(format!("apt-get install {} failed with exit code {}", pkgname, code));
+                        return Err(format!(
+                            "apt-get install {} failed with exit code {}",
+                            pkgname, code
+                        ));
                     }
                 }
                 Err(e) => return Err(format!("failed to spawn apt-get: {e}")),
@@ -95,14 +113,23 @@ pub fn exec(
         let dst = dest_base.join(app);
         let s_sp = SafePath::from_rooted(root, &source_bin)
             .map_err(|e| format!("invalid source_bin: {e:?}"))?;
-        let d_sp = SafePath::from_rooted(root, &dst)
-            .map_err(|e| format!("invalid dest: {e:?}"))?;
-        links.push(LinkRequest { source: s_sp.clone(), target: d_sp });
+        let d_sp = SafePath::from_rooted(root, &dst).map_err(|e| format!("invalid dest: {e:?}"))?;
+        links.push(LinkRequest {
+            source: s_sp.clone(),
+            target: d_sp,
+        });
     }
 
-    let plan = api.plan(PlanInput { link: links, restore: vec![] });
-    let _pre = api.preflight(&plan).map_err(|e| format!("preflight failed: {e:?}"))?;
-    let rep = api.apply(&plan, mode).map_err(|e| format!("apply failed: {e:?}"))?;
+    let plan = api.plan(PlanInput {
+        link: links,
+        restore: vec![],
+    });
+    let _pre = api
+        .preflight(&plan)
+        .map_err(|e| format!("preflight failed: {e:?}"))?;
+    let rep = api
+        .apply(&plan, mode)
+        .map_err(|e| format!("apply failed: {e:?}"))?;
 
     if matches!(mode, ApplyMode::DryRun) {
         eprintln!("dry-run: planned {} actions", rep.executed.len());
@@ -119,14 +146,18 @@ pub fn exec(
                 let src = SafePath::from_rooted(root, &source_bin)
                     .map_err(|e| format!("invalid source_bin: {e:?}"))?
                     .as_path();
-                if let Some(parent) = dst.parent() { let _ = fs::create_dir_all(parent); }
+                if let Some(parent) = dst.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
                 let md = fs::symlink_metadata(&dst);
                 let mut needs = true;
                 if let Ok(m) = md {
                     if m.file_type().is_symlink() {
                         // Verify points to src; if not, replace
                         if let Ok(cur) = fs::read_link(&dst) {
-                            if cur == src { needs = false; }
+                            if cur == src {
+                                needs = false;
+                            }
                         }
                     } else {
                         let _ = fs::remove_file(&dst);

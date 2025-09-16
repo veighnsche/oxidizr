@@ -1,1 +1,3 @@
-pub fn applets() -> Vec<String> { vec!["sudo".to_string()] }
+pub fn applets() -> Vec<String> {
+    vec!["sudo".to_string()]
+}

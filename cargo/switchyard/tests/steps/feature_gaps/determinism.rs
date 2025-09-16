@@ -42,21 +42,32 @@ pub async fn then_facts_identical_after_redaction(world: &mut World) {
     let plan = world.plan.as_ref().unwrap().clone();
     world.clear_facts();
     // DryRun
-    let _ = world.api.as_ref().unwrap().apply(&plan, switchyard::types::plan::ApplyMode::DryRun);
+    let _ = world
+        .api
+        .as_ref()
+        .unwrap()
+        .apply(&plan, switchyard::types::plan::ApplyMode::DryRun);
     let mut a = facts::filter_apply_result_per_action(world.all_facts())
         .into_iter()
         .map(facts::redact_and_normalize)
         .collect::<Vec<_>>();
     // Commit
     world.clear_facts();
-    let _ = world.api.as_ref().unwrap().apply(&plan, switchyard::types::plan::ApplyMode::Commit);
+    let _ = world
+        .api
+        .as_ref()
+        .unwrap()
+        .apply(&plan, switchyard::types::plan::ApplyMode::Commit);
     let mut b = facts::filter_apply_result_per_action(world.all_facts())
         .into_iter()
         .map(facts::redact_and_normalize)
         .collect::<Vec<_>>();
     crate::bdd_support::facts::sort_by_action_id(&mut a);
     crate::bdd_support::facts::sort_by_action_id(&mut b);
-    assert_eq!(a, b, "apply.result per-action not identical after redaction");
+    assert_eq!(
+        a, b,
+        "apply.result per-action not identical after redaction"
+    );
 }
 
 // ----------------------

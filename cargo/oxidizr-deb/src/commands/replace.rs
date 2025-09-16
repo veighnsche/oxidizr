@@ -25,10 +25,15 @@ pub fn exec(
     assume_yes: bool,
 ) -> Result<(), String> {
     if matches!(mode, ApplyMode::Commit) {
-        if let Some(msg) = pm_lock_message(root) { return Err(msg); }
+        if let Some(msg) = pm_lock_message(root) {
+            return Err(msg);
+        }
         // Live-root constraint for PM mutations
         if root != Path::new("/") {
-            return Err("replace operations require --root=/ (live system) for apt/dpkg changes".to_string());
+            return Err(
+                "replace operations require --root=/ (live system) for apt/dpkg changes"
+                    .to_string(),
+            );
         }
         // Confirm if interactive
         if !assume_yes && !crate::util::prompts::should_proceed(assume_yes, root) {
@@ -38,7 +43,11 @@ pub fn exec(
 
     let targets: Vec<Package> = if all {
         vec![Package::Coreutils, Package::Findutils, Package::Sudo]
-    } else if let Some(p) = package { vec![p] } else { return Err("specify a package or use --all".to_string()); };
+    } else if let Some(p) = package {
+        vec![p]
+    } else {
+        return Err("specify a package or use --all".to_string());
+    };
 
     // First ensure RS is installed & active (use semantics)
     for p in &targets {
@@ -63,7 +72,10 @@ pub fn exec(
             Ok(out) => {
                 let code = out.status.code().unwrap_or(1);
                 if code != 0 {
-                    return Err(format!("apt-get purge {} failed with exit code {}", name, code));
+                    return Err(format!(
+                        "apt-get purge {} failed with exit code {}",
+                        name, code
+                    ));
                 }
             }
             Err(e) => return Err(format!("failed to spawn apt-get: {e}")),

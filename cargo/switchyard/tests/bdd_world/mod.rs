@@ -168,25 +168,31 @@ impl World {
             .unwrap();
     }
 
-    
-
     pub fn apply_current_plan_commit(&mut self) {
         // Allow unlocked commit in test scenarios without a LockManager
         if self.lock_path.is_none() {
             self.policy.governance.allow_unlocked_commit = true;
         }
         // Rebuild API to propagate any policy changes; preserve smoke runner configuration
-        let mut builder = Switchyard::builder(self.facts.clone(), self.audit.clone(), self.policy.clone());
+        let mut builder =
+            Switchyard::builder(self.facts.clone(), self.audit.clone(), self.policy.clone());
         if let Some(kind) = self.smoke_runner {
             match kind {
                 SmokeRunnerKind::Default => {
-                    builder = builder.with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner));
+                    builder = builder
+                        .with_smoke_runner(Box::new(switchyard::adapters::DefaultSmokeRunner));
                 }
                 SmokeRunnerKind::Failing => {
                     #[derive(Debug, Default)]
                     struct Failing;
                     impl switchyard::adapters::SmokeTestRunner for Failing {
-                        fn run(&self, _plan: &switchyard::types::plan::Plan) -> Result<(), switchyard::adapters::smoke::SmokeFailure> { Err(switchyard::adapters::smoke::SmokeFailure) }
+                        fn run(
+                            &self,
+                            _plan: &switchyard::types::plan::Plan,
+                        ) -> Result<(), switchyard::adapters::smoke::SmokeFailure>
+                        {
+                            Err(switchyard::adapters::smoke::SmokeFailure)
+                        }
                     }
                     builder = builder.with_smoke_runner(Box::new(Failing));
                 }

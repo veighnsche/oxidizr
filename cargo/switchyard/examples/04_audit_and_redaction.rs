@@ -1,5 +1,5 @@
-use switchyard::logging::redact::redact_event;
 use serde_json::json;
+use switchyard::logging::redact::redact_event;
 
 fn main() {
     let sample = json!({

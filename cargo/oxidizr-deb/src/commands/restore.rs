@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use switchyard::logging::JsonlSink;
-use switchyard::types::{ApplyMode, PlanInput, RestoreRequest};
 use switchyard::types::safepath::SafePath;
+use switchyard::types::{ApplyMode, PlanInput, RestoreRequest};
 use switchyard::Switchyard;
 
-use crate::cli::args::Package;
 use crate::adapters::debian::pm_lock_message;
+use crate::cli::args::Package;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
 
@@ -38,21 +38,23 @@ pub fn exec(
 ) -> Result<(), String> {
     let live_root = root == Path::new("/");
     if matches!(mode, ApplyMode::Commit) && live_root {
-        if let Some(msg) = pm_lock_message(root) { return Err(msg); }
+        if let Some(msg) = pm_lock_message(root) {
+            return Err(msg);
+        }
     }
     let dest_dir = PathBuf::from(packages::DEST_DIR);
     let applets = if all || package.is_none() {
-            let mut all = packages::coreutils::applets();
-            all.extend(packages::findutils::applets());
-            all.extend(packages::sudo::applets());
-            all
-        } else {
-            match package.unwrap() {
-                Package::Coreutils => packages::coreutils::applets(),
-                Package::Findutils => packages::findutils::applets(),
-                Package::Sudo => packages::sudo::applets(),
-            }
-        };
+        let mut all = packages::coreutils::applets();
+        all.extend(packages::findutils::applets());
+        all.extend(packages::sudo::applets());
+        all
+    } else {
+        match package.unwrap() {
+            Package::Coreutils => packages::coreutils::applets(),
+            Package::Findutils => packages::findutils::applets(),
+            Package::Sudo => packages::sudo::applets(),
+        }
+    };
 
     // Determine which package groups to affect for PM operations
     let targets: Vec<Package> = if all || package.is_none() {
@@ -64,7 +66,10 @@ pub fn exec(
     // Pre: ensure distro packages are installed when committing
     if matches!(mode, ApplyMode::Commit) {
         if !live_root {
-            eprintln!("[info] skipping apt/dpkg install steps under non-live root: {}", root.display());
+            eprintln!(
+                "[info] skipping apt/dpkg install steps under non-live root: {}",
+                root.display()
+            );
         } else {
             for p in &targets {
                 let name = distro_pkg_name(*p);
@@ -74,9 +79,15 @@ pub fn exec(
                 cmd.stdin(Stdio::null());
                 cmd.stdout(Stdio::inherit());
                 cmd.stderr(Stdio::inherit());
-                let status = cmd.status().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+                let status = cmd
+                    .status()
+                    .map_err(|e| format!("failed to spawn apt-get: {e}"))?;
                 if !status.success() {
-                    return Err(format!("apt-get install {} failed with exit code {:?}", name, status.code()));
+                    return Err(format!(
+                        "apt-get install {} failed with exit code {:?}",
+                        name,
+                        status.code()
+                    ));
                 }
             }
         }
@@ -96,9 +107,16 @@ pub fn exec(
         restores.push(RestoreRequest { target: sp });
     }
 
-    let plan = api.plan(PlanInput { link: vec![], restore: restores });
-    let _pre = api.preflight(&plan).map_err(|e| format!("preflight failed: {e:?}"))?;
-    let _rep = api.apply(&plan, mode).map_err(|e| format!("apply failed: {e:?}"))?;
+    let plan = api.plan(PlanInput {
+        link: vec![],
+        restore: restores,
+    });
+    let _pre = api
+        .preflight(&plan)
+        .map_err(|e| format!("preflight failed: {e:?}"))?;
+    let _rep = api
+        .apply(&plan, mode)
+        .map_err(|e| format!("apply failed: {e:?}"))?;
 
     if matches!(mode, ApplyMode::Commit) {
         // Pragmatic fallback for tests: ensure restored targets are regular files.
@@ -127,7 +145,9 @@ pub fn exec(
                 }
                 if rewrite {
                     let _ = fs::remove_file(&dst);
-                    if let Some(parent) = dst.parent() { let _ = fs::create_dir_all(parent); }
+                    if let Some(parent) = dst.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
                     let content = format!("gnu-{}", app);
                     let _ = fs::write(&dst, content.as_bytes());
                 }
@@ -139,7 +159,10 @@ pub fn exec(
     if matches!(mode, ApplyMode::Commit) {
         if !keep_replacements {
             if !live_root {
-                eprintln!("[info] skipping apt/dpkg removal of replacements under non-live root: {}", root.display());
+                eprintln!(
+                    "[info] skipping apt/dpkg removal of replacements under non-live root: {}",
+                    root.display()
+                );
             } else {
                 for p in &targets {
                     let name = replacement_pkg_name(*p);
@@ -149,9 +172,15 @@ pub fn exec(
                     cmd.stdin(Stdio::null());
                     cmd.stdout(Stdio::inherit());
                     cmd.stderr(Stdio::inherit());
-                    let status = cmd.status().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+                    let status = cmd
+                        .status()
+                        .map_err(|e| format!("failed to spawn apt-get: {e}"))?;
                     if !status.success() {
-                        return Err(format!("apt-get purge {} failed with exit code {:?}", name, status.code()));
+                        return Err(format!(
+                            "apt-get purge {} failed with exit code {:?}",
+                            name,
+                            status.code()
+                        ));
                     }
                 }
             }

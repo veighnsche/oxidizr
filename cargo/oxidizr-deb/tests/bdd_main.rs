@@ -22,7 +22,11 @@ async fn main() {
     let features_env = std::env::var("OXIDIZR_DEB_BDD_FEATURE_PATH").ok();
     let features = if let Some(p) = features_env {
         let pb = PathBuf::from(p);
-        if pb.is_absolute() { pb } else { root.join(pb) }
+        if pb.is_absolute() {
+            pb
+        } else {
+            root.join(pb)
+        }
     } else {
         root.join("tests/features")
     };

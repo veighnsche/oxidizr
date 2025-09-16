@@ -34,7 +34,9 @@ pub async fn then_failure_locking_alias(world: &mut World) {
     then_locking_failure(world).await;
 }
 
-#[then(regex = r"^lock acquisition uses a bounded wait and times out with E_LOCKING when exceeded$")]
+#[then(
+    regex = r"^lock acquisition uses a bounded wait and times out with E_LOCKING when exceeded$"
+)]
 pub async fn then_bounded_wait_timeout(world: &mut World) {
     // Combine assertions: presence of lock_wait_ms metric and classified timeout failure
     then_lock_wait(world).await;
@@ -126,7 +128,10 @@ pub async fn then_warn_no_lock(world: &mut World) {
             }
         }
     }
-    assert!(saw, "expected apply.attempt indicating no lock manager (warn or lock_backend=none)");
+    assert!(
+        saw,
+        "expected apply.attempt indicating no lock manager (warn or lock_backend=none)"
+    );
 }
 
 #[given(regex = r"^another apply\(\) is already holding the lock$")]

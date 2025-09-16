@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, ValueEnum)]
 pub enum Package {
@@ -9,7 +9,11 @@ pub enum Package {
 }
 
 #[derive(Debug, Parser)]
-#[command(name = "oxidizr-deb", version, about = "Debian-family CLI to swap GNU coreutils with uutils-coreutils and sudo with sudo-rs using Switchyard")] 
+#[command(
+    name = "oxidizr-deb",
+    version,
+    about = "Debian-family CLI to swap GNU coreutils with uutils-coreutils and sudo with sudo-rs using Switchyard"
+)]
 pub struct Cli {
     /// Root of the filesystem tree to operate on (default "/")
     #[arg(long, global = true, default_value = "/")]

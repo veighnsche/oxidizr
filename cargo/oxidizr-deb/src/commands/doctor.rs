@@ -24,7 +24,10 @@ fn detect_distro(root: &Path) -> (String, Option<String>) {
                 map.insert(k.to_string(), v.to_string());
             }
         }
-        let id = map.get("ID").cloned().unwrap_or_else(|| "unknown".to_string());
+        let id = map
+            .get("ID")
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
         let ver = map.get("VERSION_ID").cloned();
         return (id, ver);
     }
@@ -38,7 +41,12 @@ fn check_locks(root: &Path) -> (bool, Vec<String>) {
         "/var/lib/apt/lists/lock",
     ];
     let mut present = vec![];
-    for l in locks { let p = root.join(l.trim_start_matches('/')); if p.exists() { present.push(l.to_string()); } }
+    for l in locks {
+        let p = root.join(l.trim_start_matches('/'));
+        if p.exists() {
+            present.push(l.to_string());
+        }
+    }
     (!present.is_empty(), present)
 }
 
@@ -55,24 +63,48 @@ pub fn exec(root: &Path, json: bool) -> Result<(), String> {
         tips.push("Package manager busy (dpkg/apt lock detected); retry after current operation finishes.".to_string());
     }
     if !paths_ok {
-        tips.push("Missing expected directories under --root (usr/bin); ensure target root is correct.".to_string());
+        tips.push(
+            "Missing expected directories under --root (usr/bin); ensure target root is correct."
+                .to_string(),
+        );
     }
 
     if json {
-        let rep = DoctorReport { distro_id, distro_version, locks_present, locks, paths_ok, tips };
-        println!("{}", serde_json::to_string(&rep).map_err(|e| e.to_string())?);
+        let rep = DoctorReport {
+            distro_id,
+            distro_version,
+            locks_present,
+            locks,
+            paths_ok,
+            tips,
+        };
+        println!(
+            "{}",
+            serde_json::to_string(&rep).map_err(|e| e.to_string())?
+        );
     } else {
-        println!("Detected distro: {} {}", distro_id, distro_version.clone().unwrap_or_default());
+        println!(
+            "Detected distro: {} {}",
+            distro_id,
+            distro_version.clone().unwrap_or_default()
+        );
         if locks_present {
             println!("Locks present: yes");
-            for l in &locks { println!("  - {}", l); }
+            for l in &locks {
+                println!("  - {}", l);
+            }
         } else {
             println!("Locks present: no");
         }
-        println!("Paths ok (usr/bin): {}", if paths_ok { "yes" } else { "no" });
+        println!(
+            "Paths ok (usr/bin): {}",
+            if paths_ok { "yes" } else { "no" }
+        );
         if !tips.is_empty() {
             println!("Tips:");
-            for t in &tips { println!("  - {}", t); }
+            for t in &tips {
+                println!("  - {}", t);
+            }
         }
     }
     Ok(())

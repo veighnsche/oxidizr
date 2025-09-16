@@ -33,7 +33,7 @@ pub use builder::ApiBuilder;
 /// Public API overrides.
 pub use overrides::Overrides;
 /// DX alias for `ApiBuilder`.
-/// 
+///
 /// This type alias provides a more convenient and readable way to construct a `Switchyard` instance.
 pub type SwitchyardBuilder<E, A> = ApiBuilder<E, A>;
 

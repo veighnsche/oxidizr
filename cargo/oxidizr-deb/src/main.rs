@@ -1,10 +1,10 @@
+mod adapters;
 mod cli;
 mod commands;
-mod packages;
-mod fetch;
-mod adapters;
-mod util;
 mod errors;
+mod fetch;
+mod packages;
+mod util;
 
 use clap::Parser;
 

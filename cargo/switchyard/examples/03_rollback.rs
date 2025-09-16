@@ -1,7 +1,7 @@
 use switchyard::api::ApiBuilder;
 use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
-use switchyard::types::{PlanInput, LinkRequest, RestoreRequest, SafePath, ApplyMode};
+use switchyard::types::{ApplyMode, LinkRequest, PlanInput, RestoreRequest, SafePath};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let facts = JsonlSink::default();
@@ -23,8 +23,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Plan with a symlink replacement followed by a restore that is expected to fail
     // by targeting a different path that has no backup artifacts.
     let plan = PlanInput {
-        link: vec![LinkRequest { source, target: target.clone() }],
-        restore: vec![RestoreRequest { target: missing_target.clone() }],
+        link: vec![LinkRequest {
+            source,
+            target: target.clone(),
+        }],
+        restore: vec![RestoreRequest {
+            target: missing_target.clone(),
+        }],
     };
     let plan = api.plan(plan);
 

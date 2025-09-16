@@ -1,7 +1,7 @@
 use switchyard::api::ApiBuilder;
 use switchyard::logging::JsonlSink;
 use switchyard::policy::Policy;
-use switchyard::types::{PlanInput, LinkRequest, SafePath, ApplyMode};
+use switchyard::types::{ApplyMode, LinkRequest, PlanInput, SafePath};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let facts = JsonlSink::default();
@@ -18,7 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = SafePath::from_rooted(root, &root.join("bin/new"))?;
     let target = SafePath::from_rooted(root, &root.join("usr/bin/tool"))?;
 
-    let plan = switchyard::api::Switchyard::plan(&api, PlanInput { link: vec![LinkRequest { source, target }], restore: vec![] });
+    let plan = switchyard::api::Switchyard::plan(
+        &api,
+        PlanInput {
+            link: vec![LinkRequest { source, target }],
+            restore: vec![],
+        },
+    );
     let _report = switchyard::api::Switchyard::apply(&api, &plan, ApplyMode::DryRun)?;
     Ok(())
 }

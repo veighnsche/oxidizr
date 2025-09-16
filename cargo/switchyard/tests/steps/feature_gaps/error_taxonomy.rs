@@ -46,5 +46,8 @@ pub async fn then_preflight_summary_policy_10(world: &mut World) {
             break;
         }
     }
-    assert!(ok, "expected preflight.summary with error_id=E_POLICY and exit_code=10");
+    assert!(
+        ok,
+        "expected preflight.summary with error_id=E_POLICY and exit_code=10"
+    );
 }

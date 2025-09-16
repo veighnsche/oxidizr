@@ -1,4 +1,4 @@
-use cucumber::{given};
+use cucumber::given;
 
 use crate::bdd_world::World;
 

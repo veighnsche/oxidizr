@@ -91,6 +91,7 @@ pub async fn given_new_switchyard(world: &mut World) {
 #[given(regex = r"^a policy requiring strict ownership and unsupported preservation$")]
 pub async fn given_strict_unsupported(world: &mut World) {
     world.policy.risks.ownership_strict = true;
-    world.policy.durability.preservation = switchyard::policy::types::PreservationPolicy::RequireBasic;
+    world.policy.durability.preservation =
+        switchyard::policy::types::PreservationPolicy::RequireBasic;
     world.rebuild_api();
 }
