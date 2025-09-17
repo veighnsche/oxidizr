@@ -62,7 +62,10 @@ log() { echo "[INFO] $*"; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { err "Missing required command: $1"; exit 1; }; }
 
 need_cmd git
-need_cmd git-filter-repo || true # Arch installs git-filter-repo; we will invoke via 'git filter-repo'
+if ! git filter-repo -h >/dev/null 2>&1; then
+  err "'git filter-repo' is not available. Install git-filter-repo (e.g., 'sudo pacman -S git-filter-repo')."
+  exit 1
+fi
 
 if [[ ! -d "$MONOREPO/.git" ]]; then
   err "MONOREPO does not look like a git repo: $MONOREPO"

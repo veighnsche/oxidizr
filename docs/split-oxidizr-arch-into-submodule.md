@@ -113,6 +113,7 @@ Optional: ensure the temporary clone has no untracked refs or stashes.
 ## 2) Filter the history to only `cargo/oxidizr-arch/`
 
 Following GitHub Docs and git-filter-repo manual, use `--subdirectory-filter` to make the subfolder the new repo root and preserve history.
+Note: `--subdirectory-filter DIRECTORY` is equivalent to `--path DIRECTORY/ --path-rename DIRECTORY/:` (per `git filter-repo --help`).
 
 Recommended preliminary steps:
 
@@ -302,5 +303,6 @@ Background:
 
 - GitHub Docs — Splitting a subfolder: <https://docs.github.com/en/get-started/using-git/splitting-a-subfolder-out-into-a-new-repository>
 - newren/git-filter-repo (README & manual): <https://github.com/newren/git-filter-repo>
+  - Alternate manual (mankier): <https://www.mankier.com/1/git-filter-repo>
 - Pro Git — Submodules: <https://git-scm.com/book/en/v2/Git-Tools-Submodules>
 - GitHub Blog — Working with submodules: <https://github.blog/open-source/git/working-with-submodules/>
