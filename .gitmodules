@@ -1,3 +1,6 @@
 [submodule "cargo/switchyard"]
 	path = cargo/switchyard
 	url = git@github.com:veighnsche/switchyard.git
+[submodule "cargo/oxidizr-arch"]
+	path = cargo/oxidizr-arch
+	url = git@github.com:veighnsche/oxidizr-arch.git
