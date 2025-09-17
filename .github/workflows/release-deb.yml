@@ -1,0 +1,87 @@
+name: Build and Release Debian package (oxidizr-deb)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build oxidizr-deb (release)
+        run: cargo build -p oxidizr-deb --release --locked
+
+      - name: Package .deb via cargo-deb
+        run: |
+          cargo deb -p oxidizr-deb --no-build --quiet
+          ls -lah target/debian
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxidizr-deb-deb
+          path: target/debian/*.deb
+
+  release:
+    needs: build-deb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: oxidizr-deb-deb
+          path: dist
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cloudsmith:
+    if: ${{ secrets.CLOUDSMITH_API_KEY != '' && secrets.CLOUDSMITH_OWNER != '' && secrets.CLOUDSMITH_REPO != '' }}
+    needs: build-deb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cloudsmith CLI
+        run: |
+          python3 -m pip install --upgrade --user cloudsmith-cli
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: oxidizr-deb-deb
+          path: dist
+
+      - name: Push to Cloudsmith (optional)
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+          OWNER: ${{ secrets.CLOUDSMITH_OWNER }}
+          REPO: ${{ secrets.CLOUDSMITH_REPO }}
+          # Comma-separated list of distributions, e.g. "ubuntu/jammy,ubuntu/noble,debian/bookworm"
+          DISTRIBUTIONS: ${{ secrets.DEBIAN_DISTRIBUTIONS }}
+        run: |
+          set -euo pipefail
+          for deb in dist/*.deb; do
+            if [ -z "${DISTRIBUTIONS}" ]; then
+              echo "No DISTRIBUTIONS configured; skipping Cloudsmith push"
+              exit 0
+            fi
+            IFS=',' read -ra dists <<< "${DISTRIBUTIONS}"
+            for d in "${dists[@]}"; do
+              echo "Pushing $deb to $OWNER/$REPO for $d"
+              cloudsmith push deb "$OWNER/$REPO/$d" "$deb"
+            done
+          done

@@ -6,22 +6,24 @@ pkgrel=1
 epoch=
 pkgdesc="oxidizr-arch style coreutils switching tool (dry-run capable)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/your/repo"
-license=('GPL3')
-depends=('pacman' 'bash')
+url="https://github.com/veighnsche/oxidizr-arch"
+license=('Apache' 'MIT')
+depends=('bash' 'pacman')
 makedepends=('rust' 'cargo')
 provides=('oxidizr-arch')
-conflicts=()
-source=("local://${pkgname}-${pkgver}.tar.gz")
+conflicts=('oxidizr-arch-git')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/veighnsche/oxidizr-arch/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-  cd "${srcdir}/${pkgname}-${pkgver}"
-  cargo build --release --locked
+  cd "${srcdir}/${pkgname}-${pkgver}" 2>/dev/null || cd "${srcdir}/${pkgname}-v${pkgver}"
+  cargo build -p oxidizr-arch --release --locked
 }
 
 package() {
-  cd "${srcdir}/${pkgname}-${pkgver}"
+  cd "${srcdir}/${pkgname}-${pkgver}" 2>/dev/null || cd "${srcdir}/${pkgname}-v${pkgver}"
   install -Dm755 "target/release/oxidizr-arch" "${pkgdir}/usr/bin/oxidizr-arch"
-  install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 README-oxidizr-arch.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 LICENSE-MIT "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT"
 }

@@ -40,3 +40,14 @@ name = "bdd"
 path = "tests/bdd_main.rs"
 harness = false
 required-features = ["bdd"]
+
+[package.metadata.deb]
+# Adjust maintainer to your preferred contact before publishing
+maintainer = "Oxidizr Maintainers <maintainers@example.com>"
+homepage = "https://github.com/veighnsche/oxidizr-arch"
+section = "utils"
+priority = "optional"
+# Minimal runtime tools expected on Debian/Ubuntu systems
+depends = "bash, apt, dpkg"
+# Install README as packaged documentation
+assets = [["README.md", "usr/share/doc/oxidizr-deb/README.md", "644"]]

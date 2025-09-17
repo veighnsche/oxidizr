@@ -1,0 +1,74 @@
+name: Publish AUR (oxidizr-arch)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  aur:
+    name: Release to AUR
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    env:
+      AUR_PKGNAME: oxidizr-arch
+      AUR_COMMIT_EMAIL: ${{ secrets.AUR_COMMIT_EMAIL }}
+    steps:
+      - name: Install tooling
+        run: |
+          pacman -Syu --noconfirm git openssh base-devel sudo pacman-contrib
+          # makepkg needs a non-root user; create one
+          useradd -m builder || true
+          echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
+          usermod -aG wheel builder
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Fix workspace ownership for builder
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+      - name: Setup SSH for AUR
+        run: |
+          mkdir -p /home/builder/.ssh
+          chmod 700 /home/builder/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > /home/builder/.ssh/id_rsa
+          chmod 600 /home/builder/.ssh/id_rsa
+          ssh-keyscan -t rsa aur.archlinux.org >> /home/builder/.ssh/known_hosts
+          chown -R builder:builder /home/builder/.ssh
+      - name: Prepare PKGBUILD for tag version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          sed -i -E "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i -E "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          # Update checksums for the tag tarball
+          sudo -u builder bash -lc 'updpkgsums'
+      - name: Generate .SRCINFO
+        run: |
+          sudo -u builder bash -lc 'makepkg --printsrcinfo > .SRCINFO'
+      - name: Clone AUR repo
+        run: |
+          sudo -u builder bash -lc '
+            set -e
+            if git clone ssh://aur@aur.archlinux.org/${AUR_PKGNAME}.git aur-repo; then
+              exit 0
+            fi
+            echo "AUR repo not found; initializing new repository"
+            mkdir -p aur-repo
+            cd aur-repo
+            git init
+            git remote add origin ssh://aur@aur.archlinux.org/${AUR_PKGNAME}.git
+          '
+      - name: Copy packaging files
+        run: |
+          sudo -u builder bash -lc 'cp PKGBUILD .SRCINFO aur-repo/'
+      - name: Commit and push to AUR
+        run: |
+          cd aur-repo
+          sudo -u builder git config user.name "${GITHUB_ACTOR}"
+          email="${AUR_COMMIT_EMAIL:-actions@github.com}"
+          sudo -u builder git config user.email "$email"
+          sudo -u builder git add PKGBUILD .SRCINFO
+          if sudo -u builder git commit -m "release: ${GITHUB_REF_NAME}"; then
+            sudo -u builder git push origin HEAD:master
+          else
+            echo "No changes to commit; skipping push"
+          fi
