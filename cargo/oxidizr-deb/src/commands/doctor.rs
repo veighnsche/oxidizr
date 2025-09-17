@@ -45,7 +45,9 @@ fn check_locks(root: &Path) -> (bool, Vec<String>) {
     let mut held = vec![];
     for l in locks {
         let p = root.join(l.trim_start_matches('/'));
-        if !p.exists() { continue; }
+        if !p.exists() {
+            continue;
+        }
         if let Ok(f) = OpenOptions::new().read(true).write(true).open(&p) {
             if f.try_lock_exclusive().is_err() {
                 held.push(l.to_string());

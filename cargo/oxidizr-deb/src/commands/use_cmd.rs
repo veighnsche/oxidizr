@@ -1,20 +1,19 @@
 use std::path::{Path, PathBuf};
 
-
 use switchyard::logging::JsonlSink;
 use switchyard::types::safepath::SafePath;
 use switchyard::types::{ApplyMode, LinkRequest, PlanInput};
 use switchyard::Switchyard;
 
 use crate::adapters::debian::pm_lock_message;
+use crate::adapters::debian_adapter::DebianAdapter;
 use crate::adapters::preflight::sudo_guard;
 use crate::cli::args::Package;
-use crate::fetch::resolver::resolve_artifact;
 use crate::fetch::fallback::ensure_artifact_available;
+use crate::fetch::resolver::resolve_artifact;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
 use oxidizr_cli_core::{resolve_applets_for_use, PackageKind};
-use crate::adapters::debian_adapter::DebianAdapter;
 
 fn apt_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -41,24 +40,15 @@ pub fn exec(
     let (mut source_bin, dest_dir) = match package {
         Package::Coreutils => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
-            (
-                src,
-                PathBuf::from(packages::DEST_DIR),
-            )
+            (src, PathBuf::from(packages::DEST_DIR))
         }
         Package::Findutils => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
-            (
-                src,
-                PathBuf::from(packages::DEST_DIR),
-            )
+            (src, PathBuf::from(packages::DEST_DIR))
         }
         Package::Sudo => {
             let src = resolve_artifact(root, package, offline, use_local.as_ref());
-            (
-                src,
-                PathBuf::from(packages::DEST_DIR),
-            )
+            (src, PathBuf::from(packages::DEST_DIR))
         }
     };
 
@@ -91,7 +81,11 @@ pub fn exec(
         if !source_bin.exists() {
             let pkgname = apt_pkg_name(package);
             let apt_ver = std::env::var("OXIDIZR_DEB_APT_VERSION").ok();
-            let apt_arg = if let Some(v) = apt_ver { format!("{}={}", pkgname, v) } else { pkgname.to_string() };
+            let apt_arg = if let Some(v) = apt_ver {
+                format!("{}={}", pkgname, v)
+            } else {
+                pkgname.to_string()
+            };
             eprintln!("[dry-run] would run: apt-get install -y {}", apt_arg);
             // No online fallback; apt-only path.
         }
@@ -182,12 +176,18 @@ pub fn exec(
                 if let Ok(md) = fs::symlink_metadata(&dst) {
                     if md.file_type().is_symlink() {
                         if let Ok(cur) = fs::read_link(&dst) {
-                            if cur == src { count += 1; }
+                            if cur == src {
+                                count += 1;
+                            }
                         }
                     }
                 }
             }
-            let need = if matches!(package, Package::Coreutils) { 2 } else { 1 };
+            let need = if matches!(package, Package::Coreutils) {
+                2
+            } else {
+                1
+            };
             if count < need {
                 return Err(format!(
                     "post-apply smoke failed: expected >={} applet symlinks to point to replacement, found {}",

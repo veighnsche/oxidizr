@@ -47,5 +47,8 @@ pub fn staged_default_path(root: &Path, pkg: Package) -> PathBuf {
         Package::Findutils => ("uutils-findutils", "uutils-findutils"),
         Package::Sudo => ("sudo-rs", "sudo-rs"),
     };
-    root.join("opt/oxidizr/replacements").join(sub).join("bin").join(bin)
+    root.join("opt/oxidizr/replacements")
+        .join(sub)
+        .join("bin")
+        .join(bin)
 }

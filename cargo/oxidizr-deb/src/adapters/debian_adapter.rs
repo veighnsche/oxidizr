@@ -25,7 +25,10 @@ impl DistroAdapter for DebianAdapter {
         let s = String::from_utf8_lossy(&out.stdout);
         let mut names = Vec::new();
         for line in s.lines() {
-            if let Some(n) = line.strip_prefix("/usr/bin/").or_else(|| line.strip_prefix("/bin/")) {
+            if let Some(n) = line
+                .strip_prefix("/usr/bin/")
+                .or_else(|| line.strip_prefix("/bin/"))
+            {
                 if !n.is_empty() && !n.ends_with('/') {
                     names.push(n.to_string());
                 }

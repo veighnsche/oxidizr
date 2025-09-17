@@ -6,14 +6,13 @@ use switchyard::types::safepath::SafePath;
 use switchyard::types::{ApplyMode, PlanInput, RestoreRequest};
 use switchyard::Switchyard;
 
-use crate::adapters::debian::pm_lock_message;
+use oxidizr_cli_core::{PackageKind, static_fallback_applets, DistroAdapter};
+use crate::adapters::debian_adapter::DebianAdapter;
 use crate::cli::args::Package;
+use crate::fetch::fallback::apt_pkg_name;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
 use serde_json::json;
-use crate::fetch::fallback::apt_pkg_name;
-use oxidizr_cli_core::{PackageKind, static_fallback_applets};
-use crate::adapters::debian_adapter::DebianAdapter;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -34,7 +33,9 @@ fn dpkg_installed(name: &str) -> bool {
 }
 
 // Replacement package name in apt (Debian-correct)
-fn replacement_pkg_name(pkg: Package) -> &'static str { apt_pkg_name(pkg) }
+fn replacement_pkg_name(pkg: Package) -> &'static str {
+    apt_pkg_name(pkg)
+}
 
 pub fn exec(
     api: &Switchyard<JsonlSink, JsonlSink>,
@@ -57,11 +58,19 @@ pub fn exec(
         let mut out: Vec<String> = Vec::new();
         let cu = {
             let d = adapter.enumerate_package_commands(root, PackageKind::Coreutils);
-            if d.is_empty() { static_fallback_applets(PackageKind::Coreutils) } else { d }
+            if d.is_empty() {
+                static_fallback_applets(PackageKind::Coreutils)
+            } else {
+                d
+            }
         };
         let fu = {
             let d = adapter.enumerate_package_commands(root, PackageKind::Findutils);
-            if d.is_empty() { static_fallback_applets(PackageKind::Findutils) } else { d }
+            if d.is_empty() {
+                static_fallback_applets(PackageKind::Findutils)
+            } else {
+                d
+            }
         };
         let su = static_fallback_applets(PackageKind::Sudo);
         out.extend(cu);
@@ -72,11 +81,19 @@ pub fn exec(
         match package.unwrap() {
             Package::Coreutils => {
                 let d = adapter.enumerate_package_commands(root, PackageKind::Coreutils);
-                if d.is_empty() { static_fallback_applets(PackageKind::Coreutils) } else { d }
+                if d.is_empty() {
+                    static_fallback_applets(PackageKind::Coreutils)
+                } else {
+                    d
+                }
             }
             Package::Findutils => {
                 let d = adapter.enumerate_package_commands(root, PackageKind::Findutils);
-                if d.is_empty() { static_fallback_applets(PackageKind::Findutils) } else { d }
+                if d.is_empty() {
+                    static_fallback_applets(PackageKind::Findutils)
+                } else {
+                    d
+                }
             }
             Package::Sudo => static_fallback_applets(PackageKind::Sudo),
         }
@@ -106,20 +123,24 @@ pub fn exec(
                 cmd.stdin(Stdio::null());
                 cmd.stdout(Stdio::piped());
                 cmd.stderr(Stdio::piped());
-                let out = cmd.output().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+                let out = cmd
+                    .output()
+                    .map_err(|e| format!("failed to spawn apt-get: {e}"))?;
                 let code = out.status.code().unwrap_or(1);
                 let stderr_tail = String::from_utf8_lossy(&out.stderr);
-                eprintln!("{}", json!({
-                    "event":"pm.install",
-                    "pm": {"tool":"apt-get","args": args_view, "package": name},
-                    "exit_code": code,
-                    "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
-                }));
+                eprintln!(
+                    "{}",
+                    json!({
+                        "event":"pm.install",
+                        "pm": {"tool":"apt-get","args": args_view, "package": name},
+                        "exit_code": code,
+                        "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+                    })
+                );
                 if code != 0 {
                     return Err(format!(
                         "apt-get install {} failed with exit code {}",
-                        name,
-                        code
+                        name, code
                     ));
                 }
             }
@@ -201,17 +222,25 @@ pub fn exec(
                     cmd.stdin(Stdio::null());
                     cmd.stdout(Stdio::piped());
                     cmd.stderr(Stdio::piped());
-                    let out = cmd.output().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+                    let out = cmd
+                        .output()
+                        .map_err(|e| format!("failed to spawn apt-get: {e}"))?;
                     let code = out.status.code().unwrap_or(1);
                     let stderr_tail = String::from_utf8_lossy(&out.stderr);
-                    eprintln!("{}", json!({
-                        "event":"pm.purge",
-                        "pm": {"tool":"apt-get","args": args_view, "package": rs_name},
-                        "exit_code": code,
-                        "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
-                    }));
+                    eprintln!(
+                        "{}",
+                        json!({
+                            "event":"pm.purge",
+                            "pm": {"tool":"apt-get","args": args_view, "package": rs_name},
+                            "exit_code": code,
+                            "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+                        })
+                    );
                     if code != 0 {
-                        return Err(format!("apt-get purge {} failed with exit code {}", rs_name, code));
+                        return Err(format!(
+                            "apt-get purge {} failed with exit code {}",
+                            rs_name, code
+                        ));
                     }
                 }
             }

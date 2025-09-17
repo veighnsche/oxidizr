@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::cli::args::Package;
- 
 
 pub fn apt_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -31,10 +30,13 @@ fn run(cmd: &str, args: &[&str]) -> Result<(i32, String, String), String> {
 
 fn apt_install(pkg: &str) -> Result<(), String> {
     let (code, _so, se) = run("apt-get", &["update"])?;
-    eprintln!("{}", serde_json::json!({
-        "event":"pm.update","pm":{"tool":"apt-get","args":["update"]},"exit_code":code,
-        "stderr_tail": se.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
-    }));
+    eprintln!(
+        "{}",
+        serde_json::json!({
+            "event":"pm.update","pm":{"tool":"apt-get","args":["update"]},"exit_code":code,
+            "stderr_tail": se.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+        })
+    );
     if code != 0 {
         return Err("apt-get update failed".to_string());
     }
@@ -49,10 +51,13 @@ fn apt_install(pkg: &str) -> Result<(), String> {
         install_args.push(pkg);
     }
     let (code, _so, se) = run("apt-get", &install_args)?;
-    eprintln!("{}", serde_json::json!({
-        "event":"pm.install","pm":{"tool":"apt-get","args":install_args,"package":pkg},"exit_code":code,
-        "stderr_tail": se.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
-    }));
+    eprintln!(
+        "{}",
+        serde_json::json!({
+            "event":"pm.install","pm":{"tool":"apt-get","args":install_args,"package":pkg},"exit_code":code,
+            "stderr_tail": se.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+        })
+    );
     if code != 0 {
         return Err(format!("apt-get install {} failed", pkg));
     }
@@ -77,7 +82,11 @@ fn dpkg_locate_binary(pkgname: &str, candidates: &[&str]) -> Option<PathBuf> {
 
 // Online fallbacks removed; apt-only path is supported.
 
-pub fn ensure_artifact_available(root: &Path, pkg: Package, commit: bool) -> Result<PathBuf, String> {
+pub fn ensure_artifact_available(
+    root: &Path,
+    pkg: Package,
+    commit: bool,
+) -> Result<PathBuf, String> {
     let setuid = matches!(pkg, Package::Sudo);
     let root_is_live = root == Path::new("/");
 

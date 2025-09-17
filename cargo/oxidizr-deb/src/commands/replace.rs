@@ -1,19 +1,19 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use oxidizr_cli_core::prompts::should_proceed;
+use oxidizr_cli_core::{coverage_preflight, PackageKind};
 use switchyard::logging::JsonlSink;
 use switchyard::types::ApplyMode;
 use switchyard::Switchyard;
-use oxidizr_cli_core::prompts::should_proceed;
-use oxidizr_cli_core::{coverage_preflight, PackageKind};
 
 use crate::adapters::debian::pm_lock_message;
+use crate::adapters::debian_adapter::DebianAdapter;
 use crate::cli::args::Package;
-use serde_json::json;
 use crate::fetch::fallback::apt_pkg_name;
 use crate::fetch::resolver::resolve_artifact;
 use crate::packages;
-use crate::adapters::debian_adapter::DebianAdapter;
+use serde_json::json;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {
     match pkg {
@@ -23,7 +23,9 @@ fn distro_pkg_name(pkg: Package) -> &'static str {
     }
 }
 
-fn replacement_pkg_name(pkg: Package) -> &'static str { apt_pkg_name(pkg) }
+fn replacement_pkg_name(pkg: Package) -> &'static str {
+    apt_pkg_name(pkg)
+}
 
 fn dpkg_installed(name: &str) -> bool {
     let st = Command::new("dpkg")
@@ -85,7 +87,10 @@ pub fn exec(
         crate::commands::r#use::exec(api, root, *p, false, None, mode)?;
         // Provider pre-check: replacement must now be active
         if !is_active(root, *p) {
-            return Err(format!("replacement for {:?} is not active after use; aborting replace", p));
+            return Err(format!(
+                "replacement for {:?} is not active after use; aborting replace",
+                p
+            ));
         }
         // Coverage preflight: replacement must cover all distro-provided applets (coreutils/findutils)
         let kind = match p {
@@ -116,10 +121,16 @@ pub fn exec(
         let rs_name = replacement_pkg_name(*p);
         let have_rs_pkg = dpkg_installed(rs_name);
         if !is_active(root, *p) {
-            return Err(format!("invariant violation: replacement for {:?} not active before purge", p));
+            return Err(format!(
+                "invariant violation: replacement for {:?} not active before purge",
+                p
+            ));
         }
         if !have_rs_pkg {
-            return Err(format!("invariant violation: no replacement package present for {:?}", p));
+            return Err(format!(
+                "invariant violation: no replacement package present for {:?}",
+                p
+            ));
         }
         let mut cmd = Command::new("apt-get");
         let args = vec!["purge".to_string(), "-y".to_string(), name.to_string()];
@@ -128,22 +139,33 @@ pub fn exec(
         cmd.stdin(Stdio::null());
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
-        let out = cmd.output().map_err(|e| format!("failed to spawn apt-get: {e}"))?;
+        let out = cmd
+            .output()
+            .map_err(|e| format!("failed to spawn apt-get: {e}"))?;
         let code = out.status.code().unwrap_or(1);
         let stderr_tail = String::from_utf8_lossy(&out.stderr);
-        eprintln!("{}", json!({
-            "event":"pm.purge",
-            "pm": {"tool":"apt-get","args": args_view, "package": name},
-            "exit_code": code,
-            "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
-        }));
+        eprintln!(
+            "{}",
+            json!({
+                "event":"pm.purge",
+                "pm": {"tool":"apt-get","args": args_view, "package": name},
+                "exit_code": code,
+                "stderr_tail": stderr_tail.chars().rev().take(400).collect::<String>().chars().rev().collect::<String>()
+            })
+        );
         if code != 0 {
-            return Err(format!("apt-get purge {} failed with exit code {}", name, code));
+            return Err(format!(
+                "apt-get purge {} failed with exit code {}",
+                name, code
+            ));
         }
         // Pre-check: replacement must be active before purging GNU packages
         if matches!(mode, ApplyMode::Commit) {
             if !is_active(root, *p) {
-                return Err(format!("replacement for {:?} not active before purge; aborting", p));
+                return Err(format!(
+                    "replacement for {:?} not active before purge; aborting",
+                    p
+                ));
             }
         }
     }
@@ -152,11 +174,17 @@ pub fn exec(
     if matches!(mode, ApplyMode::Commit) {
         for p in &targets {
             if !is_active(root, *p) {
-                return Err(format!("invariant violation: replacement for {:?} not active after purge", p));
+                return Err(format!(
+                    "invariant violation: replacement for {:?} not active after purge",
+                    p
+                ));
             }
             let rs_name = replacement_pkg_name(*p);
             if !dpkg_installed(rs_name) {
-                return Err(format!("invariant violation: no provider present for {:?} after purge", p));
+                return Err(format!(
+                    "invariant violation: no provider present for {:?} after purge",
+                    p
+                ));
             }
         }
     }

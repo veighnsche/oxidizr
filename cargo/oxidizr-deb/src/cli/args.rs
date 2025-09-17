@@ -31,8 +31,6 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub apt_version: Option<String>,
 
-    
-
     #[command(subcommand)]
     pub command: Commands,
 }

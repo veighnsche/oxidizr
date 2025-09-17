@@ -1,8 +1,9 @@
-use crate::packages::static_fallback_applets;
-use crate::{DistroAdapter, PackageKind};
 use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
+
+use crate::{DistroAdapter, PackageKind};
+use crate::packages::static_fallback_applets;
 
 /// Interrogate the replacement binary and return the set of applets it claims to support,
 /// intersected with the provided `allow` list. Falls back to `allow` if probing fails
@@ -10,55 +11,17 @@ use std::process::Command;
 pub fn discover_applets_with_allow(source_bin: &Path, allow: &[String]) -> Vec<String> {
     fn parse(stdout: &str, allow: &HashSet<&str>) -> Vec<String> {
         let mut out = Vec::new();
-        for token in stdout.split(|c: char| c.is_whitespace() || [',', ';', '|', '/'].contains(&c))
-        {
+        for token in stdout.split(|c: char| c.is_whitespace() || [',', ';', '|', '/'].contains(&c)) {
             let t = token.trim();
             if !t.is_empty() && allow.contains(t) {
                 out.push(t.to_string());
-            }
-
-            /// Resolve the set of applets to link during `use` for a given package, by
-            /// interrogating the replacement binary, intersecting with distro-provided
-            /// commands when available, and falling back to the static list if needed.
-            pub fn resolve_applets_for_use<A: DistroAdapter>(
-                adapter: &A,
-                root: &Path,
-                pkg: PackageKind,
-                source_bin: &Path,
-            ) -> Vec<String> {
-                let allow = static_fallback_applets(pkg);
-                let repl = discover_applets_with_allow(source_bin, &allow);
-                let distro = adapter.enumerate_package_commands(root, pkg);
-                if distro.is_empty() {
-                    repl
-                } else {
-                    intersect_distro_with_replacement(&distro, &repl)
-                }
-            }
-
-            /// Preflight coverage for `replace`: require that the replacement supports all
-            /// distro-provided commands for the given package; returns Err(missing) if not.
-            pub fn coverage_preflight<A: DistroAdapter>(
-                adapter: &A,
-                root: &Path,
-                pkg: PackageKind,
-                source_bin: &Path,
-            ) -> Result<(), Vec<String>> {
-                let allow = static_fallback_applets(pkg);
-                let repl = discover_applets_with_allow(source_bin, &allow);
-                let distro = adapter.enumerate_package_commands(root, pkg);
-                if distro.is_empty() {
-                    // No distro enumeration (non-live root). Accept preflight; downstream code
-                    // should still perform post-apply smoke checks.
-                    return Ok(());
-                }
-                coverage_check(&distro, &repl)
             }
         }
         out.sort();
         out.dedup();
         out
     }
+
     let allow_set: HashSet<&str> = allow.iter().map(|s| s.as_str()).collect();
 
     if let Ok(out) = Command::new(source_bin).arg("--list").output() {
@@ -80,6 +43,44 @@ pub fn discover_applets_with_allow(source_bin: &Path, allow: &[String]) -> Vec<S
         }
     }
     allow.iter().cloned().collect()
+}
+
+/// Resolve the set of applets to link during `use` for a given package, by
+/// interrogating the replacement binary, intersecting with distro-provided
+/// commands when available, and falling back to the static list if needed.
+pub fn resolve_applets_for_use<A: DistroAdapter>(
+    adapter: &A,
+    root: &Path,
+    pkg: PackageKind,
+    source_bin: &Path,
+) -> Vec<String> {
+    let allow = static_fallback_applets(pkg);
+    let repl = discover_applets_with_allow(source_bin, &allow);
+    let distro = adapter.enumerate_package_commands(root, pkg);
+    if distro.is_empty() {
+        repl
+    } else {
+        intersect_distro_with_replacement(&distro, &repl)
+    }
+}
+
+/// Preflight coverage for `replace`: require that the replacement supports all
+/// distro-provided commands for the given package; returns Err(missing) if not.
+pub fn coverage_preflight<A: DistroAdapter>(
+    adapter: &A,
+    root: &Path,
+    pkg: PackageKind,
+    source_bin: &Path,
+) -> Result<(), Vec<String>> {
+    let allow = static_fallback_applets(pkg);
+    let repl = discover_applets_with_allow(source_bin, &allow);
+    let distro = adapter.enumerate_package_commands(root, pkg);
+    if distro.is_empty() {
+        // No distro enumeration (non-live root). Accept preflight; downstream code
+        // should still perform post-apply smoke checks.
+        return Ok(());
+    }
+    coverage_check(&distro, &repl)
 }
 
 /// Intersect distro-provided commands with replacement-supported applets.
@@ -113,7 +114,6 @@ pub fn coverage_check(distro: &[String], repl: &[String]) -> Result<(), Vec<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     struct MockAdapter {
         distro: Vec<String>,
@@ -152,17 +152,15 @@ mod tests {
     #[test]
     fn test_discover_fallback_when_binary_missing() {
         let allow = vec!["ls".into(), "cat".into()];
-        let bogus = PathBuf::from("/definitely/not/a/binary/path");
-        let out = discover_applets_with_allow(&bogus, &allow);
+        let bogus = Path::new("/definitely/not/a/binary/path");
+        let out = discover_applets_with_allow(bogus, &allow);
         // Missing binary → fallback to allow set
         assert_eq!(out, allow);
     }
 
     #[test]
     fn test_resolve_applets_for_use_intersects_with_distro_when_present() {
-        let adapter = MockAdapter {
-            distro: vec!["ls".into(), "cat".into()],
-        };
+        let adapter = MockAdapter { distro: vec!["ls".into(), "cat".into()] };
         let root = Path::new("/");
         // Non-existent so discovery falls back to static allow; intersection should retain only the mocked distro names that are allowed.
         let source_bin = Path::new("/nonexistent/bin");
@@ -174,7 +172,7 @@ mod tests {
     #[test]
     fn test_resolve_applets_for_use_returns_repl_when_no_distro_list() {
         let adapter = MockAdapter { distro: vec![] };
-        let root = Path::new("/");
+        let root = Path::new("/" );
         let source_bin = Path::new("/nonexistent/bin");
         let out = resolve_applets_for_use(&adapter, root, PackageKind::Findutils, source_bin);
         // Fallback returns static set for findutils

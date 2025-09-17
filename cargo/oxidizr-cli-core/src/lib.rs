@@ -43,11 +43,14 @@ pub mod api {
 }
 
 // Cross-distro core modules
-pub mod packages;
 pub mod adapter;
-pub mod coverage;
+pub mod coverage2;
+pub mod packages;
 
 // Re-exports for convenience
 pub use adapter::DistroAdapter;
-pub use coverage::{coverage_check, coverage_preflight, discover_applets_with_allow, intersect_distro_with_replacement, resolve_applets_for_use};
+pub use coverage2::{
+    coverage_check, coverage_preflight, discover_applets_with_allow,
+    intersect_distro_with_replacement, resolve_applets_for_use,
+};
 pub use packages::{dest_dir_path, static_fallback_applets, PackageKind, DEST_DIR};
