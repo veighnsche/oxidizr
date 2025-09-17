@@ -8,6 +8,16 @@ repository = "https://github.com/veighnsche/oxidizr-arch"
 keywords = ["cli", "switchyard"]
 readme = "README.md"
 categories = ["command-line-utilities"]
+documentation = "https://docs.rs/oxidizr-cli-core"
+rust-version = "1.81"
+exclude = [
+  "Cargo.toml.orig",
+]
+
+[package.metadata.docs.rs]
+all-features = false
+features = []
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 switchyard = { package = "switchyard-fs", version = "0.1.0" }
