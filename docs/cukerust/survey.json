@@ -1,0 +1,290 @@
+{
+  "generated_at": "2025-09-17T13:59:11+02:00",
+  "workspace": {
+    "root": ".",
+    "feature_roots": [
+      "cargo/switchyard/SPEC/features/",
+      "cargo/oxidizr-arch/tests/features/",
+      "cargo/oxidizr-deb/tests/features/",
+      "cargo/oxidizr-cli-core/tests/features/"
+    ],
+    "step_crates": [
+      "cargo/switchyard/tests/steps/",
+      "cargo/oxidizr-arch/tests/steps/",
+      "cargo/oxidizr-deb/tests/steps/",
+      "cargo/oxidizr-cli-core/tests/steps/"
+    ]
+  },
+  "features": {
+    "count": 50,
+    "roots": [
+      { "path": "cargo/switchyard/SPEC/features/", "approx_count": 20 },
+      { "path": "cargo/oxidizr-arch/tests/features/", "approx_count": 11 },
+      { "path": "cargo/oxidizr-deb/tests/features/", "approx_count": 15 },
+      { "path": "cargo/oxidizr-cli-core/tests/features/", "approx_count": 4 }
+    ],
+    "tags": {
+      "has_wip": false,
+      "has_ignore": false,
+      "has_xfail": true,
+      "unique": [
+        "@REQ-A1",
+        "@REQ-A2",
+        "@REQ-A3",
+        "@REQ-API1",
+        "@REQ-BND1",
+        "@REQ-C1",
+        "@REQ-C2",
+        "@REQ-CI1",
+        "@REQ-CI2",
+        "@REQ-CI3",
+        "@REQ-D1",
+        "@REQ-D2",
+        "@REQ-E1",
+        "@REQ-E2",
+        "@REQ-F1",
+        "@REQ-F2",
+        "@REQ-F3",
+        "@REQ-H1",
+        "@REQ-H2",
+        "@REQ-H3",
+        "@REQ-L1",
+        "@REQ-L2",
+        "@REQ-L3",
+        "@REQ-L4",
+        "@REQ-L5",
+        "@REQ-O1",
+        "@REQ-O2",
+        "@REQ-O3",
+        "@REQ-O4",
+        "@REQ-O5",
+        "@REQ-O6",
+        "@REQ-O7",
+        "@REQ-O8",
+        "@REQ-PF1",
+        "@REQ-PN1",
+        "@REQ-PN2",
+        "@REQ-PN3",
+        "@REQ-R1",
+        "@REQ-R2",
+        "@REQ-R3",
+        "@REQ-R4",
+        "@REQ-R5",
+        "@REQ-RC1",
+        "@REQ-RC2",
+        "@REQ-RC3",
+        "@REQ-S1",
+        "@REQ-S2",
+        "@REQ-S3",
+        "@REQ-S4",
+        "@REQ-S5",
+        "@REQ-S6",
+        "@REQ-T1",
+        "@REQ-T2",
+        "@REQ-TOCTOU1",
+        "@REQ-VERS1",
+        "@unit-bdd",
+        "@xfail"
+      ],
+      "byTag": {
+        "@REQ-D2": 3,
+        "@REQ-F1": 3,
+        "@REQ-F2": 3,
+        "@xfail": 3,
+        "@REQ-A1": 2,
+        "@REQ-A2": 2,
+        "@REQ-A3": 2,
+        "@REQ-C1": 2,
+        "@REQ-C2": 2,
+        "@REQ-D1": 2,
+        "@REQ-H1": 2,
+        "@REQ-H2": 2,
+        "@REQ-H3": 2,
+        "@REQ-L1": 2,
+        "@REQ-L2": 2,
+        "@REQ-L3": 2,
+        "@REQ-L4": 2,
+        "@REQ-O1": 2,
+        "@REQ-O2": 2,
+        "@REQ-O3": 2,
+        "@REQ-O4": 2,
+        "@REQ-O5": 2,
+        "@REQ-O6": 2,
+        "@REQ-R1": 2,
+        "@REQ-R2": 2,
+        "@REQ-R3": 2,
+        "@REQ-R4": 2,
+        "@REQ-R5": 2,
+        "@REQ-RC1": 2,
+        "@REQ-RC2": 2,
+        "@REQ-RC3": 2,
+        "@REQ-VERS1": 2,
+        "@REQ-API1": 1,
+        "@REQ-BND1": 1,
+        "@REQ-CI1": 1,
+        "@REQ-CI2": 1,
+        "@REQ-CI3": 1,
+        "@REQ-E1": 1,
+        "@REQ-E2": 1,
+        "@REQ-F3": 1,
+        "@REQ-L5": 1,
+        "@REQ-O7": 1,
+        "@REQ-O8": 1,
+        "@REQ-PF1": 1,
+        "@REQ-PN1": 1,
+        "@REQ-PN2": 1,
+        "@REQ-PN3": 1,
+        "@REQ-S1": 1,
+        "@REQ-S2": 1,
+        "@REQ-S3": 1,
+        "@REQ-S4": 1,
+        "@REQ-S5": 1,
+        "@REQ-S6": 1,
+        "@REQ-T1": 1,
+        "@REQ-T2": 1,
+        "@REQ-TOCTOU1": 1,
+        "@unit-bdd": 1
+      }
+    },
+    "naming_conventions": {
+      "switchyard": "SPEC/features/<area>.feature",
+      "cli_crates": "tests/features/<topic>.feature"
+    }
+  },
+  "steps": {
+    "crates": [
+      {
+        "name": "switchyard-fs",
+        "path": "cargo/switchyard/tests/steps/",
+        "world": {
+          "file": "cargo/switchyard/tests/bdd_world/mod.rs",
+          "derive": "#[derive(Default, cucumber::World)]",
+          "pattern": "async steps take &mut World; state via fields + EnvGuard"
+        },
+        "registration_mode": "macro",
+        "macros": ["#[given]", "#[when]", "#[then]"],
+        "notes": "Regex-based patterns in attributes; async fn world: &mut World"
+      },
+      {
+        "name": "oxidizr-arch",
+        "path": "cargo/oxidizr-arch/tests/steps/",
+        "world": {
+          "file": "cargo/oxidizr-arch/tests/world.rs",
+          "derive": "#[derive(Default, cucumber::World)]"
+        },
+        "registration_mode": "macro"
+      },
+      {
+        "name": "oxidizr-deb",
+        "path": "cargo/oxidizr-deb/tests/steps/",
+        "world": {
+          "file": "cargo/oxidizr-deb/tests/bdd_world/mod.rs",
+          "derive": "#[derive(Default, cucumber::World)]"
+        },
+        "registration_mode": "macro"
+      },
+      {
+        "name": "oxidizr-cli-core",
+        "path": "cargo/oxidizr-cli-core/tests/steps/",
+        "world": {
+          "file": "cargo/oxidizr-cli-core/tests/world.rs",
+          "derive": "#[derive(Default, cucumber::World)]"
+        },
+        "registration_mode": "macro"
+      }
+    ],
+    "registration_modes": ["macro"],
+    "patterns_sample": [
+      "^(/.+) is a symlink to (.+)$",
+      "^a plan with at least one action$",
+      "^I run in real mode$",
+      "^I run preflight$",
+      "^a pacman db lock is held$",
+      "^I call coverage_check with distro \"([^\"]*)\" and repl \"([^\"]*)\"$"
+    ]
+  },
+  "runner": {
+    "framework": "cucumber-rs (0.20) via harness=false test binaries",
+    "entrypoints": [
+      { "crate": "switchyard-fs", "file": "cargo/switchyard/tests/bdd_main.rs", "features_env": "SWITCHYARD_BDD_FEATURE_PATH", "default_features_dir": "SPEC/features" },
+      { "crate": "oxidizr-arch", "file": "cargo/oxidizr-arch/tests/bdd_main.rs", "features_env": "OXIDIZR_ARCH_BDD_FEATURE_PATH", "default_features_dir": "tests/features" },
+      { "crate": "oxidizr-deb", "file": "cargo/oxidizr-deb/tests/bdd_main.rs", "features_env": "OXIDIZR_DEB_BDD_FEATURE_PATH", "default_features_dir": "tests/features" },
+      { "crate": "oxidizr-cli-core", "file": "cargo/oxidizr-cli-core/tests/bdd_main.rs", "default_features_dir": "tests/features" }
+    ],
+    "command_examples": [
+      "cargo test -p switchyard-fs --features bdd --test bdd -- --nocapture",
+      "SWITCHYARD_BDD_FEATURE_PATH=SPEC/features/locking.feature cargo test -p switchyard-fs --features bdd --test bdd -- --nocapture",
+      "cargo test -p oxidizr-arch --features bdd -q",
+      "OXIDIZR_DEB_BDD_FEATURE_PATH=cargo/oxidizr-deb/tests/features/coreutils_replace_dry_run.feature cargo test -p oxidizr-deb --features bdd -q"
+    ],
+    "filters": {
+      "path": true,
+      "tags": false,
+      "name": false,
+      "line": false
+    },
+    "concurrency": {
+      "tokio_runtime": "multi_thread",
+      "scenario_concurrency": "not explicitly configured"
+    },
+    "output": {
+      "format": "plain text to stdout/stderr",
+      "fail_on_skipped": true,
+      "cucumber_messages_ndjson": {
+        "supported": false,
+        "howto_enable": "Would require configuring a JSON/NDJSON writer in test entrypoint; not enabled in current codebase"
+      },
+      "artifacts": [
+        {
+          "tool": "scripts/bdd_filter_results.py",
+          "output": "target/bdd-lastrun.log",
+          "notes": "helper filters output to failures only"
+        }
+      ]
+    },
+    "env": {
+      "SWITCHYARD_BDD_FEATURE_PATH": "<path to SPEC/features or a specific .feature>",
+      "OXIDIZR_ARCH_BDD_FEATURE_PATH": "<path to tests/features or specific file>",
+      "OXIDIZR_DEB_BDD_FEATURE_PATH": "<path to tests/features or specific file>"
+    }
+  },
+  "ci": {
+    "workflows": [
+      {
+        "file": ".github/workflows/ci.yml",
+        "jobs": [
+          "lint", "test-unit", "test-ci-runner", "bdd", "golden-fixtures", "traceability",
+          "e2e-oxidizr-deb", "oxidizr-deb-bdd", "oxidizr-arch-smoke", "oxidizr-arch-bdd", "oxidizr-cli-core-bdd"
+        ],
+        "bdd_job": {
+          "name": "BDD Gating (Switchyard)",
+          "command": "python3 scripts/bdd_filter_results.py --fail-only",
+          "artifacts": ["target/bdd-lastrun.log"]
+        },
+        "golden_fixtures": {
+          "command": "python3 test_ci_runner.py --golden all --nocapture",
+          "artifacts": ["golden-diff/"]
+        }
+      },
+      { "file": "cargo/switchyard/.github/workflows/bdd.yml", "jobs": ["bdd"] }
+    ]
+  },
+  "pain_points": [
+    "Undefined or skipped steps will fail the run due to fail_on_skipped().",
+    "No NDJSON (Cucumber Messages) output currently enabled; limits live decorations.",
+    "Scenario line-number selection not supported; rely on path, --name, or --tags.",
+    "Multiple crates own steps; cross-crate navigation helpful for jump-to-def."
+  ],
+  "quick_wins": [
+    "Add Run CodeLens: run current feature or scenario using cargo test + env path.",
+    "Jump-to-definition from .feature to Rust step via regex index (this step_index.json).",
+    "Completion of step texts from collected regex patterns.",
+    "Diagnostics for undefined/ambiguous steps during edit (static check).",
+    "Tag browser for @REQ-* and @xfail; quick filters for --tags and --name.",
+    "Show last BDD run log (target/bdd-lastrun.log) and filter to failures."
+  ],
+  "blocked_reasons": [
+    "Cucumber Messages NDJSON is not enabled in test entrypoints; live decorations would require wiring a JSON/NDJSON writer in the BDD mains.",
+    "Scenario name and tag filters are not passed through the test entrypoints; selecting by name or tags would require changes to how args are forwarded to the test binary."
+  ]
+}

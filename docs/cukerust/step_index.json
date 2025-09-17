@@ -1,0 +1,3309 @@
+{
+  "generated_at": "2025-09-17T13:18:06.056078Z",
+  "repo_root": "oxidizr-arch",
+  "step_files_scanned": [
+    "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+    "cargo/oxidizr-arch/tests/steps/cli_steps.rs",
+    "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+    "cargo/oxidizr-arch/tests/steps/fs_steps.rs",
+    "cargo/oxidizr-arch/tests/steps/locks_steps.rs",
+    "cargo/oxidizr-arch/tests/steps/mod.rs",
+    "cargo/oxidizr-cli-core/tests/steps/assert_steps.rs",
+    "cargo/oxidizr-cli-core/tests/steps/common_steps.rs",
+    "cargo/oxidizr-cli-core/tests/steps/coverage_steps.rs",
+    "cargo/oxidizr-cli-core/tests/steps/discover_steps.rs",
+    "cargo/oxidizr-cli-core/tests/steps/mod.rs",
+    "cargo/oxidizr-cli-core/tests/steps/resolve_steps.rs",
+    "cargo/oxidizr-deb/tests/steps/assert_steps.rs",
+    "cargo/oxidizr-deb/tests/steps/cli_steps.rs",
+    "cargo/oxidizr-deb/tests/steps/common_steps.rs",
+    "cargo/oxidizr-deb/tests/steps/fs_steps.rs",
+    "cargo/oxidizr-deb/tests/steps/locks_steps.rs",
+    "cargo/oxidizr-deb/tests/steps/mod.rs",
+    "cargo/switchyard/tests/steps/api_toctou_steps.rs",
+    "cargo/switchyard/tests/steps/apply_steps.rs",
+    "cargo/switchyard/tests/steps/attestation_steps.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/api_safety.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/locking_aliases.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/mod.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/rescue_aliases.rs",
+    "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+    "cargo/switchyard/tests/steps/locks_steps.rs",
+    "cargo/switchyard/tests/steps/mod.rs",
+    "cargo/switchyard/tests/steps/observability_steps.rs",
+    "cargo/switchyard/tests/steps/plan_steps.rs",
+    "cargo/switchyard/tests/steps/preflight_steps.rs",
+    "cargo/switchyard/tests/steps/rescue_steps.rs",
+    "cargo/switchyard/tests/steps/rollback_steps.rs",
+    "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+    "cargo/switchyard/tests/steps/thread_safety_steps.rs"
+  ],
+  "steps": [
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 5,
+      "function": "it_works",
+      "attr": "#[then(\"it works\")]",
+      "pattern_src": "r\"^the command exits (\\d+)$\"",
+      "regex": "r\"^the command exits (\\d+)$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(\"it works\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 8,
+      "function": "command_exits",
+      "attr": "#[then(regex = r\"^the command exits (\\d+)$\")]",
+      "pattern_src": "r\"^the command exits (\\d+)$\"",
+      "regex": "r\"^the command exits (\\d+)$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^the command exits (\\d+)$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 14,
+      "function": "output_not_contains",
+      "attr": "#[then(regex = r\"^output does not contain `(.+)`$\")]",
+      "pattern_src": "r\"^output does not contain `(.+)`$\"",
+      "regex": "r\"^output does not contain `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^output does not contain `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 28,
+      "function": "stderr_contains",
+      "attr": "#[then(regex = r\"^stderr contains `(.+)`$\")]",
+      "pattern_src": "r\"^stderr contains `(.+)`$\"",
+      "regex": "r\"^stderr contains `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^stderr contains `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 40,
+      "function": "stdout_contains",
+      "attr": "#[then(regex = r\"^stdout contains `(.+)`$\")]",
+      "pattern_src": "r\"^stdout contains `(.+)`$\"",
+      "regex": "r\"^stdout contains `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^stdout contains `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 52,
+      "function": "output_contains",
+      "attr": "#[then(regex = r\"^output contains `(.+)`$\")]",
+      "pattern_src": "r\"^output contains `(.+)`$\"",
+      "regex": "r\"^output contains `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^output contains `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/assert_steps.rs",
+      "line": 66,
+      "function": "reports_dry_run_non_zero",
+      "attr": "#[then(regex = r\"^it reports a dry-run with a non-zero planned action count$\")]",
+      "pattern_src": "r\"^it reports a dry-run with a non-zero planned action count$\"",
+      "regex": "r\"^it reports a dry-run with a non-zero planned action count$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^it reports a dry-run with a non-zero planned action count$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/oxidizr-arch/tests/steps/cli_steps.rs",
+      "line": 6,
+      "function": "i_run_oxidizr_arch",
+      "attr": "#[when(regex = r\"^I run `oxidizr-arch (.+)`$\")]",
+      "pattern_src": "r\"^I run `oxidizr-arch (.+)`$\"",
+      "regex": "r\"^I run `oxidizr-arch (.+)`$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r\"^I run `oxidizr-arch (.+)`$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+      "line": 6,
+      "function": "staging_root_at",
+      "attr": "#[given(regex = r\"^a staging root at .*$\")]",
+      "pattern_src": "r\"^a staging root at .*$\"",
+      "regex": "r\"^a staging root at .*$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a staging root at .*$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+      "line": 13,
+      "function": "verified_artifact_lists_applets",
+      "attr": "#[given(",
+      "pattern_src": "r#\"^a verified replacement artifact lists applets \\\"([^\"]+)\\\" for package \\\"(coreutils|findutils|sudo)\\\"$\"#",
+      "regex": "^a verified replacement artifact lists applets \\\"([^\"]+)\\\" for package \\\"(coreutils|findutils|sudo)\\\"$",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[given("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+      "line": 43,
+      "function": "create_regular_file_with_content",
+      "attr": "#[given(regex = r\"^a regular file exists at `(/.+)` with content `(.+)`$\")]",
+      "pattern_src": "r\"^a regular file exists at `(/.+)` with content `(.+)`$\"",
+      "regex": "r\"^a regular file exists at `(/.+)` with content `(.+)`$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[given(regex = r\"^a regular file exists at `(/.+)` with content `(.+)`$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+      "line": 48,
+      "function": "fakeroot_with_stock_coreutils",
+      "attr": "#[given(regex = r\"^a fakeroot with stock coreutils applets$\")]",
+      "pattern_src": "r\"^a fakeroot with stock coreutils applets$\"",
+      "regex": "r\"^a fakeroot with stock coreutils applets$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a fakeroot with stock coreutils applets$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+      "line": 57,
+      "function": "verified_artifact_available",
+      "attr": "#[given(",
+      "pattern_src": "r#\"^a verified replacement artifact is available for package \\\"(coreutils|findutils|sudo)\\\"$\"#",
+      "regex": "^a verified replacement artifact is available for package \\\"(coreutils|findutils|sudo)\\\"$",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/common_steps.rs",
+      "line": 85,
+      "function": "sudo_artifact_setuid",
+      "attr": "#[given(regex = r\"^the sudo artifact has setuid 4755$\")]",
+      "pattern_src": "r\"^the sudo artifact has setuid 4755$\"",
+      "regex": "r\"^the sudo artifact has setuid 4755$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the sudo artifact has setuid 4755$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/fs_steps.rs",
+      "line": 6,
+      "function": "path_is_regular_with_content",
+      "attr": "#[then(regex = r\"^`(/.+)` is a regular file with content `(.+)`$\")]",
+      "pattern_src": "r\"^`(/.+)` is a regular file with content `(.+)`$\"",
+      "regex": "r\"^`(/.+)` is a regular file with content `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a regular file with content `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/fs_steps.rs",
+      "line": 24,
+      "function": "path_is_regular",
+      "attr": "#[then(regex = r\"^`(/.+)` is a regular file$\")]",
+      "pattern_src": "r\"^`(/.+)` is a regular file$\"",
+      "regex": "r\"^`(/.+)` is a regular file$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a regular file$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/fs_steps.rs",
+      "line": 35,
+      "function": "path_is_symlink",
+      "attr": "#[then(regex = r\"^`(/.+)` is a symlink$\")]",
+      "pattern_src": "r\"^`(/.+)` is a symlink$\"",
+      "regex": "r\"^`(/.+)` is a symlink$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a symlink$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-arch/tests/steps/fs_steps.rs",
+      "line": 46,
+      "function": "path_is_symlink_to_replacement",
+      "attr": "#[then(regex = r\"^`(/.+)` is a symlink to the replacement$\")]",
+      "pattern_src": "r\"^`(/.+)` is a symlink to the replacement$\"",
+      "regex": "r\"^`(/.+)` is a symlink to the replacement$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a symlink to the replacement$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-arch/tests/steps/locks_steps.rs",
+      "line": 7,
+      "function": "pacman_db_lock_held",
+      "attr": "#[given(regex = r\"^a pacman db lock is held$\")]",
+      "pattern_src": "r\"^a pacman db lock is held$\"",
+      "regex": "r\"^a pacman db lock is held$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a pacman db lock is held$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-cli-core/tests/steps/assert_steps.rs",
+      "line": 12,
+      "function": "vec_equals",
+      "attr": "#[then(regex = r#\"^the vector equals \\\"([^\\\"]*)\\\"$\"#)]",
+      "pattern_src": "r#\"^the vector equals \\\"([^\\\"]*)\\\"$\"#",
+      "regex": "^the vector equals \\\"([^\\\"]*)\\\"$",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r#\"^the vector equals \\\"([^\\\"]*)\\\"$\"#)]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-cli-core/tests/steps/assert_steps.rs",
+      "line": 23,
+      "function": "vec_contains",
+      "attr": "#[then(regex = r#\"^the vector contains \\\"([^\\\"]*)\\\"$\"#)]",
+      "pattern_src": "r#\"^the vector contains \\\"([^\\\"]*)\\\"$\"#",
+      "regex": "^the vector contains \\\"([^\\\"]*)\\\"$",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r#\"^the vector contains \\\"([^\\\"]*)\\\"$\"#)]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-cli-core/tests/steps/assert_steps.rs",
+      "line": 36,
+      "function": "result_ok",
+      "attr": "#[then(regex = r\"^the result is Ok$\")]",
+      "pattern_src": "r\"^the result is Ok$\"",
+      "regex": "r\"^the result is Ok$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the result is Ok$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-cli-core/tests/steps/assert_steps.rs",
+      "line": 42,
+      "function": "result_err_missing",
+      "attr": "#[then(regex = r#\"^the result is Err with missing \\\"([^\\\"]*)\\\"$\"#)]",
+      "pattern_src": "r#\"^the result is Err with missing \\\"([^\\\"]*)\\\"$\"#",
+      "regex": "^the result is Err with missing \\\"([^\\\"]*)\\\"$",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r#\"^the result is Err with missing \\\"([^\\\"]*)\\\"$\"#)]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-cli-core/tests/steps/common_steps.rs",
+      "line": 5,
+      "function": "staging_root_at",
+      "attr": "#[given(regex = r\"^a staging root at .*$\")]",
+      "pattern_src": "r\"^a staging root at .*$\"",
+      "regex": "r\"^a staging root at .*$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a staging root at .*$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-cli-core/tests/steps/common_steps.rs",
+      "line": 10,
+      "function": "artifact_lists_applets_at",
+      "attr": "#[given(regex = r#\"^a replacement artifact lists applets \\\"([^\\\"]+)\\\" at `(/.+)`$\"#)]",
+      "pattern_src": "r#\"^a replacement artifact lists applets \\\"([^\\\"]+)\\\" at `(/.+)`$\"#",
+      "regex": "^a replacement artifact lists applets \\\"([^\\\"]+)\\\" at `(/.+)`$",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[given(regex = r#\"^a replacement artifact lists applets \\\"([^\\\"]+)\\\" at `(/.+)`$\"#)]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-cli-core/tests/steps/common_steps.rs",
+      "line": 20,
+      "function": "set_distro",
+      "attr": "#[given(",
+      "pattern_src": "r#\"^the distro commands for package \\\"(coreutils|findutils|sudo)\\\" are \\\"([^\\\"]*)\\\"$\"#",
+      "regex": "^the distro commands for package \\\"(coreutils|findutils|sudo)\\\" are \\\"([^\\\"]*)\\\"$",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[given("
+    },
+    {
+      "kind": "When",
+      "file": "cargo/oxidizr-cli-core/tests/steps/coverage_steps.rs",
+      "line": 5,
+      "function": "call_coverage_check",
+      "attr": "#[when(regex = r#\"^I call coverage_check with distro \\\"([^\\\"]*)\\\" and repl \\\"([^\\\"]*)\\\"$\"#)]",
+      "pattern_src": "r#\"^I call coverage_check with distro \\\"([^\\\"]*)\\\" and repl \\\"([^\\\"]*)\\\"$\"#",
+      "regex": "^I call coverage_check with distro \\\"([^\\\"]*)\\\" and repl \\\"([^\\\"]*)\\\"$",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[when(regex = r#\"^I call coverage_check with distro \\\"([^\\\"]*)\\\" and repl \\\"([^\\\"]*)\\\"$\"#)]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/oxidizr-cli-core/tests/steps/coverage_steps.rs",
+      "line": 18,
+      "function": "call_coverage_preflight",
+      "attr": "#[when(regex = r#\"^I call coverage_preflight for package \\\"(coreutils|findutils|sudo)\\\"$\"#)]",
+      "pattern_src": "r#\"^I call coverage_preflight for package \\\"(coreutils|findutils|sudo)\\\"$\"#",
+      "regex": "^I call coverage_preflight for package \\\"(coreutils|findutils|sudo)\\\"$",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r#\"^I call coverage_preflight for package \\\"(coreutils|findutils|sudo)\\\"$\"#)]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/oxidizr-cli-core/tests/steps/discover_steps.rs",
+      "line": 5,
+      "function": "call_discover",
+      "attr": "#[when(regex = r#\"^I call discover_applets_with_allow with allow \\\"([^\\\"]*)\\\"$\"#)]",
+      "pattern_src": "r#\"^I call discover_applets_with_allow with allow \\\"([^\\\"]*)\\\"$\"#",
+      "regex": "^I call discover_applets_with_allow with allow \\\"([^\\\"]*)\\\"$",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r#\"^I call discover_applets_with_allow with allow \\\"([^\\\"]*)\\\"$\"#)]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/oxidizr-cli-core/tests/steps/resolve_steps.rs",
+      "line": 5,
+      "function": "call_resolve",
+      "attr": "#[when(regex = r#\"^I call resolve_applets_for_use for package \\\"(coreutils|findutils|sudo)\\\"$\"#)]",
+      "pattern_src": "r#\"^I call resolve_applets_for_use for package \\\"(coreutils|findutils|sudo)\\\"$\"#",
+      "regex": "^I call resolve_applets_for_use for package \\\"(coreutils|findutils|sudo)\\\"$",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r#\"^I call resolve_applets_for_use for package \\\"(coreutils|findutils|sudo)\\\"$\"#)]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/assert_steps.rs",
+      "line": 6,
+      "function": "the_command_exits",
+      "attr": "#[then(regex = r\"^the command exits (\\d+)$\")]",
+      "pattern_src": "r\"^the command exits (\\d+)$\"",
+      "regex": "r\"^the command exits (\\d+)$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^the command exits (\\d+)$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/assert_steps.rs",
+      "line": 15,
+      "function": "output_not_contains",
+      "attr": "#[then(regex = r\"^output does not contain `(.+)`$\")]",
+      "pattern_src": "r\"^output does not contain `(.+)`$\"",
+      "regex": "r\"^output does not contain `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^output does not contain `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/assert_steps.rs",
+      "line": 30,
+      "function": "it_reports_dry_run_nonzero",
+      "attr": "#[then(regex = r\"^it reports a dry-run with a non-zero planned action count$\")]",
+      "pattern_src": "r\"^it reports a dry-run with a non-zero planned action count$\"",
+      "regex": "r\"^it reports a dry-run with a non-zero planned action count$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^it reports a dry-run with a non-zero planned action count$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/assert_steps.rs",
+      "line": 45,
+      "function": "output_contains",
+      "attr": "#[then(regex = r\"^output contains `(.+)`$\")]",
+      "pattern_src": "r\"^output contains `(.+)`$\"",
+      "regex": "r\"^output contains `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^output contains `(.+)`$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/oxidizr-deb/tests/steps/cli_steps.rs",
+      "line": 6,
+      "function": "i_run_oxidizr_deb",
+      "attr": "#[when(regex = r\"^I run `oxidizr-deb (.+)`$\")]",
+      "pattern_src": "r\"^I run `oxidizr-deb (.+)`$\"",
+      "regex": "r\"^I run `oxidizr-deb (.+)`$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r\"^I run `oxidizr-deb (.+)`$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/common_steps.rs",
+      "line": 6,
+      "function": "fakeroot_with_stock_coreutils",
+      "attr": "#[given(regex = r\"^a fakeroot with stock coreutils applets$\")]",
+      "pattern_src": "r\"^a fakeroot with stock coreutils applets$\"",
+      "regex": "r\"^a fakeroot with stock coreutils applets$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a fakeroot with stock coreutils applets$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/common_steps.rs",
+      "line": 24,
+      "function": "staging_root_at",
+      "attr": "#[given(regex = r\"^a staging root at .*$\")]",
+      "pattern_src": "r\"^a staging root at .*$\"",
+      "regex": "r\"^a staging root at .*$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a staging root at .*$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/common_steps.rs",
+      "line": 32,
+      "function": "verified_artifact_available",
+      "attr": "#[given(",
+      "pattern_src": "r#\"^a verified replacement artifact is available for package \"(coreutils|findutils|sudo)\"$\"#",
+      "regex": "^a verified replacement artifact is available for package \"(coreutils|findutils|sudo)\"$",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/common_steps.rs",
+      "line": 60,
+      "function": "sudo_artifact_setuid",
+      "attr": "#[given(regex = r\"^the sudo artifact has setuid 4755$\")]",
+      "pattern_src": "r\"^the sudo artifact has setuid 4755$\"",
+      "regex": "r\"^the sudo artifact has setuid 4755$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the sudo artifact has setuid 4755$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/fs_steps.rs",
+      "line": 6,
+      "function": "path_is_regular_with_content",
+      "attr": "#[then(regex = r\"^`(/.+)` is a regular file with content `(.+)`$\")]",
+      "pattern_src": "r\"^`(/.+)` is a regular file with content `(.+)`$\"",
+      "regex": "r\"^`(/.+)` is a regular file with content `(.+)`$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a regular file with content `(.+)`$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/fs_steps.rs",
+      "line": 24,
+      "function": "path_is_regular",
+      "attr": "#[then(regex = r\"^`(/.+)` is a regular file$\")]",
+      "pattern_src": "r\"^`(/.+)` is a regular file$\"",
+      "regex": "r\"^`(/.+)` is a regular file$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a regular file$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/fs_steps.rs",
+      "line": 35,
+      "function": "path_is_symlink",
+      "attr": "#[then(regex = r\"^`(/.+)` is a symlink$\")]",
+      "pattern_src": "r\"^`(/.+)` is a symlink$\"",
+      "regex": "r\"^`(/.+)` is a symlink$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a symlink$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/oxidizr-deb/tests/steps/fs_steps.rs",
+      "line": 46,
+      "function": "path_is_symlink_to_replacement",
+      "attr": "#[then(regex = r\"^`(/.+)` is a symlink to the replacement$\")]",
+      "pattern_src": "r\"^`(/.+)` is a symlink to the replacement$\"",
+      "regex": "r\"^`(/.+)` is a symlink to the replacement$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^`(/.+)` is a symlink to the replacement$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/locks_steps.rs",
+      "line": 5,
+      "function": "dpkg_apt_locks_present",
+      "attr": "#[given(regex = r\"^dpkg/apt locks are present$\")]",
+      "pattern_src": "r\"^dpkg/apt locks are present$\"",
+      "regex": "r\"^dpkg/apt locks are present$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^dpkg/apt locks are present$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/locks_steps.rs",
+      "line": 14,
+      "function": "allow_nonroot_sudo_owner",
+      "attr": "#[given(regex = r\"^non-root sudo owner is allowed in tests$\")]",
+      "pattern_src": "r\"^non-root sudo owner is allowed in tests$\"",
+      "regex": "r\"^non-root sudo owner is allowed in tests$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^non-root sudo owner is allowed in tests$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/oxidizr-deb/tests/steps/locks_steps.rs",
+      "line": 22,
+      "function": "force_exdev",
+      "attr": "#[given(regex = r\"^EXDEV degraded fallback is forced via env$\")]",
+      "pattern_src": "r\"^EXDEV degraded fallback is forced via env$\"",
+      "regex": "r\"^EXDEV degraded fallback is forced via env$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^EXDEV degraded fallback is forced via env$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/api_toctou_steps.rs",
+      "line": 5,
+      "function": "given_mutating_public_api_endpoint",
+      "attr": "#[given(regex = r\"^a mutating public API endpoint$\")]",
+      "pattern_src": "r\"^a mutating public API endpoint$\"",
+      "regex": "r\"^a mutating public API endpoint$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a mutating public API endpoint$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/api_toctou_steps.rs",
+      "line": 11,
+      "function": "given_mutation_final_component",
+      "attr": "#[given(regex = r\"^a mutation of a final path component under a parent directory$\")]",
+      "pattern_src": "r\"^a mutation of a final path component under a parent directory$\"",
+      "regex": "r\"^a mutation of a final path component under a parent directory$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a mutation of a final path component under a parent directory$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 9,
+      "function": "when_run_real",
+      "attr": "#[when(regex = r\"^I run in real mode$\")]",
+      "pattern_src": "r\"^I run in real mode$\"",
+      "regex": "r\"^I run in real mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run in real mode$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 14,
+      "function": "when_run_commit",
+      "attr": "#[when(regex = r\"^I run in Commit mode$\")]",
+      "pattern_src": "r\"^I run in Commit mode$\"",
+      "regex": "r\"^I run in Commit mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run in Commit mode$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 19,
+      "function": "when_run_both_modes",
+      "attr": "#[when(regex = r\"^I run in DryRun and Commit modes$\")]",
+      "pattern_src": "r\"^I run in DryRun and Commit modes$\"",
+      "regex": "r\"^I run in DryRun and Commit modes$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run in DryRun and Commit modes$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 24,
+      "function": "when_apply",
+      "attr": "#[when(regex = r\"^I apply the plan$\")]",
+      "pattern_src": "r\"^I apply the plan$\"",
+      "regex": "r\"^I apply the plan$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I apply the plan$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 32,
+      "function": "when_run_dry",
+      "attr": "#[when(regex = r\"^I run in dry-run mode$\")]",
+      "pattern_src": "r\"^I run in dry-run mode$\"",
+      "regex": "r\"^I run in dry-run mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run in dry-run mode$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 37,
+      "function": "when_attempt_apply_commit",
+      "attr": "#[when(regex = r\"^I attempt apply in Commit mode$\")]",
+      "pattern_src": "r\"^I attempt apply in Commit mode$\"",
+      "regex": "r\"^I attempt apply in Commit mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I attempt apply in Commit mode$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 44,
+      "function": "then_apply_result_identical",
+      "attr": "#[then(",
+      "pattern_src": "r\"^the emitted facts for apply\\.result per-action events are byte-identical after redaction$\"",
+      "regex": "r\"^the emitted facts for apply\\.result per-action events are byte-identical after redaction$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 70,
+      "function": "then_hash_fields_present",
+      "attr": "#[then(",
+      "pattern_src": "r\"^the resulting facts include hash_alg=sha256 and both before_hash and after_hash$\"",
+      "regex": "r\"^the resulting facts include hash_alg=sha256 and both before_hash and after_hash$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 93,
+      "function": "then_degraded_flag",
+      "attr": "#[then(regex = r\"^facts record degraded=true when policy allow_degraded_fs is enabled$\")]",
+      "pattern_src": "r\"^facts record degraded=true when policy allow_degraded_fs is enabled$\"",
+      "regex": "r\"^facts record degraded=true when policy allow_degraded_fs is enabled$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^facts record degraded=true when policy allow_degraded_fs is enabled$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 122,
+      "function": "then_exdev_fail",
+      "attr": "#[then(regex = r\"^the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$\")]",
+      "pattern_src": "r\"^the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$\"",
+      "regex": "r\"^the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the operation fails with error_id=E_EXDEV when allow_degraded_fs is disabled$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 148,
+      "function": "given_target_fs_unsupported",
+      "attr": "#[given(regex = r\"^the target filesystem is read-only or noexec or immutable$\")]",
+      "pattern_src": "r\"^the target filesystem is read-only or noexec or immutable$\"",
+      "regex": "r\"^the target filesystem is read-only or noexec or immutable$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the target filesystem is read-only or noexec or immutable$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 159,
+      "function": "when_attempt_apply",
+      "attr": "#[when(regex = r\"^I attempt to apply a plan$\")]",
+      "pattern_src": "r\"^I attempt to apply a plan$\"",
+      "regex": "r\"^I attempt to apply a plan$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I attempt to apply a plan$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/apply_steps.rs",
+      "line": 172,
+      "function": "then_policy_violation",
+      "attr": "#[then(regex = r\"^operations fail closed with a policy violation error$\")]",
+      "pattern_src": "r\"^operations fail closed with a policy violation error$\"",
+      "regex": "r\"^operations fail closed with a policy violation error$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^operations fail closed with a policy violation error$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/attestation_steps.rs",
+      "line": 19,
+      "function": "when_complete_apply",
+      "attr": "#[when(regex = r\"^I complete an apply$\")]",
+      "pattern_src": "r\"^I complete an apply$\"",
+      "regex": "r\"^I complete an apply$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I complete an apply$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/attestation_steps.rs",
+      "line": 58,
+      "function": "given_attestor_and_apply",
+      "attr": "#[given(regex = r\"^an attestor is configured and apply succeeds in Commit mode$\")]",
+      "pattern_src": "r\"^an attestor is configured and apply succeeds in Commit mode$\"",
+      "regex": "r\"^an attestor is configured and apply succeeds in Commit mode$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^an attestor is configured and apply succeeds in Commit mode$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/attestation_steps.rs",
+      "line": 84,
+      "function": "then_attestation_present",
+      "attr": "#[then(",
+      "pattern_src": "r\"^an attestation is attached to the apply\\.result summary fact with sig_alg=ed25519, signature, bundle_hash, and public_key_id$\"",
+      "regex": "r\"^an attestation is attached to the apply\\.result summary fact with sig_alg=ed25519, signature, bundle_hash, and public_key_id$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/attestation_steps.rs",
+      "line": 108,
+      "function": "then_attestation_fields_alias",
+      "attr": "#[then(",
+      "pattern_src": "r\"^attestation fields \\(sig_alg, signature, bundle_hash, public_key_id\\) are present$\"",
+      "regex": "r\"^attestation fields \\(sig_alg, signature, bundle_hash, public_key_id\\) are present$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/api_safety.rs",
+      "line": 5,
+      "function": "when_inspect_signature",
+      "attr": "#[when(regex = r\"^I inspect its signature$\")]",
+      "pattern_src": "r\"^I inspect its signature$\"",
+      "regex": "r\"^I inspect its signature$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I inspect its signature$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/api_safety.rs",
+      "line": 10,
+      "function": "then_signature_requires_safepath",
+      "attr": "#[then(regex = r\"^the signature requires SafePath and does not accept PathBuf$\")]",
+      "pattern_src": "r\"^the signature requires SafePath and does not accept PathBuf$\"",
+      "regex": "r\"^the signature requires SafePath and does not accept PathBuf$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the signature requires SafePath and does not accept PathBuf$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/api_safety.rs",
+      "line": 27,
+      "function": "when_engine_performs_op",
+      "attr": "#[when(regex = r\"^the engine performs the operation$\")]",
+      "pattern_src": "r\"^the engine performs the operation$\"",
+      "regex": "r\"^the engine performs the operation$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^the engine performs the operation$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/api_safety.rs",
+      "line": 32,
+      "function": "then_toctou_sequence_present",
+      "attr": "#[then(",
+      "pattern_src": "r\"^it opens the parent with O_DIRECTORY\\|O_NOFOLLOW, uses openat on the final component, renames with renameat, and fsyncs the parent$\"",
+      "regex": "r\"^it opens the parent with O_DIRECTORY\\|O_NOFOLLOW, uses openat on the final component, renames with renameat, and fsyncs the parent$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 12,
+      "function": "then_ls_resolves_to_providerb",
+      "attr": "#[then(regex = r\"^/usr/bin/ls resolves to providerB/ls atomically$\")]",
+      "pattern_src": "r\"^/usr/bin/ls resolves to providerB/ls atomically$\"",
+      "regex": "r\"^/usr/bin/ls resolves to providerB/ls atomically$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^/usr/bin/ls resolves to providerB/ls atomically$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 24,
+      "function": "then_partial_restoration_alias",
+      "attr": "#[then(regex = r\"^facts clearly indicate partial restoration state if any rollback step fails$\")]",
+      "pattern_src": "r\"^facts clearly indicate partial restoration state if any rollback step fails$\"",
+      "regex": "r\"^facts clearly indicate partial restoration state if any rollback step fails$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^facts clearly indicate partial restoration state if any rollback step fails$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 29,
+      "function": "then_rollback_restores_providera",
+      "attr": "#[then(regex = r\"^rollback restores providerA/ls$\")]",
+      "pattern_src": "r\"^rollback restores providerA/ls$\"",
+      "regex": "r\"^rollback restores providerA/ls$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^rollback restores providerA/ls$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 56,
+      "function": "when_apply_plan_replaces_cp",
+      "attr": "#[when(regex = r\"^I apply a plan that replaces /usr/bin/cp$\")]",
+      "pattern_src": "r\"^I apply a plan that replaces /usr/bin/cp$\"",
+      "regex": "r\"^I apply a plan that replaces /usr/bin/cp$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I apply a plan that replaces /usr/bin/cp$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 92,
+      "function": "then_target_resolves_provb_no_missing",
+      "attr": "#[then(",
+      "pattern_src": "r\"^the target path resolves to providerB/ls without any intermediate missing path visible$\"",
+      "regex": "r\"^the target path resolves to providerB/ls without any intermediate missing path visible$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 107,
+      "function": "then_no_visible_mutations",
+      "attr": "#[then(regex = r\"^no visible mutations remain on the filesystem$\")]",
+      "pattern_src": "r\"^no visible mutations remain on the filesystem$\"",
+      "regex": "r\"^no visible mutations remain on the filesystem$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^no visible mutations remain on the filesystem$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 131,
+      "function": "then_crash_sim_recovery_valid_link",
+      "attr": "#[then(regex = r\"^if a crash is simulated immediately after rename, recovery yields a valid link$\")]",
+      "pattern_src": "r\"^if a crash is simulated immediately after rename, recovery yields a valid link$\"",
+      "regex": "r\"^if a crash is simulated immediately after rename, recovery yields a valid link$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^if a crash is simulated immediately after rename, recovery yields a valid link$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 141,
+      "function": "when_apply_plan_commit",
+      "attr": "#[when(regex = r\"^I apply a plan in Commit mode$\")]",
+      "pattern_src": "r\"^I apply a plan in Commit mode$\"",
+      "regex": "r\"^I apply a plan in Commit mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I apply a plan in Commit mode$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 181,
+      "function": "then_auto_reverse_alias",
+      "attr": "#[then(regex = r\"^the engine automatically rolls back A in reverse order$\")]",
+      "pattern_src": "r\"^the engine automatically rolls back A in reverse order$\"",
+      "regex": "r\"^the engine automatically rolls back A in reverse order$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the engine automatically rolls back A in reverse order$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 243,
+      "function": "given_three_actions",
+      "attr": "#[given(regex = r\"^a plan with three actions A, B, C$\")]",
+      "pattern_src": "r\"^a plan with three actions A, B, C$\"",
+      "regex": "r\"^a plan with three actions A, B, C$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan with three actions A, B, C$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/atomicity.rs",
+      "line": 299,
+      "function": "given_b_will_fail",
+      "attr": "#[given(regex = r\"^action B will fail during apply$\")]",
+      "pattern_src": "r\"^action B will fail during apply$\"",
+      "regex": "r\"^action B will fail during apply$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^action B will fail during apply$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 5,
+      "function": "given_no_approval",
+      "attr": "#[given(regex = r\"^no explicit approval flag is provided$\")]",
+      "pattern_src": "r\"^no explicit approval flag is provided$\"",
+      "regex": "r\"^no explicit approval flag is provided$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^no explicit approval flag is provided$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 8,
+      "function": "when_run_engine",
+      "attr": "#[when(regex = r\"^I run the engine$\")]",
+      "pattern_src": "r\"^I run the engine$\"",
+      "regex": "r\"^I run the engine$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run the engine$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 14,
+      "function": "then_runs_dry_default",
+      "attr": "#[then(regex = r\"^it runs in dry-run mode by default$\")]",
+      "pattern_src": "r\"^it runs in dry-run mode by default$\"",
+      "regex": "r\"^it runs in dry-run mode by default$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^it runs in dry-run mode by default$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 19,
+      "function": "when_execute_without_approval",
+      "attr": "#[when(regex = r\"^I execute without explicit commit approval$\")]",
+      "pattern_src": "r\"^I execute without explicit commit approval$\"",
+      "regex": "r\"^I execute without explicit commit approval$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I execute without explicit commit approval$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 25,
+      "function": "then_side_effects_not_performed",
+      "attr": "#[then(regex = r\"^side effects are not performed \\(DryRun is default\\)$\")]",
+      "pattern_src": "r\"^side effects are not performed \\(DryRun is default\\)$\"",
+      "regex": "r\"^side effects are not performed \\(DryRun is default\\)$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then(regex = r\"^side effects are not performed \\(DryRun is default\\)$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 39,
+      "function": "when_preflight_and_apply_commit",
+      "attr": "#[when(regex = r\"^I run preflight and apply in Commit mode$\")]",
+      "pattern_src": "r\"^I run preflight and apply in Commit mode$\"",
+      "regex": "r\"^I run preflight and apply in Commit mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run preflight and apply in Commit mode$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 45,
+      "function": "given_critical_violation",
+      "attr": "#[given(regex = r\"^a critical compatibility violation is detected in preflight$\")]",
+      "pattern_src": "r\"^a critical compatibility violation is detected in preflight$\"",
+      "regex": "r\"^a critical compatibility violation is detected in preflight$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a critical compatibility violation is detected in preflight$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 51,
+      "function": "when_run_engine_default",
+      "attr": "#[when(regex = r\"^I run the engine with default policy$\")]",
+      "pattern_src": "r\"^I run the engine with default policy$\"",
+      "regex": "r\"^I run the engine with default policy$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run the engine with default policy$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 56,
+      "function": "then_fail_closed_alias",
+      "attr": "#[then(regex = r\"^the operation fails closed unless an explicit override is present$\")]",
+      "pattern_src": "r\"^the operation fails closed unless an explicit override is present$\"",
+      "regex": "r\"^the operation fails closed unless an explicit override is present$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the operation fails closed unless an explicit override is present$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 61,
+      "function": "then_fail_closed_policy_override",
+      "attr": "#[then(regex = r\"^the operation fails closed unless an explicit policy override is set$\")]",
+      "pattern_src": "r\"^the operation fails closed unless an explicit policy override is set$\"",
+      "regex": "r\"^the operation fails closed unless an explicit policy override is set$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the operation fails closed unless an explicit policy override is set$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 66,
+      "function": "given_golden_fixtures",
+      "attr": "#[given(regex = r\"^golden fixtures for plan, preflight, apply, and rollback$\")]",
+      "pattern_src": "r\"^golden fixtures for plan, preflight, apply, and rollback$\"",
+      "regex": "r\"^golden fixtures for plan, preflight, apply, and rollback$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^golden fixtures for plan, preflight, apply, and rollback$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 69,
+      "function": "given_ci_violation",
+      "attr": "#[given(regex = r\"^a required test is marked SKIP or a fixture diff is not byte-identical$\")]",
+      "pattern_src": "r\"^a required test is marked SKIP or a fixture diff is not byte-identical$\"",
+      "regex": "r\"^a required test is marked SKIP or a fixture diff is not byte-identical$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a required test is marked SKIP or a fixture diff is not byte-identical$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 72,
+      "function": "when_ci_runs",
+      "attr": "#[when(regex = r\"^CI runs$\")]",
+      "pattern_src": "r\"^CI runs$\"",
+      "regex": "r\"^CI runs$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^CI runs$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 75,
+      "function": "then_ci_fails",
+      "attr": "#[then(regex = r\"^the CI job fails$\")]",
+      "pattern_src": "r\"^the CI job fails$\"",
+      "regex": "r\"^the CI job fails$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the CI job fails$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 86,
+      "function": "given_new_switchyard",
+      "attr": "#[given(regex = r\"^a newly constructed Switchyard$\")]",
+      "pattern_src": "r\"^a newly constructed Switchyard$\"",
+      "regex": "r\"^a newly constructed Switchyard$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a newly constructed Switchyard$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/conservatism_ci.rs",
+      "line": 91,
+      "function": "given_strict_unsupported",
+      "attr": "#[given(regex = r\"^a policy requiring strict ownership and unsupported preservation$\")]",
+      "pattern_src": "r\"^a policy requiring strict ownership and unsupported preservation$\"",
+      "regex": "r\"^a policy requiring strict ownership and unsupported preservation$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a policy requiring strict ownership and unsupported preservation$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 5,
+      "function": "given_exdev_parents",
+      "attr": "#[given(regex = r\"^staging and target parents reside on different filesystems \\(EXDEV\\)$\")]",
+      "pattern_src": "r\"^staging and target parents reside on different filesystems \\(EXDEV\\)$\"",
+      "regex": "r\"^staging and target parents reside on different filesystems \\(EXDEV\\)$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given(regex = r\"^staging and target parents reside on different filesystems \\(EXDEV\\)$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 10,
+      "function": "given_allow_degraded_true",
+      "attr": "#[given(regex = r\"^policy allow_degraded_fs is true$\")]",
+      "pattern_src": "r\"^policy allow_degraded_fs is true$\"",
+      "regex": "r\"^policy allow_degraded_fs is true$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^policy allow_degraded_fs is true$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 16,
+      "function": "given_allow_degraded_false",
+      "attr": "#[given(regex = r\"^policy allow_degraded_fs is false$\")]",
+      "pattern_src": "r\"^policy allow_degraded_fs is false$\"",
+      "regex": "r\"^policy allow_degraded_fs is false$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^policy allow_degraded_fs is false$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 22,
+      "function": "given_exdev_conditions",
+      "attr": "#[given(regex = r\"^EXDEV conditions$\")]",
+      "pattern_src": "r\"^EXDEV conditions$\"",
+      "regex": "r\"^EXDEV conditions$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^EXDEV conditions$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 27,
+      "function": "given_env_matrix",
+      "attr": "#[given(regex = r\"^an environment matrix with ext4, xfs, btrfs, and tmpfs$\")]",
+      "pattern_src": "r\"^an environment matrix with ext4, xfs, btrfs, and tmpfs$\"",
+      "regex": "r\"^an environment matrix with ext4, xfs, btrfs, and tmpfs$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^an environment matrix with ext4, xfs, btrfs, and tmpfs$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 30,
+      "function": "when_apply_symlink_replacement_plan",
+      "attr": "#[when(regex = r\"^I apply a symlink replacement plan$\")]",
+      "pattern_src": "r\"^I apply a symlink replacement plan$\"",
+      "regex": "r\"^I apply a symlink replacement plan$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I apply a symlink replacement plan$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 36,
+      "function": "then_operation_completes_atomic",
+      "attr": "#[then(",
+      "pattern_src": "r\"^the operation completes via safe copy \\+ fsync \\+ rename preserving atomic visibility$\"",
+      "regex": "r\"^the operation completes via safe copy \\+ fsync \\+ rename preserving atomic visibility$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 51,
+      "function": "then_emitted_degraded_true_reason",
+      "attr": "#[then(regex = r#\"^emitted facts record degraded=true with degraded_reason=\\\"exdev_fallback\\\"$\"#)]",
+      "pattern_src": "r#\"^emitted facts record degraded=true with degraded_reason=\\\"exdev_fallback\\\"$\"#",
+      "regex": "^emitted facts record degraded=true with degraded_reason=\\\"exdev_fallback\\\"$",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r#\"^emitted facts record degraded=true with degraded_reason=\\\"exdev_fallback\\\"$\"#)]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 68,
+      "function": "then_apply_fails_exdev_50",
+      "attr": "#[then(regex = r\"^the apply fails with error_id=E_EXDEV and exit_code=50$\")]",
+      "pattern_src": "r\"^the apply fails with error_id=E_EXDEV and exit_code=50$\"",
+      "regex": "r\"^the apply fails with error_id=E_EXDEV and exit_code=50$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the apply fails with error_id=E_EXDEV and exit_code=50$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 82,
+      "function": "then_emitted_degraded_false_reason",
+      "attr": "#[then(regex = r#\"^emitted facts include degraded=false with degraded_reason=\\\"exdev_fallback\\\"$\"#)]",
+      "pattern_src": "r#\"^emitted facts include degraded=false with degraded_reason=\\\"exdev_fallback\\\"$\"#",
+      "regex": "^emitted facts include degraded=false with degraded_reason=\\\"exdev_fallback\\\"$",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r#\"^emitted facts include degraded=false with degraded_reason=\\\"exdev_fallback\\\"$\"#)]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 99,
+      "function": "when_run_acceptance_tests",
+      "attr": "#[when(regex = r\"^I run acceptance tests$\")]",
+      "pattern_src": "r\"^I run acceptance tests$\"",
+      "regex": "r\"^I run acceptance tests$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run acceptance tests$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 102,
+      "function": "then_semantics_verified",
+      "attr": "#[then(regex = r\"^semantics for rename and degraded path are verified per filesystem$\")]",
+      "pattern_src": "r\"^semantics for rename and degraded path are verified per filesystem$\"",
+      "regex": "r\"^semantics for rename and degraded path are verified per filesystem$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^semantics for rename and degraded path are verified per filesystem$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/degraded_fs.rs",
+      "line": 158,
+      "function": "then_best_effort_degraded",
+      "attr": "#[then(",
+      "pattern_src": "r\"^the operation uses a best-effort degraded fallback for symlink replacement \\(unlink \\+ symlink\\) when EXDEV occurs$\"",
+      "regex": "r\"^the operation uses a best-effort degraded fallback for symlink replacement \\(unlink \\+ symlink\\) when EXDEV occurs$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 9,
+      "function": "given_stable_plan",
+      "attr": "#[given(regex = r\"^a plan built from a stable set of inputs$\")]",
+      "pattern_src": "r\"^a plan built from a stable set of inputs$\"",
+      "regex": "r\"^a plan built from a stable set of inputs$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan built from a stable set of inputs$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 14,
+      "function": "when_compute_ids",
+      "attr": "#[when(regex = r\"^I compute plan_id and action_id$\")]",
+      "pattern_src": "r\"^I compute plan_id and action_id$\"",
+      "regex": "r\"^I compute plan_id and action_id$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I compute plan_id and action_id$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 17,
+      "function": "then_ids_deterministic",
+      "attr": "#[then(regex = r\"^they are deterministic UUIDv5 values under the project namespace$\")]",
+      "pattern_src": "r\"^they are deterministic UUIDv5 values under the project namespace$\"",
+      "regex": "r\"^they are deterministic UUIDv5 values under the project namespace$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^they are deterministic UUIDv5 values under the project namespace$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 36,
+      "function": "then_facts_identical_after_redaction",
+      "attr": "#[then(regex = r\"^facts are byte-identical after timestamp redaction$\")]",
+      "pattern_src": "r\"^facts are byte-identical after timestamp redaction$\"",
+      "regex": "r\"^facts are byte-identical after timestamp redaction$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^facts are byte-identical after timestamp redaction$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 77,
+      "function": "given_normalized_ns",
+      "attr": "#[given(regex = r\"^normalized plan input and a stable namespace$\")]",
+      "pattern_src": "r\"^normalized plan input and a stable namespace$\"",
+      "regex": "r\"^normalized plan input and a stable namespace$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^normalized plan input and a stable namespace$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 82,
+      "function": "given_apply_bundle",
+      "attr": "#[given(regex = r\"^an apply bundle$\")]",
+      "pattern_src": "r\"^an apply bundle$\"",
+      "regex": "r\"^an apply bundle$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^an apply bundle$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 85,
+      "function": "when_generate_ids",
+      "attr": "#[when(regex = r\"^I generate plan_id and action_id$\")]",
+      "pattern_src": "r\"^I generate plan_id and action_id$\"",
+      "regex": "r\"^I generate plan_id and action_id$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I generate plan_id and action_id$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/determinism.rs",
+      "line": 88,
+      "function": "then_uuidv5_alias",
+      "attr": "#[then(regex = r\"^they are UUIDv5 values derived from the normalized input and namespace$\")]",
+      "pattern_src": "r\"^they are UUIDv5 values derived from the normalized input and namespace$\"",
+      "regex": "r\"^they are UUIDv5 values derived from the normalized input and namespace$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^they are UUIDv5 values derived from the normalized input and namespace$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+      "line": 6,
+      "function": "given_failures_preflight_or_apply",
+      "attr": "#[given(regex = r\"^failures during preflight or apply$\")]",
+      "pattern_src": "r\"^failures during preflight or apply$\"",
+      "regex": "r\"^failures during preflight or apply$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^failures during preflight or apply$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+      "line": 11,
+      "function": "given_preflight_stop",
+      "attr": "#[given(regex = r\"^preflight STOP conditions are present$\")]",
+      "pattern_src": "r\"^preflight STOP conditions are present$\"",
+      "regex": "r\"^preflight STOP conditions are present$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^preflight STOP conditions are present$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+      "line": 16,
+      "function": "when_facts_emitted",
+      "attr": "#[when(regex = r\"^facts are emitted$\")]",
+      "pattern_src": "r\"^facts are emitted$\"",
+      "regex": "r\"^facts are emitted$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^facts are emitted$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+      "line": 22,
+      "function": "then_error_ids_stable",
+      "attr": "#[then(regex = r\"^error identifiers such as E_POLICY or E_LOCKING are stable strings$\")]",
+      "pattern_src": "r\"^error identifiers such as E_POLICY or E_LOCKING are stable strings$\"",
+      "regex": "r\"^error identifiers such as E_POLICY or E_LOCKING are stable strings$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^error identifiers such as E_POLICY or E_LOCKING are stable strings$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+      "line": 32,
+      "function": "when_compute_process_exit",
+      "attr": "#[when(regex = r\"^I compute the process exit$\")]",
+      "pattern_src": "r\"^I compute the process exit$\"",
+      "regex": "r\"^I compute the process exit$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I compute the process exit$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/error_taxonomy.rs",
+      "line": 37,
+      "function": "then_preflight_summary_policy_10",
+      "attr": "#[then(regex = r\"^preflight summary carries error_id=E_POLICY and exit_code=10$\")]",
+      "pattern_src": "r\"^preflight summary carries error_id=E_POLICY and exit_code=10$\"",
+      "regex": "r\"^preflight summary carries error_id=E_POLICY and exit_code=10$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^preflight summary carries error_id=E_POLICY and exit_code=10$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/locking_aliases.rs",
+      "line": 5,
+      "function": "then_only_one_mutator",
+      "attr": "#[then(regex = r\"^only one mutator proceeds at a time$\")]",
+      "pattern_src": "r\"^only one mutator proceeds at a time$\"",
+      "regex": "r\"^only one mutator proceeds at a time$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^only one mutator proceeds at a time$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/locking_aliases.rs",
+      "line": 10,
+      "function": "then_warn_unsupported",
+      "attr": "#[then(regex = r\"^concurrent apply is UNSUPPORTED and a WARN fact is emitted$\")]",
+      "pattern_src": "r\"^concurrent apply is UNSUPPORTED and a WARN fact is emitted$\"",
+      "regex": "r\"^concurrent apply is UNSUPPORTED and a WARN fact is emitted$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^concurrent apply is UNSUPPORTED and a WARN fact is emitted$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/locking_aliases.rs",
+      "line": 15,
+      "function": "then_apply_attempt_includes_lock_wait",
+      "attr": "#[then(regex = r\"^apply\\.attempt includes lock_wait_ms$\")]",
+      "pattern_src": "r\"^apply\\.attempt includes lock_wait_ms$\"",
+      "regex": "r\"^apply\\.attempt includes lock_wait_ms$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^apply\\.attempt includes lock_wait_ms$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/locking_aliases.rs",
+      "line": 20,
+      "function": "given_two_apply_overlap",
+      "attr": "#[given(regex = r\"^two apply\\(\\) operations targeting overlapping paths$\")]",
+      "pattern_src": "r\"^two apply\\(\\) operations targeting overlapping paths$\"",
+      "regex": "r\"^two apply\\(\\) operations targeting overlapping paths$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given(regex = r\"^two apply\\(\\) operations targeting overlapping paths$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/rescue_aliases.rs",
+      "line": 5,
+      "function": "then_rescue_verify",
+      "attr": "#[then(regex = r\"^preflight verifies a functional fallback path$\")]",
+      "pattern_src": "r\"^preflight verifies a functional fallback path$\"",
+      "regex": "r\"^preflight verifies a functional fallback path$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^preflight verifies a functional fallback path$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/rescue_aliases.rs",
+      "line": 10,
+      "function": "then_rescue_profile_available",
+      "attr": "#[then(regex = r\"^a rescue profile remains available for recovery$\")]",
+      "pattern_src": "r\"^a rescue profile remains available for recovery$\"",
+      "regex": "r\"^a rescue profile remains available for recovery$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^a rescue profile remains available for recovery$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 6,
+      "function": "given_switchyard_smoke_require",
+      "attr": "#[given(regex = r\"^a Switchyard with SmokePolicy Require$\")]",
+      "pattern_src": "r\"^a Switchyard with SmokePolicy Require$\"",
+      "regex": "r\"^a Switchyard with SmokePolicy Require$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a Switchyard with SmokePolicy Require$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 11,
+      "function": "given_failing_smoke_runner",
+      "attr": "#[given(regex = r\"^a failing SmokeTestRunner$\")]",
+      "pattern_src": "r\"^a failing SmokeTestRunner$\"",
+      "regex": "r\"^a failing SmokeTestRunner$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a failing SmokeTestRunner$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 34,
+      "function": "then_smoke_detects_failure",
+      "attr": "#[then(regex = r\"^the smoke suite runs and detects the failure$\")]",
+      "pattern_src": "r\"^the smoke suite runs and detects the failure$\"",
+      "regex": "r\"^the smoke suite runs and detects the failure$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the smoke suite runs and detects the failure$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 52,
+      "function": "then_auto_rollback_occurs",
+      "attr": "#[then(regex = r\"^automatic rollback occurs unless policy explicitly disables it$\")]",
+      "pattern_src": "r\"^automatic rollback occurs unless policy explicitly disables it$\"",
+      "regex": "r\"^automatic rollback occurs unless policy explicitly disables it$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^automatic rollback occurs unless policy explicitly disables it$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 64,
+      "function": "given_configured_smoke_runner",
+      "attr": "#[given(regex = r\"^a configured SmokeTestRunner$\")]",
+      "pattern_src": "r\"^a configured SmokeTestRunner$\"",
+      "regex": "r\"^a configured SmokeTestRunner$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a configured SmokeTestRunner$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 76,
+      "function": "given_auto_rollback_enabled",
+      "attr": "#[given(regex = r\"^auto_rollback is enabled$\")]",
+      "pattern_src": "r\"^auto_rollback is enabled$\"",
+      "regex": "r\"^auto_rollback is enabled$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^auto_rollback is enabled$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 111,
+      "function": "given_smoke_command_will_fail",
+      "attr": "#[given(regex = r\"^at least one smoke command will fail with a non-zero exit$\")]",
+      "pattern_src": "r\"^at least one smoke command will fail with a non-zero exit$\"",
+      "regex": "r\"^at least one smoke command will fail with a non-zero exit$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^at least one smoke command will fail with a non-zero exit$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 122,
+      "function": "then_minimal_smoke_runs",
+      "attr": "#[then(regex = r\"^the minimal smoke suite runs after apply$\")]",
+      "pattern_src": "r\"^the minimal smoke suite runs after apply$\"",
+      "regex": "r\"^the minimal smoke suite runs after apply$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the minimal smoke suite runs after apply$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 140,
+      "function": "then_apply_fails_smoke",
+      "attr": "#[then(regex = r\"^apply fails with error_id=E_SMOKE and exit_code=80$\")]",
+      "pattern_src": "r\"^apply fails with error_id=E_SMOKE and exit_code=80$\"",
+      "regex": "r\"^apply fails with error_id=E_SMOKE and exit_code=80$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^apply fails with error_id=E_SMOKE and exit_code=80$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/feature_gaps/smoke.rs",
+      "line": 154,
+      "function": "then_executed_actions_rolled_back",
+      "attr": "#[then(regex = r\"^executed actions are rolled back automatically$\")]",
+      "pattern_src": "r\"^executed actions are rolled back automatically$\"",
+      "regex": "r\"^executed actions are rolled back automatically$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^executed actions are rolled back automatically$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 8,
+      "function": "given_with_lock",
+      "attr": "#[given(regex = r\"^a production deployment with a LockManager$\")]",
+      "pattern_src": "r\"^a production deployment with a LockManager$\"",
+      "regex": "r\"^a production deployment with a LockManager$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a production deployment with a LockManager$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 22,
+      "function": "given_other_process_holds_lock",
+      "attr": "#[given(regex = r\"^another process holds the lock$\")]",
+      "pattern_src": "r\"^another process holds the lock$\"",
+      "regex": "r\"^another process holds the lock$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^another process holds the lock$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 27,
+      "function": "given_other_process_holds_lock_paren",
+      "attr": "#[given(regex = r\"^another process holds the lock \\([^)]*\\)$\")]",
+      "pattern_src": "r\"^another process holds the lock \\([^)]*\\)$\"",
+      "regex": "r\"^another process holds the lock \\([^)]*\\)$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given(regex = r\"^another process holds the lock \\([^)]*\\)$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 32,
+      "function": "then_failure_locking_alias",
+      "attr": "#[then(regex = r\"^the failure is emitted with error_id=E_LOCKING and exit_code=30$\")]",
+      "pattern_src": "r\"^the failure is emitted with error_id=E_LOCKING and exit_code=30$\"",
+      "regex": "r\"^the failure is emitted with error_id=E_LOCKING and exit_code=30$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the failure is emitted with error_id=E_LOCKING and exit_code=30$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 37,
+      "function": "then_bounded_wait_timeout",
+      "attr": "#[then(",
+      "pattern_src": "r\"^lock acquisition uses a bounded wait and times out with E_LOCKING when exceeded$\"",
+      "regex": "r\"^lock acquisition uses a bounded wait and times out with E_LOCKING when exceeded$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 46,
+      "function": "given_with_lock_alias",
+      "attr": "#[given(regex = r\"^a Switchyard built with a LockManager$\")]",
+      "pattern_src": "r\"^a Switchyard built with a LockManager$\"",
+      "regex": "r\"^a Switchyard built with a LockManager$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a Switchyard built with a LockManager$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 51,
+      "function": "given_without_lock",
+      "attr": "#[given(regex = r\"^a development environment without a LockManager$\")]",
+      "pattern_src": "r\"^a development environment without a LockManager$\"",
+      "regex": "r\"^a development environment without a LockManager$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a development environment without a LockManager$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 58,
+      "function": "given_without_lock_alias",
+      "attr": "#[given(regex = r\"^a Switchyard without a LockManager$\")]",
+      "pattern_src": "r\"^a Switchyard without a LockManager$\"",
+      "regex": "r\"^a Switchyard without a LockManager$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a Switchyard without a LockManager$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 63,
+      "function": "when_two_apply_overlap",
+      "attr": "#[when(regex = r\"^two apply\\(\\) calls overlap in time$\")]",
+      "pattern_src": "r\"^two apply\\(\\) calls overlap in time$\"",
+      "regex": "r\"^two apply\\(\\) calls overlap in time$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r\"^two apply\\(\\) calls overlap in time$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 103,
+      "function": "when_both_started",
+      "attr": "#[when(regex = r\"^both apply\\(\\) are started in Commit mode$\")]",
+      "pattern_src": "r\"^both apply\\(\\) are started in Commit mode$\"",
+      "regex": "r\"^both apply\\(\\) are started in Commit mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r\"^both apply\\(\\) are started in Commit mode$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 108,
+      "function": "then_lock_wait",
+      "attr": "#[then(regex = r\"^facts record lock_wait_ms when available$\")]",
+      "pattern_src": "r\"^facts record lock_wait_ms when available$\"",
+      "regex": "r\"^facts record lock_wait_ms when available$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^facts record lock_wait_ms when available$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 117,
+      "function": "then_warn_no_lock",
+      "attr": "#[then(regex = r\"^a WARN fact is emitted stating concurrent apply is unsupported$\")]",
+      "pattern_src": "r\"^a WARN fact is emitted stating concurrent apply is unsupported$\"",
+      "regex": "r\"^a WARN fact is emitted stating concurrent apply is unsupported$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^a WARN fact is emitted stating concurrent apply is unsupported$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 137,
+      "function": "given_other_holds_lock",
+      "attr": "#[given(regex = r\"^another apply\\(\\) is already holding the lock$\")]",
+      "pattern_src": "r\"^another apply\\(\\) is already holding the lock$\"",
+      "regex": "r\"^another apply\\(\\) is already holding the lock$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given(regex = r\"^another apply\\(\\) is already holding the lock$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 149,
+      "function": "given_short_timeout",
+      "attr": "#[given(regex = r\"^a LockManager configured with a short timeout$\")]",
+      "pattern_src": "r\"^a LockManager configured with a short timeout$\"",
+      "regex": "r\"^a LockManager configured with a short timeout$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a LockManager configured with a short timeout$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 164,
+      "function": "then_locking_failure",
+      "attr": "#[then(regex = r\"^the stage fails with error_id=E_LOCKING and exit_code=30$\")]",
+      "pattern_src": "r\"^the stage fails with error_id=E_LOCKING and exit_code=30$\"",
+      "regex": "r\"^the stage fails with error_id=E_LOCKING and exit_code=30$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the stage fails with error_id=E_LOCKING and exit_code=30$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 178,
+      "function": "given_contended",
+      "attr": "#[given(regex = r\"^a contended lock with retries$\")]",
+      "pattern_src": "r\"^a contended lock with retries$\"",
+      "regex": "r\"^a contended lock with retries$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a contended lock with retries$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/locks_steps.rs",
+      "line": 209,
+      "function": "then_lock_attempts",
+      "attr": "#[then(regex = r\"^apply.attempt includes lock_attempts approximating retry count$\")]",
+      "pattern_src": "r\"^apply.attempt includes lock_attempts approximating retry count$\"",
+      "regex": "r\"^apply.attempt includes lock_attempts approximating retry count$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^apply.attempt includes lock_attempts approximating retry count$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 8,
+      "function": "then_schema_v2",
+      "attr": "#[then(regex = r\"^each fact carries schema_version=2$\")]",
+      "pattern_src": "r\"^each fact carries schema_version=2$\"",
+      "regex": "r\"^each fact carries schema_version=2$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^each fact carries schema_version=2$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 15,
+      "function": "then_validate_schema",
+      "attr": "#[then(",
+      "pattern_src": "r\"^(every|each) stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json$\"",
+      "regex": "r\"^(every|each) stage emits a JSON fact that validates against /SPEC/audit_event.v2.schema.json$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 38,
+      "function": "then_emitted_byte_identical",
+      "attr": "#[then(regex = r\"^emitted facts are byte-identical after timestamp redaction$\")]",
+      "pattern_src": "r\"^emitted facts are byte-identical after timestamp redaction$\"",
+      "regex": "r\"^emitted facts are byte-identical after timestamp redaction$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^emitted facts are byte-identical after timestamp redaction$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 43,
+      "function": "then_apply_result_hashes",
+      "attr": "#[then(regex = r\"^apply\\.result includes hash_alg=sha256 and both before_hash and after_hash$\")]",
+      "pattern_src": "r\"^apply\\.result includes hash_alg=sha256 and both before_hash and after_hash$\"",
+      "regex": "r\"^apply\\.result includes hash_alg=sha256 and both before_hash and after_hash$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^apply\\.result includes hash_alg=sha256 and both before_hash and after_hash$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 48,
+      "function": "given_failing_preflight",
+      "attr": "#[given(regex = r\"^a failing preflight or apply stage$\")]",
+      "pattern_src": "r\"^a failing preflight or apply stage$\"",
+      "regex": "r\"^a failing preflight or apply stage$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a failing preflight or apply stage$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 66,
+      "function": "when_inspect_summary",
+      "attr": "#[when(regex = r\"^I inspect summary events$\")]",
+      "pattern_src": "r\"^I inspect summary events$\"",
+      "regex": "r\"^I inspect summary events$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I inspect summary events$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 71,
+      "function": "then_summary_error_chain",
+      "attr": "#[then(regex = r\"^summary_error_ids is present and ordered from specific to general$\")]",
+      "pattern_src": "r\"^summary_error_ids is present and ordered from specific to general$\"",
+      "regex": "r\"^summary_error_ids is present and ordered from specific to general$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^summary_error_ids is present and ordered from specific to general$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 84,
+      "function": "when_inspect_apply_result",
+      "attr": "#[when(regex = r\"^I inspect apply\\.result$\")]",
+      "pattern_src": "r\"^I inspect apply\\.result$\"",
+      "regex": "r\"^I inspect apply\\.result$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I inspect apply\\.result$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 87,
+      "function": "then_no_secrets",
+      "attr": "#[then(regex = r\"^no unmasked secret values appear in any emitted fact or (?:log )?sink$\")]",
+      "pattern_src": "r\"^no unmasked secret values appear in any emitted fact or (?:log )?sink$\"",
+      "regex": "r\"^no unmasked secret values appear in any emitted fact or (?:log )?sink$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^no unmasked secret values appear in any emitted fact or (?:log )?sink$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 109,
+      "function": "given_env_sensitive_alias",
+      "attr": "#[given(regex = r\"^environment-derived sensitive values might appear in facts$\")]",
+      "pattern_src": "r\"^environment-derived sensitive values might appear in facts$\"",
+      "regex": "r\"^environment-derived sensitive values might appear in facts$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^environment-derived sensitive values might appear in facts$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 114,
+      "function": "then_provenance_fields",
+      "attr": "#[then(regex = r\"^facts include origin, helper, uid, gid, pkg, and env_sanitized=true$\")]",
+      "pattern_src": "r\"^facts include origin, helper, uid, gid, pkg, and env_sanitized=true$\"",
+      "regex": "r\"^facts include origin, helper, uid, gid, pkg, and env_sanitized=true$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^facts include origin, helper, uid, gid, pkg, and env_sanitized=true$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 129,
+      "function": "when_inspect_preflight",
+      "attr": "#[when(regex = r\"^I inspect preflight and emitted facts$\")]",
+      "pattern_src": "r\"^I inspect preflight and emitted facts$\"",
+      "regex": "r\"^I inspect preflight and emitted facts$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I inspect preflight and emitted facts$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 141,
+      "function": "given_rename_completes",
+      "attr": "#[given(regex = r\"^a rename completes for a staged swap$\")]",
+      "pattern_src": "r\"^a rename completes for a staged swap$\"",
+      "regex": "r\"^a rename completes for a staged swap$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a rename completes for a staged swap$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 149,
+      "function": "when_engine_fsyncs",
+      "attr": "#[when(regex = r\"^the engine performs fsync on the parent directory$\")]",
+      "pattern_src": "r\"^the engine performs fsync on the parent directory$\"",
+      "regex": "r\"^the engine performs fsync on the parent directory$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^the engine performs fsync on the parent directory$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 152,
+      "function": "then_fsync_recorded",
+      "attr": "#[then(regex = r\"^the fsync occurs within 50ms of the rename and is recorded in telemetry$\")]",
+      "pattern_src": "r\"^the fsync occurs within 50ms of the rename and is recorded in telemetry$\"",
+      "regex": "r\"^the fsync occurs within 50ms of the rename and is recorded in telemetry$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the fsync occurs within 50ms of the rename and is recorded in telemetry$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/observability_steps.rs",
+      "line": 167,
+      "function": "then_fsync_warn",
+      "attr": "#[then(regex = r\"^if the fsync duration exceeds 50ms the fact is recorded with severity=warn$\")]",
+      "pattern_src": "r\"^if the fsync duration exceeds 50ms the fact is recorded with severity=warn$\"",
+      "regex": "r\"^if the fsync duration exceeds 50ms the fact is recorded with severity=warn$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^if the fsync duration exceeds 50ms the fact is recorded with severity=warn$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 7,
+      "function": "given_symlink",
+      "attr": "#[given(regex = r\"^(/.+) is a symlink to (.+)$\")]",
+      "pattern_src": "r\"^(/.+) is a symlink to (.+)$\"",
+      "regex": "r\"^(/.+) is a symlink to (.+)$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1",
+        "2"
+      ],
+      "notes": "attribute: #[given(regex = r\"^(/.+) is a symlink to (.+)$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 12,
+      "function": "given_plan_min",
+      "attr": "#[given(regex = r\"^a plan with at least one action$\")]",
+      "pattern_src": "r\"^a plan with at least one action$\"",
+      "regex": "r\"^a plan with at least one action$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan with at least one action$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 25,
+      "function": "given_exdev_env",
+      "attr": "#[given(regex = r\"^the target and staging directories reside on different filesystems$\")]",
+      "pattern_src": "r\"^the target and staging directories reside on different filesystems$\"",
+      "regex": "r\"^the target and staging directories reside on different filesystems$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the target and staging directories reside on different filesystems$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 35,
+      "function": "given_smoke",
+      "attr": "#[given(regex = r\"^the minimal post-apply smoke suite is configured$\")]",
+      "pattern_src": "r\"^the minimal post-apply smoke suite is configured$\"",
+      "regex": "r\"^the minimal post-apply smoke suite is configured$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the minimal post-apply smoke suite is configured$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 51,
+      "function": "when_plan_swap",
+      "attr": "#[when(regex = r\"^I plan a swap to (\\S+)$\")]",
+      "pattern_src": "r\"^I plan a swap to (\\S+)$\"",
+      "regex": "r\"^I plan a swap to (\\S+)$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r\"^I plan a swap to (\\S+)$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 61,
+      "function": "given_plan_mutates",
+      "attr": "#[given(regex = r\"^a plan that mutates a file$\")]",
+      "pattern_src": "r\"^a plan that mutates a file$\"",
+      "regex": "r\"^a plan that mutates a file$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan that mutates a file$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 75,
+      "function": "given_plan_env_sensitive",
+      "attr": "#[given(regex = r\"^a plan with environment-derived values that may be sensitive$\")]",
+      "pattern_src": "r\"^a plan with environment-derived values that may be sensitive$\"",
+      "regex": "r\"^a plan with environment-derived values that may be sensitive$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan with environment-derived values that may be sensitive$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/plan_steps.rs",
+      "line": 83,
+      "function": "given_plan_external_helper",
+      "attr": "#[given(regex = r\"^a plan that uses an external helper$\")]",
+      "pattern_src": "r\"^a plan that uses an external helper$\"",
+      "regex": "r\"^a plan that uses an external helper$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan that uses an external helper$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/preflight_steps.rs",
+      "line": 8,
+      "function": "when_preflight",
+      "attr": "#[when(regex = r\"^I run preflight$\")]",
+      "pattern_src": "r\"^I run preflight$\"",
+      "regex": "r\"^I run preflight$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run preflight$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/preflight_steps.rs",
+      "line": 16,
+      "function": "when_preflight_both",
+      "attr": "#[when(regex = r\"^I run preflight in DryRun and Commit modes$\")]",
+      "pattern_src": "r\"^I run preflight in DryRun and Commit modes$\"",
+      "regex": "r\"^I run preflight in DryRun and Commit modes$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I run preflight in DryRun and Commit modes$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/preflight_steps.rs",
+      "line": 26,
+      "function": "then_plan_preflight_identical",
+      "attr": "#[then(",
+      "pattern_src": "r\"^the emitted facts for plan and preflight are byte-identical after timestamp redaction$\"",
+      "regex": "r\"^the emitted facts for plan and preflight are byte-identical after timestamp redaction$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/preflight_steps.rs",
+      "line": 61,
+      "function": "then_preflight_yaml_identical",
+      "attr": "#[then(regex = r\"^the exported preflight YAML rows are byte-identical between runs$\")]",
+      "pattern_src": "r\"^the exported preflight YAML rows are byte-identical between runs$\"",
+      "regex": "r\"^the exported preflight YAML rows are byte-identical between runs$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the exported preflight YAML rows are byte-identical between runs$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 6,
+      "function": "given_rescue_configured",
+      "attr": "#[given(regex = r\"^a configured rescue profile consisting of backup symlinks$\")]",
+      "pattern_src": "r\"^a configured rescue profile consisting of backup symlinks$\"",
+      "regex": "r\"^a configured rescue profile consisting of backup symlinks$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a configured rescue profile consisting of backup symlinks$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 16,
+      "function": "given_rescue_system",
+      "attr": "#[given(regex = r\"^a system with configured rescue profile$\")]",
+      "pattern_src": "r\"^a system with configured rescue profile$\"",
+      "regex": "r\"^a system with configured rescue profile$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a system with configured rescue profile$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 21,
+      "function": "given_gnu_subset_ok",
+      "attr": "#[given(regex = r\"^no BusyBox but GNU core utilities are present on PATH$\")]",
+      "pattern_src": "r\"^no BusyBox but GNU core utilities are present on PATH$\"",
+      "regex": "r\"^no BusyBox but GNU core utilities are present on PATH$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^no BusyBox but GNU core utilities are present on PATH$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 26,
+      "function": "given_fallback_present",
+      "attr": "#[given(regex = r\"^at least one fallback binary set \\(GNU or BusyBox\\) is installed and on PATH$\")]",
+      "pattern_src": "r\"^at least one fallback binary set \\(GNU or BusyBox\\) is installed and on PATH$\"",
+      "regex": "r\"^at least one fallback binary set \\(GNU or BusyBox\\) is installed and on PATH$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given(regex = r\"^at least one fallback binary set \\(GNU or BusyBox\\) is installed and on PATH$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 36,
+      "function": "then_rescue_recorded",
+      "attr": "#[then(regex = r\"^the presence of a rescue symlink set is recorded$\")]",
+      "pattern_src": "r\"^the presence of a rescue symlink set is recorded$\"",
+      "regex": "r\"^the presence of a rescue symlink set is recorded$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the presence of a rescue symlink set is recorded$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 50,
+      "function": "then_rescue_fallback",
+      "attr": "#[then(regex = r\"^preflight verifies at least one functional fallback path is executable$\")]",
+      "pattern_src": "r\"^preflight verifies at least one functional fallback path is executable$\"",
+      "regex": "r\"^preflight verifies at least one functional fallback path is executable$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^preflight verifies at least one functional fallback path is executable$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 66,
+      "function": "given_multiple_backups",
+      "attr": "#[given(regex = r\"^a target with multiple backup artifacts$\")]",
+      "pattern_src": "r\"^a target with multiple backup artifacts$\"",
+      "regex": "r\"^a target with multiple backup artifacts$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a target with multiple backup artifacts$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 82,
+      "function": "given_eligible_old_backups",
+      "attr": "#[given(regex = r\"^eligible backups older than retention limits$\")]",
+      "pattern_src": "r\"^eligible backups older than retention limits$\"",
+      "regex": "r\"^eligible backups older than retention limits$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^eligible backups older than retention limits$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 90,
+      "function": "when_prune_backups",
+      "attr": "#[when(regex = r\"^I prune backups under policy$\")]",
+      "pattern_src": "r\"^I prune backups under policy$\"",
+      "regex": "r\"^I prune backups under policy$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I prune backups under policy$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 99,
+      "function": "then_newest_retained",
+      "attr": "#[then(regex = r\"^the newest backup is never deleted$\")]",
+      "pattern_src": "r\"^the newest backup is never deleted$\"",
+      "regex": "r\"^the newest backup is never deleted$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the newest backup is never deleted$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 141,
+      "function": "then_prune_deletions_complete",
+      "attr": "#[then(regex = r\"^deletions remove payload and sidecar pairs and fsync the parent directory$\")]",
+      "pattern_src": "r\"^deletions remove payload and sidecar pairs and fsync the parent directory$\"",
+      "regex": "r\"^deletions remove payload and sidecar pairs and fsync the parent directory$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^deletions remove payload and sidecar pairs and fsync the parent directory$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 157,
+      "function": "given_prune_completed",
+      "attr": "#[given(regex = r\"^a prune operation completed$\")]",
+      "pattern_src": "r\"^a prune operation completed$\"",
+      "regex": "r\"^a prune operation completed$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a prune operation completed$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 163,
+      "function": "when_inspect_emitted",
+      "attr": "#[when(regex = r\"^I inspect emitted facts$\")]",
+      "pattern_src": "r\"^I inspect emitted facts$\"",
+      "regex": "r\"^I inspect emitted facts$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I inspect emitted facts$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rescue_steps.rs",
+      "line": 166,
+      "function": "then_prune_event_has_fields",
+      "attr": "#[then(",
+      "pattern_src": "r\"^a prune\\.result event includes path, policy_used, pruned_count, and retained_count$\"",
+      "regex": "r\"^a prune\\.result event includes path, policy_used, pruned_count, and retained_count$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 14,
+      "function": "given_three_actions_b_fails",
+      "attr": "#[given(regex = r\"^a plan with three actions A, B, C where B will fail$\")]",
+      "pattern_src": "r\"^a plan with three actions A, B, C where B will fail$\"",
+      "regex": "r\"^a plan with three actions A, B, C where B will fail$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan with three actions A, B, C where B will fail$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 90,
+      "function": "when_apply_commit",
+      "attr": "#[when(regex = r\"^I apply the plan in Commit mode$\")]",
+      "pattern_src": "r\"^I apply the plan in Commit mode$\"",
+      "regex": "r\"^I apply the plan in Commit mode$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I apply the plan in Commit mode$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 98,
+      "function": "then_rollback_of_a",
+      "attr": "#[then(regex = r\"^the engine rolls back A in reverse order automatically$\")]",
+      "pattern_src": "r\"^the engine rolls back A in reverse order automatically$\"",
+      "regex": "r\"^the engine rolls back A in reverse order automatically$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the engine rolls back A in reverse order automatically$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 135,
+      "function": "then_partial_restoration_if_any",
+      "attr": "#[then(regex = r\"^emitted facts include partial restoration state if any rollback step fails$\")]",
+      "pattern_src": "r\"^emitted facts include partial restoration state if any rollback step fails$\"",
+      "regex": "r\"^emitted facts include partial restoration state if any rollback step fails$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^emitted facts include partial restoration state if any rollback step fails$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 158,
+      "function": "given_replace_then_restore",
+      "attr": "#[given(regex = r\"^a plan that replaces a symlink then restores it$\")]",
+      "pattern_src": "r\"^a plan that replaces a symlink then restores it$\"",
+      "regex": "r\"^a plan that replaces a symlink then restores it$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a plan that replaces a symlink then restores it$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 183,
+      "function": "when_apply_and_rollback_twice",
+      "attr": "#[when(regex = r\"^I apply the plan and then apply a rollback plan twice$\")]",
+      "pattern_src": "r\"^I apply the plan and then apply a rollback plan twice$\"",
+      "regex": "r\"^I apply the plan and then apply a rollback plan twice$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I apply the plan and then apply a rollback plan twice$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/rollback_steps.rs",
+      "line": 200,
+      "function": "then_topology_identical",
+      "attr": "#[then(regex = r\"^the final link/file topology is identical to the prior state$\")]",
+      "pattern_src": "r\"^the final link/file topology is identical to the prior state$\"",
+      "regex": "r\"^the final link/file topology is identical to the prior state$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the final link/file topology is identical to the prior state$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 9,
+      "function": "then_preflight_fails_unless_override",
+      "attr": "#[then(regex = r\"^preflight fails closed unless an explicit policy override is present$\")]",
+      "pattern_src": "r\"^preflight fails closed unless an explicit policy override is present$\"",
+      "regex": "r\"^preflight fails closed unless an explicit policy override is present$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^preflight fails closed unless an explicit policy override is present$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 26,
+      "function": "then_preservation_fail_unless_override",
+      "attr": "#[then(regex = r\"^preflight stops with a fail-closed decision unless an explicit override is set$\")]",
+      "pattern_src": "r\"^preflight stops with a fail-closed decision unless an explicit override is set$\"",
+      "regex": "r\"^preflight stops with a fail-closed decision unless an explicit override is set$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^preflight stops with a fail-closed decision unless an explicit override is set$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 72,
+      "function": "given_candidate_path_unsafe",
+      "attr": "#[given(regex = r\"^a candidate path containing \\.\\.\\s*segments or symlink escapes$\")]",
+      "pattern_src": "r\"^a candidate path containing \\.\\.\\s*segments or symlink escapes$\"",
+      "regex": "r\"^a candidate path containing \\.\\.\\s*segments or symlink escapes$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a candidate path containing \\.\\.\\s*segments or symlink escapes$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 78,
+      "function": "when_construct_safepath",
+      "attr": "#[when(regex = r\"^I attempt to construct a SafePath$\")]",
+      "pattern_src": "r\"^I attempt to construct a SafePath$\"",
+      "regex": "r\"^I attempt to construct a SafePath$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I attempt to construct a SafePath$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 95,
+      "function": "then_safepath_rejects",
+      "attr": "#[then(regex = r\"^SafePath normalization rejects the path as unsafe$\")]",
+      "pattern_src": "r\"^SafePath normalization rejects the path as unsafe$\"",
+      "regex": "r\"^SafePath normalization rejects the path as unsafe$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^SafePath normalization rejects the path as unsafe$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 104,
+      "function": "given_strict_ownership_policy",
+      "attr": "#[given(regex = r\"^strict_ownership=true policy$\")]",
+      "pattern_src": "r\"^strict_ownership=true policy$\"",
+      "regex": "r\"^strict_ownership=true policy$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^strict_ownership=true policy$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 110,
+      "function": "given_target_not_pkg_owned",
+      "attr": "#[given(regex = r\"^a target that is not package-owned per the ownership oracle$\")]",
+      "pattern_src": "r\"^a target that is not package-owned per the ownership oracle$\"",
+      "regex": "r\"^a target that is not package-owned per the ownership oracle$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a target that is not package-owned per the ownership oracle$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 141,
+      "function": "then_preflight_fails_closed",
+      "attr": "#[then(regex = r\"^preflight fails closed$\")]",
+      "pattern_src": "r\"^preflight fails closed$\"",
+      "regex": "r\"^preflight fails closed$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^preflight fails closed$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 157,
+      "function": "given_preservation_required",
+      "attr": "#[given(",
+      "pattern_src": "r\"^the policy requires preserving owner, mode, timestamps, xattrs, ACLs, and caps$\"",
+      "regex": "r\"^the policy requires preserving owner, mode, timestamps, xattrs, ACLs, and caps$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given("
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 166,
+      "function": "given_env_lacks_support",
+      "attr": "#[given(regex = r\"^the filesystem or environment lacks support for one or more of these$\")]",
+      "pattern_src": "r\"^the filesystem or environment lacks support for one or more of these$\"",
+      "regex": "r\"^the filesystem or environment lacks support for one or more of these$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the filesystem or environment lacks support for one or more of these$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 173,
+      "function": "given_backup_sidecar_with_payload",
+      "attr": "#[given(regex = r\"^a backup sidecar v2 with payload present$\")]",
+      "pattern_src": "r\"^a backup sidecar v2 with payload present$\"",
+      "regex": "r\"^a backup sidecar v2 with payload present$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a backup sidecar v2 with payload present$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 205,
+      "function": "when_restore_with_integrity",
+      "attr": "#[when(regex = r\"^I restore under policy requiring sidecar integrity$\")]",
+      "pattern_src": "r\"^I restore under policy requiring sidecar integrity$\"",
+      "regex": "r\"^I restore under policy requiring sidecar integrity$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [],
+      "notes": "attribute: #[when(regex = r\"^I restore under policy requiring sidecar integrity$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 219,
+      "function": "then_restore_fails_on_mismatch",
+      "attr": "#[then(regex = r\"^the engine verifies the payload hash and fails restore on mismatch$\")]",
+      "pattern_src": "r\"^the engine verifies the payload hash and fails restore on mismatch$\"",
+      "regex": "r\"^the engine verifies the payload hash and fails restore on mismatch$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^the engine verifies the payload hash and fails restore on mismatch$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/safety_preconditions_steps.rs",
+      "line": 238,
+      "function": "given_world_writable_source",
+      "attr": "#[given(regex = r\"^a source file that is not root-owned or is world-writable$\")]",
+      "pattern_src": "r\"^a source file that is not root-owned or is world-writable$\"",
+      "regex": "r\"^a source file that is not root-owned or is world-writable$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a source file that is not root-owned or is world-writable$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/thread_safety_steps.rs",
+      "line": 9,
+      "function": "given_core_types",
+      "attr": "#[given(regex = r\"^the Switchyard core types$\")]",
+      "pattern_src": "r\"^the Switchyard core types$\"",
+      "regex": "r\"^the Switchyard core types$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^the Switchyard core types$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/thread_safety_steps.rs",
+      "line": 19,
+      "function": "then_core_types_send_sync",
+      "attr": "#[then(regex = r\"^they are Send \\+ Sync for safe use across threads$\")]",
+      "pattern_src": "r\"^they are Send \\+ Sync for safe use across threads$\"",
+      "regex": "r\"^they are Send \\+ Sync for safe use across threads$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^they are Send \\+ Sync for safe use across threads$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/thread_safety_steps.rs",
+      "line": 24,
+      "function": "given_two_threads",
+      "attr": "#[given(regex = r\"^two threads invoking apply\\(\\) concurrently$\")]",
+      "pattern_src": "r\"^two threads invoking apply\\(\\) concurrently$\"",
+      "regex": "r\"^two threads invoking apply\\(\\) concurrently$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[given(regex = r\"^two threads invoking apply\\(\\) concurrently$\")]"
+    },
+    {
+      "kind": "Given",
+      "file": "cargo/switchyard/tests/steps/thread_safety_steps.rs",
+      "line": 30,
+      "function": "given_lock_manager_configured",
+      "attr": "#[given(regex = r\"^a LockManager is configured$\")]",
+      "pattern_src": "r\"^a LockManager is configured$\"",
+      "regex": "r\"^a LockManager is configured$\"",
+      "tags": [
+        "Given"
+      ],
+      "captures": [],
+      "notes": "attribute: #[given(regex = r\"^a LockManager is configured$\")]"
+    },
+    {
+      "kind": "When",
+      "file": "cargo/switchyard/tests/steps/thread_safety_steps.rs",
+      "line": 35,
+      "function": "when_both_apply_run",
+      "attr": "#[when(regex = r\"^both apply\\(\\) calls run$\")]",
+      "pattern_src": "r\"^both apply\\(\\) calls run$\"",
+      "regex": "r\"^both apply\\(\\) calls run$\"",
+      "tags": [
+        "When"
+      ],
+      "captures": [
+        "1"
+      ],
+      "notes": "attribute: #[when(regex = r\"^both apply\\(\\) calls run$\")]"
+    },
+    {
+      "kind": "Then",
+      "file": "cargo/switchyard/tests/steps/thread_safety_steps.rs",
+      "line": 40,
+      "function": "then_mutual_exclusion",
+      "attr": "#[then(regex = r\"^only one mutator proceeds at a time under the lock$\")]",
+      "pattern_src": "r\"^only one mutator proceeds at a time under the lock$\"",
+      "regex": "r\"^only one mutator proceeds at a time under the lock$\"",
+      "tags": [
+        "Then"
+      ],
+      "captures": [],
+      "notes": "attribute: #[then(regex = r\"^only one mutator proceeds at a time under the lock$\")]"
+    }
+  ],
+  "stats": {
+    "total": 225,
+    "by_kind": {
+      "Given": 83,
+      "When": 45,
+      "Then": 97
+    },
+    "ambiguous": 11
+  }
+}
