@@ -21,6 +21,54 @@ pub fn dest_dir_path() -> PathBuf {
     PathBuf::from(DEST_DIR)
 }
 
+/// Critical subset of coreutils considered necessary for a functional system
+/// (non-SELinux). Used by parity gates.
+pub fn coreutils_critical_set() -> Vec<String> {
+    [
+        "ls",
+        "cp",
+        "mv",
+        "rm",
+        "mkdir",
+        "ln",
+        "readlink",
+        "cat",
+        "echo",
+        "date",
+        "touch",
+        "chmod",
+        "chown",
+        "realpath",
+        "mktemp",
+        "paste",
+        "cut",
+        "sort",
+        "uniq",
+        "tr",
+        "wc",
+        "tee",
+        "head",
+        "tail",
+        "env",
+        "printenv",
+        "sleep",
+        "pwd",
+        "basename",
+        "dirname",
+        "test",
+        "true",
+        "false",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+}
+
+/// SELinux-specific applets that may be absent in some uutils builds
+pub fn coreutils_selinux_set() -> Vec<String> {
+    ["chcon", "runcon"].iter().map(|s| s.to_string()).collect()
+}
+
 fn coreutils_full_list() -> Vec<String> {
     [
         "[",
