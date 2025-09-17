@@ -25,7 +25,7 @@ Workflow: `.github/workflows/release-aur.yml`
 
 - Triggers on tags `v*`.
 - Updates `PKGBUILD`'s `pkgver` and `pkgrel`, refreshes checksums with `updpkgsums`, generates `.SRCINFO`, and pushes to the AUR Git repo.
-- Assumes `PKGBUILD` in repo root builds the `oxidizr-arch` crate via `cargo`.
+- Uses centralized packaging at `cargo/oxidizr-arch/packaging/aur/PKGBUILD` which builds the `oxidizr-arch` crate via `cargo` from the GitHub tag tarball.
 
 Required repository secrets:
 
@@ -41,6 +41,7 @@ Manual verification (optional):
 
 ```bash
 # From an Arch/Manjaro/EndeavourOS machine
+cd cargo/oxidizr-arch/packaging/aur
 makepkg --printsrcinfo > .SRCINFO
 updpkgsums
 namcap PKGBUILD

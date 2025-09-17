@@ -37,13 +37,14 @@ jobs:
       - name: Prepare PKGBUILD for tag version
         run: |
           VERSION=${GITHUB_REF_NAME#v}
+          cd cargo/oxidizr-arch/packaging/aur
           sed -i -E "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
           sed -i -E "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
           # Update checksums for the tag tarball
-          sudo -u builder bash -lc 'updpkgsums'
+          sudo -u builder bash -lc 'cd cargo/oxidizr-arch/packaging/aur && updpkgsums'
       - name: Generate .SRCINFO
         run: |
-          sudo -u builder bash -lc 'makepkg --printsrcinfo > .SRCINFO'
+          sudo -u builder bash -lc 'cd cargo/oxidizr-arch/packaging/aur && makepkg --printsrcinfo > .SRCINFO'
       - name: Clone AUR repo
         run: |
           sudo -u builder bash -lc '
@@ -59,7 +60,7 @@ jobs:
           '
       - name: Copy packaging files
         run: |
-          sudo -u builder bash -lc 'cp PKGBUILD .SRCINFO aur-repo/'
+          sudo -u builder bash -lc 'cp cargo/oxidizr-arch/packaging/aur/PKGBUILD cargo/oxidizr-arch/packaging/aur/.SRCINFO aur-repo/'
       - name: Commit and push to AUR
         run: |
           cd aur-repo
