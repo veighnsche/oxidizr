@@ -6,12 +6,13 @@ use switchyard::types::safepath::SafePath;
 use switchyard::types::{ApplyMode, PlanInput, RestoreRequest};
 use switchyard::Switchyard;
 
-use oxidizr_cli_core::{PackageKind, static_fallback_applets, DistroAdapter};
+use crate::adapters::debian::pm_lock_message;
 use crate::adapters::debian_adapter::DebianAdapter;
 use crate::cli::args::Package;
 use crate::fetch::fallback::apt_pkg_name;
 use crate::packages;
 use crate::util::paths::ensure_under_root;
+use oxidizr_cli_core::{static_fallback_applets, DistroAdapter, PackageKind};
 use serde_json::json;
 
 fn distro_pkg_name(pkg: Package) -> &'static str {

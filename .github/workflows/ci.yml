@@ -445,3 +445,57 @@ jobs:
             /tmp/arch_status.json
             /tmp/arch_doctor.json
           if-no-files-found: ignore
+
+  oxidizr-arch-bdd:
+    name: BDD (oxidizr-arch CLI)
+    runs-on: ubuntu-latest
+    needs: oxidizr-arch-smoke
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run oxidizr-arch BDD tests
+        run: |
+          set -euo pipefail
+          cargo check -p oxidizr-arch
+          cargo test -p oxidizr-arch --features bdd -q
+
+  oxidizr-cli-core-bdd:
+    name: BDD (oxidizr-cli-core)
+    runs-on: ubuntu-latest
+    needs: test-unit
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run oxidizr-cli-core BDD tests
+        run: |
+          set -euo pipefail
+          cargo check -p oxidizr-cli-core
+          cargo test -p oxidizr-cli-core --features bdd -q

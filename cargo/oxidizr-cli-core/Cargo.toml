@@ -6,7 +6,25 @@ description = "Common helpers for oxidizr-* CLIs (API builder, prompts)"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/veighnsche/oxidizr-arch"
 keywords = ["cli", "switchyard"]
+readme = "README.md"
+categories = ["command-line-utilities"]
 
 [dependencies]
 switchyard = { package = "switchyard-fs", path = "../switchyard" }
 atty = "0.2"
+
+[features]
+default = []
+bdd = []
+
+[dev-dependencies]
+cucumber = { version = "0.20", features = ["macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tempfile = "3.10"
+regex = "1"
+
+[[test]]
+name = "bdd"
+path = "tests/bdd_main.rs"
+harness = false
+required-features = ["bdd"]

@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
 
-use crate::{DistroAdapter, PackageKind};
 use crate::packages::static_fallback_applets;
+use crate::{DistroAdapter, PackageKind};
 
 /// Interrogate the replacement binary and return the set of applets it claims to support,
 /// intersected with the provided `allow` list. Falls back to `allow` if probing fails
@@ -11,7 +11,8 @@ use crate::packages::static_fallback_applets;
 pub fn discover_applets_with_allow(source_bin: &Path, allow: &[String]) -> Vec<String> {
     fn parse(stdout: &str, allow: &HashSet<&str>) -> Vec<String> {
         let mut out = Vec::new();
-        for token in stdout.split(|c: char| c.is_whitespace() || [',', ';', '|', '/'].contains(&c)) {
+        for token in stdout.split(|c: char| c.is_whitespace() || [',', ';', '|', '/'].contains(&c))
+        {
             let t = token.trim();
             if !t.is_empty() && allow.contains(t) {
                 out.push(t.to_string());
@@ -160,7 +161,9 @@ mod tests {
 
     #[test]
     fn test_resolve_applets_for_use_intersects_with_distro_when_present() {
-        let adapter = MockAdapter { distro: vec!["ls".into(), "cat".into()] };
+        let adapter = MockAdapter {
+            distro: vec!["ls".into(), "cat".into()],
+        };
         let root = Path::new("/");
         // Non-existent so discovery falls back to static allow; intersection should retain only the mocked distro names that are allowed.
         let source_bin = Path::new("/nonexistent/bin");
@@ -172,7 +175,7 @@ mod tests {
     #[test]
     fn test_resolve_applets_for_use_returns_repl_when_no_distro_list() {
         let adapter = MockAdapter { distro: vec![] };
-        let root = Path::new("/" );
+        let root = Path::new("/");
         let source_bin = Path::new("/nonexistent/bin");
         let out = resolve_applets_for_use(&adapter, root, PackageKind::Findutils, source_bin);
         // Fallback returns static set for findutils

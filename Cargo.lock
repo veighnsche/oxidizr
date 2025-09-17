@@ -1422,7 +1422,11 @@ name = "oxidizr-cli-core"
 version = "0.1.0"
 dependencies = [
  "atty",
+ "cucumber",
+ "regex",
  "switchyard-fs",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
