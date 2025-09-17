@@ -1,0 +1,57 @@
+name: Lint & Guardrails (Repo)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Format check
+        run: cargo fmt -- --check
+      - name: Clippy (warnings as errors)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Guardrails (authoritative modules)
+        run: |
+          set -euo pipefail
+          echo "Checking no direct which::which usage outside src/system/worker/fs_ops.rs"
+          if grep -R --line-number --fixed-strings "which::which" src | grep -v "^src/system/worker/fs_ops.rs:"; then
+            echo "ERROR: which::which used outside src/system/worker/fs_ops.rs" >&2
+            exit 1
+          fi
+
+          echo "Checking single logging sink setup (tracing_subscriber::fmt only in src/logging/init.rs)"
+          if grep -R --line-number --fixed-strings "tracing_subscriber::fmt" src | grep -v "^src/logging/init.rs:"; then
+            echo "ERROR: tracing_subscriber::fmt used outside src/logging/init.rs" >&2
+            exit 1
+          fi
+
+          echo "Checking single symlink implementation (std::os::unix::fs::symlink only in src/symlink/ops.rs)"
+          if grep -R --line-number --fixed-strings "std::os::unix::fs::symlink" src | grep -v "^src/symlink/ops.rs:"; then
+            echo "ERROR: std::os::unix::fs::symlink used outside src/symlink/ops.rs" >&2
+            exit 1
+          fi
+
+          # Also check the common alias used in code: unix_fs::symlink
+          if grep -R --line-number --fixed-strings "unix_fs::symlink" src | grep -v "^src/symlink/ops.rs:"; then
+            echo "ERROR: unix_fs::symlink used outside src/symlink/ops.rs" >&2
+            exit 1
+          fi
+
+          echo "Repo guardrails passed"

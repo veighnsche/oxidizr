@@ -1,10 +1,7 @@
-name: mdBook
+name: mdBook (manual)
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   book-build:
