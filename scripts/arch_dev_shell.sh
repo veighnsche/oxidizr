@@ -51,6 +51,7 @@ if ! command -v paru >/dev/null 2>&1; then
 fi
 
 # Drop to an interactive shell for manual testing
+export OXI_AUR_HELPER_USER=builder
 cat <<EOF
 
 You are now in a safe Arch container shell. Suggestions:

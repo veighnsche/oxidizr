@@ -52,13 +52,17 @@ oxidizr-arch status --json | tee /tmp/arch_status.json || true
 
 # Attempt to enable replacements via oxidizr-arch
 # Prefer the "enable" subcommand if present; otherwise try "use" semantics.
+OXI_EVENTS="/tmp/oxidizr_arch_events.jsonl"
+rm -f "$OXI_EVENTS" || true
+# Allow CLI to delegate AUR installs to non-root helper user
+export OXI_AUR_HELPER_USER=builder
 if oxidizr-arch --help 2>&1 | grep -q "enable"; then
-  oxidizr-arch --all --commit enable || true
+  oxidizr-arch --all --commit enable 2>>"$OXI_EVENTS" || true
 elif oxidizr-arch --help 2>&1 | grep -q "use "; then
   # Fall back to package-by-package enable semantics if supported
-  oxidizr-arch --commit use coreutils || true
-  oxidizr-arch --commit use findutils || true
-  oxidizr-arch --commit use sudo || true
+  oxidizr-arch --commit use coreutils 2>>"$OXI_EVENTS" || true
+  oxidizr-arch --commit use findutils 2>>"$OXI_EVENTS" || true
+  oxidizr-arch --commit use sudo 2>>"$OXI_EVENTS" || true
 else
   echo "[info] Neither 'enable' nor 'use' detected in CLI help; skipping enable step"
 fi
@@ -106,4 +110,5 @@ if [ -L "$LS_PATH" ] && [ -n "$TARGET" ] && [ -x "$TARGET" ]; then
 else
   echo "[PROOF] WARN: Replacement not verified (either no symlink or target not executable)."
 fi
+echo "[PROOF] Saved CLI event logs to: $OXI_EVENTS"
 SCRIPT
