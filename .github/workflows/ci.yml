@@ -165,6 +165,48 @@ jobs:
       - name: Run unit tests
         run: cargo test
 
+  provenance-publish:
+    name: Publish Provenance (gh-pages, commit-pinned)
+    runs-on: ubuntu-latest
+    needs: switchyard-provenance
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download provenance ci artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: provenance-ci-${{ github.sha }}
+          path: _pub/ci
+      - name: Download provenance index artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: provenance-index-${{ github.sha }}
+          path: _pub/index
+      - name: Stage commit-pinned payload
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          DEST=_site/provenance/${GITHUB_SHA}
+          mkdir -p "$DEST"
+          # Copy artifacts preserving structure (portable without rsync --mkpath)
+          mkdir -p "$DEST/.provenance"
+          cp -a _pub/ci/. "$DEST/"
+          cp -a _pub/index/. "$DEST/.provenance/"
+          # Ensure front page exists and is referenced by manifest
+          test -f ci/front_page.pml
+          # Emit an index.html placeholder (host service will render Proofdown)
+          echo "<html><body>Commit-pinned artifacts published under provenance/${GITHUB_SHA}/</body></html>" > "$DEST/index.html"
+      - name: Publish to gh-pages under provenance/${{ github.sha }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: _site
+          keep_files: true
+          destination_dir: .
+          publish_branch: provenance
+
   test-ci-runner:
     name: Test CI Runner
     runs-on: ubuntu-latest
@@ -189,6 +231,114 @@ jobs:
         run: |
           set -e
           python3 test_ci_runner.py -p switchyard-fs --nocapture
+
+  switchyard-provenance:
+    name: Provenance Artifacts (Switchyard)
+    runs-on: ubuntu-latest
+    needs: test-unit
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust (stable)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install Python dependencies (PyNaCl for Ed25519)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pynacl
+      - name: Generate Provenance artifacts (tests + coverage + manifest)
+        env:
+          PROVENANCE_ED25519_PRIVATE_KEY_B64: ${{ secrets.PROVENANCE_ED25519_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          python3 cargo/switchyard/scripts/provenance_ci.py
+      - name: Verify manifest digests
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq coreutils
+          MAN=.provenance/manifest.json
+          test -f "$MAN"
+          count_total=$(jq '.artifacts | length' "$MAN")
+          count_ok=0
+          for i in $(seq 0 $((count_total-1))); do
+            path=$(jq -r ".artifacts[$i].path" "$MAN")
+            want=$(jq -r ".artifacts[$i].sha256" "$MAN")
+            got=$(sha256sum "$path" | awk '{print $1}')
+            if [ "$want" != "$got" ]; then
+              echo "Digest mismatch for $path: want=$want got=$got" >&2
+              exit 1
+            fi
+            count_ok=$((count_ok+1))
+          done
+          echo "Verified $count_ok/$count_total artifact digests"
+      - name: Verify manifest signature (if pubkey provided)
+        env:
+          PROVENANCE_ED25519_PUBLIC_KEY_B64: ${{ secrets.PROVENANCE_ED25519_PUBLIC_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PROVENANCE_ED25519_PUBLIC_KEY_B64:-}" ]; then
+            if [ ! -f .provenance/manifest.json.sig ]; then
+              echo "Public key provided but .provenance/manifest.json.sig is missing" >&2
+              exit 1
+            fi
+            python - <<'PY'
+import base64, os, sys
+from pathlib import Path
+try:
+    from nacl.signing import VerifyKey
+except Exception as e:
+    print("PyNaCl not available for signature verification", file=sys.stderr)
+    sys.exit(1)
+man = Path('.provenance/manifest.json').read_text(encoding='utf-8')
+data = man.encode('utf-8')
+sig_b64 = Path('.provenance/manifest.json.sig').read_text(encoding='utf-8').strip()
+sig = base64.b64decode(sig_b64)
+pk_b64 = os.environ.get('PROVENANCE_ED25519_PUBLIC_KEY_B64', '')
+vk = VerifyKey(base64.b64decode(pk_b64))
+try:
+    vk.verify(data, sig)
+    print('Signature OK')
+except Exception as e:
+    print('Signature verification failed:', e, file=sys.stderr)
+    sys.exit(1)
+PY
+          else
+            echo "No public key provided or no signature file; skipping signature verification"
+          fi
+      - name: Upload Provenance artifacts (ci/)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provenance-ci-${{ github.sha }}
+          path: |
+            ci/
+          if-no-files-found: error
+      - name: Upload Provenance manifest (.provenance/)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provenance-index-${{ github.sha }}
+          path: |
+            .provenance/manifest.json*
+          if-no-files-found: error
 
   bdd:
     name: BDD Gating (Switchyard)
