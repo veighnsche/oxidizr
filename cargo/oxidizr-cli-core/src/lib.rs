@@ -34,10 +34,10 @@ pub mod api {
     use switchyard::Switchyard;
 
     pub fn build_api(policy: Policy, lock_path: PathBuf) -> Switchyard<JsonlSink, JsonlSink> {
-        Switchyard::builder(JsonlSink::default(), JsonlSink::default(), policy)
+        Switchyard::builder(JsonlSink, JsonlSink, policy)
             .with_lock_manager(Box::new(FileLockManager::new(lock_path)))
-            .with_smoke_runner(Box::new(DefaultSmokeRunner::default()))
-            .with_ownership_oracle(Box::new(FsOwnershipOracle::default()))
+            .with_smoke_runner(Box::new(DefaultSmokeRunner))
+            .with_ownership_oracle(Box::new(FsOwnershipOracle))
             .build()
     }
 }

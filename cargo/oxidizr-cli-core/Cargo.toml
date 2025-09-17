@@ -10,7 +10,7 @@ readme = "README.md"
 categories = ["command-line-utilities"]
 
 [dependencies]
-switchyard = { package = "switchyard-fs", path = "../switchyard" }
+switchyard = { package = "switchyard-fs", version = "0.1.0" }
 atty = "0.2"
 
 [features]

@@ -43,7 +43,7 @@ pub fn discover_applets_with_allow(source_bin: &Path, allow: &[String]) -> Vec<S
             }
         }
     }
-    allow.iter().cloned().collect()
+    allow.to_vec()
 }
 
 /// Resolve the set of applets to link during `use` for a given package, by

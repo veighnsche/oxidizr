@@ -6,3 +6,8 @@ members = [
 ]
 default-members = ["cargo/switchyard"]
 resolver = "2"
+
+[patch.crates-io]
+# Use local workspace crates during development while allowing publishing with versions
+switchyard-fs = { path = "cargo/switchyard" }
+oxidizr-cli-core = { path = "cargo/oxidizr-cli-core" }
