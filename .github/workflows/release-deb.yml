@@ -50,28 +50,35 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cloudsmith:
-    if: ${{ secrets.CLOUDSMITH_API_KEY != '' && secrets.CLOUDSMITH_OWNER != '' && secrets.CLOUDSMITH_REPO != '' }}
     needs: build-deb
     runs-on: ubuntu-latest
+    env:
+      CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+      CLOUDSMITH_OWNER: ${{ secrets.CLOUDSMITH_OWNER }}
+      CLOUDSMITH_REPO: ${{ secrets.CLOUDSMITH_REPO }}
+      DEBIAN_DISTRIBUTIONS: ${{ secrets.DEBIAN_DISTRIBUTIONS }}
     steps:
       - name: Install Cloudsmith CLI
+        if: ${{ env.CLOUDSMITH_API_KEY != '' && env.CLOUDSMITH_OWNER != '' && env.CLOUDSMITH_REPO != '' }}
         run: |
           python3 -m pip install --upgrade --user cloudsmith-cli
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Download artifact
+        if: ${{ env.CLOUDSMITH_API_KEY != '' && env.CLOUDSMITH_OWNER != '' && env.CLOUDSMITH_REPO != '' }}
         uses: actions/download-artifact@v4
         with:
           name: oxidizr-deb-deb
           path: dist
 
       - name: Push to Cloudsmith (optional)
+        if: ${{ env.CLOUDSMITH_API_KEY != '' && env.CLOUDSMITH_OWNER != '' && env.CLOUDSMITH_REPO != '' }}
         env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-          OWNER: ${{ secrets.CLOUDSMITH_OWNER }}
-          REPO: ${{ secrets.CLOUDSMITH_REPO }}
+          CLOUDSMITH_API_KEY: ${{ env.CLOUDSMITH_API_KEY }}
+          OWNER: ${{ env.CLOUDSMITH_OWNER }}
+          REPO: ${{ env.CLOUDSMITH_REPO }}
           # Comma-separated list of distributions, e.g. "ubuntu/jammy,ubuntu/noble,debian/bookworm"
-          DISTRIBUTIONS: ${{ secrets.DEBIAN_DISTRIBUTIONS }}
+          DISTRIBUTIONS: ${{ env.DEBIAN_DISTRIBUTIONS }}
         run: |
           set -euo pipefail
           for deb in dist/*.deb; do

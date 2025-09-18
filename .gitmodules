@@ -4,3 +4,5 @@
 [submodule "cargo/oxidizr-arch"]
 	path = cargo/oxidizr-arch
 	url = git@github.com:veighnsche/oxidizr-arch.git
+[submodule "switchyard"]
+	branch = main

@@ -41,7 +41,7 @@ This document explains why the `oxidizr-cli-core` crate is suitable for producti
 ## Dependencies and compatibility
 
 - Minimal runtime deps: `switchyard-fs`, `atty`.
-- MSRV pinned: `rust-version = "1.81"` in `Cargo.toml`.
+- MSRV pinned: `rust-version = "1.85"` in `Cargo.toml`.
 - No `unsafe` code in this crate.
 - Unix-focused (Switchyard is Unix/FS centric). Thread-safety derives from Switchyard; this crate holds no global mutable state.
 
