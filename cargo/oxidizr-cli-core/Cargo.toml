@@ -20,7 +20,7 @@ features = []
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-switchyard = { package = "switchyard-fs", version = "0.1.0" }
+switchyard = { package = "switchyard-fs", version = "1.0.0" }
 atty = "0.2"
 
 [features]
