@@ -44,13 +44,13 @@ The crate does not perform privileged operations. It composes the Switchyard API
 
 - `description`, `license`, `repository`, `keywords`, `categories`, `readme`
 - `documentation = "https://docs.rs/oxidizr-cli-core"`
-- `rust-version = "1.85"`
+- `rust-version = "1.89"`
 - Versioned dependency on `switchyard-fs` (no path deps in the published manifest)
 
 ## Versioning & compatibility
 
 - Pre-1.0 SemVer: minor releases may contain breaking changes. Consumers should pin explicitly.
-- MSRV: 1.85 (tested; pinned in `Cargo.toml`)
+- MSRV: 1.89 (tested; pinned in `Cargo.toml`)
 - No `unsafe` usage in this crate.
 
 ## Risks & mitigations

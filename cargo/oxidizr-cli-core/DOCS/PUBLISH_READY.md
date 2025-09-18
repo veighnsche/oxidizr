@@ -8,7 +8,7 @@ This document explains why `oxidizr-cli-core` is ready to publish on crates.io a
   - `name`, `version`, `edition`, `description`, `license`, `repository`, `keywords`, `categories` are set in `cargo/oxidizr-cli-core/Cargo.toml`.
   - `readme = "README.md"` so crates.io renders the crate README.
   - `documentation = "https://docs.rs/oxidizr-cli-core"` so users land on API docs.
-  - `rust-version = "1.81"` (MSRV) is pinned for user expectations and CI.
+  - `rust-version = "1.89"` (MSRV) is pinned for user expectations and CI.
   - Dependency on Switchyard uses a versioned dependency: `switchyard = { package = "switchyard-fs", version = "0.1.0" }`.
   - No path-only or git-only dependencies in the published manifest.
 
